@@ -167,3 +167,30 @@ From `references/triton/third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/LoadStoreOp
 Implication: the *meaning* of “async copy” depends on detailed instruction legality constraints (layout/contiguity/mask alignment). Retargeting this to other hardware requires either:
 - defining a portable async-copy semantic layer with capability/legality checks per backend, or
 - baking per-backend rules throughout the pipeline.
+
+### Triton warp specialization task partitioning depends on NVIDIA-specific ops
+From `references/triton/third_party/nvidia/hopper/lib/Transforms/WarpSpecialization/WSTaskPartition.cpp`:
+
+- `doTaskPartition` searches the function for:
+  - `ttng::WarpGroupDotOp` (NVIDIA-specific warp-group MMA op)
+  - `tt::LoadOp` / `tt::DescriptorLoadOp`
+  - `tt::StoreOp` / `tt::DescriptorStoreOp`
+- It selects producer ops by taking a backward slice from the dot operands and picking expensive loads / descriptor loads.
+- It annotates ops with async task IDs (`setAsyncTaskIds`) which later passes use to outline partitions and build channels.
+- It bails out if user annotations already exist (non-empty async task IDs).
+
+Implication: “warp specialization” is not expressed in a backend-neutral way; its key partitioning signal is a backend-specific op (`WarpGroupDotOp`). Retargeting would require defining an equivalent op or lifting the partitioning criteria into a backend-neutral contract.
+
+### Triton backend reality: per-vendor, per-arch pass pipelines hard-code feature logic
+From `references/triton/third_party/nvidia/backend/compiler.py` (`make_ttgir`) and `references/triton/third_party/amd/backend/compiler.py` (`make_ttgir`):
+
+- NVIDIA backend `make_ttgir` has explicit compute-capability branching that changes the pass pipeline:
+  - for SM80/SM90: runs Hopper warp specialization via `nvidia.passes.hopper.add_hopper_warpspec(...)` then `assign_latencies`, `schedule_loops`, `pipeline`.
+  - for SM100+: adds additional passes: `optimize_accumulator_init`, `hoist_tmem_alloc`, `promote_lhs_to_tmem`, `add_warp_specialize`, `optimize_partition_warps`, `remove_tmem_tokens`, etc.
+  - also includes `tma_lowering` for SM90+.
+- AMD backend `make_ttgir` is a different pipeline (AMD-specific passes and knobs):
+  - scheduling/pipelining decisions depend on `gfx*` arch and flags like `use_async_copy`, `use_block_pingpong`, etc.
+
+Implication: performance-critical features are encoded as backend-specific pass pipelines with arch-dependent conditions. Retargeting to “many hardware targets” means either:
+- a proliferation of similar-but-different pipelines, or
+- creating a more explicit, typed contract layer that lets multiple backends share transformations without duplicating logic.

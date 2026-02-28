@@ -97,6 +97,12 @@ The blog describes an autoWS pipeline with (at least) 6–7 conceptual passes (l
 
 ### 3.2 Concrete code: NV Hopper warp specialization pass + its constraints
 
+Warp specialization is not a single monolithic pass; it is a pipeline of analyses and transforms. Even its *starting point* is NVIDIA-specific:
+
+- Task partitioning relies on `ttng::WarpGroupDotOp` (see `references/triton/third_party/nvidia/hopper/lib/Transforms/WarpSpecialization/WSTaskPartition.cpp`).
+- The transform chooses producer loads by backward-slicing from dot operands and annotates ops with async task IDs that later passes consume.
+
+
 In `triton-lang/triton`, warp specialization lives under NVIDIA/Hopper code:
 
 - Pass driver: `references/triton/third_party/nvidia/hopper/lib/Transforms/WarpSpecialization.cpp`
@@ -114,6 +120,15 @@ These are not merely “implementation details”: they are **semantic and contr
 
 ### 3.3 Concrete code: code partitioning introduces new comm ops and barrier lowering
 
+In addition to code partitioning itself, Triton must materialize async memory movement into real instruction constraints. For example, NVIDIA `cp.async` lowering enforces hard legality constraints (see `references/triton/third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/LoadStoreOpToLLVM.cpp`):
+
+- rejects transfers smaller than 4 bytes,
+- rejects cross-CTA async loads,
+- rejects certain non-trivial block-dimension layouts.
+
+This is a key retargetability lesson: “async copy” is not a portable semantic by default; its legality and performance depend on the backend’s instruction set and memory model.
+
+
 `WSCodePartition.cpp` shows an explicit multi-step pipeline:
 
 - Create buffers per channel
@@ -123,6 +138,12 @@ These are not merely “implementation details”: they are **semantic and contr
 - Special-case TMA lowering
 
 This produces a *new internal program structure*: outlined partitions guarded by warp-group conditions plus explicit comm ops.
+
+### 3.6 Triton backend pipelines are per-vendor and per-arch
+
+Triton’s Python backends explicitly construct pass pipelines that branch on the target architecture. For example, NVIDIA `make_ttgir` selects different pipelines for SM80/90 vs SM100+ and wires in warp specialization and TMA lowering (see `references/triton/third_party/nvidia/backend/compiler.py`). AMD has a different pipeline controlled by `gfx*` arch and feature knobs like async copy and ping-pong scheduling (see `references/triton/third_party/amd/backend/compiler.py`).
+
+This is not a criticism; it is an empirical observation: *retargetability is bounded by how much of the compiler is allowed to be target-specific*. If high performance depends on deep target-specific scheduling/memory/sync features, a pass-based architecture tends to accumulate per-target pipelines that are difficult to share.
 
 ### 3.4 Why this matters for retargetability
 
@@ -148,6 +169,13 @@ In Triton, these answers are materially encoded in:
 That implies: adding a new backend with different concurrency/memory models either (a) forks the feature or (b) forces a new shared abstraction layer above NVWS.
 
 ## 4. Why “MLIR dialects + passes” is not enough by itself
+
+### 3.5 Lowering abstraction still encodes a GPU execution model
+
+Even outside the Hopper-specific code, Triton’s shared lowering interface (`TargetInfoBase`) is GPU-shaped: it includes warp shuffles, ballots, warp-level barriers, and program-id semantics (see `references/triton/include/triton/Conversion/TritonGPUToLLVM/TargetInfoBase.h`).
+
+This abstraction is excellent for CUDA-vs-ROCm portability, but it highlights a boundary: retargeting to non-GPU hardware (spatial arrays, NPUs with different synchronization, etc.) likely requires new semantic interfaces, not just implementing one more TargetInfo subclass.
+
 
 This section does **not** claim “MLIR is bad”. It claims:
 
@@ -182,6 +210,20 @@ Without explicit contracts, a pass-based system tends to devolve into:
 
 - backend-specific lowerings everywhere,
 - and “retargeting” becomes a rewrite.
+
+## 4.3 LittleKernel viewpoint: emitter-first retargeting (and its limits)
+
+The LittleKernel note (`references/size-littlekernel.md`) argues for a lightweight approach: use Python AST as the IR, minimize passes (const-fold, inline, type inference), and treat hardware-specific features as hot-pluggable intrinsics whose codegen is handled by an emitter. The author’s retargeting claim is essentially: “hardware is fragmented; swapping hardware should only require swapping the emitter and registering new intrinsics.”
+
+This viewpoint captures an important truth: for many SOTA kernels, the *dominant complexity is hardware-specific scheduling and instruction use* (e.g., NVIDIA WGMMA/TMA vs other vendors’ tensor cores). A heavy compiler that hides those details can become a bottleneck.
+
+However, for a *multi-backend compiler framework* (HTP’s goal), “swap the emitter” is not sufficient on its own:
+
+- Different targets have different memory and synchronization semantics; without explicit contracts, an emitter can silently generate incorrect code.
+- Composition (kernel → megakernel → serving routine) requires checkable protocols (bounded channels, collectives, barriers).
+- Even if passes are few, the remaining passes must enforce strong typing/effects/layout legality, or retargeting degenerates into debugging backend-specific failures.
+
+HTP can adopt the *good part* of this view (AST-first extensibility, hot-pluggable intrinsics, emitter-as-a-first-class component) while adding what the lightweight approach omits: capability/effect/layout contracts that make compositions and retargeting diagnosable and safe.
 
 ## 5. What HTP should do differently (and why it might win)
 
