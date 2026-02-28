@@ -10,7 +10,7 @@ Produce a research-grade report that explains:
 Deliverables are Markdown docs committed under `docs/future-htp/` (plus supporting planning files at repo root).
 
 ## Current Phase
-Phase 2
+Phase 3
 
 ## Phases
 
@@ -22,18 +22,18 @@ Phase 2
 - **Status:** complete
 
 ### Phase 2: Evaluation Framework
-- [ ] Define a “retargetability checklist” (semantic contracts, memory model, scheduling model, layout/effects, cost model, debug/IR visibility, backend surface area)
-- [ ] Define what “extensibility” means operationally (what can 3rd parties add without forking core?)
-- [ ] Decide report structure and file layout
-- **Status:** in_progress
+- [x] Define a “retargetability checklist” (semantic contracts, memory model, scheduling model, layout/effects, cost model, debug/IR visibility, backend surface area)
+- [x] Define what “extensibility” means operationally (what can 3rd parties add without forking core?)
+- [x] Decide report structure and file layout
+- **Status:** complete
 
 ### Phase 3: Triton Case Study (roadmap + code)
-- [ ] Read Triton roadmap blog (warp specialization) and extract claims/features
-- [ ] Clone `triton-lang/triton` into `references/triton/`
+- [x] Read Triton roadmap blog (warp specialization) and extract claims/features
+- [x] Clone `triton-lang/triton` into `references/triton/`
 - [ ] Map the relevant compiler IR layers and pass pipelines in Triton
 - [ ] For each chosen optimization, locate the implementing passes/files and explain cross-target complexity
 - [ ] Summarize why general retargetability is constrained by Triton’s design choices
-- **Status:** pending
+- **Status:** in_progress
 
 ### Phase 4: JAX/XLA/StableHLO and TileLang/TVM Case Studies
 - [ ] Summarize where retargetability is strong (HLO portability) and where extensibility is weak (hard to add new low-level semantics)

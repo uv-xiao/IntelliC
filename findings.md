@@ -194,3 +194,26 @@ From `references/triton/third_party/nvidia/backend/compiler.py` (`make_ttgir`) a
 Implication: performance-critical features are encoded as backend-specific pass pipelines with arch-dependent conditions. Retargeting to “many hardware targets” means either:
 - a proliferation of similar-but-different pipelines, or
 - creating a more explicit, typed contract layer that lets multiple backends share transformations without duplicating logic.
+
+### Triton example: matmul acceleration is vendor-specific pattern sets
+From AMD backend pass definition and implementation:
+
+- AMD defines its own matmul acceleration pass `tritonamdgpu-accelerate-matmul` (see `references/triton/third_party/amd/include/TritonAMDGPUTransforms/Passes.td`).
+- The implementation (`references/triton/third_party/amd/lib/TritonAMDGPUTransforms/AccelerateAMDMatmul.cpp`) selects different rewrite patterns based on ISA family (e.g., CDNA*, RDNA*, GFX1250):
+  - chooses MFMA vs WMMA patterns,
+  - uses different decomposition passes for scaled blocked formats,
+  - parameterizes by `matrixInstructionSize` and `kPack`.
+
+In contrast, NVIDIA’s matmul acceleration (`passes.ttgpuir.add_accelerate_matmul`) and MMA lowering are implemented in different files and are keyed off NVIDIA compute capability.
+
+Implication: even “same high-level op” (`dot`/matmul) requires disjoint legalization + layout + instruction selection pipelines per vendor. This is a core retargetability challenge.
+
+### TileLang and JAX/XLA sources (web)
+Key points from quick source scan:
+
+- TileLang (`tile-ai/tilelang`) positions as a Python DSL for high-performance kernels, tested on NVIDIA (H100/A100/…), AMD (MI250/MI300X), and mentions accelerator portability; example API shows explicit Kernel grid/threads, shared/fragment alloc, `T.Pipelined(num_stages=...)`, swizzle options, and `T.gemm` dispatch. (Source: TileLang GitHub README: https://github.com/tile-ai/tilelang)
+- OpenXLA describes XLA’s pipeline as StableHLO → backend codegen, and notes XLA:GPU uses both native emitters and TritonIR emitters; execution via PJRT. (Source: https://openxla.org/xla/gpu_architecture)
+
+Implication for our comparison:
+- JAX/XLA is strongly retargetable at the *HLO/tensor algebra* layer but typically uses custom calls / backend-specific emitters for low-level kernel features.
+- TileLang is closer to “kernel DSL + schedule primitives” similar in spirit to Triton, with explicit scheduling constructs and backend-specific lowering.

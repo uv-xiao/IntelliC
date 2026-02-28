@@ -141,6 +141,15 @@ This produces a *new internal program structure*: outlined partitions guarded by
 
 ### 3.6 Triton backend pipelines are per-vendor and per-arch
 
+### 3.7 Another concrete example: matmul acceleration is not shared
+
+Even for a seemingly universal operation like matmul/dot, Triton’s legalization and instruction selection differ per vendor:
+
+- AMD implements `tritonamdgpu-accelerate-matmul` with ISA-family-specific rewrite pattern sets (MFMA vs WMMA variants, scaled-blocked decompositions, etc.). See `references/triton/third_party/amd/include/TritonAMDGPUTransforms/Passes.td` and `references/triton/third_party/amd/lib/TritonAMDGPUTransforms/AccelerateAMDMatmul.cpp`.
+- NVIDIA uses a different set of passes and lowerings keyed off compute capability (e.g., MMA version selection, WGMMA/TMA integration).
+
+This matters because ‘retargetability’ is not just about having a common op name; it is about having a common *semantic and scheduling contract* that lets backends specialize without duplicating the entire optimization story.
+
 Triton’s Python backends explicitly construct pass pipelines that branch on the target architecture. For example, NVIDIA `make_ttgir` selects different pipelines for SM80/90 vs SM100+ and wires in warp specialization and TMA lowering (see `references/triton/third_party/nvidia/backend/compiler.py`). AMD has a different pipeline controlled by `gfx*` arch and feature knobs like async copy and ping-pong scheduling (see `references/triton/third_party/amd/backend/compiler.py`).
 
 This is not a criticism; it is an empirical observation: *retargetability is bounded by how much of the compiler is allowed to be target-specific*. If high performance depends on deep target-specific scheduling/memory/sync features, a pass-based architecture tends to accumulate per-target pipelines that are difficult to share.
@@ -263,12 +272,60 @@ Then:
 
 This avoids “bail out silently because numWarps != 4” and replaces it with a capability/type error.
 
-## 6. Next: JAX and TileLang comparisons (to be expanded)
+## 6. JAX/XLA and TileLang comparisons
 
-This section will compare:
+This section is not meant to “rank” systems; it is meant to clarify *where* each system sits on the retargetability checklist and why HTP’s target differs.
 
-- JAX/XLA/StableHLO: strong portability at tensor-algebra level, weaker extensibility at low-level async/layout semantics.
-- TileLang/TVM: strong scheduling expressiveness, but retargetability depends on target-specific schedules and codegen integration.
+### 6.1 JAX/XLA/StableHLO: portable tensor algebra, limited low-level extensibility
+
+JAX’s core portability story flows through XLA’s high-level IR (StableHLO / HLO). This is a strong kind of retargetability:
+
+- If your program stays within the HLO abstraction, new devices can be supported by adding/maintaining an XLA backend and runtime (typically via PJRT).
+- Whole-program graph optimizations (fusion, algebraic simplification, layout assignment) are expressed at a relatively stable level.
+
+But the flip side is also structural:
+
+- HLO is intentionally **not** a kernel ISA; it does not directly express target-specific async copy/barrier protocols, warp-group partitioning, or tensor-core instruction contracts.
+- When performance depends on low-level mechanisms, the system tends to use:
+  - backend-specific emitters (e.g., XLA:GPU’s Triton emitter path),
+  - vendor libraries,
+  - or custom calls.
+
+So the “extensibility” boundary is higher: adding a new low-level primitive often means extending backend codegen or introducing custom-call hooks rather than writing user-level schedule/program transformations.
+
+Reference: OpenXLA XLA:GPU architecture overview (StableHLO → XLA → backend codegen; native and Triton-based emitters; PJRT runtime).
+- https://openxla.org/xla/gpu_architecture
+
+### 6.2 TileLang: kernel DSL with explicit schedule knobs (Triton-adjacent)
+
+TileLang positions as a Python kernel DSL with explicit scheduling constructs (grid/thread mapping, shared allocations, pipelined loops, swizzles, etc.). This is closer to Triton than to XLA:
+
+- You get fine-grained control over kernel structure and memory usage.
+- Retargetability across GPU vendors is plausible *within the GPU family* if the DSL’s semantics are carefully chosen.
+
+However, the same core challenge appears:
+
+- Once the DSL exposes hardware-specific concepts (warp-level behavior, shared-memory swizzles, special matrix instructions), the compiler must carry target-specific legality/performance rules.
+- Supporting *non-GPU* targets (NPU/AIE) requires either a new semantic layer above these concepts or a different set of primitives.
+
+Reference: TileLang README and examples.
+- https://github.com/tile-ai/tilelang
+
+### 6.3 HTP’s intended niche relative to these systems
+
+HTP aims to sit in a different place:
+
+- Like Triton/TileLang, it must support hardware-specific low-level control where needed.
+- Like XLA, it must support composition and multi-component programs (kernels → pipelines → serving routines) and multiple backends.
+
+The differentiator HTP needs is **contract-first retargetability**:
+
+- Users (or extensions) can express low-level intent via typed intrinsics and schedule directives.
+- The compiler checks capability/effect/layout contracts before lowering.
+- Backends provide explicit `ArchModel` capability sets and lowering implementations.
+
+This is how HTP can adopt the best parts of “kernel DSL” systems without becoming a pile of per-target pass pipelines.
+
 
 ## Appendix A: Code pointers (Triton)
 

@@ -35,7 +35,7 @@
 | What have I done? | Initialized planning files; summarized LittleKernel post |
 
 ### Phase 2: Evaluation Framework
-- **Status:** in_progress
+- **Status:** complete
 - Actions taken:
   -
 - Files created/modified:
@@ -46,3 +46,11 @@
   - Drafted report skeleton with retargetability checklist and Triton case study.
 - Files created/modified:
   - `docs/future-htp/reports/retargetable_extensibility_report.md` (created)
+
+### Phase 3: Triton Case Study (roadmap + code)
+- **Status:** in_progress
+- Actions taken:
+  - Read Triton warp specialization roadmap and mapped to concrete code in `references/triton`.
+  - Identified concrete cross-cutting files: warp specialization transforms, pipeliner, LLVM lowering, backend pass pipelines.
+- Files created/modified:
+  - `docs/future-htp/reports/retargetable_extensibility_report.md` (expanded)
