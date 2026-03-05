@@ -18,6 +18,7 @@ This folder is the **redo design** described by `docs/design/REDO.md`.
 
 - Features: `docs/design/feats/`
 - Implementation components: `docs/design/impls/`
+- Retargetability evidence report: `docs/design/reports/retargetable_extensibility_report.md`
 
 ## Scope note
 

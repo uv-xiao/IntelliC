@@ -24,6 +24,13 @@ The unit of interaction is the **artifact package**:
 
 This avoids “agent memory drift” and ensures changes are replayable.
 
+In HTP, replayability includes not only transformed IR snapshots, but also the **analyses that justified transforms**:
+
+- each stage may contain `ir/stages/<id>/analysis/` results (versioned, schema-tagged)
+- `ir/pass_trace.jsonl` records whether a pass mutated the AST and which analyses it produced/consumed
+
+This is critical for long-term autonomy: the agent must reason from evidence, not from implicit invariants.
+
 ## Agent architecture (recommended)
 
 ### 1) State machine
@@ -31,6 +38,7 @@ This avoids “agent memory drift” and ensures changes are replayable.
 1. **Observe**
    - load artifact package
    - read manifest + pass trace + diagnostics
+   - load relevant stage analyses (`ir/stages/<id>/analysis/index.json`)
 2. **Localize**
    - map failure to a contract boundary (capability/effect/layout/backend handler)
    - minimize to the smallest reproducer if needed
@@ -51,6 +59,7 @@ This avoids “agent memory drift” and ensures changes are replayable.
      - what changed
      - why (evidence pointers)
      - what gates passed/failed
+     - which analyses changed (semantic diffs of analysis outputs are often the earliest signal of regressions)
 7. **Promote**
    - optionally open a PR / land the change depending on repo policy
 

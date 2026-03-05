@@ -86,3 +86,34 @@ logs/
 ```
 
 and record the paths in `manifest.outputs` or `manifest.extensions.<backend>`.
+
+---
+
+## 6) Replay semantics (stage programs are the contract)
+
+Replaying a stage means:
+
+- import and execute `ir/stages/<stage_id>/program.py`, not an internal IR interpreter.
+- honor the stage’s declared `RunnablePy` contract:
+  - `preserves`: stage is runnable in the declared modes
+  - `stubbed`: runnable but calls stubs for some regions (must have stub metadata + explicit diagnostics)
+  - `breaks`: replay is not supported; binding must refuse with a structured reason
+
+This is how HTP keeps debugging stable across refactors: replay is a file contract, not a private API.
+
+---
+
+## 7) Surfacing analysis results (developer ergonomics)
+
+Bindings should treat analyses as first-class debug data:
+
+- stage-local analysis results live under `ir/stages/<id>/analysis/`
+- `analysis/index.json` enumerates available analyses, versions, and schemas
+
+When a runtime failure occurs, the binding should include pointers to:
+
+- relevant stage programs (`program.py`)
+- relevant analyses that justify the applied transforms (e.g., pipelining plans)
+- relevant build/run logs
+
+This is essential for long-term agentic development: failures must be localizable to a contract boundary with evidence.

@@ -120,3 +120,79 @@ The binding should write build/run logs into:
 and record their paths in the manifest outputs/extensions.
 
 Deep dive: binding API contract in `docs/design/impls/07_binding_interface.md`.
+
+---
+
+## 5) ArchModel (what the backend must declare, concretely)
+
+The PTO backend must declare an `ArchModel` sufficient for legality checks and for retargetable planning passes to reason
+about buffering, async transfers, and synchronization.
+
+At minimum, PTO’s `ArchModel` should expose:
+
+- **Hierarchy**
+  - host / AICPU orchestration
+  - compute cores (AIV, optional AIC)
+  - logical “groups” for scheduling (block/task granularity)
+- **Memory spaces**
+  - global memory (GM)
+  - unified buffer (UB) and any other on-chip spaces relevant to kernels
+  - alignment and capacity constraints per space
+- **Async primitives**
+  - supported copy kinds (e.g., GM→UB, UB→GM)
+  - whether copies are tokenized (awaitable) or implicitly ordered
+  - concurrency limits (in-flight copies)
+- **Barrier/event model**
+  - what synchronization primitives exist within a kernel/task
+  - what ordering guarantees are provided by the runtime
+
+This is the boundary that lets target-neutral passes plan buffering/pipelining without embedding PTO-specific assumptions.
+
+---
+
+## 6) Retargetability rule: unsupported features must fail early (or be declared optional)
+
+PTO is not a “warp execution” target in the GPU sense. Therefore:
+
+- `Arch.Subgroup(kind=warp|wavefront)` is typically **not** provided for PTO.
+- A schedule directive like `s.warp_specialize(...)` must either:
+  - fail solver satisfiability early with an explicit missing capability, or
+  - be declared as an *optional preference* (`s.warp_specialize(optional=True)`), in which case the solver may pick a
+    pipeline that ignores it (but must record that the preference was not honored).
+
+This is an important contract for long-term extension: “feature availability” is a capability fact, not a silent fallback.
+
+---
+
+## 7) Portable async/effect discharge (where PTO-specific work lives)
+
+HTP’s portable intrinsics can express a target-neutral protocol:
+
+- `portable.async_copy(scope="group_shared")`
+- `portable.await_(token)`
+- handoff protocols (producer/consumer effects)
+
+For PTO, a backend-specific discharge pass should map these into PTO-ready operations:
+
+- allocate UB buffers (with explicit sizes and alignment checks)
+- choose DMA/copy mechanisms that PTO supports
+- convert awaitable tokens into PTO’s ordering semantics (token → barrier, token → explicit wait, or “already ordered”)
+
+Design intent:
+> the PTO backend should not re-implement planning; it should discharge portable protocols into PTO primitives behind
+> explicit capabilities.
+
+This is the same structural split demonstrated in the warp specialization + pipelining case study:
+
+- `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
+
+---
+
+## 8) What “ready to implement” means here
+
+The PTO backend is “design-complete” when the following are explicit and testable:
+
+- which PTO capabilities exist (ArchModel declaration + capability tags),
+- which intrinsic handlers are implemented (`lower|emit|simulate` sets),
+- how portable async/effect protocols are discharged (which pass ids, what invariants they establish),
+- and the exact artifact contract under `codegen/pto/` (validated by golden artifact tests).

@@ -1,232 +1,222 @@
-# HTP Full Story — Analysis, Rationale, and Concrete Design
+# HTP Full Story — Contract-First, Artifact-First Compilation for Retargetable Kernels
 
-This document is the “single narrative” for the redo: it ties together **WHY → WHAT → HOW**, with concrete interfaces and
-explicit contracts. It is intended to be “ready to implement” guidance, not a loose set of ideas.
+This document is the single narrative that ties together **WHY → WHAT → HOW** in a form that is meant to be
+“ready to implement”. It is written in a paper-like style because HTP is fundamentally a systems-design claim:
+retargetable extensibility is not a bag of features; it is an architecture that prevents feature work from collapsing
+into per-target pass soups.
 
-Read order:
-- WHY: `docs/design/analysis.md`
-- WHAT: `docs/design/features.md`
-- HOW: `docs/design/implementations.md`
-- E2E sketches: `docs/design/examples.md`
+Read order for details:
 
-This story focuses on: the minimal stable core, the exact extension surfaces, and the artifact contract that makes the
-system debuggable, retargetable, and agent-friendly.
-
----
-
-## 0) The problem we are solving (in one paragraph)
-
-Modern ML systems need to compile **kernels → megakernels → serving routines** to many hardware targets with incompatible
-execution, memory, and synchronization models. Existing ecosystems tend to split into:
-
-- *Graph-level compilers* (e.g., XLA) that are retargetable at tensor-algebra level but struggle to expose/extend low-level
-  semantics; and
-- *Kernel DSL compilers* (e.g., Triton/TileLang) that expose low-level control but accumulate per-arch/per-vendor pipelines
-  and implicit invariants that are hard to extend safely.
-
-HTP’s thesis: the only scalable path is **contract-first extensibility**: explicit capabilities, typed layout/effects, and
-artifact contracts that make compositions checkable and retargeting diagnosable.
+- WHY (problem + critique + evidence): `docs/design/analysis.md`
+- WHAT (feature surfaces + contracts): `docs/design/features.md`
+- HOW (architecture + components): `docs/design/implementations.md`
+- E2E examples: `docs/design/examples.md`
+- Deep evidence report (Triton/JAX/TileLang/MLIR): `docs/design/reports/retargetable_extensibility_report.md`
 
 ---
 
-## 1) What the user writes (concrete programming surfaces)
+## Abstract
 
-HTP is Python-first. The primary user-facing surfaces are:
+ML compiler stacks must increasingly target heterogeneous hardware while supporting rapid extension: new memory
+primitives, new scheduling strategies, new synchronization protocols, and new “kernel micro-architectures” such as
+warp specialization and software pipelining. Existing approaches often force a choice between portability and control.
+Graph compilers are portable but opaque at low-level semantics; kernel DSL compilers are expressive but accumulate
+target-specific lowering pipelines whose implicit invariants resist extension.
 
-### 1.1 Kernels (tile-level)
-
-```python
-from htp import kernel
-from htp.types import Tile, f16, In, Out
-from htp.intrinsics import portable, pto
-
-@kernel
-def add_tile(a: In[Tile[16, 16, f16]], b: In[Tile[16, 16, f16]], c: Out[Tile[16, 16, f16]]):
-    c[:] = portable.add(a, b)
-```
-
-Key design points:
-- A kernel is a typed function. Types carry tile shape + dtype (and later layout facets).
-- Intrinsics are called as typed primitives. Backends provide lowering/emitters for intrinsic sets.
-
-### 1.2 WSP programs (workload + schedule)
-
-```python
-from htp import workload, schedule, P
-
-@workload
-def add(A, B, C):
-    for i in P(0, M // 16):
-        for j in P(0, N // 16):
-            add_tile(A.tile(i, j), B.tile(i, j), C.tile(i, j))
-
-@schedule(add)
-def add_sched(s):
-    s.tile("i", 4).tile("j", 4)
-    s.buffer("A", space="UB").buffer("B", space="UB")
-    s.pipeline(stages=2)
-```
-
-Key design points:
-- Workload is semantic; schedule is constraints. Schedules must be checkable against backend capabilities.
-
-### 1.3 CSP programs (process/channel pipelines)
-
-```python
-from htp import process, Channel, connect, consume
-
-l2c = Channel("l2c", depth=2)
-c2s = Channel("c2s", depth=2)
-
-loader = process("loader").produces(l2c).body(...)
-computer = process("computer").consumes(l2c).produces(c2s).body(...)
-storer = process("storer").consumes(c2s).body(...)
-
-pipeline = connect([loader, computer, storer], [l2c, c2s])
-```
-
-Key design points:
-- Channels are typed, bounded, and effect-checked.
-- Backends lower CSP differently (sim/runtime/AIE-FIFO), but the CSP graph form is canonical.
+HTP’s thesis is that retargetable extensibility requires a different core: **contract-first compilation** with explicit
+capability typing, typed layout/effects, and artifact-first staging. HTP is **AST-first**: the canonical IR is a typed
+Python AST, and every intermediate stage is intended to be recoverable as a **runnable Python replay program**. Passes
+are explicit about two effect kinds—AST mutation and analysis production—and both are staged as artifacts. Pipelines are
+selected by satisfiability rather than backend-specific branching. Together these choices make extension work checkable,
+debuggable, and long-term maintainable.
 
 ---
 
-## 2) What the compiler does (a contracted, inspectable pipeline)
+## 1. Motivation: what goes wrong in “IR + passes” retargeting
 
-### 2.1 The internal “IR” is AST + typed metadata
+Retargeting fails in practice not because a compiler lacks an IR, but because the *real contracts* live elsewhere:
 
-HTP’s default IR is:
-- Source AST → Canonical AST → Typed AST
+- in undocumented pass ordering requirements,
+- in target-specific “attrs as APIs” conventions that leak across passes,
+- and in analyses that exist as ephemeral caches rather than staged evidence.
 
-Typed metadata includes:
-- symbol table + types
-- layout facets (distribution/memory/hardware)
-- effects/protocol obligations (channels, collectives, async handoffs)
-- schedule directives
+When a feature spans multiple layers (front-end surface, analysis, transformation, backend discharge), the absence of
+explicit contracts causes the work to become target-owned. Warp specialization and software pipelining are canonical
+examples: their correctness hinges on precise async and barrier semantics, and their performance hinges on target
+capabilities and resource constraints.
 
-See: `docs/design/impls/01_ir_model.md`.
-
-### 2.2 Passes are the primary extension unit
-
-A pass is registered with:
-- name + version
-- `requires/provides/invalidates` capabilities
-- diagnostics schema
-- tracing hooks
-
-See: `docs/design/impls/02_pass_manager.md`.
-
-### 2.3 Pipelines are selected by satisfiability, not by “if backend == …”
-
-Given:
-- program capabilities inferred from AST + enabled dialects + imported intrinsic sets
-- target backend requirements
-
-HTP selects a pipeline by solving the `requires/provides` graph.
-
-See: `docs/design/impls/03_capability_solver.md`.
+HTP treats this as a design constraint: if the system cannot *explain* why a transformation is legal and what it assumed,
+it is not retargetable in the long run.
 
 ---
 
-## 3) What a backend must provide (explicit surface area)
+## 2. Design goals (what HTP optimizes for)
 
-Backends are plugins. A backend provides:
+HTP makes a small number of goals primary:
 
-1) **ArchModel**
-- hierarchy (levels of parallelism / placement)
-- memory spaces (with alignment/capacity constraints)
-- async primitives (copy, DMA, bulk transfer kinds)
-- barrier/event model
+1) **Retargetable extensibility**: adding a feature should primarily mean adding a small number of capability-gated passes
+   and intrinsic handlers, not rewriting backends.
+2) **Inspectable compilation**: every pass produces a staged snapshot with traceable diagnostics and evidence.
+3) **Executable intermediates**: because the canonical IR is Python AST, each stage can emit runnable `program.py` for
+   replay and debugging (with explicit stub contracts when needed).
+4) **Composable contracts**: layout, effects, and capabilities are typed and staged; pipelines are satisfiable or rejected
+   early with explainable reasons.
 
-2) **Intrinsic handlers**
-- lowering rules (typed AST → backend-ready form)
-- emitter rules (backend-ready form → artifact files)
-
-3) **Artifact contract**
-- package layout (files, roles, entrypoints)
-- manifest extension fields
-
-See:
-- `docs/design/feats/07_backends_artifacts.md`
-- `docs/design/impls/05_backend_pto.md`
-- `docs/design/impls/06_backend_aie.md`
+These goals bias the architecture toward explicitness and away from implicit conventions.
 
 ---
 
-## 4) What “artifact-first” means (the non-negotiable integration boundary)
+## 3. Programming model: intent, constraints, and protocols
 
-Every compile emits a directory tree with:
-- `manifest.json` (schema + versions + pipeline + target + capabilities)
-- `ir/` dumps (AST snapshots, typed metadata snapshots)
-- `pass_trace.jsonl` (before/after pointers, timings, diagnostics)
-- `codegen/<backend>/...` outputs
+HTP is Python-first. Users write programs in three mutually reinforcing surfaces:
 
-See: `docs/design/impls/04_artifact_manifest.md`.
+### 3.1 Kernels (tile-level intent)
 
-This is what makes:
-- debugging practical,
-- runtime integration stable,
-- and agentic compiler development feasible (artifacts are “context packs”).
+Kernels are typed functions over tiles/tensors and call typed intrinsics. The kernel expresses semantic intent (e.g.,
+async copy, barrier scope) without committing to a target-specific primitive.
 
-HTP can do something most compilers cannot: because the canonical form is Python AST, each stage can also emit a
-**runnable Python replay program** (`ir/stages/<id>/program.py`). This makes intermediate artifacts executable, enabling
-stage-by-stage debugging and simulation without bespoke IR runners.
+### 3.2 WSP (workload + schedule)
 
----
+WSP separates:
 
-## 5) Extensibility: the exact surfaces and how they compose
+- the semantic workload (what computation happens), and
+- the schedule (constraints on mapping/buffering/pipelining).
 
-HTP extension units:
-- dialect package
-- intrinsic set
-- pass
-- pipeline template
-- backend
-- binding/runtime adapter
+Schedules are not “imperative rewrite scripts”; they are constraints that must be checked against target capabilities.
 
-Composition rule:
-- every unit must declare `requires/provides` capabilities, and all cross-cutting semantics must be represented as typed
-  layout facets and effects.
+### 3.3 CSP (process/channel pipelines)
 
-See: `docs/design/feats/01_extensibility.md`.
+CSP makes pipeline parallelism explicit via typed channels and effect-checked protocols. Backends may implement channels
+in very different ways, but the CSP graph is the canonical contract surface.
 
 ---
 
-## 6) Retargetability: how HTP avoids “attrs as APIs”
+## 4. Compiler architecture: AST-first, artifact-first, contract-first
 
-Retargetability fails when the “true contracts” are hidden in:
-- pass ordering,
-- target-specific branches,
-- and target-only dialect ops.
+### 4.1 IR: typed Python AST + staged analyses
 
-HTP’s answer is:
-- capability typing + solver-based pipelines,
-- typed effects/protocol obligations,
-- and explicit backend surfaces (ArchModel + handlers + artifact contract).
+HTP’s canonical IR is a typed Python AST plus attached metadata snapshots (types/layout/effects/schedule). A crucial
+addition is that analyses are first-class and staged: if an analysis justifies a rewrite, it is emitted under
+`ir/stages/<id>/analysis/` and indexed.
 
-Evidence and comparison:
+Deep dive: `docs/design/impls/01_ir_model.md`
+
+### 4.2 Passes: two effect kinds, explicitly recorded
+
+During compilation, passes may have two observable effect kinds:
+
+- **AST mutation**: produces a new typed AST and typically a new runnable replay stage program.
+- **Analysis production**: produces typed, versioned data structures used by later passes and humans/agents.
+
+These are not internal implementation details; they are part of the pass contract and are recorded in the staged
+artifacts and `ir/pass_trace.jsonl`.
+
+Deep dive: `docs/design/impls/02_pass_manager.md`
+
+### 4.3 Pipelines: satisfiable by construction
+
+HTP selects pipelines by satisfiability. Given the program’s capabilities and the target’s declared capabilities, the
+solver checks that every pass contract is satisfiable before execution. Failure is explained as a missing capability,
+handler, invariant, or artifact output—not as a late “backend crash”.
+
+Deep dive: `docs/design/impls/03_capability_solver.md`
+
+### 4.4 Artifacts: the integration boundary, not an afterthought
+
+Every compile emits a package that is both:
+
+- a runtime integration boundary (bindings consume it), and
+- a debugging/research substrate (humans/agents inspect and replay it).
+
+The package includes:
+
+- a manifest (`manifest.json`) with versions, capabilities, target, and stage graph,
+- per-stage dumps (`program.pyast.json`, typed metadata, analysis outputs),
+- `ir/pass_trace.jsonl` with structured pass events,
+- backend outputs under `codegen/<backend>/...`.
+
+Deep dive: `docs/design/impls/04_artifact_manifest.md`
+
+### 4.5 Backends and islands: explicit, auditable boundaries
+
+Backends are plugins. Each backend must provide:
+
+- an `ArchModel` (hierarchy, memory spaces, async/barrier semantics),
+- intrinsic handlers (lower/emit/simulate),
+- and an artifact contract.
+
+External toolchains (MLIR-AIE, vendor compilers, etc.) are treated as **explicit compilation islands** that are entered
+and exited by contracted passes; they do not become hidden global dependencies.
+
+Deep dives:
+
+- PTO backend packaging: `docs/design/impls/05_backend_pto.md`
+- AIE island contract: `docs/design/impls/06_backend_aie.md`
+
+---
+
+## 5. Case study: warp specialization + software pipelining, as contracts
+
+Warp specialization and software pipelining are a stress test: they mix planning and rewriting, they require explicit
+async and barrier semantics, and they must adapt to target capabilities.
+
+HTP’s design makes the structure explicit:
+
+- analyses produce a role plan and a pipeline plan (staged, versioned artifacts),
+- transform passes apply the plan by rewriting the typed AST,
+- discharge passes map portable protocols into target primitives behind capability gates,
+- and every stage can remain runnable in Python when contracts allow, enabling replay-based debugging.
+
+Complete end-to-end walkthrough:
+
+- `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
+
+This is the smallest example that exercises HTP’s core claims: explicit pass effects, staged analyses, and explicit
+retargeting boundaries.
+
+---
+
+## 6. Why HTP aims to do better than MLIR-first construction
+
+MLIR’s IR + pass ecosystem is powerful, but it does not by itself guarantee retargetable extensibility. In practice,
+retargeting failures come from:
+
+- contracts encoded as conventions (pass order, attribute interpretation, dialect coupling),
+- analyses that are not staged and therefore become invisible assumptions,
+- and backend-owned expansions that are hard to reason about across targets.
+
+HTP’s approach is not “anti-MLIR”; it is “MLIR as an explicit island”. HTP uses the Python AST as the canonical form and
+requires that any external IR boundary be explicit, replayable (via stubs when needed), and auditable via artifacts.
+
+For detailed comparative evidence (including Triton’s roadmap features and concrete pass complexity), see:
+
 - `docs/design/reports/retargetable_extensibility_report.md`
 
 ---
 
-## 7) Agentic compiler development (fully autonomous, healthy)
+## 7. Long-term development: why this architecture stays healthy
 
-HTP should be designed so agents can safely evolve the compiler:
-- bounded edit surfaces (“safe corridors” templates)
-- non-negotiable verification gates
-- structured provenance recorded in manifests (`extensions.agent.*`)
+A compiler remains healthy when it accumulates explicit invariants rather than implicit ones. HTP bakes this into:
 
-See:
-- `docs/design/feats/10_agentic_development.md`
+- pass contracts (`requires/provides/invalidates` + invariants),
+- staged analyses (no “critical data lives only in RAM caches”),
+- and a stable artifact substrate for golden tests and autonomous repair loops.
+
+Agentic development is therefore a direct consequence of the design, not a bolt-on feature:
+
 - `docs/design/impls/10_agentic_tooling.md`
 
 ---
 
-## 8) Definition of done (design completeness)
+## 8. Definition of done (design completeness)
 
 The redo design is “complete enough to implement” when:
 
-- Every extension surface above has a concrete interface and a contract.
-- Every compiler stage has an artifact/tracing output.
-- Every backend/binding contract is explicit and testable via golden artifact checks.
-- Every “open question” is either resolved or explicitly recorded as deferred research/non-goal.
+- every extension surface has a concrete interface and a contract,
+- every pipeline stage has an artifact/tracing output (including analyses where relevant),
+- every backend/binding contract is explicit and testable via golden artifact checks,
+- and open questions are either resolved or explicitly recorded as deferred.
+
+Operational checklist:
+
+- `docs/design/acceptance_checklist.md`

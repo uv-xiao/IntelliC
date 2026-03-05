@@ -89,3 +89,73 @@ Recommended fields:
 
 Any mismatch must be reported as an unsatisfied capability/effect/layout constraint (solver-style), not as a late MLIR
 lowering crash.
+
+---
+
+## 6) Recommended pass split: plan vs emit (analysis + transform)
+
+To keep the island maintainable over years, split the island work into two explicit layers:
+
+1) **planning analyses** (staged, serializable):
+   - mapping decisions (tile placement, buffer placement)
+   - FIFO decisions (depth, protocol, endpoints)
+   - DMA routing decisions (when explicit)
+2) **emission transforms**:
+   - generate `aie.mlir`
+   - generate `host.*`
+   - generate sidecars (`mapping.json`, `fifos.json`, `toolchain.json`)
+
+This aligns with HTP’s “pass can mutate AST and/or produce analysis” principle:
+
+- analysis passes preserve runnable Python stages and produce `ir/stages/<id>/analysis/*`
+- emit passes may convert regions into `IslandCall(...)` stubs while keeping `program.py` runnable via runtime shims
+
+See pass effect model: `docs/design/impls/02_pass_manager.md`.
+
+---
+
+## 7) Island replay contract (how stages stay runnable)
+
+When an AST region is exported to MLIR-AIE:
+
+- the stage program remains runnable by calling:
+  - `htp.runtime.islands.invoke(island_id, ...)`
+- in `mode="sim"`, the island may:
+  - call a software simulator (if available), or
+  - run a reference implementation (slow but correct), or
+  - run a stub and fail with a structured diagnostic (explicit, not silent)
+
+This is the central advantage of AST-first staging:
+> even after exporting to an external IR, the host-level program remains executable for debugging and minimization.
+
+---
+
+## 8) Capability gates (how the solver prevents late MLIR failures)
+
+The AIE backend should declare capabilities such as:
+
+- `Backend.AIE(variant=mlir-aie)`
+- `Arch.Grid(dim=2, family=xdna2)`
+- `Arch.Streams` / `Arch.FIFO`
+- `Arch.DMA(kind=...)`
+- and any toolchain contract ids
+
+The island entry pass requires these capabilities. If they are missing, the solver fails before running MLIR-AIE tooling,
+and the failure report points to:
+
+- which region required the island,
+- which capabilities are missing,
+- and which backend packages could provide them (if registered).
+
+Deep dive: `docs/design/impls/03_capability_solver.md`.
+
+---
+
+## 9) “Ready to implement” checklist (AIE island)
+
+Design completeness requires:
+
+- an eligibility matcher that is explicit and testable,
+- staged mapping/FIFO analyses (sidecars are stable diffs),
+- an explicit `IslandCall` stub node with typed effects,
+- and a package validator that enforces the AIE artifact contract.
