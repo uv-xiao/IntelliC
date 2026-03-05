@@ -5,6 +5,9 @@
 - stable integration contract
 - reproducibility and auditability
 - backend-specific extension fields without breaking core readers
+- stage replay: every intermediate stage is a “context pack” (AST + metadata + runnable Python when available)
+
+---
 
 ## Core fields (recommended)
 
@@ -21,6 +24,10 @@
 - `outputs`:
   - emitted files with semantic roles
   - entry symbols and callable signatures
+- `stages`:
+  - stage graph metadata (per-pass stage snapshots)
+- `replay`:
+  - runnable Python entrypoints + supported modes (`sim|device`)
 
 ## Extensibility
 
@@ -68,9 +75,26 @@
       {"name": "emit_pto_package", "version": "1"}
     ]
   },
+  "stages": {
+    "current": "s05",
+    "graph": [
+      {"id": "s00", "pass": null, "dir": "ir/stages/s00"},
+      {"id": "s01", "pass": "ast_canonicalize@1", "dir": "ir/stages/s01"},
+      {"id": "s02", "pass": "typecheck_layout_effects@1", "dir": "ir/stages/s02"},
+      {"id": "s03", "pass": "apply_schedule@1", "dir": "ir/stages/s03"},
+      {"id": "s04", "pass": "lower_pto@1", "dir": "ir/stages/s04"},
+      {"id": "s05", "pass": "emit_pto_package@1", "dir": "ir/stages/s05"}
+    ]
+  },
+  "replay": {
+    "entrypoints": [{"name": "add", "kind": "workload"}],
+    "modes": ["sim", "device"],
+    "default_mode": "sim",
+    "stage_program": "ir/stages/s05/program.py"
+  },
   "outputs": {
-    "package_manifest": "codegen/pto/package_manifest.json",
-    "kernel_registry": "codegen/pto/kernel_registry.json",
+    "kernel_config": "codegen/pto/kernel_config.py",
+    "pto_codegen_index": "codegen/pto/pto_codegen.json",
     "entrypoints": [
       {"name": "add", "kind": "workload", "signature": "(*inputs) -> None"}
     ]
@@ -84,3 +108,18 @@
 }
 ```
 
+---
+
+## Recommended companion files (artifact contract)
+
+The manifest is the index, but a complete package should also include:
+
+- `ir/pass_trace.jsonl` (contracted per-pass trace)
+- per-stage dumps:
+  - `ir/stages/<id>/program.py` (runnable replay, when `RunnablePy` holds)
+  - `ir/stages/<id>/program.pyast.json` (canonical AST)
+  - `ir/stages/<id>/types.json`, `layout.json`, `effects.json`, `schedule.json`
+  - `ir/stages/<id>/summary.json`
+
+Design note: this is what makes HTP “agent-friendly by construction”: tools/agents can replay and diff stages without
+re-implementing an IR interpreter.

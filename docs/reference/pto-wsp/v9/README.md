@@ -17,7 +17,7 @@ This directory contains the main documentation set for PTO Workload-Schedule Pro
 - `docs/reference/` — external references and extracted notes
 - `docs/research/` — older working docs and explorations
 - `docs/archive/` — historical specs/analysis
-- `docs/future/` — forward-looking plans (v10+)
+- `docs/reference/pto-wsp/v10/` — forward-looking plans (v10+) preserved as reference on this branch
 
 ## Examples
 

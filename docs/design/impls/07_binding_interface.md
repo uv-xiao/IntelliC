@@ -1,21 +1,88 @@
-# Impl: Binding Interface
+# Impl: Binding Interface (compile → bind → run → replay)
 
 ## Goal
 
-Standardize `bind(package)` so users get a consistent experience across backends.
+Standardize `bind(package)` so users get a consistent experience across backends, while preserving backend-specific
+build/run realities.
 
-## Binding lifecycle
+Bindings are also the execution substrate for:
 
-1. validate package + manifest
-2. build (optional) using toolchain integration
-3. load (library/runtime/simulator)
-4. run entrypoints with typed marshalling
-5. trace/report
+- staged replay (`RunnablePy`) in `sim|device` modes,
+- artifact contract validation,
+- and trace/log collection.
 
-## Minimal API (illustrative)
+---
 
-- `binding = bind(package_path)`
-- `binding.build()` (optional)
-- `binding.run(entry="...", args=..., symbols=...)`
-- `binding.trace(level=...)`
+## 1) Binding lifecycle
 
+1) **Validate**: validate package + manifest against backend artifact contract.
+2) **Build** (optional): invoke toolchains to produce runnable binaries from `codegen/<backend>/...` sources/recipes.
+3) **Load**: load runtime handles (shared libraries, device runners, simulators).
+4) **Run**: execute entrypoints with typed marshalling and trace hooks.
+5) **Replay**: execute a specific stage’s `ir/stages/<id>/program.py` when available.
+6) **Report**: emit structured run records, diagnostics, and log pointers into the package.
+
+---
+
+## 2) Binding selection
+
+`bind(package_dir)` selects a binding plugin based on:
+
+- `manifest.target.backend` (`pto`, `aie`, ...)
+- `manifest.target.variant` (optional)
+- and optional binding overrides (developer tooling)
+
+The binding must refuse to run if:
+
+- required files are missing from the artifact contract, or
+- required toolchain/runtime contracts are not satisfied.
+
+---
+
+## 3) Minimal API surface (illustrative)
+
+Conceptual API (exact names not important; semantics are):
+
+- `binding = htp.bind(package_dir)`
+- `report = binding.validate()`
+- `build = binding.build(mode="sim"|"device", force=False, cache_dir=None)`
+- `session = binding.load(mode="sim"|"device")`
+- `result = session.run(entry="main", args=[...], trace="off"|"basic"|"full")`
+- `result = session.replay(stage_id="s02", entry="main", args=[...], mode="sim")`
+
+Notes:
+
+- `mode="sim"` uses backend simulators where possible (e.g. `pto-runtime` `a2a3sim`).
+- `mode="device"` uses device runtimes/toolchains and may require environment setup.
+- `replay(stage_id=...)` requires that stage provides `program.py` (pass contract `RunnablePy`).
+
+---
+
+## 4) Validation and diagnostics contract
+
+Validation returns a structured report:
+
+- missing required files (artifact contract violations)
+- toolchain/runtime contract mismatches
+- entrypoint signature mismatches
+
+Run/replay failures must emit:
+
+- stable diagnostic codes,
+- node ids (when source-level blame is possible),
+- and file pointers to relevant stage dumps and logs.
+
+---
+
+## 5) Logs and run records
+
+Bindings should write into the package:
+
+```
+logs/
+  build_<backend>_<mode>_<ts>.log
+  run_<backend>_<mode>_<ts>.log
+  trace_<backend>_<ts>.jsonl          # optional structured runtime trace
+```
+
+and record the paths in `manifest.outputs` or `manifest.extensions.<backend>`.

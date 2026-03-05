@@ -3,7 +3,7 @@
 This folder contains reference notes and design context about `pto-runtime`, which PTO-WSP v10 targets as its primary runtime
 substrate for Ascend simulation and device execution.
 
-Local repository clone (gitignored): `references/pto-runtime/` (and the tracked submodule at `3rdparty/pto-runtime/`).
+Local repository clone (gitignored): `references/pto-runtime/`.
 
 ## Contents
 
@@ -12,7 +12,7 @@ Local repository clone (gitignored): `references/pto-runtime/` (and the tracked 
 - `docs/reference/pto_runtime/gaps.md` — explicit gaps / missing features PTO-WSP needs (semantics-honest checklist)
 - `docs/reference/pto_runtime/task_buffer.md` — preview/reference: task-buffer direction for bounded execution and true backpressure
 
-## How this relates to v10 docs
+## How this relates to PTO‑WSP v10 docs (reference only)
 
-v10 living specs remain in `docs/future/` (plan/spec/tracker). Those docs should link here for background and reference
-material, while keeping v10 requirements and checkpoints in `docs/future/`.
+The PTO‑WSP v10 reference docs in this branch live under `docs/reference/pto-wsp/v10/`.
+The relevant interface checkpoint is `docs/reference/pto-wsp/v10/v10_pto_runtime_interface.md`.

@@ -10,7 +10,7 @@ The redo’s core thesis:
 2. Extensibility only works if the framework can **type-check composition across extensions** (dialects, intrinsics, layouts, passes, pipelines, backends, bindings).
 3. Therefore HTP must be designed as an **AST-first, artifact-first, capability-typed compiler framework**, not as an incremental evolution of a single-backend compiler.
 
-This is a docs-only design under `docs/future-htp/`.
+This is a docs-only design under `docs/design/`.
 
 ---
 
@@ -157,8 +157,9 @@ Everything else is extension territory.
 
 ## 7. Reading map (this redo set)
 
-- `docs/future-htp/features.md` — feature catalog and rationale (WHAT)
-- `docs/future-htp/implementations.md` — architecture and component design (HOW)
-- `docs/future-htp/examples.md` — end-to-end examples across backends
-- `docs/future-htp/feats/` — deep dives per feature
-- `docs/future-htp/impls/` — deep dives per implementation component
+- `docs/design/features.md` — feature catalog and rationale (WHAT)
+- `docs/design/implementations.md` — architecture and component design (HOW)
+- `docs/design/story.md` — cohesive end-to-end narrative (WHY→WHAT→HOW)
+- `docs/design/examples.md` — end-to-end examples across backends
+- `docs/design/feats/` — deep dives per feature
+- `docs/design/impls/` — deep dives per implementation component

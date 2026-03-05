@@ -80,10 +80,19 @@ Concrete shape (conceptual):
   kernel_config.py
 ```
 
-Notable for v10:
+Notable:
 - `kernel_config.py` plays the role of a **manifest/config** tying together orchestration and kernels, including runtime
   config and `func_id` mapping. This aligns closely with PTO‑WSP’s `pto_runtime_*` packaging needs (Phase 1 host_build_graph
   trees and Phase 2 versioned packages).
+
+### 3.1 PTO backend packaging (newer direction)
+
+PyPTO’s PTO backend adds additional intermediates (as documented in `references/pypto/docs/en/dev/codegen/00-pto_codegen.md`):
+
+- optional `ptoas/` intermediates (`.pto` MLIR and ptoas-produced `.cpp`)
+- kernel wrapper generation into `kernels/aiv/<name>.cpp` (runner-compatible ABI)
+
+This makes the emitted directory a complete “compile → run” context for existing runners.
 
 ## 4) PTO backend output (PTO “assembly” artifact)
 
@@ -109,5 +118,6 @@ Pointer:
   formatting decisions.
 
 Concrete “follow this” guideline for PTO‑WSP v10:
-- For `pto_runtime_*` targets, treat `kernels/kernel_config.py` (or a future manifest) as the stable bridge between PTO‑WSP
-  codegen and pto-runtime build/run tooling, in the same spirit as PyPTO’s CCE packaging.
+- Treat `kernel_config.py` (and the `kernels/` + `orchestration/` layout it indexes) as the stable runner-facing bridge,
+  in the same spirit as PyPTO’s packaging. Use an additional HTP-owned index above runner-specific ids for long-term
+  reproducibility.

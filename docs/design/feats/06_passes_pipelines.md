@@ -8,6 +8,7 @@ Make transformation pipelines:
 - inspectable
 - extensible
 - safe to compose
+- replayable as staged runnable artifacts
 
 ## Pass types
 
@@ -24,7 +25,13 @@ Each pass declares:
 
 - `requires` capabilities
 - `provides` capabilities
-- invariants and failure diagnostics
+- `invalidates` capabilities (optional)
+- layout/effect invariants and failure diagnostics
+- replay contract (`RunnablePy`: preserves | stubbed | breaks)
+
+Deep dive:
+- pass manager and tracing: `docs/design/impls/02_pass_manager.md`
+- satisfiable pipeline selection: `docs/design/impls/03_capability_solver.md`
 
 ## Pipeline definition
 
@@ -35,4 +42,3 @@ A pipeline declares:
 - output artifact contract + binding requirement
 
 Pipeline selection checks satisfiability before running.
-

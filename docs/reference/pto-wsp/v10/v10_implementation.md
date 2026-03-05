@@ -54,7 +54,7 @@ pto-runtime runtime (a2a3sim / a2a3)
 For v10, “implementing backends” is inseparable from defining a clean, versioned boundary with `pto-runtime`. Treat the
 interface contract as a gating specification:
 
-- `docs/future/v10_pto_runtime_interface.md`
+- `docs/reference/pto-wsp/v10/v10_pto_runtime_interface.md`
 
 ## 1. Organizing principle
 

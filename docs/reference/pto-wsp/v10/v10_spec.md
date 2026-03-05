@@ -2,7 +2,7 @@
 
 > This document is a **draft spec** for v10. It is intended to be aligned with implementation as v10 is built.
 >
-> Interface checkpoint (gating spec): `docs/future/v10_pto_runtime_interface.md`.
+> Interface checkpoint (gating spec): `docs/reference/pto-wsp/v10/v10_pto_runtime_interface.md`.
 
 ## 1. Non-negotiable semantic rules
 
@@ -292,7 +292,7 @@ v10 allows a phased interface, but it must not misrepresent schedule semantics:
   - CSP channel waits/signals participate in readiness and can deadlock with bounded resources (diagnostics required).
 
 This phase split and hazards are tracked in:
-- `docs/future/v10_pto_runtime_interface.md`
+- `docs/reference/pto-wsp/v10/v10_pto_runtime_interface.md`
 
 ### 7.2 Package + ABI requirements (minimum)
 

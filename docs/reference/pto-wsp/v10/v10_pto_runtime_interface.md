@@ -194,4 +194,4 @@ Reference files (read-only):
 - pto-runtime status: `docs/reference/pto_runtime/analysis.md`
 - pto-runtime integration overview: `docs/reference/pto_runtime/integration.md`
 - task-buffer preview/reference: `docs/reference/pto_runtime/task_buffer.md`
-- v10 spec: `docs/future/v10_spec.md`
+- v10 spec: `docs/reference/pto-wsp/v10/v10_spec.md`

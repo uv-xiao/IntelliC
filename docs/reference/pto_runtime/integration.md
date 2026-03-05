@@ -1,10 +1,10 @@
 # Reference: PTO‑WSP ↔ pto-runtime Integration Notes (v10 direction)
 
 This document is a **reference note** for how PTO‑WSP v10 should integrate with `pto-runtime` (source clone in
-`references/pto-runtime/` and submodule in `3rdparty/pto-runtime/`).
+`references/pto-runtime/`).
 
-Interface checkpoint (v10 living spec):
-- `docs/future/v10_pto_runtime_interface.md`
+Interface checkpoint (v10 reference docs on this branch):
+- `docs/reference/pto-wsp/v10/v10_pto_runtime_interface.md`
 
 ## 0) Goals and non-negotiables
 
@@ -17,14 +17,11 @@ Interface checkpoint (v10 living spec):
 
 ## 1) Dependency shape
 
-### Option A: Git submodule (recommended, current)
+On this docs-only branch, `pto-runtime` is treated as a **local external checkout**:
+- `references/pto-runtime/` (gitignored)
 
-Pinned runtime for reproducibility:
-- `3rdparty/pto-runtime/`
-
-### Option B: External checkout
-
-Allow pointing PTO‑WSP to a runtime checkout via config/env var, but keep submodule as the default for CI.
+In an implementation branch, you can choose whether to pin `pto-runtime` via a submodule or by a workspace-level
+checkout; the key requirement is reproducibility (version pinning + manifest recording) rather than the mechanism.
 
 ## 2) Runtime flavors and the integration ladder
 
@@ -128,4 +125,3 @@ pto-runtime status:
 - Treat the emitted artifact directory as the canonical interface boundary for `pto_runtime_*` backends.
 - Reuse pto-runtime Python toolchain for compilation and execution (don’t duplicate platform toolchain logic in PTO‑WSP).
 - Keep “Phase 1 runnable” and “Phase 2 semantics-complete” explicitly distinct in docs and capability matrices.
-

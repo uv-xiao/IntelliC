@@ -4,8 +4,8 @@ This document tracks **missing or not-yet-stable pto-runtime features** required
 integration **semantics-honest**: if something is not supported, PTO‑WSP should treat it as *recorded/diagnosed* (or
 explicitly unsupported), not “implemented”.
 
-Related v10 checkpoint:
-- `docs/future/v10_pto_runtime_interface.md`
+Related v10 checkpoint (reference docs on this branch):
+- `docs/reference/pto-wsp/v10/v10_pto_runtime_interface.md`
 
 ## 1) User-controlled `dispatch(policy)` → scheduler-domain assignment
 
@@ -79,4 +79,3 @@ PTO‑WSP direction:
 pto-runtime status:
 - pto-runtime is a single-runtime substrate (Ascend + sim) rather than a multi-target framework.
 - PTO‑WSP needs to define its own “multi-target layer” while treating pto-runtime as one backend target.
-

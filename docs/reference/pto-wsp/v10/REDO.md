@@ -4,7 +4,10 @@ I've review the v10 design by myself. And I found it not satisfying. Let's redo 
 
 ## HOW TO?
 
-We should create the docs/future-htp folder to hold the redo design. The principles of the redo process is listed below. You should generate: 
+Note (current docs branch): the redo design lives in `docs/design/` (this document is preserved as historical v10
+reference context).
+
+We should create the `docs/design/` folder to hold the redo design. The principles of the redo process is listed below. You should generate:
 
 - analysis.md: motivation and fundamentail methodology
 - features.md: feature summary and rationale discussion 
@@ -13,7 +16,9 @@ We should create the docs/future-htp folder to hold the redo design. The princip
 - impls/ folder to hold more implementation details of every component
 - feats/ folder to hold detailed explanation of every feature
 
-You can learn from docs/future, but you must do fundamental REDO, not incremental fixes from v10 design. You must conduct very careful thinking and analysis as experts in related domains (PL, computer architect, LLM performance engineer, compiler, ...) For related work, you need to carefully read paper and code and reports.
+You can learn from `docs/design/REDO.md`, but you must do fundamental REDO, not incremental fixes from v10 design. You
+must conduct very careful thinking and analysis as experts in related domains (PL, computer architect, LLM performance
+engineer, compiler, ...) For related work, you need to carefully read paper and code and reports.
 
 This is a very large design work. You should do it with huge patience and frequent review. 
 
@@ -72,4 +77,3 @@ We must codegen artifacts to be further compiled by pto-runtime, for both a2a3si
 ### AIE
 
 We must codegen artifacts to be compiled by mlir-aie, similar to what Allo's aie backend does and DATO does.
-

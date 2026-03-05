@@ -1,20 +1,24 @@
 # HTP Redo (docs-only) — Index
 
-This folder is the **redo design** described by `docs/future/REDO.md`.
+This folder is the **redo design** described by `docs/design/REDO.md`.
 
 ## Read order
 
-- `docs/future-htp/analysis.md` — positioning and methodology (WHY)
-- `docs/future-htp/features.md` — feature catalog (WHAT)
-- `docs/future-htp/implementations.md` — architecture and contracts (HOW)
-- `docs/future-htp/examples.md` — end-to-end examples
+- `docs/design/analysis.md` — positioning and methodology (WHY)
+- `docs/design/features.md` — feature catalog (WHAT)
+- `docs/design/implementations.md` — architecture and contracts (HOW)
+- `docs/design/story.md` — cohesive end-to-end narrative (WHY→WHAT→HOW)
+- `docs/design/examples.md` — end-to-end examples
+
+## Completeness criteria
+
+- `docs/design/acceptance_checklist.md`
 
 ## Deep dives
 
-- Features: `docs/future-htp/feats/`
-- Implementation components: `docs/future-htp/impls/`
+- Features: `docs/design/feats/`
+- Implementation components: `docs/design/impls/`
 
 ## Scope note
 
 This redo is **docs-only**: it does not rename packages, move code, or change build scripts yet.
-

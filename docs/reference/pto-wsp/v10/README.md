@@ -12,14 +12,14 @@ relevant v10 docs in the same change:
   (including pto-runtime as a codegen target) and must not drift from what the codebase actually supports.
 - `v10_implementation.md` must include a dated “done vs todo” snapshot and should be refreshed as milestones land.
 
-- `docs/future/v10_analysis.md` — v10 design analysis (WHY)
-- `docs/future/v10_features.md` — v10 feature catalog (WHAT, at a glance)
-- `docs/future/v10_spec.md` — v10 spec draft (semantics + API surface)
-- `docs/future/v10_implementation.md` — v10 implementation plan (HOW)
-- `docs/future/v10_plan.md` — v10 goals, workstreams, milestones
-- `docs/future/v10_tracker.md` — checklist tracker for v10 execution
-- `docs/future/v10_compiler_pipeline.md` — v10 Python-driven compiler/codegen pipeline (AST passes + intrinsics + optional MLIR islands)
-- `docs/future/v10_pto_runtime_interface.md` — interface contract / hazards checkpoint for PTO‑WSP ↔ pto-runtime
+- `docs/reference/pto-wsp/v10/v10_analysis.md` — v10 design analysis (WHY)
+- `docs/reference/pto-wsp/v10/v10_features.md` — v10 feature catalog (WHAT, at a glance)
+- `docs/reference/pto-wsp/v10/v10_spec.md` — v10 spec draft (semantics + API surface)
+- `docs/reference/pto-wsp/v10/v10_implementation.md` — v10 implementation plan (HOW)
+- `docs/reference/pto-wsp/v10/v10_plan.md` — v10 goals, workstreams, milestones
+- `docs/reference/pto-wsp/v10/v10_tracker.md` — checklist tracker for v10 execution
+- `docs/reference/pto-wsp/v10/v10_compiler_pipeline.md` — v10 Python-driven compiler/codegen pipeline (AST passes + intrinsics + optional MLIR islands)
+- `docs/reference/pto-wsp/v10/v10_pto_runtime_interface.md` — interface contract / hazards checkpoint for PTO‑WSP ↔ pto-runtime
 - `docs/reference/pto_runtime/README.md` — reference index for pto-runtime notes (for v10)
 - `docs/reference/pto_runtime/analysis.md` — notes on the decoupled `pto-runtime` runtime architecture (reference)
 - `docs/reference/pto_runtime/integration.md` — how PTO‑WSP should integrate with `pto-runtime` (reference)

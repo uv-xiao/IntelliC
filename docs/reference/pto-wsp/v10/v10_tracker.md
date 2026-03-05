@@ -1,6 +1,6 @@
 # PTO‑WSP v10 Tracker (draft)
 
-This file is a checklist tracker for executing `docs/future/v10_plan.md`.
+This file is a checklist tracker for executing `docs/reference/pto-wsp/v10/v10_plan.md`.
 
 ## Progress log
 

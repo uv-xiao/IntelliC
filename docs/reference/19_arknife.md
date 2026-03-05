@@ -61,6 +61,5 @@ Arknife is directly relevant to the v10 “Emitter/Backend layer” design:
   bound to different instruction/channel implementations, rather than “forking the compiler”.
 
 Related v10 docs:
-- `docs/future/v10_analysis.md`
-- `docs/future/v10_compiler_pipeline.md`
-
+- `docs/reference/pto-wsp/v10/v10_analysis.md`
+- `docs/reference/pto-wsp/v10/v10_compiler_pipeline.md`

@@ -2,38 +2,107 @@
 
 ## Goal
 
-Make “backend-specific operations” usable from Python while keeping portability and correctness.
+Expose low-level operations (vector ops, async copies, barriers, accelerators) in a way that is:
 
-## Intrinsic contract
+- **portable when possible** (multiple backends can implement the same contract),
+- **explicitly target-specific when needed** (namespaced ops like `pto.*`),
+- and **checkable** (layout/effects/capabilities, not “attrs as APIs”).
 
-Every intrinsic should declare:
+Intrinsics are the *only* way a kernel touches target-specific semantics. They are therefore a primary retargetability
+surface.
 
-- semantic signature:
-  - operand types (tiles/tensors/scalars)
-  - result types
-- layout constraints:
-  - required distribution/memory/hardware facets
-  - permitted memory spaces
-- scheduling constraints:
-  - vector width, alignment, pipeline stage constraints, etc.
-- backend handlers:
-  - which backends can lower/emit it
+---
 
-## Examples
+## 1) Intrinsic contract: `IntrinsicDecl`
 
-- `pto.add(tileA, tileB)`:
-  - requires: PTO backend handler
-  - layout: compatible tile shapes + dtype
-  - hardware: specific memory space constraints may apply
-- `aie.matmul(tileA, tileB)`:
-  - requires: AIE handler and mapping context
+An intrinsic is declared by a contract object (conceptual schema):
 
-## Portability strategy
+- identity:
+  - `name`: stable symbol name (e.g. `portable.add`, `portable.dot`, `pto.tma_async_copy`, `aie.mma`)
+  - `version`: semantic version of the contract
+- type signature:
+  - `params`: list of typed parameters (`Tile[...]`, `Tensor[...]`, `Buffer[..., space]`, scalars, tokens)
+  - `returns`: list of typed returns
+  - `type_params`: explicit polymorphism (dtype/shape generics); no “duck typing”
+- legality constraints:
+  - `requires_layout`: facet predicates (distribution/memory/hardware facets)
+  - `requires_caps`: capability tags (e.g. `cap.hw.async_copy.tma`, `cap.vec.width>=16`)
+  - `requires_schedule`: scheduling predicates (alignment, pipeline stages, vector width constraints)
+- effect interface:
+  - `requires_effects`: obligations that must already hold
+  - `produces_effects`: obligations introduced by the intrinsic (e.g. an async token)
+  - `discharges_effects`: obligations that the intrinsic resolves (e.g. a `wait(token)` discharges `AsyncCopy(token)`)
+- semantics:
+  - minimal semantic spec sufficient for simulation and verification (not prose-only)
+- diagnostics:
+  - stable error codes + structured payload schema for violations
 
-Support two classes:
+### 1.1 “Two-tier” intrinsic sets
 
-1. **Portable intrinsics**: abstract ops that multiple backends can lower (e.g., `add`, `mul`, `dot`).
-2. **Backend intrinsics**: explicitly namespaced ops (`pto.*`, `aie.*`) used when authors want control.
+HTP supports two classes, with the same contract mechanism:
 
-The type system prevents accidental use of backend intrinsics in unsupported pipelines.
+1) **Portable intrinsics** (`portable.*`): multiple backends may implement the same semantics, possibly via different
+   lowering strategies.
+2) **Backend intrinsics** (`pto.*`, `aie.*`): explicitly constrain pipeline selection to targets that provide handlers.
 
+This is the primary portability strategy: authors choose the portability tier explicitly, and the solver enforces it.
+
+---
+
+## 2) Handler interface (backend-provided)
+
+Backends implement intrinsics via handlers. Split handlers into three roles so pipelines can be explicit about what they
+need:
+
+- `LoweringRule`: typed AST call → backend-ready structured op(s)
+- `Emitter`: backend-ready op(s) → files/sections under `codegen/<backend>/...`
+- `Simulator` (optional but recommended): defines semantics for `RunnablePy` simulation mode
+
+Not all targets need all roles, but the pipeline must declare which roles it requires.
+
+### 2.1 Handler registration contract
+
+A backend provides a registry mapping:
+
+- `IntrinsicDecl.name@version` → handler set (`lower`, `emit`, optional `simulate`)
+
+Missing handlers are not “runtime errors”; they are **capability mismatches** detected during pipeline selection and
+reported as structured diagnostics.
+
+---
+
+## 3) Effects and async intrinsics (example contracts)
+
+### 3.1 Async copy
+
+`pto.tma_async_copy(src: Buffer[..., global], dst: Buffer[..., ub], bytes: i32) -> Token[AsyncCopy]`
+
+- requires:
+  - `requires_caps`: `cap.hw.async_copy.tma`
+  - `requires_layout`: `dst.hw.space == "ub"`
+- produces:
+  - `produces_effects`: `AsyncCopy(token, src_space="global", dst_space="ub", bytes, ordering="relaxed")`
+
+`portable.wait(token: Token[AsyncCopy]) -> ()`
+
+- discharges:
+  - `discharges_effects`: `AsyncCopy(token, ...)`
+
+This makes ordering obligations explicit and checkable.
+
+### 3.2 Barrier
+
+`portable.barrier(scope: BarrierScope) -> ()`
+
+- requires:
+  - backend must support the selected `scope` (`cap.hw.barrier.scope=warp|block|tile|...`)
+- produces/discharges:
+  - may discharge pending async visibility obligations depending on the backend’s memory model
+
+---
+
+## 4) What this buys us (retargetability + extensibility)
+
+- Intrinsics define the **semantic boundary** between portable kernels and backend specifics.
+- Layout/effects/capabilities make legality checkable without relying on pass ordering folklore.
+- Adding a backend becomes: declare capability support + implement handler tables, rather than forking pipelines.

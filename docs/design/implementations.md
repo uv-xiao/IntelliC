@@ -10,7 +10,7 @@ HTP is a Python-driven compiler framework with:
 - **Artifact-first output**: compilation emits a package with a manifest and dumps.
 - **Backend plugins**: codegen emitters + bindings are backend-registered.
 
-This file describes components and data flow; implementation deep dives are in `docs/future-htp/impls/`.
+This file describes components and data flow; implementation deep dives are in `docs/design/impls/`.
 
 Related design references already captured in this repo:
 
@@ -161,9 +161,19 @@ Directory layout (illustrative):
 <out>/
   manifest.json
   ir/
-    ast_original.pyast.json
-    ast_canonical.pyast.json
     pass_trace.jsonl
+    stages/
+      s00/
+        program.py
+        program.pyast.json
+        env.json
+        types.json
+        layout.json
+        effects.json
+        schedule.json
+        summary.json
+      s01/
+        ...
   codegen/
     <backend>/
       ... backend-specific outputs ...
@@ -181,8 +191,12 @@ The manifest must include:
 - backend target and hardware profile
 - entrypoints (kernel/routine symbols)
 - produced artifacts with paths and semantics
+- replay info:
+  - runnable python entrypoints
+  - supported modes (`sim|device`)
+  - current stage pointer
 
-Deep dive: `docs/future-htp/impls/04_artifact_manifest.md`.
+Deep dive: `docs/design/impls/04_artifact_manifest.md`.
 
 ---
 
@@ -194,17 +208,21 @@ Recommended shape (mirrors proven kernel/orchestration separation patterns):
 
 ```
 codegen/pto/
+  kernel_config.py
   kernels/
-    ... kernel sources / pto binaries ...
+    aiv/
+    aic/                   # optional
   orchestration/
-    ... host orchestration code ...
-  package_manifest.json
-  kernel_registry.json
+  ptoas/                   # optional intermediates
+  pto_codegen.json
+  build/
+    toolchain.json
 ```
 
-Key design point: “package manifests” are the stable integration boundary with runtime tooling.
+Key design point: `kernel_config.py` is the runner-facing bridge (existing tooling expects it); HTP keeps a stable
+`pto_codegen.json` above runner-specific ids.
 
-Deep dive: `docs/future-htp/impls/05_backend_pto.md`.
+Deep dive: `docs/design/impls/05_backend_pto.md`.
 
 ### 4.2 AIE backend (MLIR-AIE)
 
@@ -219,7 +237,7 @@ codegen/aie/
   build.sh / cmake/ (optional)
 ```
 
-Deep dive: `docs/future-htp/impls/06_backend_aie.md`.
+Deep dive: `docs/design/impls/06_backend_aie.md`.
 
 ---
 
@@ -238,7 +256,7 @@ Deep dive: `docs/future-htp/impls/06_backend_aie.md`.
 - Type-check tests: known-bad programs produce stable diagnostics.
 - Backend contract tests: package validates against binding expectations.
 
-Deep dive: `docs/future-htp/impls/08_testing.md`.
+Deep dive: `docs/design/impls/08_testing.md`.
 
 ---
 
@@ -246,12 +264,13 @@ Deep dive: `docs/future-htp/impls/08_testing.md`.
 
 Implementation deep dives live in:
 
-- `docs/future-htp/impls/01_ir_model.md`
-- `docs/future-htp/impls/02_pass_manager.md`
-- `docs/future-htp/impls/03_capability_solver.md`
-- `docs/future-htp/impls/04_artifact_manifest.md`
-- `docs/future-htp/impls/05_backend_pto.md`
-- `docs/future-htp/impls/06_backend_aie.md`
-- `docs/future-htp/impls/07_binding_interface.md`
-- `docs/future-htp/impls/08_testing.md`
-- `docs/future-htp/impls/09_transition_plan.md`
+- `docs/design/impls/01_ir_model.md`
+- `docs/design/impls/02_pass_manager.md`
+- `docs/design/impls/03_capability_solver.md`
+- `docs/design/impls/04_artifact_manifest.md`
+- `docs/design/impls/05_backend_pto.md`
+- `docs/design/impls/06_backend_aie.md`
+- `docs/design/impls/07_binding_interface.md`
+- `docs/design/impls/08_testing.md`
+- `docs/design/impls/09_transition_plan.md`
+- `docs/design/impls/10_agentic_tooling.md`

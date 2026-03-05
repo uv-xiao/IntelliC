@@ -50,6 +50,51 @@ What this demonstrates:
 - Intrinsic typing: `pto.add` is only legal in PTO-capable backends.
 - Artifact-first: `out/add/` contains manifest + IR dumps + PTO artifacts.
 
+Illustrative emitted tree (key files only):
+
+```
+out/add/
+  manifest.json
+  ir/
+    pass_trace.jsonl
+    stages/
+      s00/                      # capture stage
+        program.py              # runnable replay (sim/device)
+        program.pyast.json
+        env.json
+        types.json
+        layout.json
+        effects.json
+        schedule.json
+      s01/                      # canonicalize
+        program.py
+        program.pyast.json
+        ...
+      s02/                      # type/layout/effect check
+        program.py
+        ...
+      s03/                      # apply schedule
+        program.py
+        ...
+      s04/                      # lower to PTO-ready form (may become stubbed for some kernels)
+        program.py
+        ...
+  codegen/
+    pto/
+      kernel_config.py
+      kernels/
+        aiv/
+        aic/                     # optional
+      orchestration/
+      ptoas/                     # optional intermediates
+      pto_codegen.json
+      build/
+        toolchain.json
+```
+
+Design intent: because the canonical IR is Python AST, every stage emits `program.py` when pass contracts preserve
+`RunnablePy`. This is the primary mechanism for stage-by-stage replay/debugging without an IR interpreter.
+
 ---
 
 ## Example 2 — CSP pipeline megakernel: load → compute → store

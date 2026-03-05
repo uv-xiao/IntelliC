@@ -67,7 +67,7 @@ v10 also requires a **semantics-honest** integration with the decoupled `pto-run
 - Phase 1 (host graph build) can unblock runnable backends quickly, but must not claim true `task_window` backpressure-to-orchestration.
 - Phase 2 (task-buffer + on-device expansion) is required for v10 completeness and restores the v9 thesis.
 
-See `docs/future/v10_pto_runtime_interface.md`.
+See `docs/reference/pto-wsp/v10/v10_pto_runtime_interface.md`.
 
 ## Migration note: `cpu_sim` → `pto_runtime_a2a3sim` (v10 requirement)
 
@@ -95,7 +95,7 @@ is considered a v9 legacy backend and is planned to be removed during v10 implem
     - “emit-only” backends can still compile host-side shims for sanity
   - Improve the Python-driven compilation pipeline (frontend → codegen):
     - AST pass pipeline as the primary “kernel/orchestration authoring” transformation layer
-    - backend-specific intrinsic/builtin mechanism (see `docs/future/v10_features.md`)
+    - backend-specific intrinsic/builtin mechanism (see `docs/reference/pto-wsp/v10/v10_features.md`)
     - optional internal `AST ↔ MLIR` bridge for pass-selected regions (no user-facing markers required)
 
 - **CSP as a complete feature (no compromise)**
@@ -163,10 +163,10 @@ is considered a v9 legacy backend and is planned to be removed during v10 implem
 ## Workstreams (v10)
 
 Supporting docs:
-- `docs/future/v10_analysis.md` (WHY)
-- `docs/future/v10_features.md` (WHAT)
-- `docs/future/v10_spec.md` (semantics/API)
-- `docs/future/v10_implementation.md` (HOW)
+- `docs/reference/pto-wsp/v10/v10_analysis.md` (WHY)
+- `docs/reference/pto-wsp/v10/v10_features.md` (WHAT)
+- `docs/reference/pto-wsp/v10/v10_spec.md` (semantics/API)
+- `docs/reference/pto-wsp/v10/v10_implementation.md` (HOW)
 
 ### W1) Backend/runtime architecture maturity
 

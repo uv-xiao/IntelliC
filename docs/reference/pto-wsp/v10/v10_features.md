@@ -1,6 +1,6 @@
 # PTO‑WSP v10: Feature Catalog (draft)
 
-This document is an at-a-glance catalog for v10. For rationale see `docs/future/v10_analysis.md`.
+This document is an at-a-glance catalog for v10. For rationale see `docs/reference/pto-wsp/v10/v10_analysis.md`.
 
 ## Status vocabulary (v10 planning)
 

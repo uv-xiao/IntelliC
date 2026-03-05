@@ -3,11 +3,23 @@
 ## 0. Feature principles
 
 - **Extensibility-first**: every major axis must be extensible (dialects, intrinsics, layout facets, passes, pipelines, backends, bindings).
-- **Typed composition**: extension compatibility is checked via `requires/provides` capability typing plus layout/effect typing. 
-<!-- Here, we need more typing for extension. For example, new dialects (e.g. WSP and CSP) for programming also introduce new typing. Meanwhile, we should have some basic typing, as those in CuTile about basic data types and tensor/tile elements. -->
+- **Typed composition**: extension compatibility is checked via `requires/provides` capability typing plus layout/effect typing.
 - **Artifact-first**: compilation output is always a package with a manifest and inspectable intermediate dumps.
 - **AST-first**: Python AST is the base IR; optional external compilation islands are explicit.
-<!-- The external compilation should have extension mechanism. For example, an island MLIR pipeline may be defined with Python classes to specify matcher logic and bridge (bidirectional) logic (e.g., through MLIR's Python binding) -->
+
+### 0.1 Core type system (minimum, shared across dialects)
+
+HTP needs a small, stable type system that all dialects build on:
+
+- scalars: `i{8,16,32,64}`, `u{8,16,32,64}`, `f16`, `bf16`, `f32`, `f64`, `bool`
+- indices/sizes: `Index`, `Dim`, `Sym("M")` style symbolic dimensions
+- tiles/tensors:
+  - `Tile[m, n, dtype]` (value-level tile in registers or local scratch)
+  - `Tensor[shape..., dtype]` (logical tensor; may carry layout facets)
+- memory references/buffers:
+  - `Buffer[shape..., dtype, space]` where `space ∈ {global, smem, ub, lds, sram, ...}`
+
+Layout facets and effects refine these types; dialects must not invent incompatible “parallel worlds” of types.
 
 ---
 
@@ -15,7 +27,6 @@
 
 ### 1.1 Kernel programming (tile-level)
 
-<!-- @kernel is not something special. Instead, it should be an instance of the decarator-based programming extension mechanism. In other words, it shouldn't be hardcoded, but should be defined based on an extension framework (e.g., defining classes with bases). -->
 - `@kernel` defines a tile kernel with a typed signature.
 - Kernel bodies call intrinsics (portable or backend-specific) such as:
   - arithmetic/elementwise
@@ -27,7 +38,10 @@
   - layout facets (distribution/memory/hardware constraints)
 
 Rationale: kernels are the reusable unit for megakernels and pipelines.
-<!-- Although kernels are reusable abstraction, they are not the minimal unit for extensions. -->
+
+Design decision (extensibility): `@kernel` is *not* a compiler hardcode. It is provided by a default dialect package
+(`Dialect.CoreKernel`) and is replaceable/extendable via the dialect registry. All kernel dialects must lower into the
+canonical `KernelDef` AST form (see `docs/design/impls/01_ir_model.md`).
 
 ### 1.2 WSP: workload vs schedule programming
 
@@ -38,7 +52,8 @@ Two interlocked but separate layers:
 
 Rationale: preserve the “workload first; schedule later” workflow across backends.
 
-<!-- This should be a dialect to be plugged at the programming layer. -->
+Design decision: WSP is a dialect package. It defines syntax (`@workload`, `@schedule`) plus typing rules and
+canonicalization/lowering passes into a canonical WSP graph/loop form.
 
 ### 1.3 CSP: process/channel pipelines
 
@@ -50,7 +65,8 @@ Rationale: preserve the “workload first; schedule later” workflow across bac
 
 Rationale: pipelines are the natural representation for megakernels and serving routines.
 
-<!-- This should also be a dialect to be extended. -->
+Design decision: CSP is a dialect package. It defines process/channel syntax and effect typing rules, and it must lower
+into a canonical CSP graph form consumable by backends.
 
 ### 1.4 Serving routine programming (host orchestration)
 
@@ -62,7 +78,8 @@ Rationale: pipelines are the natural representation for megakernels and serving 
 
 Rationale: serving is “things above kernels” and must be in scope.
 
-<!-- This don't need to be a standalone dialect/extension. Instead, it can be represented with basic + WSP + CSP. So this should be a case study. -->
+Design decision: “serving routines” are not a separate dialect. They are compositions of CoreKernel + WSP + CSP plus
+ordinary Python orchestration constructs, with explicit compilation boundaries.
 ---
 
 ## 2. Layout system (unified, multi-facet)
@@ -88,7 +105,13 @@ Rationale: serving is “things above kernels” and must be in scope.
 
 Rationale: backends differ; layout must bridge distributed ↔ on-device ↔ runtime constraints.
 
-<!-- We need to think about how we integrate a specific layout with the program. We just use the Python's typing system and add type inference/checking for a specific layout as passes in the pipeline? But how should we easily move to another backend? For example, we can definitely build different pipelines to compile program of Axe layout targetting GPU and Ascend NPU. But if we want to switch the program of Axe to program of Arknife to target Qualcomm Hexagon NPU, can we do this automatically? This is about a unified defination of different layouts and their automatic conversion, which is very interesting. If we cannot achieve this, we should make best preparation for this at the code architecture level to leave the challenge for future solving. -->
+Design decision: layout is integrated as **typed metadata** attached to tensors/tiles/buffers, refined by passes. Cross-
+backend portability is achieved by:
+
+- a single *facet product model* (distribution ⊗ memory ⊗ hardware),
+- explicit relayout operations (never silent “magical conversion”),
+- backend-declared supported facet subsets and legality rules,
+- and pipeline selection that chooses which facet refinements are available on a target.
 
 ---
 
@@ -109,8 +132,9 @@ Dialects are packages that:
 
 - define AST constructs / decorators / helper APIs,
 - define typing rules / legality,
-<!-- - define canonicalization/lowering passes into core representations. This is not correct. We don't have such a thing as the core representations. -->
-<!-- - instead: define their own data structure (Python classes) which should be built and maintained for analysis during mutator passes. -->
+- define canonicalization/lowering passes into **canonical AST forms** (CoreKernel/WSP/CSP canonical nodes)
+- optionally define analysis-time helper data structures (dialect-local), but they must be serializable and derived from
+  the canonical forms + metadata.
 
 Rationale: CSP and WSP should be optional and independently evolvable.
 
@@ -129,6 +153,16 @@ Rationale: CSP and WSP should be optional and independently evolvable.
   - MLIR module(s) + dialects
   - external toolchain invocations
 - The pass also defines how artifacts rejoin the main pipeline (manifested outputs).
+
+Design decision: islands are defined via an explicit interface:
+
+- an island pass declares:
+  - a matcher (which AST regions it can “enter”),
+  - an exporter (AST → external IR/tool inputs),
+  - an importer (external outputs → HTP artifact references + typed stubs),
+  - and an artifact contract (what files it emits and how they are named/manifested).
+
+This keeps island semantics auditable and makes retargeting explicit.
 
 ### 4.3 Pipeline selection via capability typing
 
@@ -166,6 +200,10 @@ Each compile emits:
 
 Rationale: reproducibility, debugging, and stable runtime integration.
 
+Design addition: because the canonical IR is Python AST, HTP should also emit a **runnable Python replay program** at
+each stage (`ir/stages/<id>/program.py`) when the pass contracts allow it (`RunnablePy`). This makes intermediate dumps
+executable “context packs”.
+
 ---
 
 ## 6. “Must-support” targets (initial)
@@ -198,13 +236,13 @@ Rationale: reproducibility, debugging, and stable runtime integration.
 
 Feature deep dives live in:
 
-- `docs/future-htp/feats/01_extensibility.md`
-- `docs/future-htp/feats/02_dialects_wsp.md`
-- `docs/future-htp/feats/03_dialects_csp.md`
-- `docs/future-htp/feats/04_intrinsics.md`
-- `docs/future-htp/feats/05_layout.md`
-- `docs/future-htp/feats/06_passes_pipelines.md`
-- `docs/future-htp/feats/07_backends_artifacts.md`
-- `docs/future-htp/feats/08_binding_runtime.md`
-- `docs/future-htp/feats/09_debuggability.md`
-
+- `docs/design/feats/01_extensibility.md`
+- `docs/design/feats/02_dialects_wsp.md`
+- `docs/design/feats/03_dialects_csp.md`
+- `docs/design/feats/04_intrinsics.md`
+- `docs/design/feats/05_layout.md`
+- `docs/design/feats/06_passes_pipelines.md`
+- `docs/design/feats/07_backends_artifacts.md`
+- `docs/design/feats/08_binding_runtime.md`
+- `docs/design/feats/09_debuggability.md`
+- `docs/design/feats/10_agentic_development.md`
