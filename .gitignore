@@ -13,6 +13,11 @@ build/
 # Large reference checkouts are intentionally not tracked on this branch
 references/
 
+# Planning scratchpads (local-only)
+findings.md
+progress.md
+task_plan.md
+
 # OS
 .DS_Store
 Thumbs.db
