@@ -18,6 +18,7 @@ Make transformation pipelines:
 - Lowering passes (to backend-ready forms)
 - Packaging passes (artifact emission, manifest finalization)
 - Island passes (enter/exit MLIR or external toolchains)
+- Analysis passes (produce staged, versioned analyses for downstream transforms)
 
 ## Contract-driven execution
 
@@ -28,6 +29,7 @@ Each pass declares:
 - `invalidates` capabilities (optional)
 - layout/effect invariants and failure diagnostics
 - replay contract (`RunnablePy`: preserves | stubbed | breaks)
+- pass effect kind (`analysis | transform | mixed`) and AST effect (`preserves | mutates`)
 
 Deep dive:
 - pass manager and tracing: `docs/design/impls/02_pass_manager.md`

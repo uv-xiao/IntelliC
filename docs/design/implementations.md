@@ -20,6 +20,10 @@ Related design references already captured in this repo:
 - Stream/layout typing and mapping concepts: `docs/reference/16_dato.md`
 - AIE mapping + FIFOs reference shape: `docs/reference/15_allo.md`
 
+Case study (end-to-end, pass-by-pass):
+
+- Warp specialization + software pipelining: `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
+
 ---
 
 ## 1. Top-level data flow
@@ -109,7 +113,14 @@ HTP should separate:
 
 ### 2.6 Passes
 
-A pass is a pure(ish) transform with a contract:
+A pass is a contracted unit that may:
+
+- **mutate the typed Python AST** (producing a new runnable stage program), and/or
+- **produce analyses** (typed data structures) that are staged and serializable.
+
+This distinction is explicit in the pass contract (`kind`, `ast_effect`) and recorded in stage artifacts.
+
+A pass has a contract:
 
 - `requires`: capabilities that must exist beforehand
 - `provides`: capabilities established after it runs
@@ -151,6 +162,24 @@ Bindings provide:
 - load/execute/simulate integration
 - trace and diagnostics hooks
 
+### 2.9 Long-term architecture (module boundaries and stable seams)
+
+To keep the system extensible for years, HTP should be built around a small number of stable seams:
+
+- `htp.frontend`: capture decorators/APIs into canonical AST entrypoints
+- `htp.ir`: node ids, canonical AST forms, typed metadata snapshots, analysis staging utilities
+- `htp.pass`: pass contracts, pass manager, tracing, stage emission
+- `htp.pipeline`: pipeline templates + capability solver
+- `htp.artifacts`: package writer, manifest schema, validators, semantic diff tools
+- `htp.dialects`: dialect packages (WSP/CSP/etc.) as extension units
+- `htp.intrinsics`: intrinsic sets and backend handler registries
+- `htp.backends`: backend plugins (ArchModel + codegen emitters)
+- `htp.bindings`: build/load/run integrations (pto-runtime, MLIR-AIE toolchains, etc.)
+- `htp.runtime`: portable simulation stubs + island invocation shims
+
+Design rule: anything that affects semantics or legality must be visible at these seams as typed layout/effects,
+capabilities, or staged analyses. Hidden “one-off” invariants do not scale.
+
 ---
 
 ## 3. Artifact package contract (recommended baseline)
@@ -171,6 +200,8 @@ Directory layout (illustrative):
         layout.json
         effects.json
         schedule.json
+        analysis/
+          index.json
         summary.json
       s01/
         ...

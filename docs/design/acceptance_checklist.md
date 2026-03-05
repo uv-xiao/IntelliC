@@ -57,6 +57,11 @@ Extension units include:
 - bindings (validate/build/load/run/replay)
 - islands (matcher/exporter/importer + artifact contract)
 
+Additionally:
+
+- Pass contracts explicitly distinguish **AST mutation** vs **analysis production** (and record both in stage artifacts and
+  `ir/pass_trace.jsonl`).
+
 ---
 
 ## 4) Artifact contract is complete and replayable
@@ -69,6 +74,7 @@ Extension units include:
 - `ir/pass_trace.jsonl` is defined and points to stage dumps.
 - Each stage directory has deterministic dumps:
   - `program.pyast.json` and `types/layout/effects/schedule` metadata
+  - `analysis/index.json` plus serialized analysis results when passes produce analyses
   - `program.py` when `RunnablePy` is preserved (or a stub/diagnostic otherwise)
 
 ---

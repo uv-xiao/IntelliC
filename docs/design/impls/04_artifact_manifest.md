@@ -28,10 +28,36 @@
   - stage graph metadata (per-pass stage snapshots)
 - `replay`:
   - runnable Python entrypoints + supported modes (`sim|device`)
+  - current stage pointer and runnable contract for that stage
 
 ## Extensibility
 
 - `extensions` namespace for backend/dialect-specific structured fields.
+
+---
+
+## Stage records (what must be captured, concretely)
+
+The manifest’s `stages.graph[]` entries should be sufficient to:
+
+- locate the stage dumps (`dir`),
+- identify what produced them (`pass`),
+- understand replay availability (`runnable_py`),
+- and locate analyses (for transform justification and agent loops).
+
+Recommended per-stage fields (illustrative):
+
+- `id`, `dir`
+- `pass`: `null` for capture, or `pass_id@version`
+- `runnable_py`:
+  - `status`: `preserves|stubbed|breaks`
+  - `modes`: `["sim", "device"]` subset
+  - `program_py`: path (stage-relative)
+- `analysis_index`: path to `analysis/index.json` (if present)
+- optional `digests`:
+  - `ast_hash`, `types_hash`, `effects_hash`, `analysis_hash` (semantic or byte hashes)
+
+Digests are not required for correctness, but they make long-term regression triage and caching dramatically easier.
 
 ---
 
@@ -119,6 +145,7 @@ The manifest is the index, but a complete package should also include:
   - `ir/stages/<id>/program.py` (runnable replay, when `RunnablePy` holds)
   - `ir/stages/<id>/program.pyast.json` (canonical AST)
   - `ir/stages/<id>/types.json`, `layout.json`, `effects.json`, `schedule.json`
+  - `ir/stages/<id>/analysis/index.json` + analysis result files (typed, versioned pass analyses)
   - `ir/stages/<id>/summary.json`
 
 Design note: this is what makes HTP “agent-friendly by construction”: tools/agents can replay and diff stages without

@@ -60,7 +60,36 @@ Metadata must be:
 
 ---
 
-## 4) Dump schema and replay program (`RunnablePy`)
+## 4) Analysis results (first-class, staged)
+
+A key architectural requirement is to distinguish:
+
+- **transformations** that produce a new AST (new runnable replay stage), from
+- **analyses** that produce typed data structures used by later passes and humans/agents.
+
+Analyses are not “compiler-internal whispers”: if an analysis justifies a rewrite or a legality decision, it must be
+serializable and included in the artifact package.
+
+### 4.1 Analysis identity (minimum)
+
+Each analysis result is keyed by:
+
+- `analysis_id`: `pkg::name@version`
+- `schema`: `htp.analysis.<name>.vN` (schema identifier)
+
+### 4.2 Where analyses live
+
+Analyses belong to a stage and are emitted under:
+
+- `ir/stages/<stage_id>/analysis/`
+  - `index.json`
+  - one file per analysis result
+
+See pass manager details: `docs/design/impls/02_pass_manager.md`.
+
+---
+
+## 5) Dump schema and replay program (`RunnablePy`)
 
 Each stage emits:
 
@@ -81,7 +110,28 @@ If a stage contains an external compilation island that cannot be simulated, the
 
 ---
 
-## 5) Metadata requirements (minimum)
+## 6) Replay generation contract (what passes must preserve)
+
+Because “runnable Python at every stage” is a core differentiator, HTP needs an explicit contract for how
+`ir/stages/<id>/program.py` is produced.
+
+Recommended contract:
+
+- `program.py` is generated from the stage’s canonical AST plus `env.json`.
+- device-level computation is routed through stable runtime shims:
+  - `htp.runtime.call_kernel(...)`
+  - `htp.runtime.intrinsics.*` (portable simulation stubs when possible)
+- when a region is lowered into an external island (MLIR-AIE, vendor toolchains, etc.), the replay program calls an
+  island stub:
+  - `htp.runtime.islands.invoke(island_id, ...)`
+
+The pass contract must state whether it preserves or breaks this property (`RunnablePy` in
+`docs/design/impls/02_pass_manager.md`). If a pass breaks runnability, it must do so explicitly and with a structured
+diagnostic (no silent disappearance of `program.py`).
+
+---
+
+## 7) Metadata requirements (minimum)
 
 - serializable for artifact dumps
 - stable node identity scheme (see above)
