@@ -231,3 +231,51 @@ What this demonstrates:
 - Passes/pipelines are registered extension points.
 - Capability typing prevents invalid pipelines (missing `requires`).
 - Debug output is standardized (manifest + pass trace + IR dumps).
+
+---
+
+## Example 6 — Warp specialization + software pipelining (complete staged example)
+
+Goal: express a “prefetch + compute” kernel intent, then request warp specialization and loop pipelining via schedule
+constraints. The pipeline must:
+
+- stage both transforms and analyses (analysis results are artifacts too),
+- keep intermediate stages runnable in Python when contracts allow,
+- and make target-specific discharge explicit and capability-gated.
+
+```python
+from htp import kernel, schedule, Tile, In, Out, f16, f32
+from htp.intrinsics import portable as I
+
+BM, BN, BK = 128, 128, 32
+
+@kernel
+def matmul_tile(A: In[Tile[BM, BK, f16]],
+                B: In[Tile[BK, BN, f16]],
+                C: Out[Tile[BM, BN, f16]]):
+    acc: Tile[BM, BN, f32] = I.zeros((BM, BN), f32)
+    for k in range(0, K, BK):
+        a = I.async_copy(A, k=k, scope="group_shared")
+        b = I.async_copy(B, k=k, scope="group_shared")
+        I.await_(a); I.await_(b)
+        acc = I.mma(acc, I.load(a), I.load(b))
+    C[:] = I.cast(acc, f16)
+
+@schedule(matmul_tile)
+def matmul_sched(s):
+    s.map(group="block", subgroup="warp")
+    s.warp_specialize(producers=2, consumers=6)
+    s.pipeline(loop="k", stages=3, buffer="pingpong")
+```
+
+What you should see in the emitted package:
+
+- `ir/stages/<id>/program.py`: runnable replay of the stage when `RunnablePy` holds.
+- `ir/stages/<id>/analysis/`: typed analysis outputs such as:
+  - `warp_role_plan.json` (produced before warp specialization transform)
+  - `pipeline_plan.json` (produced before pipelining transform)
+- `ir/pass_trace.jsonl`: records whether each pass mutated the AST and which analyses it produced.
+
+Complete pass-by-pass walkthrough (with explicit analysis vs transform effects):
+
+- `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
