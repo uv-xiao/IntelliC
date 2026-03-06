@@ -11,6 +11,12 @@ Define an HTP-provided agent loop that can autonomously:
 
 This is a *developer tool* for compiler evolution, not part of end-user compilation in production by default.
 
+HTP’s broader design stance is stronger:
+
+> The compiler emits artifacts and contracts primarily so autonomous agents can safely evolve it over time.
+
+The loop is one consumer of that substrate; the substrate is an architectural requirement.
+
 ## Core idea: agents consume and produce artifact packages
 
 The unit of interaction is the **artifact package**:
@@ -75,6 +81,35 @@ HTP should expose a stable API/CLI surface for the agent:
 - `htp explain <diagnostic>` (contract-oriented explanation)
 
 The built-in agent loop is then a thin orchestrator over these tools.
+
+### 2.1 Why replay is mandatory for autonomy
+
+The agent’s key difficulty is *verification under uncertainty*. Replay reduces uncertainty by turning each stage into an
+executable witness:
+
+- if a pass claims “this is semantics-preserving”, replay can validate it for a chosen set of tests/observables
+- if a backend discharge introduces a deadlock, replay can surface it earlier in sim with staged effect evidence
+- if a performance transform changes behavior, stage bisect can locate the first divergent stage
+
+This is why HTP requires stage programs to be runnable in `mode="sim"` throughout the pipeline.
+
+---
+
+## 3) “Native target” implications (what the agent forces the architecture to do)
+
+If autonomous agents are a first-class development mode, HTP must ensure:
+
+- **machine-readable contracts everywhere**:
+  - diagnostics are stable-coded + structured payloads
+  - pass contracts are explicit and versioned
+  - manifest schemas are stable and diff-friendly
+- **bounded edit corridors**:
+  - templates for intrinsics/passes/backends that constrain changes to small, auditable surfaces
+- **evaluation harness is artifact-based**:
+  - golden artifact tests + replay-based equivalence checks are the default gates
+  - “expected diffs only” policies prevent silent drift
+
+The loop is healthy only if these are true; otherwise it degenerates into trial-and-error edits against implicit invariants.
 
 ## Safety model for “fully autonomous”
 

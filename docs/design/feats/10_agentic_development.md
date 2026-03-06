@@ -12,6 +12,13 @@ Make HTP a framework where **fully autonomous** LLM agents can:
 This feature is *not* “LLMs write random code”. It is: the framework is designed so agent work is **contracted,
 reproducible, and reviewable**, instead of being driven by pass-order folklore and implicit invariants.
 
+Design stance:
+
+> LLM-based development is a native target for HTP’s architecture.
+
+This means the framework’s core contracts (IR staging, diagnostics, artifact schemas, pass contracts) are designed to be
+machine-consumable by default, not retrofitted.
+
 ## What “agent-friendliness” means in HTP (operational)
 
 HTP is agent-friendly if the following are true:
@@ -24,6 +31,8 @@ HTP is agent-friendly if the following are true:
   illegality, missing backend handler) with a stable error code.
 - **Repro is automatic**: the artifact package contains everything needed to replay compilation and to reproduce a
   failure/regression.
+- **Replay is verifiable**: stage programs are runnable in `mode="sim"` so agents can test intermediate behavior and
+  localize regressions without relying on internal compiler state.
 - **Edits are bounded**: there are “safe corridors” (templates) for adding intrinsics, passes, pipeline steps, and backend
   handlers, so an agent changes one surface at a time.
 
@@ -42,6 +51,15 @@ Agents debug by comparing states. HTP should support:
 - “semantic diff” tooling (what changed in capabilities/effects/layout between pass A and pass B)
 
 This turns “mysterious regressions” into structured deltas the agent can search over.
+
+#### 1.1 Replay as a first-class oracle
+
+Semantic diffs are strongest when they are backed by execution:
+
+- structured stage dumps provide “what changed”
+- `ir/stages/<id>/program.py` replay in `mode="sim"` provides “did behavior change”
+
+Together, they enable automated stage bisect and minimize guesswork in autonomous loops.
 
 ### 2) Typed effects and protocol obligations
 
@@ -78,6 +96,12 @@ For autonomy, “context” must not be an ad-hoc pile of logs. Each compile emi
 
 These are sufficient inputs for an agent loop.
 
+In HTP, the artifact package is also a **training/evaluation substrate**:
+
+- failures are encoded as structured diagnostics + evidence pointers,
+- “fixes” can be evaluated by replaying stages and comparing golden artifacts,
+- and long-horizon health can be monitored by regression suites over packages.
+
 ### 5) Extension templates (safe corridors)
 
 HTP should ship templates/recipes for:
@@ -88,6 +112,15 @@ HTP should ship templates/recipes for:
 - adding a pipeline variant (with explicit output artifact contract)
 
 The objective is to make “agent edits” predictable, testable, and constrained.
+
+## Non-negotiable agent-native contracts (short list)
+
+If HTP is a native target for autonomous development, these must be treated as architecture constraints:
+
+- stage replay always exists in `sim` (`program.py` never disappears)
+- diagnostics are stable-coded + machine-localizing
+- analyses are staged and versioned (no hidden caches for important facts)
+- manifests record provenance for autonomous edits (`extensions.agent.*`)
 
 ## Why this is better (agentically) than typical MLIR-first infrastructures
 

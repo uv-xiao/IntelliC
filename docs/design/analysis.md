@@ -29,6 +29,12 @@ HTP is a **programming + compilation** framework with three roles:
 
 HTP is not a single IR/ISA project. PTO, MLIR-AIE, and future targets are **backends**.
 
+HTP also treats **LLM-based compiler development** as a native target of the framework:
+
+- artifact packages, traces, and diagnostics are designed to be *machine-consumable*, not only human-readable,
+- intermediate programs are replayable (sim) so agents can verify behavior stage-by-stage,
+- and extension surfaces are bounded so autonomous edits remain safe and reviewable.
+
 ## 1.1 Naming and repo reality (docs-only)
 
 This redo uses the name **HTP** consistently in design documents to reflect the multi-backend, multi-level ambition.
@@ -59,6 +65,16 @@ If the framework is redesigned as “a compiler with plugins”, extensions will
 - the binding expects a specific artifact contract.
 
 Without a unifying design, “extensibility” becomes a combinatorial explosion of ad-hoc checks.
+
+Equally important: without an agent-native substrate, the project’s evolution becomes brittle.
+Real compiler work is:
+
+- long-horizon (months of incremental feature work),
+- multi-surface (front-end, analyses, transforms, backends, runtimes),
+- and regression-prone (implicit invariants).
+
+If “LLM agents as maintainers” is an intended mode of development, the framework must encode explicit invariants and leave
+verifiable evidence by construction; otherwise agents (and humans) are forced into pass-order folklore and partial logs.
 
 ---
 
@@ -109,6 +125,17 @@ This matters for agent-based (and human) compiler development because it creates
 Design implication: intermediate IR forms and extensions must remain executable (typically by lowering internal constructs
 to runtime shim calls with sim semantics). External toolchains (MLIR islands, vendor compilers) become accelerators
 attached to stages, not semantic owners of the program.
+
+#### 3.2.2 Agent-native by construction (machine-consumable contracts)
+
+To treat LLM-based development as a first-class target, HTP must design *every important interface* as structured data:
+
+- **pass trace is structured** (`pass_trace.jsonl`) and references staged dumps, not ad-hoc text logs
+- **diagnostics are machine-localizing** (stable code + `node_id` + structured payload ref)
+- **analyses are staged** (`ir/stages/<id>/analysis/*`) and versioned (no “hidden RAM caches”)
+- **provenance is explicit** (`extensions.agent.*` in the manifest) so autonomous work is auditable and repeatable
+
+This is not extra tooling; it is the only way to make autonomous edits healthy over time.
 
 ### 3.3 Capability-typed composition: extensibility with correctness
 

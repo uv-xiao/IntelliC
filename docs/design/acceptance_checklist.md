@@ -112,3 +112,16 @@ For AIE:
 - Golden artifact tests are described (what to compare and why).
 - Diagnostic stability tests are described (assert codes/payload, not messages).
 - Contract validators are described for backends and replay.
+
+---
+
+## 8) Agent-native development is a first-class target
+
+- The design explicitly treats LLM-based development as a native target (not “optional future tooling”):
+  - replayable stages in `sim` are non-negotiable
+  - diagnostics and manifests are machine-consumable by default (stable codes + structured payloads)
+  - staged analyses exist for any fact that justifies a transform
+  - provenance for autonomous edits is specified (`extensions.agent.*`)
+- There is a clear agent loop/tooling story that consumes only artifacts and produces auditable evidence:
+  - `docs/design/feats/10_agentic_development.md`
+  - `docs/design/impls/10_agentic_tooling.md`

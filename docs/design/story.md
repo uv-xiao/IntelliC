@@ -30,6 +30,10 @@ are explicit about two effect kinds—AST mutation and analysis production—and
 selected by satisfiability rather than backend-specific branching. Together these choices make extension work checkable,
 debuggable, and long-term maintainable.
 
+HTP additionally treats **LLM-based compiler development** as a first-class design target: intermediate artifacts are not
+only readable, but *verifiable* (replayable) and *machine-localizing* (structured diagnostics, staged analyses), enabling
+fully autonomous development loops without relying on implicit invariants.
+
 ---
 
 ## 1. Motivation: what goes wrong in “IR + passes” retargeting
@@ -61,6 +65,8 @@ HTP makes a small number of goals primary:
    replay and debugging (with explicit stub contracts when needed).
 4) **Composable contracts**: layout, effects, and capabilities are typed and staged; pipelines are satisfiable or rejected
    early with explainable reasons.
+5) **Agent-native evolution**: the compiler emits machine-consumable evidence (structured traces, staged analyses,
+   replayable stages, provenance), so autonomous agents can modify and verify the system safely over long horizons.
 
 These goals bias the architecture toward explicitness and away from implicit conventions.
 
@@ -225,6 +231,17 @@ Stage replay turns “intermediate artifacts” into **verifiable evidence**:
 
 This is why HTP’s “always runnable in sim” constraint is architectural: it couples IR design, pass contracts, and island
 boundaries into an agent-friendly substrate.
+
+### 7.2 “Agent-native” means contracts are for machines first
+
+To be a healthy long-term target for LLM-based development, HTP must treat “machine readability” as a primary audience:
+
+- **diagnostics are APIs**: stable codes and structured payloads are normative; human messages are secondary
+- **analyses are evidence**: if an analysis justifies a rewrite, it is staged and versioned, not a hidden cache
+- **diffs are first-class**: stage dumps are stable-ordered so semantic diffs are mechanical, not heuristic
+- **provenance is required**: autonomous edits must be recorded (policy, evidence, gates) to avoid silent drift
+
+These are architecture constraints, not optional developer experience additions.
 
 ---
 

@@ -8,6 +8,7 @@ HTP is a Python-driven compiler framework with:
 - **Capability typing**: every pass/pipeline/backend declares `requires/provides`.
 - **Unified layout typing**: distribution + memory + hardware facets.
 - **Artifact-first output**: compilation emits a package with a manifest and dumps.
+- **Agent-native substrate**: replayable stage programs + staged analyses + machine-localizing diagnostics and provenance.
 - **Backend plugins**: codegen emitters + bindings are backend-registered.
 
 This file describes components and data flow; implementation deep dives are in `docs/design/impls/`.
@@ -176,6 +177,7 @@ To keep the system extensible for years, HTP should be built around a small numb
 - `htp.backends`: backend plugins (ArchModel + codegen emitters)
 - `htp.bindings`: build/load/run integrations (pto-runtime, MLIR-AIE toolchains, etc.)
 - `htp.runtime`: portable simulation stubs + island invocation shims
+- `htp.agent`: agent loop, policy, and verification orchestration (developer tooling)
 
 Design rule: anything that affects semantics or legality must be visible at these seams as typed layout/effects,
 capabilities, or staged analyses. Hidden “one-off” invariants do not scale.
