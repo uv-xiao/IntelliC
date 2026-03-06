@@ -12,8 +12,15 @@ def _normalize_many(values: tuple[str, ...] | list[str] | None) -> tuple[str, ..
 
 def _validate_path_hint(path_hint: str) -> None:
     path = PurePosixPath(path_hint)
-    if path.is_absolute() or ".." in path.parts or not path_hint:
-        raise ValueError("analysis path_hint must be a stage-relative path without '..'")
+    if (
+        not path_hint
+        or path.is_absolute()
+        or ".." in path.parts
+        or len(path.parts) != 2
+        or path.parts[0] != "analysis"
+        or path.name != path.parts[1]
+    ):
+        raise ValueError("analysis path_hint must use analysis/<basename> form")
 
 
 @dataclass(frozen=True)

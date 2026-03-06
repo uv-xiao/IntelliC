@@ -44,13 +44,15 @@ class PassManager:
         stage_before = self._current_stage_record()
         stage_after_id = self._next_stage_id()
         result = execute(stage_before)
+        self._validate_runnable_py(contract=contract, result=result)
+        self._validate_analysis_results(contract=contract, result=result)
 
         analyses = tuple(
             AnalysisSpec(
                 analysis_id=output.analysis_id,
                 schema=output.schema,
                 filename=self._analysis_filename(output.path_hint),
-                payload=result.analyses.get(output.path_hint, {}),
+                payload=result.analyses[output.path_hint],
             )
             for output in contract.analysis_produces
         )
@@ -108,10 +110,29 @@ class PassManager:
         return f"s{next_index:02d}"
 
     def _analysis_filename(self, path_hint: str) -> str:
-        path = PurePosixPath(path_hint)
-        if path.parts and path.parts[0] == "analysis":
-            return path.name
-        return path.as_posix()
+        return PurePosixPath(path_hint).name
+
+    def _validate_analysis_results(self, *, contract: PassContract, result: PassResult) -> None:
+        expected = {output.path_hint for output in contract.analysis_produces}
+        actual = set(result.analyses)
+
+        missing = sorted(expected - actual)
+        if missing:
+            raise ValueError(f"Missing analysis result for declared output(s): {', '.join(missing)}")
+
+        extra = sorted(actual - expected)
+        if extra:
+            raise ValueError(f"Undeclared analysis result(s): {', '.join(extra)}")
+
+    def _validate_runnable_py(self, *, contract: PassContract, result: PassResult) -> None:
+        expected = contract.runnable_py
+        actual = result.runnable_py
+
+        if actual.status != expected.status or tuple(actual.modes) != tuple(expected.modes):
+            raise ValueError(
+                "Pass result runnable_py does not match contract: "
+                f"expected {expected.status}/{expected.modes}, got {actual.status}/{actual.modes}"
+            )
 
 
 __all__ = ["PassManager", "PassResult", "RunnablePySpec"]

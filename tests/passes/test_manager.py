@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
 from htp.passes.contracts import AnalysisOutput, PassContract
 from htp.passes.manager import PassManager, PassResult
@@ -101,3 +103,110 @@ def test_pass_trace_emits_normalized_event(tmp_path):
         "maps": {},
         "diagnostics": [],
     }
+
+
+def test_pass_manager_requires_declared_analysis_result(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    initial_stage = write_stage(
+        package_dir,
+        StageSpec(
+            stage_id="s00",
+            pass_id=None,
+            runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+        ),
+    )
+    manager = PassManager(package_dir=package_dir, stages=[initial_stage], current_stage="s00")
+    contract = PassContract.analysis(
+        pass_id="pkg::warp_role_plan@1",
+        owner="pkg",
+        analysis_produces=(
+            AnalysisOutput(
+                analysis_id="pkg::WarpRolePlan@1",
+                schema="htp.analysis.warp_role_plan.v1",
+                path_hint="analysis/warp_role_plan.json",
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="Missing analysis result"):
+        manager.run(
+            contract,
+            lambda stage_before: PassResult(
+                runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+                analyses={},
+            ),
+        )
+
+
+def test_pass_manager_rejects_undeclared_analysis_result(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    initial_stage = write_stage(
+        package_dir,
+        StageSpec(
+            stage_id="s00",
+            pass_id=None,
+            runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+        ),
+    )
+    manager = PassManager(package_dir=package_dir, stages=[initial_stage], current_stage="s00")
+    contract = PassContract.analysis(
+        pass_id="pkg::warp_role_plan@1",
+        owner="pkg",
+        analysis_produces=(
+            AnalysisOutput(
+                analysis_id="pkg::WarpRolePlan@1",
+                schema="htp.analysis.warp_role_plan.v1",
+                path_hint="analysis/warp_role_plan.json",
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="Undeclared analysis result"):
+        manager.run(
+            contract,
+            lambda stage_before: PassResult(
+                runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+                analyses={
+                    "analysis/warp_role_plan.json": {"schema": "htp.analysis.warp_role_plan.v1"},
+                    "analysis/extra.json": {"schema": "htp.analysis.extra.v1"},
+                },
+            ),
+        )
+
+
+def test_pass_manager_requires_runnable_py_to_match_contract(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    initial_stage = write_stage(
+        package_dir,
+        StageSpec(
+            stage_id="s00",
+            pass_id=None,
+            runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+        ),
+    )
+    manager = PassManager(package_dir=package_dir, stages=[initial_stage], current_stage="s00")
+    contract = PassContract.analysis(
+        pass_id="pkg::warp_role_plan@1",
+        owner="pkg",
+        analysis_produces=(
+            AnalysisOutput(
+                analysis_id="pkg::WarpRolePlan@1",
+                schema="htp.analysis.warp_role_plan.v1",
+                path_hint="analysis/warp_role_plan.json",
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="runnable_py does not match contract"):
+        manager.run(
+            contract,
+            lambda stage_before: PassResult(
+                runnable_py=RunnablePySpec(status="stubbed", modes=("sim",)),
+                analyses={
+                    "analysis/warp_role_plan.json": {"schema": "htp.analysis.warp_role_plan.v1"},
+                },
+            ),
+        )

@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from htp.passes.contracts import AnalysisOutput, PassContract
 
 
@@ -58,3 +60,21 @@ def test_analysis_pass_declares_outputs_and_preserves_ast():
         "deterministic": True,
         "diagnostics": [],
     }
+
+
+@pytest.mark.parametrize(
+    "path_hint",
+    [
+        "warp_role_plan.json",
+        "analysis/nested/warp_role_plan.json",
+        "../analysis/warp_role_plan.json",
+        "/analysis/warp_role_plan.json",
+    ],
+)
+def test_analysis_output_requires_analysis_basename_path_hint(path_hint):
+    with pytest.raises(ValueError, match="analysis/<basename>"):
+        AnalysisOutput(
+            analysis_id="pkg::WarpRolePlan@1",
+            schema="htp.analysis.warp_role_plan.v1",
+            path_hint=path_hint,
+        )
