@@ -9,7 +9,7 @@
 
 ---
 
-## Core fields (recommended)
+## Core fields (normative v1)
 
 - `htp_version`, `git_hash`, `build_env`
 - `inputs`:
@@ -45,7 +45,7 @@ The manifest’s `stages.graph[]` entries should be sufficient to:
 - understand replay availability (`runnable_py`),
 - and locate analyses (for transform justification and agent loops).
 
-Recommended per-stage fields (illustrative):
+Required per-stage fields for v1:
 
 - `id`, `dir`
 - `pass`: `null` for capture, or `pass_id@version`
@@ -54,23 +54,31 @@ Recommended per-stage fields (illustrative):
   - `modes`: `["sim", "device"]` subset
   - `program_py`: path (stage-relative)
   - optional `stubs`: path to `replay/stubs.json`
-- `analysis_index`: path to `analysis/index.json` (if present)
-- optional `ids`:
+- `analysis_index`: path to `analysis/index.json`
+- `ids`:
   - `entities`: path to `ids/entities.json`
   - `bindings`: path to `ids/bindings.json`
-- optional `maps`:
+- `maps`:
   - `entity_map`: path to `maps/entity_map.json` (major rewrites)
   - `binding_map`: path to `maps/binding_map.json` (when bindings change)
-- optional `islands`:
+- `islands`:
   - list of `{island_id, dir}` for MLIR round-trip evidence under `islands/`
-- optional `digests`:
+- `digests`:
   - `ast_hash`, `types_hash`, `effects_hash`, `analysis_hash` (semantic or byte hashes)
+- `summary`: path to `summary.json`
 
 Digests are not required for correctness, but they make long-term regression triage and caching dramatically easier.
 
+Normalization rules:
+
+- If a stage has no rewrite maps, `maps` must still exist with `null` values.
+- If a stage has no islands, `islands` must be an empty list.
+- If a stage has no analyses, `analysis_index` must still point to an empty `analysis/index.json`.
+- If digests are not computed in v1, each digest field must be `null`; readers must not infer absence from missing keys.
+
 ---
 
-## Minimal example (illustrative JSON)
+## Minimal example (normative field layout)
 
 ```json
 {
@@ -113,12 +121,174 @@ Digests are not required for correctness, but they make long-term regression tri
   "stages": {
     "current": "s05",
     "graph": [
-      {"id": "s00", "pass": null, "dir": "ir/stages/s00"},
-      {"id": "s01", "pass": "ast_canonicalize@1", "dir": "ir/stages/s01"},
-      {"id": "s02", "pass": "typecheck_layout_effects@1", "dir": "ir/stages/s02"},
-      {"id": "s03", "pass": "apply_schedule@1", "dir": "ir/stages/s03"},
-      {"id": "s04", "pass": "lower_pto@1", "dir": "ir/stages/s04"},
-      {"id": "s05", "pass": "emit_pto_package@1", "dir": "ir/stages/s05"}
+      {
+        "id": "s00",
+        "pass": null,
+        "dir": "ir/stages/s00",
+        "runnable_py": {
+          "status": "preserves",
+          "modes": ["sim"],
+          "program_py": "ir/stages/s00/program.py",
+          "stubs": null
+        },
+        "analysis_index": "ir/stages/s00/analysis/index.json",
+        "ids": {
+          "entities": "ir/stages/s00/ids/entities.json",
+          "bindings": "ir/stages/s00/ids/bindings.json"
+        },
+        "maps": {
+          "entity_map": null,
+          "binding_map": null
+        },
+        "islands": [],
+        "digests": {
+          "ast_hash": null,
+          "types_hash": null,
+          "effects_hash": null,
+          "analysis_hash": null
+        },
+        "summary": "ir/stages/s00/summary.json"
+      },
+      {
+        "id": "s01",
+        "pass": "ast_canonicalize@1",
+        "dir": "ir/stages/s01",
+        "runnable_py": {
+          "status": "preserves",
+          "modes": ["sim"],
+          "program_py": "ir/stages/s01/program.py",
+          "stubs": null
+        },
+        "analysis_index": "ir/stages/s01/analysis/index.json",
+        "ids": {
+          "entities": "ir/stages/s01/ids/entities.json",
+          "bindings": "ir/stages/s01/ids/bindings.json"
+        },
+        "maps": {
+          "entity_map": null,
+          "binding_map": null
+        },
+        "islands": [],
+        "digests": {
+          "ast_hash": null,
+          "types_hash": null,
+          "effects_hash": null,
+          "analysis_hash": null
+        },
+        "summary": "ir/stages/s01/summary.json"
+      },
+      {
+        "id": "s02",
+        "pass": "typecheck_layout_effects@1",
+        "dir": "ir/stages/s02",
+        "runnable_py": {
+          "status": "preserves",
+          "modes": ["sim"],
+          "program_py": "ir/stages/s02/program.py",
+          "stubs": null
+        },
+        "analysis_index": "ir/stages/s02/analysis/index.json",
+        "ids": {
+          "entities": "ir/stages/s02/ids/entities.json",
+          "bindings": "ir/stages/s02/ids/bindings.json"
+        },
+        "maps": {
+          "entity_map": null,
+          "binding_map": null
+        },
+        "islands": [],
+        "digests": {
+          "ast_hash": null,
+          "types_hash": null,
+          "effects_hash": null,
+          "analysis_hash": null
+        },
+        "summary": "ir/stages/s02/summary.json"
+      },
+      {
+        "id": "s03",
+        "pass": "apply_schedule@1",
+        "dir": "ir/stages/s03",
+        "runnable_py": {
+          "status": "preserves",
+          "modes": ["sim"],
+          "program_py": "ir/stages/s03/program.py",
+          "stubs": null
+        },
+        "analysis_index": "ir/stages/s03/analysis/index.json",
+        "ids": {
+          "entities": "ir/stages/s03/ids/entities.json",
+          "bindings": "ir/stages/s03/ids/bindings.json"
+        },
+        "maps": {
+          "entity_map": null,
+          "binding_map": null
+        },
+        "islands": [],
+        "digests": {
+          "ast_hash": null,
+          "types_hash": null,
+          "effects_hash": null,
+          "analysis_hash": null
+        },
+        "summary": "ir/stages/s03/summary.json"
+      },
+      {
+        "id": "s04",
+        "pass": "lower_pto@1",
+        "dir": "ir/stages/s04",
+        "runnable_py": {
+          "status": "stubbed",
+          "modes": ["sim"],
+          "program_py": "ir/stages/s04/program.py",
+          "stubs": "ir/stages/s04/replay/stubs.json"
+        },
+        "analysis_index": "ir/stages/s04/analysis/index.json",
+        "ids": {
+          "entities": "ir/stages/s04/ids/entities.json",
+          "bindings": "ir/stages/s04/ids/bindings.json"
+        },
+        "maps": {
+          "entity_map": "ir/stages/s04/maps/entity_map.json",
+          "binding_map": null
+        },
+        "islands": [],
+        "digests": {
+          "ast_hash": null,
+          "types_hash": null,
+          "effects_hash": null,
+          "analysis_hash": null
+        },
+        "summary": "ir/stages/s04/summary.json"
+      },
+      {
+        "id": "s05",
+        "pass": "emit_pto_package@1",
+        "dir": "ir/stages/s05",
+        "runnable_py": {
+          "status": "stubbed",
+          "modes": ["sim", "device"],
+          "program_py": "ir/stages/s05/program.py",
+          "stubs": "ir/stages/s05/replay/stubs.json"
+        },
+        "analysis_index": "ir/stages/s05/analysis/index.json",
+        "ids": {
+          "entities": "ir/stages/s05/ids/entities.json",
+          "bindings": "ir/stages/s05/ids/bindings.json"
+        },
+        "maps": {
+          "entity_map": null,
+          "binding_map": null
+        },
+        "islands": [],
+        "digests": {
+          "ast_hash": null,
+          "types_hash": null,
+          "effects_hash": null,
+          "analysis_hash": null
+        },
+        "summary": "ir/stages/s05/summary.json"
+      }
     ]
   },
   "replay": {
@@ -145,7 +315,7 @@ Digests are not required for correctness, but they make long-term regression tri
 
 ---
 
-## Recommended companion files (artifact contract)
+## Required companion files (artifact contract)
 
 The manifest is the index, but a complete package should also include:
 
@@ -163,3 +333,13 @@ The manifest is the index, but a complete package should also include:
 
 Design note: this is what makes HTP “agent-friendly by construction”: tools/agents can replay and diff stages without
 re-implementing an IR interpreter.
+
+## Manifest invariants that validators must enforce
+
+- `schema` must be `htp.manifest.v1`.
+- `stages.current` must name an entry in `stages.graph`.
+- every `stages.graph[].dir` must exist.
+- every stage record must point to an existing `program.py`, `program.pyast.json`, `types.json`, `layout.json`,
+  `effects.json`, `schedule.json`, `ids/entities.json`, `ids/bindings.json`, `analysis/index.json`, and `summary.json`.
+- if `runnable_py.status == "stubbed"`, `runnable_py.stubs` must be non-null and point to `replay/stubs.json`.
+- every path under `outputs` and `extensions.*` must be package-relative, not absolute.

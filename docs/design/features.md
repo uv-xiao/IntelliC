@@ -5,7 +5,7 @@
 - **Extensibility-first**: every major axis must be extensible (dialects, intrinsics, layout facets, passes, pipelines, backends, bindings).
 - **Typed composition**: extension compatibility is checked via `requires/provides` capability typing plus layout/effect typing.
 - **Artifact-first**: compilation output is always a package with a manifest and inspectable intermediate dumps.
-- **AST-first**: Python AST is the base IR; optional MLIR round-trip islands are explicit.
+- **AST-first**: Python AST is the base IR; MLIR-based compilation flows are optional extensions, not native core IR.
 
 ### 0.1 Core type system (minimum, shared across dialects)
 
@@ -147,9 +147,9 @@ Rationale: CSP and WSP should be optional and independently evolvable.
 - Match/apply on AST with attached metadata.
 - Each pass declares `requires/provides` capabilities and invariants.
 
-### 4.2 IR round-trip compilation islands (optional)
+### 4.2 IR round-trip compilation islands (optional extension)
 
-A pass can run an **internal round-trip island**:
+A pass supplied by an extension package can run an **internal round-trip island**:
 
 - construct MLIR from Python AST
 - run an explicit MLIR pass pipeline
@@ -164,7 +164,7 @@ Design decision: round-trip islands are defined via an explicit enter/exit inter
 
 See: `docs/design/impls/12_mlir_roundtrip_island.md`.
 
-### 4.3 External toolchains (backend artifact emission)
+### 4.3 External toolchains (backend artifact emission extension)
 
 External toolchains (vendor compilers, MLIR-AIE tooling, etc.) are integrated by emitting their required IR/artifacts
 under `codegen/<backend>/...` and recording toolchain pins/contracts in the manifest.
@@ -217,15 +217,23 @@ Design constraint:
 
 ---
 
-## 6. “Must-support” targets (initial)
+## 6. “Must-support” targets (initial v1 proof)
 
 ### 6.1 Ascend PTO ecosystem
 
 - Emit artifacts consumable by a PTO runtime/toolchain (simulation and device).
 - Packaging should mirror proven patterns (kernel/orchestration separation + manifest).
 
-### 6.2 AIE via MLIR-AIE
+### 6.2 NV-GPU (Ampere and Blackwell)
 
+- Emit artifacts consumable by an NV-GPU binding and build/runtime path.
+- Hardware modeling should follow the Arknife-style explicit hierarchy and memory-space approach.
+- The same HTP core contracts must support both Ampere and Blackwell profiles through `hardware_profile`, not through a
+  second compiler architecture.
+
+### 6.3 Optional extension backends/toolchains
+
+- AIE via MLIR-AIE
 - Emit MLIR-AIE oriented artifacts:
   - compute tile mapping, FIFO/stream wiring, host runtime glue
 - Reuse known mapping concepts (kernel grid mapping + layout annotations).

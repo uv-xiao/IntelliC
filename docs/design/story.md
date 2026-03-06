@@ -34,6 +34,11 @@ HTP additionally treats **LLM-based compiler development** as a first-class desi
 only readable, but *verifiable* (replayable) and *machine-localizing* (structured diagnostics, staged analyses), enabling
 fully autonomous development loops without relying on implicit invariants.
 
+The first implementation target is also now explicit: HTP v1 should prove the design **end-to-end** on two materially
+different backends—**PTO/Ascend** and **NV-GPU** (starting with Ampere and Blackwell profiles, using Arknife-style
+hardware modeling as the reference shape)—while keeping MLIR-based round-trips and vendor toolchain integrations as
+**extensions**, not native semantic owners of the core compiler.
+
 ---
 
 ## 1. Motivation: what goes wrong in “IR + passes” retargeting
@@ -67,6 +72,8 @@ HTP makes a small number of goals primary:
    early with explainable reasons.
 5) **Agent-native evolution**: the compiler emits machine-consumable evidence (structured traces, staged analyses,
    replayable stages, provenance), so autonomous agents can modify and verify the system safely over long horizons.
+6) **Two-backend proof, not single-target overfitting**: v1 must be strong enough to serve both PTO and NV-GPU without
+   re-deriving the architecture for the second target.
 
 These goals bias the architecture toward explicitness and away from implicit conventions.
 
@@ -156,22 +163,24 @@ Backends are plugins. Each backend must provide:
 - intrinsic handlers (lower/emit) plus simulator/stub semantics for replay,
 - and an artifact contract.
 
-HTP uses two different “non-Python” integration patterns, which must not be conflated:
+HTP uses two different optional extension patterns, which must not be conflated:
 
 1) **IR round-trip compilation islands** (internal):
    - AST → MLIR → MLIR passes → AST
    - purpose: reuse MLIR’s transform infrastructure while keeping Python AST canonical
-   - contract: must reify back into Python AST and preserve the “runnable in sim” invariant
+   - contract: provided by extension packages; must reify back into Python AST and preserve the “runnable in sim”
+     invariant
 
 2) **External toolchains** (one-way artifact emission):
    - emit MLIR (or other IR) as artifacts under `codegen/<backend>/...`
    - purpose: vendor compilers/build systems consume these artifacts to produce executables
-   - contract: does *not* require semantic reification MLIR → AST; HTP keeps replayability via stage programs and/or
-     reference semantics
+   - contract: provided by backend/toolchain extensions; does *not* require semantic reification MLIR → AST; HTP keeps
+     replayability via stage programs and/or reference semantics
 
-IR islands are specified as an implementation component:
+The core runtime only provides the extension hook; it does not natively bake MLIR into HTP:
 
-- `docs/design/impls/12_mlir_roundtrip_island.md`
+- native runtime surface: `docs/design/impls/01_ir_model.md`
+- MLIR round-trip island extension contract: `docs/design/impls/12_mlir_roundtrip_island.md`
 
 External toolchains remain explicit and auditable because the emitted MLIR and toolchain pins live in the artifact
 package, not because they are treated as “the IR”.
@@ -179,6 +188,7 @@ package, not because they are treated as “the IR”.
 Deep dives:
 
 - PTO backend packaging: `docs/design/impls/05_backend_pto.md`
+- NV-GPU backend packaging: `docs/design/impls/13_backend_nvgpu.md`
 - AIE backend MLIR artifact emission: `docs/design/impls/06_backend_aie.md`
 
 ---

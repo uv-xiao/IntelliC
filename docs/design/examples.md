@@ -5,7 +5,7 @@ This file provides end-to-end examples across:
 - kernel programs
 - megakernel / dataflow pipelines
 - serving routine orchestration
-- multiple backends (PTO simulation/device; AIE/MLIR-AIE)
+- multiple backends (PTO simulation/device; NV-GPU; optional AIE/MLIR-AIE extension)
 
 The code is illustrative pseudo-Python: it prioritizes semantics and contracts over exact API names.
 
@@ -188,10 +188,13 @@ Goal: compile once into multiple packages, then choose backend at deployment tim
 
 ```python
 pkg_pto = model.compile(out="out/model_pto", target="pto-a2a3")
-pkg_aie = model.compile(out="out/model_aie", target="aie-xdna2")
+pkg_gpu = model.compile(out="out/model_gpu", target="nvgpu-ampere")
+pkg_aie = model.compile(out="out/model_aie", target="aie-xdna2")  # optional extension backend
 
 if platform.has_ascend():
     htp.bind(pkg_pto).run(inputs)
+elif platform.has_nvidia_gpu():
+    htp.bind(pkg_gpu).run(inputs)
 else:
     htp.bind(pkg_aie).run(inputs)
 ```

@@ -32,8 +32,9 @@ Every diagnostic must include:
 - `node_id`: stable stage-local node id (see `docs/design/impls/01_ir_model.md`)
 - `message`: short human-readable summary (non-normative)
 - `payload_ref`: pointer to structured payload JSON (normative)
+- `fix_hints_ref`: pointer to structured remediation hints (normative for v1, may point to an empty list)
 
-The payload schema is what tools/agents consume; the message is for humans.
+The payload schema and fix-hint schema are what tools/agents consume; the message is for humans.
 
 ### Replay/stub diagnostics (required family)
 
@@ -53,7 +54,7 @@ Recommended payload fields:
 - `entity_id` (when available)
 - `reason`: `missing_simulator | external_toolchain_only | intentionally_unimplemented`
 - `artifact_ref` (if the stub corresponds to emitted backend artifacts)
-- `next_actions` (optional, non-normative hints)
+- `next_actions` (normative structured fix hints)
 
 Recommended artifact:
 

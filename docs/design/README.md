@@ -24,6 +24,7 @@ Notable deep dives:
 
 - Warp specialization + pipelining case study: `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
 - MLIR round-trip island contract: `docs/design/impls/12_mlir_roundtrip_island.md`
+- NV-GPU backend contract: `docs/design/impls/13_backend_nvgpu.md`
 
 ## Scope note
 

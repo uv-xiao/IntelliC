@@ -32,7 +32,8 @@ Design constraint:
 HTP should not embed device runtimes; it integrates with:
 
 - PTO runtime/toolchain for Ascend
-- MLIR-AIE build/run tooling for AIE
+- NV-GPU build/runtime tooling
+- MLIR-AIE build/run tooling for AIE extensions
 - future backends via binding plugins
 
 Deep dive:

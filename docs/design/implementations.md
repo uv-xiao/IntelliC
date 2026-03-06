@@ -175,8 +175,9 @@ To keep the system extensible for years, HTP should be built around a small numb
 - `htp.dialects`: dialect packages (WSP/CSP/etc.) as extension units
 - `htp.intrinsics`: intrinsic sets and backend handler registries
 - `htp.backends`: backend plugins (ArchModel + codegen emitters)
-- `htp.bindings`: build/load/run integrations (pto-runtime, MLIR-AIE toolchains, etc.)
-- `htp.runtime`: portable simulation stubs + MLIR-island adapters + external toolchain invocation hooks (when needed)
+- `htp.bindings`: build/load/run integrations (pto-runtime, NV-GPU toolchains/runtimes, MLIR-AIE toolchains, etc.)
+- `htp.runtime`: the normative replay shim surface (`default_runtime`, `call_kernel`, `intrinsics.invoke`,
+  `extensions.invoke`, `raise_stub`)
 - `htp.agent`: agent loop, policy, and verification orchestration (developer tooling)
 
 Design rule: anything that affects semantics or legality must be visible at these seams as typed layout/effects,
@@ -184,7 +185,7 @@ capabilities, or staged analyses. Hidden “one-off” invariants do not scale.
 
 ---
 
-## 3. Artifact package contract (recommended baseline)
+## 3. Artifact package contract (normative v1 baseline)
 
 Directory layout (illustrative):
 
@@ -196,6 +197,8 @@ Directory layout (illustrative):
     stages/
       s00/
         program.py
+        replay/
+          stubs.json                # required when runnable_py=stubbed
         program.pyast.json
         env.json
         types.json
@@ -263,7 +266,22 @@ Key design point: `kernel_config.py` is the runner-facing bridge (existing tooli
 
 Deep dive: `docs/design/impls/05_backend_pto.md`.
 
-### 4.2 AIE backend (MLIR-AIE)
+### 4.2 NV-GPU backend
+
+Recommended shape:
+
+```
+codegen/nvgpu/
+  kernels/
+  host/
+  nvgpu_codegen.json
+  build/
+    toolchain.json
+```
+
+Deep dive: `docs/design/impls/13_backend_nvgpu.md`.
+
+### 4.3 Optional extension backend: AIE (MLIR-AIE)
 
 Recommended shape:
 

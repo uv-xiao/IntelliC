@@ -2,7 +2,7 @@
 
 ## Goal
 
-Define a precise meaning for “compilation island” in HTP:
+Define a precise meaning for an **extension-provided** “compilation island” in HTP:
 
 > A compilation island is an **internal IR round-trip** that temporarily represents a region in MLIR, runs MLIR passes,
 > then reconstructs Python AST to continue the HTP pipeline.
@@ -20,7 +20,7 @@ Some optimizations are substantially easier (or already implemented) in MLIR eco
 - canonicalization/CSE patterns at an IR level with rich rewrite infrastructure
 - vectorization and bufferization-style transforms (for eligible subsets)
 
-HTP can reuse these by:
+An extension package can reuse MLIR by:
 
 1) translating a well-defined subset of typed Python AST into an MLIR module,
 2) running a configured MLIR pass pipeline,
@@ -34,7 +34,7 @@ The key constraint is HTP’s executable-IR invariant:
 
 ## 2) Island contract (enter/exit)
 
-An MLIR round-trip island pass must declare:
+An MLIR round-trip island pass provided by an extension package must declare:
 
 ### 2.1 Eligibility (matcher)
 
@@ -80,6 +80,40 @@ Explicit non-goals for v1:
 If a candidate region violates any of these, the island pass must reject it with a stable diagnostic code rather than
 partially translating it.
 
+#### 2.1.2 Normative v1 exporter/importer surface
+
+The v1 island is intentionally narrow. Export/import must support only:
+
+- **statements**
+  - assignment
+  - `for`
+  - `if`
+  - `return`
+- **expressions**
+  - scalar arithmetic (`+`, `-`, `*`, `/`, `min`, `max`)
+  - comparisons used by `if`
+  - tensor/buffer indexing with affine index expressions
+  - calls to island-supported intrinsics/functions
+- **intrinsics/functions**
+  - `portable.add`
+  - `portable.mul`
+  - `portable.fma`
+  - `portable.load`
+  - `portable.store`
+  - `portable.broadcast`
+  - local helper functions already normalized to this same subset
+
+Explicitly unsupported in v1:
+
+- async copy intrinsics
+- barriers or tokens
+- channel operations
+- backend-specific intrinsics
+- calls whose semantics exist only in external toolchains
+
+The purpose of v1 is structural loop/canonicalization rewrites only. A simple CSE pipeline is the canonical first
+example of such an extension; richer MLIR usage is intentionally postponed to extension-defined pipelines.
+
 ### 2.2 Export (AST → MLIR)
 
 Export produces:
@@ -91,7 +125,7 @@ Export produces:
 
 The ledger is necessary to make reification deterministic and to support later diff/debug workflows.
 
-Recommended minimum `ledger.json` shape:
+Normative minimum `ledger.json` shape:
 
 ```json
 {
@@ -168,9 +202,9 @@ with a structured diagnostic rather than silently degrading the stage.
 
 ---
 
-## 3) Artifact outputs (recommended)
+## 3) Artifact outputs (normative v1)
 
-An island run should leave behind enough evidence for humans and agents:
+An island run must leave behind enough evidence for humans and agents:
 
 ```
 ir/stages/<stage_id>/
@@ -184,12 +218,30 @@ ir/stages/<stage_id>/
 
 This keeps the round-trip auditable without turning MLIR into HTP’s canonical IR.
 
-Recommended companion metadata:
+Required companion metadata:
 
 - `eligibility.json`
   - records which matcher rules were satisfied
 - `import_summary.json`
   - counts preserved/split/fused entities and bindings
+
+`eligibility.json` must contain:
+
+- `schema`: `htp.island.eligibility.v1`
+- `island_id`
+- `eligible: bool`
+- `satisfied_rules[]`
+- `failed_rules[]`
+
+`import_summary.json` must contain:
+
+- `schema`: `htp.island.import_summary.v1`
+- `island_id`
+- `stage_before`
+- `stage_after`
+- `entity_counts`: `{preserved, split, fused, introduced}`
+- `binding_counts`: `{preserved, rebound, introduced}`
+- `map_refs`: `{entity_map, binding_map}`
 
 ---
 

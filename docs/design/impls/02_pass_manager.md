@@ -65,7 +65,7 @@ Recommended analysis identity:
 
 ## 3) Pass contract: `PassContract` (expanded)
 
-Each pass registers a `PassContract` (conceptual schema):
+Each pass registers a `PassContract`. The fields below are normative for v1:
 
 - identity:
   - `pass_id`: `pkg::name@version` (stable)
@@ -100,6 +100,55 @@ Each pass registers a `PassContract` (conceptual schema):
   - stable diagnostic codes emitted by this pass + payload schema
 
 Design rule: if a pass consumes an analysis, it must name it in `analysis_requires`; no “just reach into global caches”.
+
+### 3.1 Normative v1 minimum schema
+
+```json
+{
+  "schema": "htp.pass_contract.v1",
+  "pass_id": "pkg::name@1",
+  "owner": "pkg",
+  "kind": "analysis",
+  "ast_effect": "preserves",
+  "requires": ["Dialect.WSPEnabled"],
+  "provides": ["Analysis.WarpRolePlan@1"],
+  "invalidates": [],
+  "requires_layout_invariants": [],
+  "requires_effect_invariants": [],
+  "establishes_layout_invariants": [],
+  "establishes_effect_invariants": [],
+  "analysis_requires": [],
+  "analysis_produces": [
+    {
+      "analysis_id": "pkg::WarpRolePlan@1",
+      "schema": "htp.analysis.warp_role_plan.v1",
+      "path_hint": "analysis/warp_role_plan.json"
+    }
+  ],
+  "inputs": ["ir.ast", "ir.types", "ir.layout", "ir.effects"],
+  "outputs": ["analysis.index", "analysis.result"],
+  "runnable_py": {
+    "status": "preserves",
+    "modes": ["sim"]
+  },
+  "deterministic": true,
+  "diagnostics": [
+    {
+      "code": "HTP.PASS.WARP_ROLE_PLAN.UNSUPPORTED_PROTOCOL",
+      "payload_schema": "htp.diag.pass.warp_role_plan.unsupported_protocol.v1"
+    }
+  ]
+}
+```
+
+Required interpretation:
+
+- `kind=analysis` implies `ast_effect=preserves`.
+- `kind=transform` or `kind=mixed` may still preserve AST identity for some entities, but a new stage is always emitted.
+- `analysis_produces[].path_hint` is stage-relative and must match `analysis/index.json`.
+- `runnable_py.modes` must always contain `sim`.
+- `outputs` must name every artifact family the pass materially changes; downstream validators use this to detect missing
+  dumps instead of inferring them heuristically.
 
 ---
 
@@ -175,6 +224,26 @@ Emit a line-delimited JSON log at `ir/pass_trace.jsonl`. Each line is one pass i
 - `dumps`: paths for `program.py`, optional `replay/stubs.json`, `program.pyast.json`, metadata dumps, `ids/*`, and `analysis/index.json`
 - `maps`: optional paths for `maps/entity_map.json` and `maps/binding_map.json`
 - `diagnostics`: list of `{code, severity, node_id, message, payload_ref}`
+
+### 6.1 Normative v1 event minimum
+
+Every `ir/pass_trace.jsonl` line must contain:
+
+- `schema`: `htp.pass_trace_event.v1`
+- `pass_id`
+- `kind`
+- `ast_effect`
+- `stage_before`
+- `stage_after`
+- `time_ms`
+- `cap_delta`
+- `analysis`
+- `runnable_py`
+- `dumps`
+- `diagnostics`
+
+If a field is not applicable, it must still appear with an empty container (`[]` or `{}`) rather than being omitted.
+This keeps agent and tooling readers simple and stable.
 
 Design note: `pass_trace.jsonl` is the primary “agent substrate” because it is:
 

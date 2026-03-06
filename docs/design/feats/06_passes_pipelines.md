@@ -17,7 +17,7 @@ Make transformation pipelines:
 - Scheduling passes (apply schedule directives)
 - Lowering passes (to backend-ready forms)
 - Packaging passes (artifact emission, manifest finalization)
-- Island passes (enter/exit MLIR or external toolchains)
+- Extension passes (e.g. MLIR round-trip islands or external-toolchain-specific transforms)
 - Analysis passes (produce staged, versioned analyses for downstream transforms)
 
 ## Contract-driven execution

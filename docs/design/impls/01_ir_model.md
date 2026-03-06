@@ -113,9 +113,9 @@ Propagation rule (contract-level):
 
 This is the key mechanism for before/after mappings that are meaningful for humans and agents.
 
-#### 2.2.1 Stage artifact: `ids/entities.json` (recommended minimum schema)
+#### 2.2.1 Stage artifact: `ids/entities.json` (normative v1 minimum schema)
 
-Each stage should emit `ids/entities.json` to make identity machine-consumable:
+Each stage must emit `ids/entities.json` to make identity machine-consumable:
 
 ```json
 {
@@ -162,9 +162,9 @@ Then each `Name` occurrence in the AST is annotated in metadata with:
 
 This lets analyses index “the variable” robustly even if later passes rename it for codegen or canonicalization.
 
-#### 2.3.1 Stage artifact: `ids/bindings.json` (recommended minimum schema)
+#### 2.3.1 Stage artifact: `ids/bindings.json` (normative v1 minimum schema)
 
-Each stage should emit `ids/bindings.json`:
+Each stage must emit `ids/bindings.json`:
 
 ```json
 {
@@ -206,7 +206,7 @@ When a pass performs major rewrites, it should emit mapping/provenance files int
 - `ir/stages/<after>/maps/entity_map.json`
 - `ir/stages/<after>/maps/binding_map.json` (when bindings are rewritten)
 
-Minimal `entity_map.json` shape (illustrative):
+Normative minimum `entity_map.json` shape:
 
 ```json
 {
@@ -226,6 +226,35 @@ Design intent:
 
 - mappings are explicit evidence for stage diffs and autonomous debugging,
 - and they avoid heuristic structural matching of AST dumps.
+
+Normative minimum `binding_map.json` shape:
+
+```json
+{
+  "schema": "htp.binding_map.v1",
+  "pass_id": "pkg::pass@1",
+  "stage_before": "s06",
+  "stage_after": "s07",
+  "bindings": [
+    {
+      "before": "module::matmul:S3:B1",
+      "after": ["module::matmul:S3:B1"],
+      "reason": "preserved"
+    },
+    {
+      "before": "module::matmul:S3:B2",
+      "after": ["module::matmul:S5:B1", "module::matmul:S5:B2"],
+      "reason": "split_unrolled"
+    },
+    {
+      "before": null,
+      "after": ["module::matmul:S7:B4"],
+      "reason": "introduced_temp",
+      "origin": ["module::matmul:E88"]
+    }
+  ]
+}
+```
 
 ---
 
@@ -306,17 +335,16 @@ via explicit stubs (`RunnablePyStubbed`) and must emit diagnostics and stub meta
 Because “runnable Python at every stage” is a core differentiator, HTP needs an explicit contract for how
 `ir/stages/<id>/program.py` is produced.
 
-Recommended contract:
+Normative v1 contract:
 
 - `program.py` is generated from the stage’s canonical AST plus `env.json`.
 - device-level computation is routed through stable runtime shims:
   - `htp.runtime.call_kernel(...)`
   - `htp.runtime.intrinsics.*` (portable simulation stubs when possible)
-- when a region is processed by an MLIR round-trip island, the replay program calls an island adapter:
-  - `htp.runtime.islands.invoke(island_id, ...)`
-  (the island itself reifies back into Python AST; see `docs/design/impls/12_mlir_roundtrip_island.md`)
-- when a region is only available as an external toolchain artifact (vendor compilers, MLIR-AIE emission), the replay
-  program routes through an explicit sim stub or reference semantics (never “missing replay”)
+- extension packages may add backend/toolchain-specific replay helpers, but the stage generator may only call them
+  through HTP’s extension hook mechanism rather than hard-coding MLIR or vendor-specific APIs into the core runtime
+- when a region is only available as an extension-owned artifact or toolchain output, the replay program routes through
+  explicit reference semantics or a structured sim stub (never “missing replay”)
 
 The pass contract must state whether it preserves or stubs this property (`RunnablePy` in
 `docs/design/impls/02_pass_manager.md`).
@@ -344,6 +372,55 @@ Minimum contents:
   - `kind`: `intrinsic | external_toolchain | island_adapter | intentionally_unimplemented`
   - `diagnostic_code`
   - `artifact_ref` (if tied to emitted backend artifacts)
+
+### 6.1 Normative v1 replay module shape
+
+Every generated stage module must expose the same entry surface so bindings and agents do not need per-stage adapters:
+
+- `STAGE_INFO`: static dict containing:
+  - `stage_id`
+  - `def_id`
+  - `runnable_py`: `preserves | stubbed`
+  - `supported_modes`: always includes `sim`
+- `def run(*args, mode="sim", runtime=None, trace=None, **kwargs):`
+  - the canonical stage entry used by bindings for replay
+- optional helpers generated from the AST (private to the module), but no custom public entry surface
+
+Normative behavior:
+
+- `run(..., mode="sim")` must execute without requiring backend binaries to exist.
+- `run(..., runtime=None)` must default to `htp.runtime.default_runtime()`.
+- if the stage is marked `stubbed`, reaching a stubbed region must raise a structured replay diagnostic, not an arbitrary
+  Python exception.
+
+### 6.2 Normative v1 runtime shim surface
+
+To keep replay stable, HTP needs a small, fixed runtime surface. The v1 stage generator is allowed to call only:
+
+- `htp.runtime.default_runtime() -> Runtime`
+- `htp.runtime.call_kernel(kernel_id, *, args, mode, artifacts, trace=None) -> object`
+- `htp.runtime.intrinsics.invoke(name, *, args, attrs=None, mode, trace=None) -> object`
+- `htp.runtime.extensions.invoke(extension_id, operation, *, payload, mode, trace=None) -> object`
+- `htp.runtime.raise_stub(code, *, node_id, entity_id=None, kind, artifact_ref=None, detail=None) -> None`
+
+Required semantics:
+
+- `call_kernel(...)`
+  - in `sim`, dispatches to reference semantics or backend simulator;
+  - in `device`, dispatches through the selected binding/runtime.
+- `intrinsics.invoke(...)`
+  - dispatches to intrinsic simulator handlers in `sim`;
+  - when no simulator exists but a stub policy is declared, it must call `raise_stub(...)`.
+- `extensions.invoke(...)`
+  - is the native escape hatch for optional extension packages such as MLIR round-trip islands or external toolchain
+    adapters;
+  - core HTP does not ship MLIR semantics in the runtime surface; extension packages own their own operation names and
+    payload schemas behind this hook.
+- `raise_stub(...)`
+  - must raise a replay diagnostic in the stable family from `docs/design/feats/09_debuggability.md`.
+
+This API is intentionally small. If a new internal IR construct cannot replay through this surface, it is not yet a
+valid HTP stage construct.
 
 ---
 

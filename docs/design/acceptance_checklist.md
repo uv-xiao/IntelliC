@@ -90,7 +90,13 @@ For PTO:
   as PyPTO/Simpler-style `CodeRunner`).
 - toolchain/runtime pins are recorded under `extensions.pto.*`.
 
-For AIE:
+For NV-GPU:
+
+- `codegen/nvgpu/` file contract is specified.
+- Ampere and Blackwell are specified as profiles of one backend, not separate compiler stacks.
+- toolchain/runtime pins are recorded under `extensions.nvgpu.*`.
+
+For optional extension backends/toolchains such as AIE:
 
 - AIE backend MLIR artifact emission contract is specified.
 - `codegen/aie/` file set is specified (`aie.mlir` + sidecars).
@@ -105,7 +111,7 @@ For AIE:
   - layout incompatibilities
   - effect/protocol violations
   - missing handler / backend gaps
-- Diagnostics always include `node_id` + structured payload pointer.
+- Diagnostics always include `node_id`, structured payload pointer, and structured fix-hint pointer.
 - Stage-to-stage “semantic diff” is possible from dumps (stable ordering + ids).
 
 ---
@@ -134,5 +140,27 @@ For AIE:
 ## 9) MLIR round-trip island scope is pinned
 
 - The design defines a normative v1 eligible subset for MLIR round-trip islands.
+- The design defines the normative v1 exporter/importer statement and intrinsic subset for MLIR round-trip islands.
 - The design defines a normative `ledger.json` role in export/import.
 - The design defines how entity/binding identities survive MLIR rewrites and where rewrite maps are emitted.
+
+---
+
+## 10) Runtime and schema closure are pinned
+
+- The design defines the normative v1 replay module surface (`STAGE_INFO`, `run(...)`).
+- The design defines the normative v1 `htp.runtime` shim surface.
+- The design defines the normative v1 `PassContract` minimum schema.
+- The design defines the normative v1 `manifest.json` and per-stage record invariants.
+- The design defines the normative v1 binding API and result record shapes.
+
+---
+
+## 11) V1 proof scope is pinned
+
+- V1 is explicitly an end-to-end proof on both PTO and NV-GPU.
+- The mandatory pass spine is explicit: `ast_canonicalize`, `typecheck_layout_effects`, staged analysis pass(es),
+  `apply_schedule`, backend lowering, and package emission.
+- MLIR-based round-trips are extensions; the core compiler only provides the extension mechanism.
+- The examples document covers kernel/backend, CSP pipeline, optional extension backend, multi-backend serving, compiler
+  extension, and staged warp-specialization-style optimization stories.

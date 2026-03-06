@@ -41,6 +41,10 @@ The artifact contract is the stable boundary between:
 ## “Must-support” initial backends
 
 - Ascend PTO toolchain/runtime (simulation + device)
+- NV-GPU (Ampere + Blackwell profiles)
+
+Optional extension backend/toolchain examples:
+
 - AIE via MLIR-AIE
 
 ---
@@ -72,5 +76,6 @@ For a backend `B`, the design must specify:
 
 Deep dive:
 - PTO packaging: `docs/design/impls/05_backend_pto.md`
+- NV-GPU packaging: `docs/design/impls/13_backend_nvgpu.md`
 - AIE backend MLIR artifact emission: `docs/design/impls/06_backend_aie.md`
 - Binding interface: `docs/design/impls/07_binding_interface.md`

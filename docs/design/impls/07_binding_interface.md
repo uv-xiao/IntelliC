@@ -39,22 +39,53 @@ The binding must refuse to run if:
 
 ---
 
-## 3) Minimal API surface (illustrative)
+## 3) Minimal API surface (normative v1)
 
-Conceptual API (exact names not important; semantics are):
+The binding API is part of the design surface. V1 should standardize these operations:
 
-- `binding = htp.bind(package_dir)`
+- `binding = htp.bind(package_dir, binding_override=None)`
 - `report = binding.validate()`
 - `build = binding.build(mode="sim"|"device", force=False, cache_dir=None)`
 - `session = binding.load(mode="sim"|"device")`
-- `result = session.run(entry="main", args=[...], trace="off"|"basic"|"full")`
-- `result = session.replay(stage_id="s02", entry="main", args=[...], mode="sim")`
+- `result = session.run(entry, *, args=(), kwargs=None, trace="off"|"basic"|"full")`
+- `result = session.replay(stage_id, *, entry=None, args=(), kwargs=None, mode="sim", trace="basic")`
 
 Notes:
 
 - `mode="sim"` uses backend simulators where possible (e.g. `pto-runtime` `a2a3sim`).
 - `mode="device"` uses device runtimes/toolchains and may require environment setup.
 - stages always provide `program.py` and are runnable in `mode="sim"` (possibly stubbed with explicit diagnostics).
+
+### 3.1 Return records
+
+`validate()` returns:
+
+- `ok: bool`
+- `backend`
+- `variant`
+- `diagnostics[]`
+- `missing_files[]`
+- `contract_refs[]`
+
+`build()` returns:
+
+- `ok: bool`
+- `mode`
+- `built_outputs[]`
+- `log_paths[]`
+- `diagnostics[]`
+
+`run()` / `replay()` return:
+
+- `ok: bool`
+- `mode`
+- `entry`
+- `result_ref` or inline scalar result
+- `trace_ref`
+- `diagnostics[]`
+- `stage_id` (for replay)
+
+Bindings may add backend-specific fields under a namespaced extension object, but the fields above must always exist.
 
 ---
 
@@ -89,6 +120,15 @@ logs/
 ```
 
 and record the paths in `manifest.outputs` or `manifest.extensions.<backend>`.
+
+Bindings should also emit:
+
+```
+logs/
+  replay_<stage_id>_<mode>_<ts>.log     # when replay is invoked
+```
+
+and surface the corresponding path in the replay result record.
 
 ---
 
