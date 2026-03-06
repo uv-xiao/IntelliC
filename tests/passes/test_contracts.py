@@ -78,3 +78,23 @@ def test_analysis_output_requires_analysis_basename_path_hint(path_hint):
             schema="htp.analysis.warp_role_plan.v1",
             path_hint=path_hint,
         )
+
+
+def test_pass_contract_rejects_duplicate_analysis_output_paths():
+    with pytest.raises(ValueError, match="Duplicate analysis output path"):
+        PassContract.analysis(
+            pass_id="pkg::warp_role_plan@1",
+            owner="pkg",
+            analysis_produces=(
+                AnalysisOutput(
+                    analysis_id="pkg::WarpRolePlan@1",
+                    schema="htp.analysis.warp_role_plan.v1",
+                    path_hint="analysis/shared.json",
+                ),
+                AnalysisOutput(
+                    analysis_id="pkg::OtherPlan@1",
+                    schema="htp.analysis.other_plan.v1",
+                    path_hint="analysis/shared.json",
+                ),
+            ),
+        )

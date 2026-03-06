@@ -126,6 +126,7 @@ class PassContract:
         object.__setattr__(self, "inputs", _normalize_many(self.inputs))
         object.__setattr__(self, "outputs", _normalize_many(self.outputs))
         object.__setattr__(self, "diagnostics", tuple(self.diagnostics))
+        self._validate_unique_analysis_outputs()
 
     @classmethod
     def analysis(
@@ -181,6 +182,15 @@ class PassContract:
             "deterministic": self.deterministic,
             "diagnostics": [diag.to_json() for diag in self.diagnostics],
         }
+
+    def _validate_unique_analysis_outputs(self) -> None:
+        seen_paths: set[str] = set()
+        seen_basenames: set[str] = set()
+        for output in self.analysis_produces:
+            if output.path_hint in seen_paths or PurePosixPath(output.path_hint).name in seen_basenames:
+                raise ValueError(f"Duplicate analysis output path: {output.path_hint}")
+            seen_paths.add(output.path_hint)
+            seen_basenames.add(PurePosixPath(output.path_hint).name)
 
 
 __all__ = [
