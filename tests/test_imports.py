@@ -1,18 +1,19 @@
-import sys
-from pathlib import Path
-
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-
 def test_public_packages_import():
     import htp
     import htp.ir
     import htp.passes
+    import htp.pipeline
+    import htp.artifacts
+    import htp.runtime
+    import htp.bindings
+    import htp.backends
 
     assert htp.passes.__name__ == "htp.passes"
+    assert htp.pipeline.__name__ == "htp.pipeline"
+    assert htp.artifacts.__name__ == "htp.artifacts"
+    assert htp.runtime.__name__ == "htp.runtime"
+    assert htp.bindings.__name__ == "htp.bindings"
+    assert htp.backends.__name__ == "htp.backends"
 
 
 def test_schema_constants():
