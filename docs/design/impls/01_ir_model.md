@@ -331,6 +331,20 @@ accelerated region, it must remain runnable by:
 - routing the region through a runtime shim with a sim fallback, or
 - using an explicit stub that raises a structured diagnostic at runtime (still importable/executable).
 
+Recommended stub metadata file:
+
+- `ir/stages/<id>/replay/stubs.json`
+
+Minimum contents:
+
+- `schema`: `htp.replay.stubs.v1`
+- one entry per stubbed region/intrinsic with:
+  - `node_id`
+  - `entity_id` (when available)
+  - `kind`: `intrinsic | external_toolchain | island_adapter | intentionally_unimplemented`
+  - `diagnostic_code`
+  - `artifact_ref` (if tied to emitted backend artifacts)
+
 ---
 
 ## 7) Metadata requirements (minimum)

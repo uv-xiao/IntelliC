@@ -64,8 +64,17 @@ For passes that perform major rewrites (split/fuse/unroll/outline), add checks t
 For MLIR round-trip islands, add checks that:
 
 - `ir/stages/<id>/islands/<island_id>/ledger.json` exists and is schema-valid,
+- `eligibility.json` exists and shows the region satisfied the v1 subset rules,
 - import reconstructs Python AST with valid `entity_id` / `binding_id` assignments,
 - stage replay still runs in `mode="sim"` after the round-trip.
+
+### 4.3 Stub metadata tests
+
+For any stage marked `RunnablePy=stubbed`, add checks that:
+
+- `ir/stages/<id>/replay/stubs.json` exists and is schema-valid,
+- each stub entry references a valid `node_id`,
+- each stub entry names a stable replay diagnostic code.
 
 ---
 

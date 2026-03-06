@@ -46,6 +46,40 @@ If a region is not eligible, the pass must:
 - refuse early with a structured diagnostic, or
 - leave the region unchanged.
 
+#### 2.1.1 Normative v1 subset
+
+The first implementation should not treat “eligible subset” as open-ended. A v1 round-trip island is restricted to
+regions satisfying all of the following:
+
+- **control flow**
+  - straight-line statements
+  - `for` loops with statically analyzable bounds/steps
+  - `if` without effectful branch-local protocol constructs
+- **values**
+  - scalars, tensors/tiles, buffers
+  - no Python objects with opaque host semantics
+- **bindings**
+  - lexical bindings only; no dynamic name lookup
+  - no closures / captured mutable Python state
+- **effects**
+  - pure compute effects
+  - layout annotations
+  - no CSP channels
+  - no unresolved async/barrier protocol effects crossing the island boundary
+- **calls**
+  - only intrinsics/functions with explicit MLIR lowering support in the island’s exporter/importer tables
+
+Explicit non-goals for v1:
+
+- exceptions
+- generators / `yield`
+- dynamic Python reflection
+- alias-heavy mutation patterns without an explicit buffer model
+- protocol-heavy CSP subgraphs
+
+If a candidate region violates any of these, the island pass must reject it with a stable diagnostic code rather than
+partially translating it.
+
 ### 2.2 Export (AST → MLIR)
 
 Export produces:
@@ -102,6 +136,11 @@ Run an explicit MLIR pass pipeline and emit:
 - `ir/stages/<id>/islands/<island_id>/output.mlir`
 - optional MLIR pass dumps (when configured)
 
+Normative constraint:
+
+- the MLIR pass pipeline used by an island must be recorded exactly enough to replay the transformation deterministically
+  (pass names, parameters, and pipeline ordering).
+
 ### 2.4 Import (MLIR → AST)
 
 Reify the transformed MLIR back into Python AST:
@@ -144,6 +183,13 @@ ir/stages/<stage_id>/
 ```
 
 This keeps the round-trip auditable without turning MLIR into HTP’s canonical IR.
+
+Recommended companion metadata:
+
+- `eligibility.json`
+  - records which matcher rules were satisfied
+- `import_summary.json`
+  - counts preserved/split/fused entities and bindings
 
 ---
 

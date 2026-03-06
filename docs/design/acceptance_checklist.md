@@ -78,6 +78,7 @@ Additionally:
   - `ids/entities.json` and `ids/bindings.json` to index constructs/variables robustly
   - `analysis/index.json` plus serialized analysis results when passes produce analyses
   - `program.py` always exists and is runnable in `mode="sim"` (may be stubbed with explicit diagnostics)
+  - `replay/stubs.json` exists whenever a stage is marked `stubbed`
 
 ---
 
@@ -127,3 +128,11 @@ For AIE:
 - There is a clear agent loop/tooling story that consumes only artifacts and produces auditable evidence:
   - `docs/design/feats/10_agentic_development.md`
   - `docs/design/impls/10_agentic_tooling.md`
+
+---
+
+## 9) MLIR round-trip island scope is pinned
+
+- The design defines a normative v1 eligible subset for MLIR round-trip islands.
+- The design defines a normative `ledger.json` role in export/import.
+- The design defines how entity/binding identities survive MLIR rewrites and where rewrite maps are emitted.

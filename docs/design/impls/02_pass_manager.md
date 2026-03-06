@@ -138,6 +138,8 @@ Each pass invocation produces a new immutable stage directory:
 A stage contains:
 
 - `program.py` (host-level replay program; may be stubbed)
+- `replay/`
+  - `stubs.json` (optional, present when `RunnablePy=stubbed`)
 - `program.pyast.json` (canonical AST dump for this stage)
 - `types.json`, `layout.json`, `effects.json`, `schedule.json` (typed metadata dumps)
 - `ids/`
@@ -170,7 +172,7 @@ Emit a line-delimited JSON log at `ir/pass_trace.jsonl`. Each line is one pass i
   - `requires`: analysis ids consumed
   - `produces`: analysis ids emitted + file paths (stage-relative)
 - `runnable_py`: `preserves|stubbed`, plus `modes` and `program_py` path
-- `dumps`: paths for `program.py`, `program.pyast.json`, metadata dumps, `ids/*`, and `analysis/index.json`
+- `dumps`: paths for `program.py`, optional `replay/stubs.json`, `program.pyast.json`, metadata dumps, `ids/*`, and `analysis/index.json`
 - `maps`: optional paths for `maps/entity_map.json` and `maps/binding_map.json`
 - `diagnostics`: list of `{code, severity, node_id, message, payload_ref}`
 

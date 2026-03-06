@@ -53,6 +53,7 @@ Recommended per-stage fields (illustrative):
   - `status`: `preserves|stubbed`
   - `modes`: `["sim", "device"]` subset
   - `program_py`: path (stage-relative)
+  - optional `stubs`: path to `replay/stubs.json`
 - `analysis_index`: path to `analysis/index.json` (if present)
 - optional `ids`:
   - `entities`: path to `ids/entities.json`
@@ -151,6 +152,7 @@ The manifest is the index, but a complete package should also include:
 - `ir/pass_trace.jsonl` (contracted per-pass trace)
 - per-stage dumps:
   - `ir/stages/<id>/program.py` (runnable replay in `mode="sim"`; may be stubbed with explicit diagnostics)
+  - optional `ir/stages/<id>/replay/stubs.json` (typed stub metadata for replay-time diagnostics)
   - `ir/stages/<id>/program.pyast.json` (canonical AST)
   - `ir/stages/<id>/types.json`, `layout.json`, `effects.json`, `schedule.json`
   - `ir/stages/<id>/ids/entities.json` and `ids/bindings.json` (stable construct and binding identities)

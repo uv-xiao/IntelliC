@@ -55,6 +55,10 @@ Recommended payload fields:
 - `artifact_ref` (if the stub corresponds to emitted backend artifacts)
 - `next_actions` (optional, non-normative hints)
 
+Recommended artifact:
+
+- `ir/stages/<id>/replay/stubs.json` containing one structured entry per stubbed region/intrinsic
+
 ---
 
 ## Required artifacts
