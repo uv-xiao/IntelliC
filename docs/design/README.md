@@ -20,6 +20,11 @@ This folder is the **redo design** described by `docs/design/REDO.md`.
 - Implementation components: `docs/design/impls/`
 - Retargetability evidence report: `docs/design/reports/retargetable_extensibility_report.md`
 
+Notable deep dives:
+
+- Warp specialization + pipelining case study: `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
+- MLIR round-trip island contract: `docs/design/impls/12_mlir_roundtrip_island.md`
+
 ## Scope note
 
 This redo is **docs-only**: it does not rename packages, move code, or change build scripts yet.

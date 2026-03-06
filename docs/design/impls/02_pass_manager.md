@@ -143,6 +143,8 @@ A stage contains:
 - `ids/`
   - `entities.json` (node_id → entity_id, plus entity metadata)
   - `bindings.json` (binding_id registry + Name-use → binding_id links)
+- `islands/` (optional, produced by MLIR round-trip islands)
+  - `<island_id>/input.mlir`, `output.mlir`, `pipeline.txt`, `ledger.json` (see `docs/design/impls/12_mlir_roundtrip_island.md`)
 - `maps/` (optional, produced by major rewrites)
   - `entity_map.json` (before/after entity mapping; see `docs/design/impls/01_ir_model.md`)
   - `binding_map.json` (before/after binding mapping, when bindings change)

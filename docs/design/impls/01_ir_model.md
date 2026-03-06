@@ -27,7 +27,7 @@ extended.
    - effect annotations
 4. **Backend-ready forms**:
    - for PTO: codegen-ready kernel/task representation
-   - for AIE: MLIR-AIE module(s) as an island product
+   - for AIE: MLIR-AIE module(s) as backend artifacts under `codegen/aie/`
 
 ---
 
@@ -44,10 +44,11 @@ This implies:
 2) **Lowering is staged as “residual programs”**, not as a one-way lowering into opaque internal IR.
    - A “lowered” stage is still a Python program; it may carry extra metadata/attachments (analyses, island handles,
      backend-ready forms) but it cannot become non-executable.
-3) **External toolchains are accelerators, not semantic owners**.
-   - Entering an external island (MLIR-AIE, vendor compilers, etc.) cannot delete the program’s sim semantics. The stage
-     must remain runnable by keeping (or reconstructing) a Python-level executable representation and by routing island
-     calls through a runtime shim with a sim fallback.
+3) **External toolchains and IR islands are accelerators, not semantic owners**.
+   - Whether HTP is emitting one-way artifacts for an external toolchain (MLIR-AIE, vendor compilers) or doing an internal
+     MLIR round-trip island (AST → MLIR → passes → AST), it cannot delete the program’s sim semantics.
+   - The stage must remain runnable by keeping (or reconstructing) a Python-level executable representation and routing
+     accelerated regions through runtime shims (or explicit stubs) with defined sim behavior.
 
 Practically, HTP must define an explicit “executable subset” of Python AST plus a small, stable runtime API that gives
 semantics to IR-level operations.
@@ -311,9 +312,11 @@ Recommended contract:
 - device-level computation is routed through stable runtime shims:
   - `htp.runtime.call_kernel(...)`
   - `htp.runtime.intrinsics.*` (portable simulation stubs when possible)
-- when a region is lowered into an external island (MLIR-AIE, vendor toolchains, etc.), the replay program calls an
-  island stub:
+- when a region is processed by an MLIR round-trip island, the replay program calls an island adapter:
   - `htp.runtime.islands.invoke(island_id, ...)`
+  (the island itself reifies back into Python AST; see `docs/design/impls/12_mlir_roundtrip_island.md`)
+- when a region is only available as an external toolchain artifact (vendor compilers, MLIR-AIE emission), the replay
+  program routes through an explicit sim stub or reference semantics (never “missing replay”)
 
 The pass contract must state whether it preserves or stubs this property (`RunnablePy` in
 `docs/design/impls/02_pass_manager.md`).

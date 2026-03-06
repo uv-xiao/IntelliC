@@ -60,6 +60,8 @@ Recommended per-stage fields (illustrative):
 - optional `maps`:
   - `entity_map`: path to `maps/entity_map.json` (major rewrites)
   - `binding_map`: path to `maps/binding_map.json` (when bindings change)
+- optional `islands`:
+  - list of `{island_id, dir}` for MLIR round-trip evidence under `islands/`
 - optional `digests`:
   - `ast_hash`, `types_hash`, `effects_hash`, `analysis_hash` (semantic or byte hashes)
 
@@ -153,6 +155,7 @@ The manifest is the index, but a complete package should also include:
   - `ir/stages/<id>/types.json`, `layout.json`, `effects.json`, `schedule.json`
   - `ir/stages/<id>/ids/entities.json` and `ids/bindings.json` (stable construct and binding identities)
   - optional `ir/stages/<id>/maps/entity_map.json` and `maps/binding_map.json` (major rewrite provenance)
+  - optional `ir/stages/<id>/islands/<island_id>/...` (MLIR round-trip evidence: input/output MLIR, pipeline, ledger)
   - `ir/stages/<id>/analysis/index.json` + analysis result files (typed, versioned pass analyses)
   - `ir/stages/<id>/summary.json`
 

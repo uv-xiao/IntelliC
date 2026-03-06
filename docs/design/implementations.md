@@ -270,10 +270,11 @@ Recommended shape:
 ```
 codegen/aie/
   aie.mlir
-  host.cpp (or host.mlir)
   mapping.json
   fifos.json
-  build.sh / cmake/ (optional)
+  host.cpp (or host.mlir)        # optional, depends on toolchain integration
+  toolchain.json                  # pinned tool versions and build flags
+  aie_codegen.json                # HTP-owned index of artifacts + entrypoints
 ```
 
 Deep dive: `docs/design/impls/06_backend_aie.md`.
@@ -313,3 +314,5 @@ Implementation deep dives live in:
 - `docs/design/impls/08_testing.md`
 - `docs/design/impls/09_transition_plan.md`
 - `docs/design/impls/10_agentic_tooling.md`
+- `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
+- `docs/design/impls/12_mlir_roundtrip_island.md`
