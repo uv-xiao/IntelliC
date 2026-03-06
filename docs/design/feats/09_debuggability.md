@@ -35,6 +35,26 @@ Every diagnostic must include:
 
 The payload schema is what tools/agents consume; the message is for humans.
 
+### Replay/stub diagnostics (required family)
+
+Because stage replay is mandatory in `mode="sim"`, stub hits must have a stable diagnostic family rather than ad-hoc
+runtime errors.
+
+Recommended codes:
+
+- `HTP.REPLAY.STUB_HIT`
+- `HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC`
+- `HTP.REPLAY.STUB_EXTERNAL_TOOLCHAIN_ONLY`
+
+Recommended payload fields:
+
+- `stage_id`
+- `node_id`
+- `entity_id` (when available)
+- `reason`: `missing_simulator | external_toolchain_only | intentionally_unimplemented`
+- `artifact_ref` (if the stub corresponds to emitted backend artifacts)
+- `next_actions` (optional, non-normative hints)
+
 ---
 
 ## Required artifacts

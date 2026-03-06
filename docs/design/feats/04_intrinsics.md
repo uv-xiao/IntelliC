@@ -79,6 +79,9 @@ reported as structured diagnostics for the compilation roles:
 - missing `simulate` is not necessarily a compile-time mismatch if a stub policy exists; it becomes a replay-time
   structured diagnostic when the intrinsic is executed in `mode="sim"`.
 
+Stub policies should name the replay diagnostic code they produce, so bindings and agents can treat stub hits as typed
+events rather than opaque failures.
+
 ---
 
 ## 3) Effects and async intrinsics (example contracts)

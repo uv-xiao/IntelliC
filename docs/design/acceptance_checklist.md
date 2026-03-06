@@ -55,7 +55,8 @@ Extension units include:
 - pipeline templates (including final artifact contract requirements)
 - backends (capabilities + artifact contracts + handler tables)
 - bindings (validate/build/load/run/replay)
-- islands (matcher/exporter/importer + artifact contract)
+- MLIR round-trip islands (matcher/exporter/MLIR pipeline/importer + artifact contract)
+- external toolchain integrations (artifact emission + toolchain contract)
 
 Additionally:
 

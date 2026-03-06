@@ -59,6 +59,14 @@ For passes that perform major rewrites (split/fuse/unroll/outline), add checks t
 - mapped entities exist in both before/after stages,
 - introduced entities record provenance (`origin`) where applicable.
 
+### 4.2 Island round-trip tests
+
+For MLIR round-trip islands, add checks that:
+
+- `ir/stages/<id>/islands/<island_id>/ledger.json` exists and is schema-valid,
+- import reconstructs Python AST with valid `entity_id` / `binding_id` assignments,
+- stage replay still runs in `mode="sim"` after the round-trip.
+
 ---
 
 ## Additional “long-term health” gates (recommended)

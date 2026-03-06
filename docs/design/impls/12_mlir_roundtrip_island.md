@@ -57,6 +57,43 @@ Export produces:
 
 The ledger is necessary to make reification deterministic and to support later diff/debug workflows.
 
+Recommended minimum `ledger.json` shape:
+
+```json
+{
+  "schema": "htp.island.ledger.v1",
+  "island_id": "mlir_roundtrip_0",
+  "stage_before": "s05",
+  "def_id": "module::matmul_tile",
+  "entity_links": [
+    {
+      "entity_id": "module::matmul_tile:E12",
+      "role": "loop_k",
+      "mlir_ops": ["%op17", "%op18"]
+    }
+  ],
+  "binding_links": [
+    {
+      "binding_id": "module::matmul_tile:S3:B1",
+      "name": "k",
+      "mlir_values": ["%arg2", "%iv0"]
+    }
+  ],
+  "region_roots": [
+    {
+      "entity_id": "module::matmul_tile:E12",
+      "mlir_block": "^bb0"
+    }
+  ]
+}
+```
+
+Constraints:
+
+- `entity_links` must be sufficient to rebuild construct-level identity after MLIR rewrites.
+- `binding_links` must be sufficient to rebuild variable identity even if MLIR renames or clones SSA values.
+- the ledger is normative for import; reification must not depend on textual MLIR pattern guessing alone.
+
 ### 2.3 Transform (MLIR passes)
 
 Run an explicit MLIR pass pipeline and emit:
@@ -79,6 +116,16 @@ Import must ensure:
 
 - the stage remains runnable in `mode="sim"` (no opaque “MLIR-only” semantics)
 - effects/layout obligations remain explicit and checkable in HTP metadata
+
+Import policy for common rewrite classes:
+
+- **preserve**: if MLIR rewrites preserve a construct semantically, keep its `entity_id`
+- **split/fuse**: emit `maps/entity_map.json` with one-to-many or many-to-one mappings
+- **rename/rebind**: preserve `binding_id` when semantics are unchanged; otherwise emit `maps/binding_map.json`
+- **introduce helper temporaries**: assign fresh `binding_id`s and record provenance in `binding_map.json`
+
+If import cannot reconstruct a well-formed Python AST region with explicit identities/effects, the island pass must fail
+with a structured diagnostic rather than silently degrading the stage.
 
 ---
 
@@ -109,4 +156,3 @@ External toolchains are a different boundary:
 - HTP does not require a semantic MLIR → AST reification for such toolchain steps
 
 Example: MLIR-AIE as a backend artifact emission path is specified in `docs/design/impls/06_backend_aie.md`.
-
