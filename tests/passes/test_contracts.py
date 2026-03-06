@@ -98,3 +98,25 @@ def test_pass_contract_rejects_duplicate_analysis_output_paths():
                 ),
             ),
         )
+
+
+def test_pass_contract_rejects_duplicate_analysis_output_basenames():
+    first = AnalysisOutput(
+        analysis_id="pkg::WarpRolePlan@1",
+        schema="htp.analysis.warp_role_plan.v1",
+        path_hint="analysis/shared.json",
+    )
+    second = object.__new__(AnalysisOutput)
+    object.__setattr__(second, "analysis_id", "pkg::OtherPlan@1")
+    object.__setattr__(second, "schema", "htp.analysis.other_plan.v1")
+    object.__setattr__(second, "path_hint", "other/shared.json")
+
+    with pytest.raises(ValueError, match="Duplicate analysis output path"):
+        PassContract.analysis(
+            pass_id="pkg::warp_role_plan@1",
+            owner="pkg",
+            analysis_produces=(
+                first,
+                second,
+            ),
+        )
