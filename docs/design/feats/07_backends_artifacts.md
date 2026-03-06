@@ -35,7 +35,7 @@ The artifact contract is the stable boundary between:
   - intermediate dumps
   - build/run metadata
 - Stage replay friendliness:
-  - per-stage `program.py` exists when pass contracts preserve `RunnablePy`
+  - per-stage `program.py` always exists and is runnable in `mode="sim"` (may be stubbed with explicit diagnostics)
   - backends should provide simulators for core intrinsic semantics whenever feasible
 
 ## “Must-support” initial backends

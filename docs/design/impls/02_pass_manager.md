@@ -92,7 +92,7 @@ Each pass registers a `PassContract` (conceptual schema):
   - `runnable_py`: one of:
     - `preserves` (stage remains runnable in declared modes)
     - `stubbed` (runnable but calls stubs for unavailable regions; must emit stub metadata)
-    - `breaks` (not runnable; must provide diagnostic explaining why)
+  - invariant: stages must be runnable in `mode="sim"` (see `docs/design/impls/01_ir_model.md`)
 - determinism:
   - `deterministic`: `true|false`
   - if `false`, must declare nondeterminism sources and the seed/recording scheme
@@ -161,7 +161,7 @@ Emit a line-delimited JSON log at `ir/pass_trace.jsonl`. Each line is one pass i
 - `analysis`:
   - `requires`: analysis ids consumed
   - `produces`: analysis ids emitted + file paths (stage-relative)
-- `runnable_py`: `preserves|stubbed|breaks`, plus `modes` and `program_py` path if present
+- `runnable_py`: `preserves|stubbed`, plus `modes` and `program_py` path
 - `dumps`: paths for `program.py`, `program.pyast.json`, metadata dumps, and `analysis/index.json`
 - `diagnostics`: list of `{code, severity, node_id, message, payload_ref}`
 

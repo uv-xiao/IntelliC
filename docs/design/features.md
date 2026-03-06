@@ -201,8 +201,12 @@ Each compile emits:
 Rationale: reproducibility, debugging, and stable runtime integration.
 
 Design addition: because the canonical IR is Python AST, HTP should also emit a **runnable Python replay program** at
-each stage (`ir/stages/<id>/program.py`) when the pass contracts allow it (`RunnablePy`). This makes intermediate dumps
-executable “context packs”.
+each stage (`ir/stages/<id>/program.py`). This makes intermediate dumps executable “context packs”.
+
+Design constraint:
+
+- stage programs are always runnable in `mode="sim"` (they may be stubbed with explicit diagnostics for accelerated
+  regions), which constrains what intermediate IR forms can exist.
 
 ---
 

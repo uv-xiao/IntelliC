@@ -23,6 +23,10 @@ home for:
 - provide tracing hooks
 - support `replay(stage_id, mode=sim|device)` when the stage provides `program.py`
 
+Design constraint:
+
+- stages always provide `program.py` and are runnable in `mode="sim"` (they may be stubbed with explicit diagnostics)
+
 ## Runtime separation
 
 HTP should not embed device runtimes; it integrates with:

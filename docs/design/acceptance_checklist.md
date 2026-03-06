@@ -75,7 +75,7 @@ Additionally:
 - Each stage directory has deterministic dumps:
   - `program.pyast.json` and `types/layout/effects/schedule` metadata
   - `analysis/index.json` plus serialized analysis results when passes produce analyses
-  - `program.py` when `RunnablePy` is preserved (or a stub/diagnostic otherwise)
+  - `program.py` always exists and is runnable in `mode="sim"` (may be stubbed with explicit diagnostics)
 
 ---
 

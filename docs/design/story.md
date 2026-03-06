@@ -99,6 +99,11 @@ HTP’s canonical IR is a typed Python AST plus attached metadata snapshots (typ
 addition is that analyses are first-class and staged: if an analysis justifies a rewrite, it is emitted under
 `ir/stages/<id>/analysis/` and indexed.
 
+HTP also treats replay as an invariant, not a best-effort feature:
+
+- every stage program is runnable in `mode="sim"` (possibly stubbed with explicit diagnostics), which constrains what IR
+  extensions are allowed and forces external toolchains to remain explicit accelerators rather than semantic owners.
+
 Deep dive: `docs/design/impls/01_ir_model.md`
 
 ### 4.2 Passes: two effect kinds, explicitly recorded

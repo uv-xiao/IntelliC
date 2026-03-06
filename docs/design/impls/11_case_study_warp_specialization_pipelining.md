@@ -17,6 +17,11 @@ This document shows a concrete HTP pipeline where each pass has two observable e
 It also demonstrates why HTP insists on explicit contracts: without named analyses, typed effects, and capability gates,
 these features quickly devolve into “target-specific pass soups”.
 
+Design constraint used throughout:
+
+- every stage remains runnable in `mode="sim"` (possibly stubbed with explicit diagnostics), so that debugging and
+  minimization never depend on internal compiler state.
+
 ---
 
 ## 0) The input program (user code)
@@ -253,4 +258,3 @@ If something goes wrong (wrong answers, deadlock, perf cliff), the artifact pack
 - `ir/stages/s07/program.py`: runnable replay of the rewritten program (when preserved/stubbed).
 
 This is the minimal set needed for long-term healthy development and for autonomous agent loops.
-

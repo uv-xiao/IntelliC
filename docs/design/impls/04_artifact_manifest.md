@@ -5,7 +5,7 @@
 - stable integration contract
 - reproducibility and auditability
 - backend-specific extension fields without breaking core readers
-- stage replay: every intermediate stage is a “context pack” (AST + metadata + runnable Python when available)
+- stage replay: every intermediate stage is a “context pack” (AST + metadata + runnable Python in `sim`)
 
 ---
 
@@ -50,7 +50,7 @@ Recommended per-stage fields (illustrative):
 - `id`, `dir`
 - `pass`: `null` for capture, or `pass_id@version`
 - `runnable_py`:
-  - `status`: `preserves|stubbed|breaks`
+  - `status`: `preserves|stubbed`
   - `modes`: `["sim", "device"]` subset
   - `program_py`: path (stage-relative)
 - `analysis_index`: path to `analysis/index.json` (if present)
@@ -142,7 +142,7 @@ The manifest is the index, but a complete package should also include:
 
 - `ir/pass_trace.jsonl` (contracted per-pass trace)
 - per-stage dumps:
-  - `ir/stages/<id>/program.py` (runnable replay, when `RunnablePy` holds)
+  - `ir/stages/<id>/program.py` (runnable replay in `mode="sim"`; may be stubbed with explicit diagnostics)
   - `ir/stages/<id>/program.pyast.json` (canonical AST)
   - `ir/stages/<id>/types.json`, `layout.json`, `effects.json`, `schedule.json`
   - `ir/stages/<id>/analysis/index.json` + analysis result files (typed, versioned pass analyses)

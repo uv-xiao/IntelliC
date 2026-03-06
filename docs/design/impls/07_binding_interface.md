@@ -19,7 +19,7 @@ Bindings are also the execution substrate for:
 2) **Build** (optional): invoke toolchains to produce runnable binaries from `codegen/<backend>/...` sources/recipes.
 3) **Load**: load runtime handles (shared libraries, device runners, simulators).
 4) **Run**: execute entrypoints with typed marshalling and trace hooks.
-5) **Replay**: execute a specific stage’s `ir/stages/<id>/program.py` when available.
+5) **Replay**: execute a specific stage’s `ir/stages/<id>/program.py` (always runnable in `mode="sim"`; may be stubbed).
 6) **Report**: emit structured run records, diagnostics, and log pointers into the package.
 
 ---
@@ -97,7 +97,7 @@ Replaying a stage means:
 - honor the stage’s declared `RunnablePy` contract:
   - `preserves`: stage is runnable in the declared modes
   - `stubbed`: runnable but calls stubs for some regions (must have stub metadata + explicit diagnostics)
-  - `breaks`: replay is not supported; binding must refuse with a structured reason
+  - invariant: stages are always runnable in `mode="sim"`; missing `program.py` is a contract violation
 
 This is how HTP keeps debugging stable across refactors: replay is a file contract, not a private API.
 

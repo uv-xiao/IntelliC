@@ -30,8 +30,11 @@ An AIE island pass must declare:
   - `aie.mlir`
   - sidecar JSON (mapping/fifos) needed for inspection and stable diffs
 - **importer**: how to rejoin the pipeline:
-  - replace the exported region with a typed stub node, e.g. `IslandCall(island_id, signature, effects)`
-  - ensure `RunnablePy` remains possible by routing calls through `htp.runtime.islands.invoke(island_id, ...)`
+  - re-materialize a Python AST representation of the region as a call boundary (the pipeline always returns to Python
+    AST as the canonical form)
+  - represent the compiled island as a typed call node, e.g. `IslandCall(island_id, signature, effects)`
+  - ensure the stage is runnable in `mode="sim"` by routing through `htp.runtime.islands.invoke(...)` with a sim fallback
+    (reference implementation or simulator), not by making the stage non-executable
 - **artifact contract**: exact file set and naming under `codegen/aie/islands/<island_id>/...`
 
 This is the mechanism that keeps “MLIR is used here” explicit and auditable, rather than leaking MLIR invariants into the
@@ -127,6 +130,10 @@ When an AST region is exported to MLIR-AIE:
 
 This is the central advantage of AST-first staging:
 > even after exporting to an external IR, the host-level program remains executable for debugging and minimization.
+
+Important constraint:
+> island entry/exit is a *local pipeline*; after the island finishes, HTP returns to Python AST as the canonical IR.
+> MLIR artifacts remain as attached products (in `codegen/aie/...`), not as the global IR.
 
 ---
 

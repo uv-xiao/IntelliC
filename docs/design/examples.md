@@ -92,8 +92,9 @@ out/add/
         toolchain.json
 ```
 
-Design intent: because the canonical IR is Python AST, every stage emits `program.py` when pass contracts preserve
-`RunnablePy`. This is the primary mechanism for stage-by-stage replay/debugging without an IR interpreter.
+Design intent: because the canonical IR is Python AST, every stage emits `program.py` and remains runnable in
+`mode="sim"` (it may be stubbed with explicit diagnostics). This is the primary mechanism for stage-by-stage
+replay/debugging without an IR interpreter.
 
 ---
 
@@ -270,7 +271,7 @@ def matmul_sched(s):
 
 What you should see in the emitted package:
 
-- `ir/stages/<id>/program.py`: runnable replay of the stage when `RunnablePy` holds.
+- `ir/stages/<id>/program.py`: runnable replay of the stage in `mode="sim"` (may be stubbed with explicit diagnostics).
 - `ir/stages/<id>/analysis/`: typed analysis outputs such as:
   - `warp_role_plan.json` (produced before warp specialization transform)
   - `pipeline_plan.json` (produced before pipelining transform)

@@ -7,6 +7,13 @@ Define the minimal internal representation strategy that preserves Python extens
 This design deliberately exploits a Python-specific advantage: because the IR is Python AST, every intermediate stage can
 also emit a **runnable Python program** (host/orchestration level) for replay, simulation, and debugging.
 
+HTP strengthens this into a hard invariant:
+
+> Every compilation stage must be runnable in `mode="sim"`.
+
+This requirement is not “nice to have”; it directly constrains what the intermediate IR can be and how it can be
+extended.
+
 ---
 
 ## 1) IR layers
@@ -21,6 +28,29 @@ also emit a **runnable Python program** (host/orchestration level) for replay, s
 4. **Backend-ready forms**:
    - for PTO: codegen-ready kernel/task representation
    - for AIE: MLIR-AIE module(s) as an island product
+
+---
+
+## 1.5) The executable-IR invariant (what “always runnable” implies)
+
+“Always runnable in sim mode” indicates that HTP’s intermediate representation must remain an **executable language** at
+all stages, not merely a data structure for compilers.
+
+This implies:
+
+1) **IR extensions must have executable semantics**, not just syntactic shape.
+   - If we introduce a new internal node/kind, it must correspond to Python code that can execute in sim (typically via a
+     runtime shim call), or it must lower immediately into such code in the same pass.
+2) **Lowering is staged as “residual programs”**, not as a one-way lowering into opaque internal IR.
+   - A “lowered” stage is still a Python program; it may carry extra metadata/attachments (analyses, island handles,
+     backend-ready forms) but it cannot become non-executable.
+3) **External toolchains are accelerators, not semantic owners**.
+   - Entering an external island (MLIR-AIE, vendor compilers, etc.) cannot delete the program’s sim semantics. The stage
+     must remain runnable by keeping (or reconstructing) a Python-level executable representation and by routing island
+     calls through a runtime shim with a sim fallback.
+
+Practically, HTP must define an explicit “executable subset” of Python AST plus a small, stable runtime API that gives
+semantics to IR-level operations.
 
 ---
 
@@ -126,8 +156,17 @@ Recommended contract:
   - `htp.runtime.islands.invoke(island_id, ...)`
 
 The pass contract must state whether it preserves or breaks this property (`RunnablePy` in
-`docs/design/impls/02_pass_manager.md`). If a pass breaks runnability, it must do so explicitly and with a structured
-diagnostic (no silent disappearance of `program.py`).
+`docs/design/impls/02_pass_manager.md`).
+
+HTP’s design constraint is stronger than “best effort replay”:
+
+> All stages must be runnable in `mode="sim"`.
+
+Therefore, passes are not allowed to “drop replay” by omitting `program.py`. When a stage cannot faithfully simulate an
+accelerated region, it must remain runnable by:
+
+- routing the region through a runtime shim with a sim fallback, or
+- using an explicit stub that raises a structured diagnostic at runtime (still importable/executable).
 
 ---
 

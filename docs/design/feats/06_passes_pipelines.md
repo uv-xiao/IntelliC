@@ -28,7 +28,8 @@ Each pass declares:
 - `provides` capabilities
 - `invalidates` capabilities (optional)
 - layout/effect invariants and failure diagnostics
-- replay contract (`RunnablePy`: preserves | stubbed | breaks)
+- replay contract (`RunnablePy`: preserves | stubbed; stages are always runnable in `sim`)
+- if stubbed, the stage remains executable but may raise structured diagnostics when a stubbed region is reached
 - pass effect kind (`analysis | transform | mixed`) and AST effect (`preserves | mutates`)
 
 Deep dive:

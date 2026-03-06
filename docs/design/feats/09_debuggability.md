@@ -43,7 +43,7 @@ The payload schema is what tools/agents consume; the message is for humans.
 - stage dumps (`ir/stages/<id>/...`):
   - `program.pyast.json` (canonical AST)
   - `types.json`, `layout.json`, `effects.json`, `schedule.json`
-  - `program.py` when pass contract preserves `RunnablePy`
+  - `program.py` always exists and is runnable in `mode="sim"` (may be stubbed with explicit diagnostics)
 - backend-specific codegen outputs
 - manifest with full pipeline info and versions
 
