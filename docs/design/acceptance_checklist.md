@@ -74,6 +74,7 @@ Additionally:
 - `ir/pass_trace.jsonl` is defined and points to stage dumps.
 - Each stage directory has deterministic dumps:
   - `program.pyast.json` and `types/layout/effects/schedule` metadata
+  - `ids/entities.json` and `ids/bindings.json` to index constructs/variables robustly
   - `analysis/index.json` plus serialized analysis results when passes produce analyses
   - `program.py` always exists and is runnable in `mode="sim"` (may be stubbed with explicit diagnostics)
 

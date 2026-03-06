@@ -21,7 +21,7 @@ home for:
 - load artifacts (dlopen, runtime API, simulator)
 - run entrypoints with typed argument marshalling
 - provide tracing hooks
-- support `replay(stage_id, mode=sim|device)` when the stage provides `program.py`
+- support `replay(stage_id, mode=sim|device)` (stages always provide `program.py` runnable in `sim`)
 
 Design constraint:
 

@@ -130,7 +130,7 @@ attached to stages, not semantic owners of the program.
 
 To treat LLM-based development as a first-class target, HTP must design *every important interface* as structured data:
 
-- **pass trace is structured** (`pass_trace.jsonl`) and references staged dumps, not ad-hoc text logs
+- **pass trace is structured** (`ir/pass_trace.jsonl`) and references staged dumps, not ad-hoc text logs
 - **diagnostics are machine-localizing** (stable code + `node_id` + structured payload ref)
 - **analyses are staged** (`ir/stages/<id>/analysis/*`) and versioned (no “hidden RAM caches”)
 - **provenance is explicit** (`extensions.agent.*` in the manifest) so autonomous work is auditable and repeatable

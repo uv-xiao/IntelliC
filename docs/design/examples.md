@@ -66,6 +66,12 @@ out/add/
         layout.json
         effects.json
         schedule.json
+        ids/
+          entities.json
+          bindings.json
+        maps/                    # optional (major rewrites)
+          entity_map.json
+          binding_map.json
       s01/                      # canonicalize
         program.py
         program.pyast.json

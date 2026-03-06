@@ -151,6 +151,8 @@ The manifest is the index, but a complete package should also include:
   - `ir/stages/<id>/program.py` (runnable replay in `mode="sim"`; may be stubbed with explicit diagnostics)
   - `ir/stages/<id>/program.pyast.json` (canonical AST)
   - `ir/stages/<id>/types.json`, `layout.json`, `effects.json`, `schedule.json`
+  - `ir/stages/<id>/ids/entities.json` and `ids/bindings.json` (stable construct and binding identities)
+  - optional `ir/stages/<id>/maps/entity_map.json` and `maps/binding_map.json` (major rewrite provenance)
   - `ir/stages/<id>/analysis/index.json` + analysis result files (typed, versioned pass analyses)
   - `ir/stages/<id>/summary.json`
 

@@ -16,6 +16,7 @@ Compile known examples and assert:
 - `ir/pass_trace.jsonl` exists and is parseable,
 - stage directories exist with required dumps,
 - stage directories include `analysis/index.json` when passes claim analysis outputs,
+- stage directories include `ids/entities.json` and `ids/bindings.json` for stable indexing and diffs,
 - backend contract outputs exist under `codegen/<backend>/...`.
 
 Golden artifacts should compare:
@@ -49,6 +50,14 @@ When `mode="sim"` is supported:
 - use this to localize semantic regressions introduced by passes.
 
 This is the backbone for long-term “healthy” development and for automated agent loops.
+
+### 4.1 Rewrite mapping tests (when major rewrites exist)
+
+For passes that perform major rewrites (split/fuse/unroll/outline), add checks that:
+
+- `maps/entity_map.json` exists and is schema-valid,
+- mapped entities exist in both before/after stages,
+- introduced entities record provenance (`origin`) where applicable.
 
 ---
 

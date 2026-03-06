@@ -73,7 +73,11 @@ A backend provides a registry mapping:
 - `IntrinsicDecl.name@version` → handler set (`lower`, `emit`, `simulate` or explicit stub policy)
 
 Missing handlers are not “runtime errors”; they are **capability mismatches** detected during pipeline selection and
-reported as structured diagnostics.
+reported as structured diagnostics for the compilation roles:
+
+- missing `lower` / `emit` is a compile-time capability mismatch (cannot build the target package),
+- missing `simulate` is not necessarily a compile-time mismatch if a stub policy exists; it becomes a replay-time
+  structured diagnostic when the intrinsic is executed in `mode="sim"`.
 
 ---
 

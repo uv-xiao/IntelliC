@@ -52,7 +52,7 @@ Declared by the backend `ArchModel`:
 - hierarchy and subgroup kinds (if any)
 - memory spaces and legality constraints
 - async primitives and barrier/event model
-- supported intrinsic handlers (lower/emit/simulate)
+- supported intrinsic handlers for compilation (`lower|emit`), plus declared simulation/stub policies
 
 ### 2.3 Pipeline template
 
@@ -128,7 +128,9 @@ Emit a structured report (path recorded in the manifest), e.g. `ir/solver_failur
 - `failed_at_pass`: pass id (or `final_contract`)
 - `missing_caps`: list of missing capability tags (with params)
 - `missing_handlers`:
-  - intrinsic ids that lack `lower|emit|simulate` handlers for the target backend
+  - intrinsic ids that lack `lower|emit` handlers for the target backend (simulation gaps are reported separately)
+- `missing_simulation` (optional):
+  - intrinsic ids that lack simulator handlers and rely on stub policies (replay may raise structured diagnostics)
 - `layout_conflicts`:
   - list of facet predicate conflicts with example node ids and relevant layout snapshots
 - `undischarged_effects`:

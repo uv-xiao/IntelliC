@@ -193,6 +193,6 @@ This is the same structural split demonstrated in the warp specialization + pipe
 The PTO backend is “design-complete” when the following are explicit and testable:
 
 - which PTO capabilities exist (ArchModel declaration + capability tags),
-- which intrinsic handlers are implemented (`lower|emit|simulate` sets),
+- which intrinsic handlers and sim/stub policies are implemented (`lower|emit`, plus simulator coverage),
 - how portable async/effect protocols are discharged (which pass ids, what invariants they establish),
 - and the exact artifact contract under `codegen/pto/` (validated by golden artifact tests).

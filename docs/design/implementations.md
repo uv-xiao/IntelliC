@@ -202,6 +202,12 @@ Directory layout (illustrative):
         layout.json
         effects.json
         schedule.json
+        ids/
+          entities.json
+          bindings.json
+        maps/                       # optional (major rewrites)
+          entity_map.json
+          binding_map.json
         analysis/
           index.json
         summary.json

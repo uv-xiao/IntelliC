@@ -47,8 +47,12 @@ These requirements align directly with existing HTP principles:
 
 Agents debug by comparing states. HTP should support:
 
-- stable node identity (symbol path + deterministic node IDs) across minor rewrites
-- “semantic diff” tooling (what changed in capabilities/effects/layout between pass A and pass B)
+- stage-local `node_id` for deterministic blame within a stage,
+- cross-stage identities:
+  - `entity_id` for constructs/statements,
+  - `binding_id` for variables/bindings (handles shadowing/renaming),
+- and explicit mapping files for major rewrites (`maps/entity_map.json`, `maps/binding_map.json`),
+- plus “semantic diff” tooling (what changed in capabilities/effects/layout between pass A and pass B).
 
 This turns “mysterious regressions” into structured deltas the agent can search over.
 
@@ -108,7 +112,7 @@ This enables:
 For autonomy, “context” must not be an ad-hoc pile of logs. Each compile emits:
 
 - `manifest.json` (pipeline, versions, target, capabilities)
-- `pass_trace.jsonl` (timings, before/after dump pointers, diagnostics)
+- `ir/pass_trace.jsonl` (timings, before/after dump pointers, diagnostics)
 - IR dumps for key boundaries (AST + typed metadata snapshots)
 
 These are sufficient inputs for an agent loop.

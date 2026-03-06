@@ -191,7 +191,7 @@ A backend defines:
 
 Each compile emits:
 
-- `manifest.json` (or equivalent) describing:
+- `manifest.json` describing:
   - inputs, versions, enabled dialects, pipeline, pass list
   - backend target and hardware model
   - produced artifact set and entrypoints

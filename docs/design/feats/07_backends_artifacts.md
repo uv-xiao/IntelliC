@@ -58,7 +58,7 @@ For a backend `B`, the design must specify:
 - layout facet subsets supported
 - memory spaces and constraints
 - async/barrier/event model supported (as capabilities)
-- intrinsic handler availability (`lower|emit|simulate`)
+- intrinsic handler availability (`lower|emit`) and simulation/stub policies for replay
 
 3) **Artifact contract**
 - required file tree under `codegen/<backend>/...`

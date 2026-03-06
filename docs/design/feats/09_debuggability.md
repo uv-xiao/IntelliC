@@ -39,10 +39,11 @@ The payload schema is what tools/agents consume; the message is for humans.
 
 ## Required artifacts
 
-- pass trace (`pass_trace.jsonl`)
+- pass trace (`ir/pass_trace.jsonl`)
 - stage dumps (`ir/stages/<id>/...`):
   - `program.pyast.json` (canonical AST)
   - `types.json`, `layout.json`, `effects.json`, `schedule.json`
+  - `ids/entities.json` and `ids/bindings.json` (stable construct and variable identities)
   - `program.py` always exists and is runnable in `mode="sim"` (may be stubbed with explicit diagnostics)
 - backend-specific codegen outputs
 - manifest with full pipeline info and versions
@@ -55,7 +56,9 @@ HTP should treat “diffability” as a contract:
 
 - stage dumps are deterministic and stable-ordered,
 - node ids enable blame without requiring full AST structural matching,
-- optional `node_id_map.json` can be emitted by large rewrites for richer diffs.
+- major rewrites emit explicit maps:
+  - `maps/entity_map.json` (semantic construct mapping)
+  - `maps/binding_map.json` (variable binding mapping, when bindings change)
 
 The canonical “what changed” view for a package is:
 

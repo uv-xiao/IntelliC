@@ -31,7 +31,7 @@ When implementation begins (in a separate branch/repo state), do it in the small
 
 1) **Repository/module rename**
    - rename repository/module from `pto-wsp` to `htp`
-   - keep old entrypoints as thin shims for a deprecation window (if needed)
+   - remove legacy `pto_wsp` entrypoints (no deprecation shims in the new architecture)
 2) **Artifact substrate first**
    - implement package emission (`manifest.json`, stage dumps, `pass_trace.jsonl`)
    - implement the binding interface skeleton that can validate + replay stages

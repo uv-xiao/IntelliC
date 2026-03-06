@@ -72,7 +72,7 @@ Every AST node that can appear in diagnostics, dumps, or traces has a stage-loca
 
 Recommended scheme (deterministic within a stage):
 
-- `def_id`: canonical symbol path of the owning definition (e.g. `module::add::add_tile`)
+- `def_id`: canonical symbol path of the owning definition (a.k.a. `symbol_path`, e.g. `module::add::add_tile`)
 - `kind`: node kind tag (e.g. `Call`, `For`, `KernelDef`, `ChannelSend`)
 - `ordinal`: deterministic pre-order index within the owning definition after canonicalization
 - `span`: `(file, line, col)` when available (debug only; not a primary key)
@@ -81,7 +81,7 @@ Recommended scheme (deterministic within a stage):
 
 Design intent:
 
-- `node_id` is stable enough for **within-stage** blame and for connecting `pass_trace.jsonl` → dumps.
+- `node_id` is stable enough for **within-stage** blame and for connecting `ir/pass_trace.jsonl` → dumps.
 - `node_id` is *not* intended to persist across AST mutations (ordinals will shift).
 
 ### 2.2 `entity_id` (cross-stage, semantic identity)
@@ -112,6 +112,30 @@ Propagation rule (contract-level):
 
 This is the key mechanism for before/after mappings that are meaningful for humans and agents.
 
+#### 2.2.1 Stage artifact: `ids/entities.json` (recommended minimum schema)
+
+Each stage should emit `ids/entities.json` to make identity machine-consumable:
+
+```json
+{
+  "schema": "htp.ids.entities.v1",
+  "def_id": "module::matmul_tile",
+  "entities": [
+    {"entity_id": "module::matmul_tile:E12", "kind": "For", "role": "loop_k"},
+    {"entity_id": "module::matmul_tile:E40", "kind": "Call", "role": "mma"}
+  ],
+  "node_to_entity": [
+    {"node_id": "module::matmul_tile:For:7", "entity_id": "module::matmul_tile:E12"},
+    {"node_id": "module::matmul_tile:Call:31", "entity_id": "module::matmul_tile:E40"}
+  ]
+}
+```
+
+Notes:
+
+- `entities[]` is a registry; `role` is optional but useful for downstream analyses.
+- `node_to_entity[]` makes it easy to attach analysis anchors to stage dumps without heuristic matching.
+
 ### 2.3 `binding_id` (variable identity, resolves shadowing/renaming)
 
 Names in Python are ambiguous across scopes and shadowing; analyses must not refer to variables by raw string name.
@@ -136,6 +160,32 @@ Then each `Name` occurrence in the AST is annotated in metadata with:
 - `name_use.node_id` → `binding_id`
 
 This lets analyses index “the variable” robustly even if later passes rename it for codegen or canonicalization.
+
+#### 2.3.1 Stage artifact: `ids/bindings.json` (recommended minimum schema)
+
+Each stage should emit `ids/bindings.json`:
+
+```json
+{
+  "schema": "htp.ids.bindings.v1",
+  "def_id": "module::matmul_tile",
+  "scopes": [
+    {"scope_id": "module::matmul_tile:S0", "parent": null, "kind": "function"},
+    {"scope_id": "module::matmul_tile:S3", "parent": "module::matmul_tile:S0", "kind": "for"}
+  ],
+  "bindings": [
+    {"binding_id": "module::matmul_tile:S3:B1", "name": "k", "site_entity_id": "module::matmul_tile:E12"}
+  ],
+  "name_uses": [
+    {"node_id": "module::matmul_tile:Name:19", "binding_id": "module::matmul_tile:S3:B1"}
+  ]
+}
+```
+
+Notes:
+
+- `site_entity_id` ties a binding definition to the construct that defines it (useful for rewrite mapping and legality).
+- if a pass rewrites bindings (splits induction variables, outlines regions), it must emit `maps/binding_map.json`.
 
 ### 2.4 What analyses should reference
 
@@ -186,6 +236,11 @@ Typed metadata is stored separately from the AST structure and keyed by `node_id
 - `layout`: facet product values (distribution/memory/hardware)
 - `effects`: protocol obligations (channels, async tokens, barriers, collectives)
 - `schedule`: schedule directives and their resolved/unsatisfied constraints
+
+In addition, identity registries are staged to support cross-stage analyses and mappings:
+
+- `ids/entities.json` for `entity_id` assignment and node_id → entity_id association
+- `ids/bindings.json` for `binding_id` registries and Name-use → binding_id association
 
 Metadata must be:
 
@@ -260,7 +315,7 @@ Recommended contract:
   island stub:
   - `htp.runtime.islands.invoke(island_id, ...)`
 
-The pass contract must state whether it preserves or breaks this property (`RunnablePy` in
+The pass contract must state whether it preserves or stubs this property (`RunnablePy` in
 `docs/design/impls/02_pass_manager.md`).
 
 HTP’s design constraint is stronger than “best effort replay”:

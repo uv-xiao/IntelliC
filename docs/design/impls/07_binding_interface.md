@@ -54,7 +54,7 @@ Notes:
 
 - `mode="sim"` uses backend simulators where possible (e.g. `pto-runtime` `a2a3sim`).
 - `mode="device"` uses device runtimes/toolchains and may require environment setup.
-- `replay(stage_id=...)` requires that stage provides `program.py` (pass contract `RunnablePy`).
+- stages always provide `program.py` and are runnable in `mode="sim"` (possibly stubbed with explicit diagnostics).
 
 ---
 

@@ -153,7 +153,7 @@ Deep dive: `docs/design/impls/04_artifact_manifest.md`
 Backends are plugins. Each backend must provide:
 
 - an `ArchModel` (hierarchy, memory spaces, async/barrier semantics),
-- intrinsic handlers (lower/emit/simulate),
+- intrinsic handlers (lower/emit) plus simulator/stub semantics for replay,
 - and an artifact contract.
 
 External toolchains (MLIR-AIE, vendor compilers, etc.) are treated as **explicit compilation islands** that are entered

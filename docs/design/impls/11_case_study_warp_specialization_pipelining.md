@@ -267,6 +267,6 @@ If something goes wrong (wrong answers, deadlock, perf cliff), the artifact pack
 - `ir/pass_trace.jsonl`: which pass introduced the protocol/retiming and which analyses justified it.
 - `ir/stages/s03/analysis/warp_role_plan.json`: role partition and handoffs.
 - `ir/stages/s06/analysis/pipeline_plan.json`: the schedule that was applied (or failed to apply).
-- `ir/stages/s07/program.py`: runnable replay of the rewritten program (when preserved/stubbed).
+- `ir/stages/s07/program.py`: runnable replay of the rewritten program (in `mode="sim"`, possibly stubbed).
 
 This is the minimal set needed for long-term healthy development and for autonomous agent loops.

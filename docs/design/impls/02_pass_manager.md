@@ -42,7 +42,7 @@ Every pass declares its effect kind:
 - `TransformPass`: mutates AST/metadata, may optionally emit analyses.
 - `MixedPass`: both.
 
-This classification is part of the contract and is recorded in `pass_trace.jsonl`.
+This classification is part of the contract and is recorded in `ir/pass_trace.jsonl`.
 
 ---
 
