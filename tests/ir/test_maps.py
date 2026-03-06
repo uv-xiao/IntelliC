@@ -65,3 +65,48 @@ def test_binding_map_records_split_and_introduced_bindings():
             },
         ],
     }
+
+
+def test_maps_sort_ids_by_numeric_ordinals():
+    entity_map = EntityMap(pass_id="pkg::pass@1", stage_before="s06", stage_after="s07")
+    entity_map.record(
+        before="module::matmul:E10",
+        after=["module::matmul:E10", "module::matmul:E2"],
+        reason="split_unrolled",
+    )
+    entity_map.record(
+        before="module::matmul:E2",
+        after=["module::matmul:E12", "module::matmul:E3"],
+        reason="split_unrolled",
+        origin=["module::matmul:E11", "module::matmul:E1"],
+    )
+
+    binding_map = BindingMap(pass_id="pkg::pass@1", stage_before="s06", stage_after="s07")
+    binding_map.record(
+        before="module::matmul:S10:B3",
+        after=["module::matmul:S10:B10", "module::matmul:S10:B2"],
+        reason="split_unrolled",
+        origin=["module::matmul:E12", "module::matmul:E2"],
+    )
+
+    assert entity_map.to_json()["entities"] == [
+        {
+            "before": "module::matmul:E2",
+            "after": ["module::matmul:E3", "module::matmul:E12"],
+            "reason": "split_unrolled",
+            "origin": ["module::matmul:E1", "module::matmul:E11"],
+        },
+        {
+            "before": "module::matmul:E10",
+            "after": ["module::matmul:E2", "module::matmul:E10"],
+            "reason": "split_unrolled",
+        },
+    ]
+    assert binding_map.to_json()["bindings"] == [
+        {
+            "before": "module::matmul:S10:B3",
+            "after": ["module::matmul:S10:B2", "module::matmul:S10:B10"],
+            "reason": "split_unrolled",
+            "origin": ["module::matmul:E2", "module::matmul:E12"],
+        }
+    ]

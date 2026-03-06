@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from htp.schemas import IDS_BINDINGS_SCHEMA_ID, IDS_ENTITIES_SCHEMA_ID
 
 from .state import BindingRecord, EntityRecord, NameUseRecord, NodeEntityRecord, ScopeRecord
@@ -21,6 +23,14 @@ def binding_id(scope: str, ordinal: int) -> str:
     return f"{scope}:B{ordinal}"
 
 
+def _natural_sort_key(value: str) -> tuple[tuple[int, object], ...]:
+    return tuple(
+        (0, int(segment)) if segment.isdigit() else (1, segment)
+        for segment in re.split(r"(\d+)", value)
+        if segment
+    )
+
+
 class EntityRegistry:
     def __init__(self, def_id: str) -> None:
         self.def_id = def_id
@@ -29,14 +39,17 @@ class EntityRegistry:
 
     def add(
         self,
-        kind: str,
+        entity_kind: str,
         *,
         role: str | None = None,
         node_kind: str | None = None,
         node_ordinal: int | None = None,
     ) -> str:
+        if (node_kind is None) != (node_ordinal is None):
+            raise ValueError("node_kind and node_ordinal must be provided together")
+
         next_entity_id = entity_id(self.def_id, len(self._entities))
-        self._entities.append(EntityRecord(entity_id=next_entity_id, kind=kind, role=role))
+        self._entities.append(EntityRecord(entity_id=next_entity_id, kind=entity_kind, role=role))
         if node_kind is not None and node_ordinal is not None:
             self._node_links.append(
                 NodeEntityRecord(
@@ -50,10 +63,16 @@ class EntityRegistry:
         return {
             "schema": IDS_ENTITIES_SCHEMA_ID,
             "def_id": self.def_id,
-            "entities": [record.to_json() for record in sorted(self._entities, key=lambda item: item.entity_id)],
+            "entities": [
+                record.to_json()
+                for record in sorted(self._entities, key=lambda item: _natural_sort_key(item.entity_id))
+            ],
             "node_to_entity": [
                 record.to_json()
-                for record in sorted(self._node_links, key=lambda item: (item.node_id, item.entity_id))
+                for record in sorted(
+                    self._node_links,
+                    key=lambda item: (_natural_sort_key(item.node_id), _natural_sort_key(item.entity_id)),
+                )
             ],
         }
 
@@ -65,6 +84,7 @@ class BindingRegistry:
         self._bindings: list[BindingRecord] = []
         self._name_uses: list[NameUseRecord] = []
         self._binding_counts: dict[str, int] = {}
+        self._binding_ids: set[str] = set()
 
     def add_scope(self, kind: str, *, parent: str | None = None) -> str:
         next_scope_id = scope_id(self.def_id, len(self._scopes))
@@ -82,12 +102,16 @@ class BindingRegistry:
         self._bindings.append(
             BindingRecord(binding_id=next_binding_id, name=name, site_entity_id=site_entity_id)
         )
+        self._binding_ids.add(next_binding_id)
         return next_binding_id
 
-    def add_name_use(self, kind: str, ordinal: int, binding: str) -> None:
+    def add_name_use(self, node_kind: str, ordinal: int, binding: str) -> None:
+        if binding not in self._binding_ids:
+            raise ValueError(f"Unknown binding: {binding}")
+
         self._name_uses.append(
             NameUseRecord(
-                node_id=node_id(self.def_id, kind, ordinal),
+                node_id=node_id(self.def_id, node_kind, ordinal),
                 binding_id=binding,
             )
         )
@@ -96,11 +120,20 @@ class BindingRegistry:
         return {
             "schema": IDS_BINDINGS_SCHEMA_ID,
             "def_id": self.def_id,
-            "scopes": [record.to_json() for record in sorted(self._scopes, key=lambda item: item.scope_id)],
-            "bindings": [record.to_json() for record in sorted(self._bindings, key=lambda item: item.binding_id)],
+            "scopes": [
+                record.to_json()
+                for record in sorted(self._scopes, key=lambda item: _natural_sort_key(item.scope_id))
+            ],
+            "bindings": [
+                record.to_json()
+                for record in sorted(self._bindings, key=lambda item: _natural_sort_key(item.binding_id))
+            ],
             "name_uses": [
                 record.to_json()
-                for record in sorted(self._name_uses, key=lambda item: (item.node_id, item.binding_id))
+                for record in sorted(
+                    self._name_uses,
+                    key=lambda item: (_natural_sort_key(item.node_id), _natural_sort_key(item.binding_id)),
+                )
             ],
         }
 

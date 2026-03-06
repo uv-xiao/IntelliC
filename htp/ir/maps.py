@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 from htp.schemas import BINDING_MAP_SCHEMA_ID, ENTITY_MAP_SCHEMA_ID
 
+from .ids import _natural_sort_key
+
 
 @dataclass(frozen=True)
 class RewriteRecord:
@@ -44,9 +46,9 @@ class _BaseMap:
         self._records.append(
             RewriteRecord(
                 before=before,
-                after=tuple(sorted(after)),
+                after=tuple(sorted(after, key=_natural_sort_key)),
                 reason=reason,
-                origin=tuple(sorted(origin or ())),
+                origin=tuple(sorted(origin or (), key=_natural_sort_key)),
             )
         )
 
@@ -60,7 +62,13 @@ class _BaseMap:
                 record.to_json()
                 for record in sorted(
                     self._records,
-                    key=lambda item: (item.before is None, item.before or "", item.after, item.reason, item.origin),
+                    key=lambda item: (
+                        item.before is None,
+                        _natural_sort_key(item.before or ""),
+                        tuple(_natural_sort_key(value) for value in item.after),
+                        item.reason,
+                        tuple(_natural_sort_key(value) for value in item.origin),
+                    ),
                 )
             ],
         }
