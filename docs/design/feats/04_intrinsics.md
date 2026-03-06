@@ -70,7 +70,7 @@ In other words: “simulation semantics” is part of the intrinsic contract sur
 
 A backend provides a registry mapping:
 
-- `IntrinsicDecl.name@version` → handler set (`lower`, `emit`, optional `simulate`)
+- `IntrinsicDecl.name@version` → handler set (`lower`, `emit`, `simulate` or explicit stub policy)
 
 Missing handlers are not “runtime errors”; they are **capability mismatches** detected during pipeline selection and
 reported as structured diagnostics.
