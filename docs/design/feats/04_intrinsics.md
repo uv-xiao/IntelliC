@@ -56,9 +56,15 @@ need:
 
 - `LoweringRule`: typed AST call → backend-ready structured op(s)
 - `Emitter`: backend-ready op(s) → files/sections under `codegen/<backend>/...`
-- `Simulator` (optional but recommended): defines semantics for `RunnablePy` simulation mode
+- `Simulator`: defines semantics for `RunnablePy` simulation mode
 
-Not all targets need all roles, but the pipeline must declare which roles it requires.
+Not all pipelines require all roles, but HTP’s design constraint (“stages always runnable in `mode="sim"`”) implies:
+
+- any intrinsic that can be executed by a stage program in sim must have either:
+  - a `Simulator` handler, or
+  - an explicit stub behavior that raises a structured diagnostic at runtime (still importable/executable).
+
+In other words: “simulation semantics” is part of the intrinsic contract surface, not a bolt-on convenience.
 
 ### 2.1 Handler registration contract
 
