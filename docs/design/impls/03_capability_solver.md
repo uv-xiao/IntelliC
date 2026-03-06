@@ -60,7 +60,6 @@ Includes:
 
 - ordered pass list (each with `requires/provides/invalidates` + invariants)
 - output artifact contract requirements
-- replay requirements (e.g. “must preserve runnable Python in sim mode until stage sN”)
 - pass parameters (fixed or solver-bound)
 
 ---
@@ -92,7 +91,6 @@ Start with a deterministic forward-checking solver:
    - apply `provides` and `invalidates` to the capability state
 3) verify final artifact contract requirements:
    - required `codegen/<backend>/...` outputs exist in the pipeline’s declared outputs
-   - required replay properties are satisfied (`RunnablePy` modes; see `docs/design/impls/02_pass_manager.md`)
 
 If any step fails, emit a failure report that points to:
 
@@ -167,6 +165,5 @@ Once satisfiable, selection can be optimized by a cost model:
 
 - compile-time cost (fast pipelines for iteration)
 - runtime estimates (perf pipelines for deployment)
-- debug constraints (preserve runnable Python deeper)
 
 Crucially, cost-based selection is layered on top of satisfiability; it never replaces contract checking.
