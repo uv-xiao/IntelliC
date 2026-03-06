@@ -170,7 +170,8 @@ HTP’s design makes the structure explicit:
 - analyses produce a role plan and a pipeline plan (staged, versioned artifacts),
 - transform passes apply the plan by rewriting the typed AST,
 - discharge passes map portable protocols into target primitives behind capability gates,
-- and every stage can remain runnable in Python when contracts allow, enabling replay-based debugging.
+- and every stage remains runnable in Python in `mode="sim"` (possibly stubbed with explicit diagnostics), enabling
+  replay-based debugging.
 
 Complete end-to-end walkthrough:
 

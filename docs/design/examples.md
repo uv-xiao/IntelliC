@@ -241,7 +241,7 @@ Goal: express a “prefetch + compute” kernel intent, then request warp specia
 constraints. The pipeline must:
 
 - stage both transforms and analyses (analysis results are artifacts too),
-- keep intermediate stages runnable in Python when contracts allow,
+- keep intermediate stages runnable in Python in `mode="sim"` (possibly stubbed with explicit diagnostics),
 - and make target-specific discharge explicit and capability-gated.
 
 ```python
