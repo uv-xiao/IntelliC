@@ -169,7 +169,7 @@ To keep the system extensible for years, HTP should be built around a small numb
 
 - `htp.frontend`: capture decorators/APIs into canonical AST entrypoints
 - `htp.ir`: node ids, canonical AST forms, typed metadata snapshots, analysis staging utilities
-- `htp.pass`: pass contracts, pass manager, tracing, stage emission
+- `htp.passes`: pass contracts, pass manager, tracing, stage emission
 - `htp.pipeline`: pipeline templates + capability solver
 - `htp.artifacts`: package writer, manifest schema, validators, semantic diff tools
 - `htp.dialects`: dialect packages (WSP/CSP/etc.) as extension units

@@ -4,7 +4,7 @@
 
 **Goal:** Build the first end-to-end HTP implementation that proves the AST-first, replay-first, artifact-first design on both PTO and NV-GPU, with MLIR-based flows only as extension mechanisms.
 
-**Architecture:** Implement the common compiler substrate first (`htp.ir`, `htp.pass`, `htp.artifacts`, `htp.runtime`, `htp.bindings`), then land one narrow backend path for PTO and one narrow backend path for NV-GPU. Keep the pass spine fixed (`ast_canonicalize`, `typecheck_layout_effects`, staged analysis, `apply_schedule`, backend lowering, package emission`) and require every stage to remain runnable in `sim`.
+**Architecture:** Implement the common compiler substrate first (`htp.ir`, `htp.passes`, `htp.artifacts`, `htp.runtime`, `htp.bindings`), then land one narrow backend path for PTO and one narrow backend path for NV-GPU. Keep the pass spine fixed (`ast_canonicalize`, `typecheck_layout_effects`, staged analysis, `apply_schedule`, backend lowering, package emission`) and require every stage to remain runnable in `sim`.
 
 **Tech Stack:** Python 3.11+, `ast`, `dataclasses`, `typing`, `json`, `pathlib`, `pytest`, optional backend toolchains (`pto-runtime`, CUDA toolkit).
 
@@ -15,7 +15,7 @@
 **Files:**
 - Create: `htp/__init__.py`
 - Create: `htp/ir/__init__.py`
-- Create: `htp/pass/__init__.py`
+- Create: `htp/passes/__init__.py`
 - Create: `htp/pipeline/__init__.py`
 - Create: `htp/artifacts/__init__.py`
 - Create: `htp/runtime/__init__.py`
@@ -30,7 +30,7 @@
 def test_public_packages_import():
     import htp
     import htp.ir
-    import htp.pass
+    import htp.passes
 ```
 
 **Step 2: Run test to verify it fails**
@@ -142,11 +142,11 @@ git commit -m "feat: add manifest and stage artifact writer"
 ### Task 4: Implement pass contracts, pass manager, and trace emission
 
 **Files:**
-- Create: `htp/pass/contracts.py`
-- Create: `htp/pass/manager.py`
-- Create: `htp/pass/trace.py`
-- Test: `tests/pass/test_contracts.py`
-- Test: `tests/pass/test_manager.py`
+- Create: `htp/passes/contracts.py`
+- Create: `htp/passes/manager.py`
+- Create: `htp/passes/trace.py`
+- Test: `tests/passes/test_contracts.py`
+- Test: `tests/passes/test_manager.py`
 
 **Step 1: Write the failing tests**
 
@@ -160,7 +160,7 @@ def test_pass_trace_emits_normalized_event():
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pytest tests/pass/test_contracts.py tests/pass/test_manager.py -v`
+Run: `pytest tests/passes/test_contracts.py tests/passes/test_manager.py -v`
 Expected: FAIL with missing contract/manager
 
 **Step 3: Write minimal implementation**
@@ -171,13 +171,13 @@ Expected: FAIL with missing contract/manager
 
 **Step 4: Run tests to verify they pass**
 
-Run: `pytest tests/pass/test_contracts.py tests/pass/test_manager.py -v`
+Run: `pytest tests/passes/test_contracts.py tests/passes/test_manager.py -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add htp/pass tests/pass
+git add htp/passes tests/passes
 git commit -m "feat: add pass contracts and trace emission"
 ```
 

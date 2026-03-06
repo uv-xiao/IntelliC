@@ -1,4 +1,3 @@
-import importlib
 import sys
 from pathlib import Path
 
@@ -11,8 +10,9 @@ if str(ROOT) not in sys.path:
 def test_public_packages_import():
     import htp
     import htp.ir
+    import htp.passes
 
-    assert importlib.import_module("htp.pass").__name__ == "htp.pass"
+    assert htp.passes.__name__ == "htp.passes"
 
 
 def test_schema_constants():
