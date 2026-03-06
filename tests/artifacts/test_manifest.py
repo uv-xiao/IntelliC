@@ -1,7 +1,10 @@
 import json
 
+import pytest
+
 from htp.artifacts.manifest import write_manifest
 from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
+from htp.artifacts.validate import ArtifactValidationError
 from htp.schemas import MANIFEST_SCHEMA_ID
 
 
@@ -93,3 +96,24 @@ def test_manifest_contains_normalized_stage_records(tmp_path):
             "summary": "ir/stages/s01/summary.json",
         },
     ]
+
+
+def test_manifest_rejects_duplicate_stage_ids(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+
+    stage_record = write_stage(
+        package_dir,
+        StageSpec(
+            stage_id="s00",
+            pass_id=None,
+            runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+        ),
+    )
+
+    with pytest.raises(ArtifactValidationError, match="Duplicate stage ids"):
+        write_manifest(
+            package_dir,
+            current_stage="s00",
+            stages=[stage_record, dict(stage_record)],
+        )

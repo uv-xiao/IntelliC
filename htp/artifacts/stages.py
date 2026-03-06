@@ -7,7 +7,7 @@ from typing import Any
 
 from htp.schemas import IDS_BINDINGS_SCHEMA_ID, IDS_ENTITIES_SCHEMA_ID, REPLAY_STUBS_SCHEMA_ID
 
-from .validate import validate_runnable_py
+from .validate import validate_path_component, validate_runnable_py
 
 ANALYSIS_INDEX_SCHEMA_ID = "htp.analysis.index.v1"
 
@@ -43,11 +43,14 @@ class StageSpec:
 
 
 def write_stage(package_dir: Path, stage: StageSpec) -> dict[str, object]:
+    validate_path_component(field_name="stage.stage_id", value=stage.stage_id)
     validate_runnable_py(
         status=stage.runnable_py.status,
         modes=stage.runnable_py.modes,
         has_stubs=stage.runnable_py.stubs_payload is not None,
     )
+    for analysis in stage.analyses:
+        validate_path_component(field_name="analysis.filename", value=analysis.filename)
 
     stage_dir = Path(package_dir) / "ir" / "stages" / stage.stage_id
     analysis_dir = stage_dir / "analysis"
