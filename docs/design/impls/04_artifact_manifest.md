@@ -54,6 +54,12 @@ Recommended per-stage fields (illustrative):
   - `modes`: `["sim", "device"]` subset
   - `program_py`: path (stage-relative)
 - `analysis_index`: path to `analysis/index.json` (if present)
+- optional `ids`:
+  - `entities`: path to `ids/entities.json`
+  - `bindings`: path to `ids/bindings.json`
+- optional `maps`:
+  - `entity_map`: path to `maps/entity_map.json` (major rewrites)
+  - `binding_map`: path to `maps/binding_map.json` (when bindings change)
 - optional `digests`:
   - `ast_hash`, `types_hash`, `effects_hash`, `analysis_hash` (semantic or byte hashes)
 

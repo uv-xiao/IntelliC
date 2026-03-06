@@ -61,6 +61,23 @@ Semantic diffs are strongest when they are backed by execution:
 
 Together, they enable automated stage bisect and minimize guesswork in autonomous loops.
 
+#### 1.2 Identity and mapping are the foundation for analysis reuse
+
+Agents (and compiler passes) need to refer to “the same construct” across transformations:
+
+- “this loop is the pipelined k-loop”
+- “this variable is the ping-pong slot index”
+
+HTP therefore needs stable identities for:
+
+- constructs/statements (`entity_id`)
+- variables (`binding_id`, disambiguates shadowing)
+
+and explicit mapping files for major rewrites (`entity_map.json`, `binding_map.json`) so agents can track changes without
+heuristic AST matching.
+
+Deep dive: `docs/design/impls/01_ir_model.md`.
+
 ### 2) Typed effects and protocol obligations
 
 Autonomous agents must not “accidentally” create deadlocks or invalid async pipelines.

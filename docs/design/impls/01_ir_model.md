@@ -54,22 +54,127 @@ semantics to IR-level operations.
 
 ---
 
-## 2) Node identity (stable IDs)
+## 2) Identity model (indexing Python constructs in a compiler)
 
-HTP must not rely on Python object identity. Every AST node that can appear in diagnostics, dumps, or traces needs a
-stable `node_id`.
+HTP must not rely on Python object identity. Every Python construct that can be referenced by:
+
+- diagnostics,
+- analyses,
+- or before/after mappings across passes
+
+needs a stable indexing scheme.
+
+HTP therefore uses multiple identity layers with different stability guarantees:
+
+### 2.1 `node_id` (stage-local, deterministic)
+
+Every AST node that can appear in diagnostics, dumps, or traces has a stage-local `node_id`.
 
 Recommended scheme (deterministic within a stage):
 
-- `symbol_path`: canonical symbol path of the owning definition (e.g. `module::add::add_tile`)
+- `def_id`: canonical symbol path of the owning definition (e.g. `module::add::add_tile`)
 - `kind`: node kind tag (e.g. `Call`, `For`, `KernelDef`, `ChannelSend`)
 - `ordinal`: deterministic pre-order index within the owning definition after canonicalization
 - `span`: `(file, line, col)` when available (debug only; not a primary key)
 
-`node_id = f"{symbol_path}:{kind}:{ordinal}"`
+`node_id = f"{def_id}:{kind}:{ordinal}"`
 
-When a pass performs major rewrites, it may optionally emit a `node_id_map.json` for “semantic diff” tools, but stable IDs
-within each stage are sufficient for traceability.
+Design intent:
+
+- `node_id` is stable enough for **within-stage** blame and for connecting `pass_trace.jsonl` → dumps.
+- `node_id` is *not* intended to persist across AST mutations (ordinals will shift).
+
+### 2.2 `entity_id` (cross-stage, semantic identity)
+
+Many analyses must talk about “the same construct” across transformations:
+
+- “this loop is the k-loop we pipeline”
+- “this buffer is the ping-pong allocation for A”
+- “this channel is the l2c FIFO”
+
+For this, we introduce a persistent `entity_id`.
+
+Definition:
+
+- `entity_id` is a stable identifier for a semantic object, intended to persist across passes when the pass preserves the
+  object’s meaning.
+
+Recommended representation:
+
+- `entity_id = f"{def_id}:E{entity_ordinal}"`
+- where `entity_ordinal` is assigned deterministically in capture/canonicalization order, and then **propagated** by
+  rewriting passes.
+
+Propagation rule (contract-level):
+
+- When a pass rewrites a node but considers it the “same semantic object”, it must propagate the `entity_id`.
+- When a pass creates a new semantic object, it assigns a new `entity_id` and records provenance (see mapping files below).
+
+This is the key mechanism for before/after mappings that are meaningful for humans and agents.
+
+### 2.3 `binding_id` (variable identity, resolves shadowing/renaming)
+
+Names in Python are ambiguous across scopes and shadowing; analyses must not refer to variables by raw string name.
+
+HTP therefore introduces a scoped binding identity:
+
+- `binding_id`: identifies a *specific binding* (definition site) of a name.
+
+Examples of binding sites:
+
+- function/kernel parameters
+- loop induction variables
+- assignment targets in the HTP subset
+
+Recommended representation:
+
+- `scope_id = f"{def_id}:S{scope_ordinal}"` (lexical scope identity, deterministic)
+- `binding_id = f"{scope_id}:B{binding_ordinal}"`
+
+Then each `Name` occurrence in the AST is annotated in metadata with:
+
+- `name_use.node_id` → `binding_id`
+
+This lets analyses index “the variable” robustly even if later passes rename it for codegen or canonicalization.
+
+### 2.4 What analyses should reference
+
+Rule of thumb:
+
+- **Within-stage** analyses can reference `node_id` for precision.
+- Any analysis meant to survive or be compared across stages should reference:
+  - `entity_id` for statements/constructs, and
+  - `binding_id` for variables.
+
+This is how we avoid the common failure mode: “analysis mentions `k` but `k` was renamed/split and the plan is now wrong”.
+
+### 2.5 Mapping files (before/after links across a mutating pass)
+
+When a pass performs major rewrites, it should emit mapping/provenance files into the *after-stage* directory, e.g.:
+
+- `ir/stages/<after>/maps/entity_map.json`
+- `ir/stages/<after>/maps/binding_map.json` (when bindings are rewritten)
+
+Minimal `entity_map.json` shape (illustrative):
+
+```json
+{
+  "schema": "htp.entity_map.v1",
+  "pass_id": "pkg::pass@1",
+  "stage_before": "s06",
+  "stage_after": "s07",
+  "entities": [
+    {"before": "module::matmul:E12", "after": ["module::matmul:E12"], "reason": "preserved"},
+    {"before": "module::matmul:E33", "after": ["module::matmul:E41", "module::matmul:E42"], "reason": "split_unrolled"},
+    {"before": null, "after": ["module::matmul:E88"], "reason": "introduced_pingpong_buffer", "origin": ["module::matmul:E12"]}
+  ]
+}
+```
+
+Design intent:
+
+- mappings are explicit evidence for stage diffs and autonomous debugging,
+- and they avoid heuristic structural matching of AST dumps.
 
 ---
 

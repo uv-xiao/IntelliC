@@ -128,6 +128,11 @@ Example (sketch) `warp_role_plan.json`:
 ```json
 {
   "schema": "htp.analysis.warp_role_plan.v1",
+  "anchors": {
+    "loop_entity_id": "module::matmul_tile:E12",
+    "prefetch_call_entities": ["module::matmul_tile:E21", "module::matmul_tile:E22"],
+    "mma_call_entities": ["module::matmul_tile:E40"]
+  },
   "subgroup_kind": "warp",
   "roles": [
     {"name": "producer", "count": 2, "responsibilities": ["async_copy(A)", "async_copy(B)"]},
@@ -156,6 +161,13 @@ ir/stages/s06/analysis/
 - which ops are moved across iteration boundaries,
 - buffer allocation plan (ping-pong / ring),
 - effect protocol plan (which `await`s become `wait_group`, etc.).
+
+Design note: analyses that will be consumed by later transforms should use stable identities:
+
+- statements/constructs by `entity_id`
+- variables by `binding_id`
+
+See identity model: `docs/design/impls/01_ir_model.md`.
 
 ---
 
