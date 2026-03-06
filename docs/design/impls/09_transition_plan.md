@@ -41,7 +41,7 @@ When implementation begins (in a separate branch/repo state), do it in the small
 4) **Backend-by-backend landing**
    - PTO backend artifact emission + simulation replay first (`a2a3sim`)
    - then device execution (`a2a3`)
-   - AIE island backend later (requires more external tooling)
+   - AIE backend later (requires more external tooling)
 5) **Golden tests before feature growth**
    - for each added pass/backend, add a golden artifact test and contract validation tests
 

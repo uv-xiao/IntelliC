@@ -90,8 +90,8 @@ For PTO:
 
 For AIE:
 
-- island entry/exit contract is specified (export/import + stubs).
-- `codegen/aie/islands/<id>/` file set is specified (`aie.mlir` + sidecars).
+- AIE backend MLIR artifact emission contract is specified.
+- `codegen/aie/` file set is specified (`aie.mlir` + sidecars).
 - toolchain/runtime pins are recorded under `extensions.aie.*`.
 
 ---

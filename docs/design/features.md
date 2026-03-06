@@ -5,7 +5,7 @@
 - **Extensibility-first**: every major axis must be extensible (dialects, intrinsics, layout facets, passes, pipelines, backends, bindings).
 - **Typed composition**: extension compatibility is checked via `requires/provides` capability typing plus layout/effect typing.
 - **Artifact-first**: compilation output is always a package with a manifest and inspectable intermediate dumps.
-- **AST-first**: Python AST is the base IR; optional external compilation islands are explicit.
+- **AST-first**: Python AST is the base IR; optional MLIR round-trip islands are explicit.
 
 ### 0.1 Core type system (minimum, shared across dialects)
 
@@ -147,22 +147,29 @@ Rationale: CSP and WSP should be optional and independently evolvable.
 - Match/apply on AST with attached metadata.
 - Each pass declares `requires/provides` capabilities and invariants.
 
-### 4.2 External compilation islands (optional)
+### 4.2 IR round-trip compilation islands (optional)
 
-- A pass can lower a region into:
-  - MLIR module(s) + dialects
-  - external toolchain invocations
-- The pass also defines how artifacts rejoin the main pipeline (manifested outputs).
+A pass can run an **internal round-trip island**:
 
-Design decision: islands are defined via an explicit interface:
+- construct MLIR from Python AST
+- run an explicit MLIR pass pipeline
+- build back Python AST from transformed MLIR
 
-- an island pass declares:
-  - a matcher (which AST regions it can “enter”),
-  - an exporter (AST → external IR/tool inputs),
-  - an importer (external outputs → HTP artifact references + typed stubs),
-  - and an artifact contract (what files it emits and how they are named/manifested).
+Design decision: round-trip islands are defined via an explicit enter/exit interface:
 
-This keeps island semantics auditable and makes retargeting explicit.
+- matcher (eligible AST subset)
+- exporter (AST → MLIR + identity ledger)
+- pass pipeline (MLIR passes)
+- importer (MLIR → AST + explicit maps when needed)
+
+See: `docs/design/impls/12_mlir_roundtrip_island.md`.
+
+### 4.3 External toolchains (backend artifact emission)
+
+External toolchains (vendor compilers, MLIR-AIE tooling, etc.) are integrated by emitting their required IR/artifacts
+under `codegen/<backend>/...` and recording toolchain pins/contracts in the manifest.
+
+This is not a “compilation island” in the IR sense; it is a codegen artifact boundary.
 
 ### 4.3 Pipeline selection via capability typing
 

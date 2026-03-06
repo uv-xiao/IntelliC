@@ -1,4 +1,4 @@
-# Impl: AIE Backend (MLIR-AIE island contract)
+# Impl: AIE Backend (MLIR-AIE artifact emission)
 
 ## Goal
 
@@ -8,8 +8,13 @@ Compile spatial/dataflow programs into MLIR-AIE artifacts with explicit:
 - FIFO/stream definitions (dataflow wiring)
 - host glue for invocation
 
-This backend is an example of an **external compilation island**: HTP’s canonical IR remains Python AST, but a contracted
-pass exports a region into MLIR-AIE and imports the produced artifacts back as an island handle.
+This backend emits **MLIR-AIE** (and sidecars) as the primary codegen artifacts consumed by MLIR-AIE toolchains.
+
+Important distinction:
+
+- this backend is **not** the definition of “compilation island” in HTP’s IR sense.
+- a “compilation island” refers to an internal round-trip: AST → MLIR → passes → AST, documented in
+  `docs/design/impls/12_mlir_roundtrip_island.md`.
 
 ---
 
@@ -21,24 +26,20 @@ pass exports a region into MLIR-AIE and imports the produced artifacts back as a
 
 ---
 
-## 2) Island interface (enter/exit contract)
+## 2) Emission interface (what the backend must provide)
 
-An AIE island pass must declare:
+The AIE backend must specify:
 
-- **matcher**: which AST regions are eligible (e.g. `df_region` / CSP subgraph with static channels)
-- **exporter**: how to translate canonical AST + layout/effects into:
+- **eligibility**: which HTP programs/regions are emit-able to MLIR-AIE (explicit subset rules)
+- **export**: how typed Python AST + layout/effects are translated into:
   - `aie.mlir`
-  - sidecar JSON (mapping/fifos) needed for inspection and stable diffs
-- **importer**: how to rejoin the pipeline:
-  - re-materialize a Python AST representation of the region as a call boundary (the pipeline always returns to Python
-    AST as the canonical form)
-  - represent the compiled island as a typed call node, e.g. `IslandCall(island_id, signature, effects)`
-  - ensure the stage is runnable in `mode="sim"` by routing through `htp.runtime.islands.invoke(...)` with a sim fallback
-    (reference implementation or simulator), not by making the stage non-executable
-- **artifact contract**: exact file set and naming under `codegen/aie/islands/<island_id>/...`
+  - sidecar JSON (mapping/fifos) for stable diffs and auditability
+- **toolchain contract**: how MLIR-AIE tooling consumes the emitted artifacts (recorded in the manifest)
 
-This is the mechanism that keeps “MLIR is used here” explicit and auditable, rather than leaking MLIR invariants into the
-rest of HTP.
+Replay constraint:
+
+- HTP stages remain runnable in `mode="sim"` via Python stage programs; the existence of MLIR-AIE artifacts does not imply
+  the canonical IR becomes MLIR.
 
 ---
 
@@ -48,19 +49,17 @@ Recommended layout:
 
 ```
 codegen/aie/
-  islands/
-    <island_id>/
-      aie.mlir
-      mapping.json
-      fifos.json
-      host.cpp                  # or host.mlir, depending on toolchain integration
-      toolchain.json            # pinned tool versions and build flags
-  aie_codegen.json              # HTP-owned index of islands + entrypoints
+  aie.mlir                      # MLIR-AIE module (authoritative toolchain input)
+  mapping.json                  # stable placement decisions (sidecar)
+  fifos.json                    # stable stream wiring decisions (sidecar)
+  host.*                        # optional host glue, depending on toolchain integration
+  toolchain.json                # pinned tool versions and build flags
+  aie_codegen.json              # HTP-owned index of artifacts + entrypoints
 ```
 
 Required semantics:
 
-- `aie.mlir` is the authoritative MLIR-AIE module for this island.
+- `aie.mlir` is the authoritative MLIR-AIE module for this package.
 - `mapping.json` is a stable, structured view of placement decisions:
   - compute tile coordinates
   - buffer placements (memory banks/spaces)
@@ -78,7 +77,8 @@ Rationale: MLIR textual diffs are noisy; sidecar JSON provides stable auditabili
 Recommended fields:
 
 - `extensions.aie.toolchain_contract`: `mlir-aie:<ver-or-git>`
-- `extensions.aie.islands`: list of `{island_id, dir, entrypoints}`
+- `extensions.aie.mlir`: path to `codegen/aie/aie.mlir`
+- `extensions.aie.sidecars`: paths to `mapping.json`, `fifos.json`, etc.
 - `extensions.aie.runtime_contract`: host runtime expectation (if any)
 
 ---
@@ -88,7 +88,7 @@ Recommended fields:
 - distribution facet drives sharding across the virtual grid (mesh → tile mapping)
 - hardware facet constrains which buffers live in which tile memories / banks
 - memory facet influences packing, DMA burst patterns, and alignment legality
-- channel effects must be discharged into concrete FIFO semantics (depth, protocol) at island boundary
+- channel effects must be discharged into concrete FIFO semantics (depth, protocol) for MLIR-AIE emission
 
 Any mismatch must be reported as an unsatisfied capability/effect/layout constraint (solver-style), not as a late MLIR
 lowering crash.
@@ -111,29 +111,20 @@ To keep the island maintainable over years, split the island work into two expli
 This aligns with HTP’s “pass can mutate AST and/or produce analysis” principle:
 
 - analysis passes preserve runnable Python stages and produce `ir/stages/<id>/analysis/*`
-- emit passes may convert regions into `IslandCall(...)` stubs while keeping `program.py` runnable via runtime shims
+- emit passes generate `codegen/aie/aie.mlir` and sidecars while keeping stage replay runnable in `mode="sim"`
 
 See pass effect model: `docs/design/impls/02_pass_manager.md`.
 
 ---
 
-## 7) Island replay contract (how stages stay runnable)
+## 7) Replay and verification (practical)
 
-When an AST region is exported to MLIR-AIE:
+Because stage programs are runnable in `mode="sim"`, developers/agents can:
 
-- the stage program remains runnable by calling:
-  - `htp.runtime.islands.invoke(island_id, ...)`
-- in `mode="sim"`, the island may:
-  - call a software simulator (if available), or
-  - run a reference implementation (slow but correct), or
-  - run a stub and fail with a structured diagnostic (explicit, not silent)
+- replay intermediate stages to verify transforms independent of MLIR-AIE tooling
+- diff staged analyses (mapping/FIFO plans) to understand changes
 
-This is the central advantage of AST-first staging:
-> even after exporting to an external IR, the host-level program remains executable for debugging and minimization.
-
-Important constraint:
-> island entry/exit is a *local pipeline*; after the island finishes, HTP returns to Python AST as the canonical IR.
-> MLIR artifacts remain as attached products (in `codegen/aie/...`), not as the global IR.
+MLIR-AIE artifacts are then the backend integration outputs, not the debugging substrate.
 
 ---
 
@@ -147,10 +138,10 @@ The AIE backend should declare capabilities such as:
 - `Arch.DMA(kind=...)`
 - and any toolchain contract ids
 
-The island entry pass requires these capabilities. If they are missing, the solver fails before running MLIR-AIE tooling,
+The AIE emission pass requires these capabilities. If they are missing, the solver fails before running MLIR-AIE tooling,
 and the failure report points to:
 
-- which region required the island,
+- which region required AIE emission,
 - which capabilities are missing,
 - and which backend packages could provide them (if registered).
 
@@ -158,11 +149,11 @@ Deep dive: `docs/design/impls/03_capability_solver.md`.
 
 ---
 
-## 9) “Ready to implement” checklist (AIE island)
+## 9) “Ready to implement” checklist (AIE backend)
 
 Design completeness requires:
 
 - an eligibility matcher that is explicit and testable,
 - staged mapping/FIFO analyses (sidecars are stable diffs),
-- an explicit `IslandCall` stub node with typed effects,
-- and a package validator that enforces the AIE artifact contract.
+- an artifact validator that enforces the AIE file contract under `codegen/aie/`,
+- and a toolchain contract/pinning story in the manifest.

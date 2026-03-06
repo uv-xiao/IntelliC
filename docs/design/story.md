@@ -148,7 +148,7 @@ The package includes:
 
 Deep dive: `docs/design/impls/04_artifact_manifest.md`
 
-### 4.5 Backends and islands: explicit, auditable boundaries
+### 4.5 Backends, IR islands, and external toolchains: explicit boundaries
 
 Backends are plugins. Each backend must provide:
 
@@ -156,13 +156,30 @@ Backends are plugins. Each backend must provide:
 - intrinsic handlers (lower/emit) plus simulator/stub semantics for replay,
 - and an artifact contract.
 
-External toolchains (MLIR-AIE, vendor compilers, etc.) are treated as **explicit compilation islands** that are entered
-and exited by contracted passes; they do not become hidden global dependencies.
+HTP uses two different “non-Python” integration patterns, which must not be conflated:
+
+1) **IR round-trip compilation islands** (internal):
+   - AST → MLIR → MLIR passes → AST
+   - purpose: reuse MLIR’s transform infrastructure while keeping Python AST canonical
+   - contract: must reify back into Python AST and preserve the “runnable in sim” invariant
+
+2) **External toolchains** (one-way artifact emission):
+   - emit MLIR (or other IR) as artifacts under `codegen/<backend>/...`
+   - purpose: vendor compilers/build systems consume these artifacts to produce executables
+   - contract: does *not* require semantic reification MLIR → AST; HTP keeps replayability via stage programs and/or
+     reference semantics
+
+IR islands are specified as an implementation component:
+
+- `docs/design/impls/12_mlir_roundtrip_island.md`
+
+External toolchains remain explicit and auditable because the emitted MLIR and toolchain pins live in the artifact
+package, not because they are treated as “the IR”.
 
 Deep dives:
 
 - PTO backend packaging: `docs/design/impls/05_backend_pto.md`
-- AIE island contract: `docs/design/impls/06_backend_aie.md`
+- AIE backend MLIR artifact emission: `docs/design/impls/06_backend_aie.md`
 
 ---
 
@@ -197,8 +214,9 @@ retargeting failures come from:
 - analyses that are not staged and therefore become invisible assumptions,
 - and backend-owned expansions that are hard to reason about across targets.
 
-HTP’s approach is not “anti-MLIR”; it is “MLIR as an explicit island”. HTP uses the Python AST as the canonical form and
-requires that any external IR boundary be explicit, replayable (via stubs when needed), and auditable via artifacts.
+HTP’s approach is not “anti-MLIR”; it is “MLIR as an explicit round-trip island”. HTP uses the Python AST as the
+canonical form and requires that any MLIR-based transform boundary be explicit, replayable (via stubs when needed), and
+auditable via artifacts.
 
 For detailed comparative evidence (including Triton’s roadmap features and concrete pass complexity), see:
 

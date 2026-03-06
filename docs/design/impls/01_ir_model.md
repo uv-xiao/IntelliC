@@ -295,8 +295,8 @@ shims, enabling:
 - `mode="sim"`: backend simulator / reference interpreter (may be slow)
 - `mode="device"`: binding loads `codegen/<backend>/...` artifacts and executes
 
-If a stage contains an external compilation island that cannot be simulated, the stage may still be runnable via stubs
-(`RunnablePyStubbed`) and must emit diagnostics and stub metadata.
+If a stage relies on an external toolchain artifact that cannot be simulated faithfully, the stage must still be runnable
+via explicit stubs (`RunnablePyStubbed`) and must emit diagnostics and stub metadata.
 
 ---
 

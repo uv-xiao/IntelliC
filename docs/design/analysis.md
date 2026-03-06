@@ -24,7 +24,7 @@ HTP is a **programming + compilation** framework with three roles:
    - Serving routines (host-side orchestration + pipelines + scheduling)
 2. **Compilation**: a Python-driven pipeline starting from **Python AST**, with:
    - pass pipelines over AST (match/apply) as the default extensibility unit
-   - optional “external compiler islands” (e.g., MLIR pipelines) triggered from AST passes
+   - optional IR round-trip islands (AST → MLIR → passes → AST) triggered from AST passes
 3. **Artifact & binding**: compilation emits a backend-specific **artifact tree** + manifest; binding loads/executes artifacts via backend runtimes/toolchains.
 
 HTP is not a single IR/ISA project. PTO, MLIR-AIE, and future targets are **backends**.
@@ -86,7 +86,8 @@ HTP’s front-end unit is Python code, and the default compiler substrate is **P
 
 - Dialects (WSP, CSP, etc.) are represented as *AST constructs + metadata*, not as “one monolithic IR”.
 - The pass system is primarily **AST mutators** using *match → apply*.
-- Optional external IRs (e.g., MLIR) are “islands”: they are entered/exited by explicit AST passes.
+ - Optional external IRs (e.g., MLIR) can be used as **round-trip islands**: entered by explicit AST passes and reified
+   back into Python AST after MLIR passes run.
 
 Rationale:
 
@@ -123,8 +124,8 @@ This matters for agent-based (and human) compiler development because it creates
   makes it suitable as a “context pack” for autonomous loops and for cross-team debugging.
 
 Design implication: intermediate IR forms and extensions must remain executable (typically by lowering internal constructs
-to runtime shim calls with sim semantics). External toolchains (MLIR islands, vendor compilers) become accelerators
-attached to stages, not semantic owners of the program.
+to runtime shim calls with sim semantics). External toolchains consume emitted artifacts; round-trip islands reuse MLIR
+passes but must reify back to Python AST.
 
 #### 3.2.2 Agent-native by construction (machine-consumable contracts)
 

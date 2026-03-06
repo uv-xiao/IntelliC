@@ -177,7 +177,7 @@ Emitted artifacts:
 
 What this demonstrates:
 
-- AIE is an “external compilation island”: AST passes produce MLIR-AIE.
+- AIE backend emits MLIR-AIE artifacts (`codegen/aie/aie.mlir` + sidecars) consumed by MLIR-AIE toolchains.
 - Layout annotation influences sharding/placement and FIFO decisions.
 
 ---

@@ -36,7 +36,7 @@ Case study (end-to-end, pass-by-pass):
    dialects/intrinsics/layout capabilities.
 5. **Lowering and codegen**:
    - AST passes perform canonicalization, scheduling, partitioning, and lowering into codegen-ready forms.
-   - Optional islands lower regions into MLIR or other toolchains.
+   - Optional IR islands round-trip regions through MLIR (AST → MLIR → passes → AST).
 6. **Emit artifact package**: a stable directory tree with manifest, IR dumps, codegen outputs, and build/run metadata.
 7. **Bind**: backend binding builds/loads/executes (or returns a build recipe) from the package.
 
@@ -133,7 +133,7 @@ A pass has a contract:
 Passes come in classes:
 
 - AST passes (primary)
-- IR-island passes (enter/exit MLIR or external pipelines)
+- IR-island passes (AST → MLIR → passes → AST)
 - packaging passes (manifest, file layout, dependency closure)
 
 ### 2.7 Pipelines
@@ -176,7 +176,7 @@ To keep the system extensible for years, HTP should be built around a small numb
 - `htp.intrinsics`: intrinsic sets and backend handler registries
 - `htp.backends`: backend plugins (ArchModel + codegen emitters)
 - `htp.bindings`: build/load/run integrations (pto-runtime, MLIR-AIE toolchains, etc.)
-- `htp.runtime`: portable simulation stubs + island invocation shims
+- `htp.runtime`: portable simulation stubs + MLIR-island adapters + external toolchain invocation hooks (when needed)
 - `htp.agent`: agent loop, policy, and verification orchestration (developer tooling)
 
 Design rule: anything that affects semantics or legality must be visible at these seams as typed layout/effects,

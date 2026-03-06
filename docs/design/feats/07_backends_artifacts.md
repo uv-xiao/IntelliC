@@ -72,5 +72,5 @@ For a backend `B`, the design must specify:
 
 Deep dive:
 - PTO packaging: `docs/design/impls/05_backend_pto.md`
-- AIE island packaging: `docs/design/impls/06_backend_aie.md`
+- AIE backend MLIR artifact emission: `docs/design/impls/06_backend_aie.md`
 - Binding interface: `docs/design/impls/07_binding_interface.md`
