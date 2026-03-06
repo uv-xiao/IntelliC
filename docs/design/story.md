@@ -212,6 +212,20 @@ Agentic development is therefore a direct consequence of the design, not a bolt-
 
 - `docs/design/impls/10_agentic_tooling.md`
 
+### 7.1 Why replay matters specifically for autonomous agents
+
+Stage replay turns “intermediate artifacts” into **verifiable evidence**:
+
+- An agent can execute `ir/stages/<id>/program.py` in `mode="sim"` to validate that a rewrite preserved observable behavior
+  (or to surface a structured diagnostic when a stubbed region is reached).
+- Because every pass leaves behind a runnable stage plus the analyses that justified it, an agent can localize regressions
+  to the first stage where behavior changes, rather than guessing from pass ordering folklore.
+- This reduces long-term maintenance debt: correctness reasoning becomes “replay + staged evidence”, not “reconstruct the
+  compiler’s implicit invariants”.
+
+This is why HTP’s “always runnable in sim” constraint is architectural: it couples IR design, pass contracts, and island
+boundaries into an agent-friendly substrate.
+
 ---
 
 ## 8. Definition of done (design completeness)

@@ -90,6 +90,26 @@ Rationale:
 - Practical debugging: users need to see what the compiler emitted.
 - Cross-team integration: runtime teams consume artifact contracts.
 
+#### 3.2.1 Stage replay is the “verifiable intermediate artifact” (essential for agents)
+
+Artifact-first becomes qualitatively stronger when intermediate artifacts are **executable**, not only inspectable.
+HTP therefore treats stage replay as a hard design constraint:
+
+- every stage emits `ir/stages/<id>/program.py`, and
+- every stage program is runnable in `mode="sim"` (possibly stubbed with explicit diagnostics for accelerated regions).
+
+This matters for agent-based (and human) compiler development because it creates an objective, automatable truth source:
+
+- **A stage is a test oracle**: an agent can replay `sN` and `sN+1` to check whether a transform preserved semantics for a
+  chosen set of observable behaviors, without depending on internal compiler state.
+- **Regression localization is mechanical**: “the first bad stage” can be found by replay/bisect over stage programs.
+- **Intermediate evidence is portable**: a stage program is a plain Python entrypoint plus staged metadata/analyses, which
+  makes it suitable as a “context pack” for autonomous loops and for cross-team debugging.
+
+Design implication: intermediate IR forms and extensions must remain executable (typically by lowering internal constructs
+to runtime shim calls with sim semantics). External toolchains (MLIR islands, vendor compilers) become accelerators
+attached to stages, not semantic owners of the program.
+
 ### 3.3 Capability-typed composition: extensibility with correctness
 
 HTP’s “glue” is a **capability/type system** that makes extension composition checkable:
@@ -143,6 +163,9 @@ Everything else is extension territory.
    - Runtime teams can rely on stable manifests and package shape.
 4. **Debuggability is first-class**:
    - Pass snapshots, IR dumps, and trace hooks are standard.
+5. **Replay is universal in sim**:
+   - Any intermediate stage can be replayed in `mode="sim"` to provide verifiable evidence for transforms and to localize
+     regressions (critical for long-term autonomous development).
 
 ---
 
