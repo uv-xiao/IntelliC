@@ -21,4 +21,6 @@ Notes:
 
 - the `sim` path is deterministic and does not need CUDA;
 - the device path needs `nvcc`, a CUDA driver, and a GPU visible to the
-  process.
+  process;
+- on A100-class machines with the required CUDA stack, the current example is
+  expected to complete the real-device path end-to-end.

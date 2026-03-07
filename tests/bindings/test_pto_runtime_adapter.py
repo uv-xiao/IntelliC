@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+import time
 from pathlib import Path
 
 from htp.backends.pto.emit import emit_package
@@ -8,6 +10,9 @@ from htp.bindings.validate import load_manifest
 
 
 class _FakeKernelCompiler:
+    def __init__(self) -> None:
+        self.gxx15 = type("FakeGxx15", (), {"cxx_path": "g++-15"})()
+
     def compile_orchestration(self, runtime_name: str, source_path: str, extra_include_dirs=None) -> bytes:
         assert runtime_name == "host_build_graph"
         assert Path(source_path).name == "demo_kernel_orchestration.cpp"
@@ -183,3 +188,53 @@ def test_pto_runtime_adapter_reports_missing_reference_runtime(tmp_path, monkeyp
             "detail": "missing reference runtime",
         }
     ]
+
+
+def test_pto_runtime_adapter_prefers_available_host_gxx_for_sim(monkeypatch):
+    compiler = _FakeKernelCompiler()
+    monkeypatch.setattr(shutil, "which", lambda name: "/bin/g++" if name == "g++" else None)
+
+    pto_runtime_adapter._configure_sim_kernel_compiler(compiler, "a2a3sim")
+
+    assert compiler.gxx15.cxx_path == "/bin/g++"
+
+
+def test_pto_runtime_adapter_rebuilds_when_codegen_sources_change(tmp_path, monkeypatch):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(package_dir, program={"entry": "demo_kernel", "ops": ["compute_tile"]})
+    manifest = load_manifest(package_dir)
+
+    monkeypatch.setattr(
+        pto_runtime_adapter,
+        "_load_reference_modules",
+        lambda: (
+            type("RuntimeBuilderModule", (), {"RuntimeBuilder": _FakeRuntimeBuilder}),
+            _FakeBindingsModule,
+        ),
+    )
+
+    built_outputs, diagnostics = pto_runtime_adapter.build_package(
+        package_dir,
+        manifest,
+        mode="sim",
+        force=True,
+    )
+    assert diagnostics == []
+    kernel_output_path = package_dir / built_outputs[-1]
+    initial_mtime = kernel_output_path.stat().st_mtime
+
+    time.sleep(0.02)
+    kernel_source_path = package_dir / "codegen" / "pto" / "kernels" / "aiv" / "demo_kernel.cpp"
+    kernel_source_path.write_text(kernel_source_path.read_text() + "\n// rebuild marker\n")
+
+    rebuilt_outputs, rebuild_diagnostics = pto_runtime_adapter.build_package(
+        package_dir,
+        manifest,
+        mode="sim",
+        force=False,
+    )
+
+    assert rebuild_diagnostics == []
+    assert rebuilt_outputs == built_outputs
+    assert kernel_output_path.stat().st_mtime > initial_mtime

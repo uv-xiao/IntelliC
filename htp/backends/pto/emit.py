@@ -174,9 +174,31 @@ def _toolchain_payload(plan: PTOCodegenPlan) -> dict[str, Any]:
 
 
 def _orchestration_source(plan: PTOCodegenPlan) -> str:
+    core_type_expr = _core_type_expr(plan.kernels[0].core_type)
     return "\n".join(
         (
-            f'extern "C" void {plan.orchestration.function_name}() {{',
+            '#include "runtime.h"',
+            "#include <cstdint>",
+            "#include <iostream>",
+            "",
+            "// PTO host_build_graph orchestration ABI expected by pto-runtime:",
+            '//   extern "C" int entry(Runtime*, uint64_t*, int)',
+            "// The v1 package emits a minimal smoke task so HTP can prove the",
+            "// real a2a3sim execution path before richer tensor marshaling lands.",
+            f'extern "C" int {plan.orchestration.function_name}(Runtime* runtime, uint64_t* args, int arg_count) {{',
+            "    (void)args;",
+            "    (void)arg_count;",
+            "    if (runtime == nullptr) {",
+            "        std::cerr << \"orchestration received null runtime\" << '\\n';",
+            "        return -1;",
+            "    }",
+            f"    const int task0 = runtime->add_task(nullptr, 0, {plan.kernels[0].func_id}, {core_type_expr});",
+            "    if (task0 < 0) {",
+            "        std::cerr << \"failed to add PTO smoke task\" << '\\n';",
+            "        return -1;",
+            "    }",
+            "    runtime->print_runtime();",
+            "    return 0;",
             "}",
             "",
         )
@@ -184,13 +206,34 @@ def _orchestration_source(plan: PTOCodegenPlan) -> str:
 
 
 def _kernel_source(plan: PTOCodegenPlan, kernel: Any) -> str:
+    del plan
     return "\n".join(
         (
-            f'extern "C" void {kernel.symbol_name}() {{',
+            "#include <cstdint>",
+            "",
+            "#ifndef __gm__",
+            "#define __gm__",
+            "#endif",
+            "",
+            "#ifndef __aicore__",
+            "#define __aicore__",
+            "#endif",
+            "",
+            '// PTO simulation kernels are loaded with dlopen+dlsym("kernel_entry").',
+            f'extern "C" __aicore__ __attribute__((always_inline)) void {kernel.symbol_name}(__gm__ int64_t* args) {{',
+            "    (void)args;",
             "}",
             "",
         )
     )
+
+
+def _core_type_expr(core_type: str) -> str:
+    if core_type == "aiv":
+        return "CoreType::AIV"
+    if core_type == "aic":
+        return "CoreType::AIC"
+    raise ValueError(f"Unsupported PTO core type: {core_type!r}")
 
 
 def _project_relative(source_path: str) -> str:

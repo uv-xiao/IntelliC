@@ -4,9 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from htp import bind, compile_program
 import htp.runtime as runtime_api
-
+from htp import bind, compile_program
 
 ARKNIFE_GEMM_PROGRAM: dict[str, Any] = {
     "entry": "gemm_tile",

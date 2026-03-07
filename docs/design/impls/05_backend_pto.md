@@ -184,6 +184,15 @@ The current v1 implementation uses:
 - `bind_host_binary(...)`, `set_device(...)`, `Runtime.initialize(...)`, `launch_runtime(...)`, and
   `Runtime.finalize()` for package execution.
 
+The current code emitted by HTP uses the same ABI assumptions the reference
+runtime expects:
+
+- kernel binaries export the unified symbol `kernel_entry`,
+- host orchestration exports `extern "C" int <name>(Runtime*, uint64_t*, int)`,
+- the v1 example emits a minimal single-task `host_build_graph` smoke run so the
+  real `a2a3sim` runtime path is exercised even before richer tensor marshaling
+  lands in the binding.
+
 The binding should write build/run logs into:
 
 - `logs/build_pto_<ts>.log`

@@ -4,6 +4,7 @@ import importlib
 import importlib.util
 import json
 import os
+import shutil
 import sys
 from collections.abc import Mapping
 from contextlib import contextmanager
@@ -36,7 +37,11 @@ def build_package(
 ) -> tuple[list[str], list[dict[str, Any]]]:
     contract = load_contract(package_dir, manifest)
     output_paths = _output_paths(contract)
-    if not force and all((package_dir / relpath).exists() for relpath in output_paths):
+    if (
+        not force
+        and all((package_dir / relpath).exists() for relpath in output_paths)
+        and not _requires_rebuild(contract, output_paths)
+    ):
         return output_paths, []
 
     try:
@@ -48,6 +53,7 @@ def build_package(
         builder = runtime_builder_module.RuntimeBuilder(platform=contract.platform)
         host_runtime, aicpu_runtime, aicore_runtime = builder.build(contract.runtime_name)
         kernel_compiler = builder.get_kernel_compiler()
+        _configure_sim_kernel_compiler(kernel_compiler, contract.platform)
         pto_isa_root = _resolve_pto_isa_root(contract)
         orchestration_binary = kernel_compiler.compile_orchestration(
             contract.runtime_name,
@@ -260,6 +266,22 @@ def _resolve_pto_isa_root(contract: PTOContract) -> str | None:
     return os.environ.get("PTO_ISA_ROOT") or os.environ.get("HTP_PTO_ISA_ROOT")
 
 
+def _configure_sim_kernel_compiler(kernel_compiler: Any, platform: str) -> None:
+    if platform != "a2a3sim":
+        return
+    gxx15 = getattr(kernel_compiler, "gxx15", None)
+    if gxx15 is None:
+        return
+    current_path = getattr(gxx15, "cxx_path", None)
+    if not isinstance(current_path, str):
+        return
+    if shutil.which(current_path) is not None:
+        return
+    fallback = shutil.which("g++")
+    if fallback is not None:
+        gxx15.cxx_path = fallback
+
+
 def _output_paths(contract: PTOContract) -> list[str]:
     outputs = [
         "build/pto/runtime/libhost_runtime.so",
@@ -269,6 +291,25 @@ def _output_paths(contract: PTOContract) -> list[str]:
     ]
     outputs.extend(_kernel_output_path(int(kernel["func_id"])) for kernel in contract.kernels)
     return outputs
+
+
+def _requires_rebuild(contract: PTOContract, output_paths: list[str]) -> bool:
+    newest_input = max(
+        path.stat().st_mtime
+        for path in (
+            contract.package_dir / "manifest.json",
+            contract.package_dir / "codegen" / "pto" / "kernel_config.py",
+            contract.package_dir / "codegen" / "pto" / "pto_codegen.json",
+            contract.package_dir / "build" / "toolchain.json",
+            contract.orchestration_source,
+            *(
+                _resolve_project_path(contract.package_dir, str(kernel["source"]))
+                for kernel in contract.kernels
+            ),
+        )
+    )
+    oldest_output = min((contract.package_dir / relpath).stat().st_mtime for relpath in output_paths)
+    return newest_input > oldest_output
 
 
 def _kernel_output_path(func_id: int) -> str:

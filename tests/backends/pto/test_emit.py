@@ -99,7 +99,7 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
             {
                 "kernel_id": "demo_kernel.kernel0",
                 "func_id": 0,
-                "symbol_name": "demo_kernel_kernel0",
+                "symbol_name": "kernel_entry",
                 "source": "codegen/pto/kernels/aiv/demo_kernel.cpp",
                 "core_type": "aiv",
             }
@@ -126,6 +126,15 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
             "build/pto/kernels/0.bin",
         ],
     }
+    assert (
+        'extern "C" int demo_kernel_orchestrate(Runtime* runtime, uint64_t* args, int arg_count)'
+        in orchestration_source.read_text()
+    )
+    assert "runtime->add_task(nullptr, 0, 0, CoreType::AIV);" in orchestration_source.read_text()
+    assert (
+        'extern "C" __aicore__ __attribute__((always_inline)) void kernel_entry(__gm__ int64_t* args)'
+        in kernel_source.read_text()
+    )
 
 
 def test_pto_emit_preserves_existing_manifest_target_metadata(tmp_path):

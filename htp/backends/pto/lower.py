@@ -44,7 +44,7 @@ def lower_program(program: Mapping[str, Any], *, variant: str | None = None) -> 
     kernel = PTOKernelSpec(
         kernel_id=f"{entrypoint}.kernel0",
         func_id=0,
-        symbol_name=f"{entrypoint}_kernel0",
+        symbol_name="kernel_entry",
         source=f"codegen/pto/kernels/{arch.core_type}/{entrypoint}.cpp",
         core_type=arch.core_type,
     )

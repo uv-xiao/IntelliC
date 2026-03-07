@@ -181,7 +181,7 @@ def load_contract(package_dir: Path, manifest: Mapping[str, Any]) -> NVGPUContra
         package_dir=package_dir,
         entrypoint=str(codegen_index["entrypoint"]),
         hardware_profile=str(codegen_index["hardware_profile"]),
-        cuda_arch=str(cuda_arches[0]),
+        cuda_arch=_normalize_cuda_arch(str(cuda_arches[0])),
         kernels=kernels,
         derived_outputs=tuple(derived_outputs),
     )
@@ -215,6 +215,14 @@ def _run_nvcc(
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"nvcc failed for {source_path}")
+
+
+def _normalize_cuda_arch(cuda_arch: str) -> str:
+    if cuda_arch.startswith("sm_"):
+        return cuda_arch
+    if cuda_arch.startswith("sm") and len(cuda_arch) > 2:
+        return f"sm_{cuda_arch[2:]}"
+    return cuda_arch
 
 
 def _launch_with_cuda_driver(

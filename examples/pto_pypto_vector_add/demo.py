@@ -6,7 +6,6 @@ from typing import Any
 
 from htp import bind, compile_program
 
-
 PYPT0_VECTOR_ADD_PROGRAM: dict[str, Any] = {
     "entry": "vector_add",
     "ops": ["load_tile", "compute_tile", "store_tile"],
@@ -18,7 +17,9 @@ def compile_example(output_dir: Path | str) -> dict[str, Any]:
 
     The example mirrors the shape of the `host_build_graph/vector_example`
     references: a simple tile kernel, a PTO package, and the standard
-    `kernel_config.py` / orchestration contract.
+    `kernel_config.py` / orchestration contract. The emitted package uses a
+    minimal `host_build_graph` orchestration/body that exercises the real
+    `pto-runtime` execution path in `a2a3sim`.
     """
 
     package = compile_program(
@@ -74,7 +75,10 @@ def run_package(output_dir: Path | str) -> dict[str, Any]:
 
     This step is environment-dependent because the local machine must
     provide the PTO runtime reference checkout and compatible host
-    compilation tools.
+    compilation tools. In v1, the package execution path is a smoke run:
+    HTP emits the correct PTO ABI and launches a real `host_build_graph`
+    task through `pto-runtime`, but the binding still avoids rich tensor
+    marshaling.
     """
 
     result = bind(Path(output_dir)).load(mode="sim").run("vector_add")

@@ -24,7 +24,7 @@ def test_nvgpu_cuda_adapter_builds_ptx_and_cubin(tmp_path, monkeypatch):
     ) -> None:
         assert nvcc_path.endswith("nvcc")
         assert source_path.name == "demo_kernel.cu"
-        assert cuda_arch == "sm80"
+        assert cuda_arch == "sm_80"
         assert target_format in {"ptx", "cubin"}
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(target_format.encode())
@@ -122,3 +122,8 @@ def test_nvgpu_cuda_adapter_reports_missing_nvcc(tmp_path, monkeypatch):
             "expected_compiler": "nvcc",
         }
     ]
+
+
+def test_nvgpu_cuda_adapter_normalizes_cuda_arch_flag():
+    assert nvgpu_cuda_adapter._normalize_cuda_arch("sm80") == "sm_80"
+    assert nvgpu_cuda_adapter._normalize_cuda_arch("sm_80") == "sm_80"

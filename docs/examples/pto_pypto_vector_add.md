@@ -12,7 +12,9 @@ vector-add flow, but uses HTP’s artifact-first pipeline:
 1. compile a small tile kernel to `pto-a2a3sim`,
 2. replay the final Python stage in `sim`,
 3. build the PTO package through the binding adapter,
-4. attempt package execution through `pto-runtime`.
+4. execute the package through `pto-runtime` in `a2a3sim`.
 
-The example is designed so replay always works. Build and package execution
-depend on the local PTO toolchain environment.
+The example is designed so replay always works. Package execution is also real
+when the local PTO reference runtime is available, but the current v1 example is
+an execution smoke test over the `host_build_graph` ABI rather than a full
+tensor-marshaling numerical validation.

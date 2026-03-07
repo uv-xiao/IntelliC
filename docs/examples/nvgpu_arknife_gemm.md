@@ -16,3 +16,5 @@ This example turns the Arknife hardware-model story into concrete HTP code:
 
 The device path is intentionally narrow in v1: it is a source-first,
 zero-argument launch path that proves the binding-owned build/load/run seam.
+On machines with `nvcc` and a working CUDA driver, the current example runs the
+real-device path end-to-end.
