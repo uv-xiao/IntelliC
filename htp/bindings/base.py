@@ -5,11 +5,13 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
+from htp.runtime.errors import ReplayDiagnosticError
 from .validate import CONTRACT_REFS, collect_missing_files, manifest_target, validation_diagnostics
 
 
-Diagnostic = dict[str, str]
+Diagnostic = dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -74,27 +76,31 @@ class LoadResult:
         kwargs: dict[str, Any] | None = None,
         trace: str = "off",
     ) -> RunResult:
-        current_stage = self._current_stage_id()
-        replay_result = self.replay(current_stage, entry=entry, args=args, kwargs=kwargs, mode=self.mode, trace=trace)
-        log_path = self._write_log(
+        stage_id = self._resolve_current_stage_id()
+        ok, result, diagnostics = self._execute_entry(
             kind="run",
-            stem=f"run_{self.backend}_{self.mode}",
-            lines=(
-                f"backend={self.backend}",
-                f"mode={self.mode}",
-                f"entry={entry}",
-                f"stage_id={current_stage}",
-                f"ok={replay_result.ok}",
-            ),
+            stage_id=stage_id,
+            entry_name=entry,
+            args=args,
+            kwargs=kwargs,
+            mode=self.mode,
+            trace=trace,
+        )
+        log_path = self._write_operation_log(
+            kind="run",
+            mode=self.mode,
+            stage_id=stage_id,
+            entry=entry,
+            trace=trace,
+            ok=ok,
+            diagnostics=diagnostics,
         )
         return RunResult(
-            ok=replay_result.ok,
+            ok=ok,
             mode=self.mode,
             entry=entry,
-            result=replay_result.result,
-            result_ref=replay_result.result_ref,
-            trace_ref=replay_result.trace_ref,
-            diagnostics=replay_result.diagnostics,
+            result=result,
+            diagnostics=diagnostics,
             log_path=log_path,
         )
 
@@ -110,47 +116,31 @@ class LoadResult:
     ) -> ReplayResult:
         replay_mode = self.mode if mode is None else mode
         entry_name = "run" if entry is None else entry
-        stage = self._stage_record(stage_id)
-        runnable_py = stage.get("runnable_py", {})
-        supported_modes = tuple(runnable_py.get("modes", ()))
-        diagnostics: list[Diagnostic] = []
-        if supported_modes and replay_mode not in supported_modes:
-            diagnostics = [
-                {
-                    "code": "HTP.BINDINGS.UNSUPPORTED_REPLAY_MODE",
-                    "detail": f"Stage {stage_id!r} does not support replay mode {replay_mode!r}.",
-                }
-            ]
-            return ReplayResult(
-                ok=False,
-                mode=replay_mode,
-                entry=entry_name,
-                stage_id=stage_id,
-                diagnostics=diagnostics,
-            )
-
-        program_path = self.package_dir / str(runnable_py["program_py"])
-        module = _load_program_module(program_path, stage_id=stage_id)
-        result = getattr(module, entry_name)(*args, **({} if kwargs is None else kwargs))
-        log_path = self._write_log(
+        ok, result, diagnostics = self._execute_entry(
             kind="replay",
-            stem=f"replay_{stage_id}_{replay_mode}",
-            lines=(
-                f"backend={self.backend}",
-                f"mode={replay_mode}",
-                f"stage_id={stage_id}",
-                f"entry={entry_name}",
-                f"trace={trace}",
-                "ok=True",
-            ),
+            stage_id=stage_id,
+            entry_name=entry_name,
+            args=args,
+            kwargs=kwargs,
+            mode=replay_mode,
+            trace=trace,
+        )
+        log_path = self._write_operation_log(
+            kind="replay",
+            mode=replay_mode,
+            stage_id=stage_id,
+            entry=entry_name,
+            trace=trace,
+            ok=ok,
+            diagnostics=diagnostics,
         )
         return ReplayResult(
-            ok=True,
+            ok=ok,
             mode=replay_mode,
             entry=entry_name,
             stage_id=stage_id,
             result=result,
-            diagnostics=[],
+            diagnostics=diagnostics,
             log_path=log_path,
         )
 
@@ -166,13 +156,136 @@ class LoadResult:
         raise KeyError(f"Unknown stage id: {stage_id}")
 
     def _write_log(self, *, kind: str, stem: str, lines: tuple[str, ...]) -> str:
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        relative_path = Path("logs") / f"{stem}_{timestamp}.log"
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        relative_path = Path("logs") / f"{stem}_{timestamp}_{uuid4().hex[:8]}.log"
         log_path = self.package_dir / relative_path
         log_path.parent.mkdir(parents=True, exist_ok=True)
         payload = "\n".join((f"kind={kind}", *lines)) + "\n"
         log_path.write_text(payload)
         return relative_path.as_posix()
+
+    def _resolve_current_stage_id(self) -> str:
+        try:
+            return self._current_stage_id()
+        except Exception:
+            return "<unknown>"
+
+    def _execute_entry(
+        self,
+        *,
+        kind: str,
+        stage_id: str,
+        entry_name: str,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any] | None,
+        mode: str,
+        trace: str,
+    ) -> tuple[bool, Any, list[Diagnostic]]:
+        try:
+            stage = self._stage_record(stage_id)
+        except KeyError:
+            return False, None, [
+                {
+                    "code": "HTP.BINDINGS.STAGE_NOT_FOUND",
+                    "detail": f"Unknown stage id: {stage_id}",
+                    "stage_id": stage_id,
+                }
+            ]
+
+        runnable_py = stage.get("runnable_py", {})
+        supported_modes = tuple(runnable_py.get("modes", ()))
+        if supported_modes and mode not in supported_modes:
+            return False, None, [
+                {
+                    "code": "HTP.BINDINGS.UNSUPPORTED_REPLAY_MODE",
+                    "detail": f"Stage {stage_id!r} does not support replay mode {mode!r}.",
+                    "stage_id": stage_id,
+                }
+            ]
+
+        program_relpath = runnable_py.get("program_py")
+        if not isinstance(program_relpath, str):
+            return False, None, [
+                {
+                    "code": f"HTP.BINDINGS.{kind.upper()}_LOAD_ERROR",
+                    "detail": f"Stage {stage_id!r} is missing runnable_py.program_py.",
+                    "stage_id": stage_id,
+                }
+            ]
+
+        program_path = self.package_dir / program_relpath
+        try:
+            module = _load_program_module(program_path, stage_id=stage_id)
+        except Exception as exc:
+            return False, None, [
+                {
+                    "code": f"HTP.BINDINGS.{kind.upper()}_LOAD_ERROR",
+                    "detail": str(exc),
+                    "stage_id": stage_id,
+                    "entry": entry_name,
+                    "program_py": program_relpath,
+                    "exception_type": exc.__class__.__name__,
+                }
+            ]
+
+        if not hasattr(module, entry_name):
+            return False, None, [
+                {
+                    "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
+                    "detail": f"Entrypoint {entry_name!r} is not defined for stage {stage_id!r}.",
+                    "stage_id": stage_id,
+                    "entry": entry_name,
+                    "program_py": program_relpath,
+                }
+            ]
+
+        try:
+            result = getattr(module, entry_name)(*args, **({} if kwargs is None else kwargs))
+        except ReplayDiagnosticError as exc:
+            diagnostic = dict(exc.payload)
+            diagnostic["code"] = exc.code
+            if exc.fix_hints:
+                diagnostic["fix_hints"] = list(exc.fix_hints)
+            return False, None, [diagnostic]
+        except Exception as exc:
+            return False, None, [
+                {
+                    "code": f"HTP.BINDINGS.{kind.upper()}_EXECUTION_ERROR",
+                    "detail": str(exc),
+                    "stage_id": stage_id,
+                    "entry": entry_name,
+                    "program_py": program_relpath,
+                    "exception_type": exc.__class__.__name__,
+                }
+            ]
+
+        return True, result, []
+
+    def _write_operation_log(
+        self,
+        *,
+        kind: str,
+        mode: str,
+        stage_id: str,
+        entry: str,
+        trace: str,
+        ok: bool,
+        diagnostics: list[Diagnostic],
+    ) -> str:
+        diagnostic_codes = ",".join(str(diagnostic.get("code", "")) for diagnostic in diagnostics)
+        return self._write_log(
+            kind=kind,
+            stem=f"{kind}_{stage_id}_{mode}" if kind == "replay" else f"{kind}_{self.backend}_{mode}",
+            lines=(
+                f"backend={self.backend}",
+                f"mode={mode}",
+                f"stage_id={stage_id}",
+                f"entry={entry}",
+                f"trace={trace}",
+                f"ok={ok}",
+                f"diagnostic_codes={diagnostic_codes}",
+            ),
+        )
 
 
 @dataclass(frozen=True)
