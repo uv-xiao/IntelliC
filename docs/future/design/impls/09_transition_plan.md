@@ -1,11 +1,11 @@
-# Impl: Transition Plan
+# Impl: Next-Phase Transition Plan
 
 This design started as a documentation-first redo, but the repository now also
 contains an active `htp/` implementation and runnable examples under
 `examples/`.
 
-The purpose of this document is to make the eventual implementation transition executable and low-risk by being explicit
-about ordering, compatibility expectations, and verification gates.
+The purpose of this document is now narrower: define the next implementation
+transitions beyond the already-landed substrate and backend proof points.
 
 ---
 
@@ -25,32 +25,31 @@ Out of scope:
 
 ---
 
-## 2) Future implementation sequencing (recommended)
+## 2) Next implementation sequencing (recommended)
 
-When implementation begins (in a separate branch/repo state), do it in the smallest verifiable slices:
+The following work should now be done in the smallest verifiable slices:
 
-1) **Repository/module rename**
-   - rename repository/module from `pto-wsp` to `htp`
-   - remove legacy `pto_wsp` entrypoints (no deprecation shims in the new architecture)
-2) **Artifact substrate first**
-   - implement package emission (`manifest.json`, stage dumps, `ir/pass_trace.jsonl`)
-   - implement the binding interface skeleton that can validate + replay stages
-3) **Core passes and solver**
-   - implement pass contracts and pass manager
-   - implement capability solver with explainable failures
-4) **Backend-by-backend landing**
-   - PTO backend artifact emission + simulation replay first (`a2a3sim`)
-   - then device execution (`a2a3`)
-   - NV-GPU backend next (Ampere first, then Blackwell profile enablement under the same backend contract)
-   - MLIR-based backends/toolchains later as extensions (AIE, MLIR round-trip pipelines)
-5) **Golden tests before feature growth**
-   - for each added pass/backend, add a golden artifact test and contract validation tests
+1) **Capability solver landing**
+   - validate the current default pipeline via explicit capability state
+   - emit explainable unsat reports
+2) **Agent-facing tooling**
+   - add replay/verify/diff/explain surfaces
+   - add structured provenance for autonomous runs
+3) **Semantic breadth expansion**
+   - broaden the kernel/workload/dataflow op set
+   - strengthen channel/process semantics
+4) **MLIR round-trip expansion**
+   - move beyond the current narrow CSE path
+   - make eligibility/export/import contracts testable
+5) **Optional extension backends**
+   - AIE / MLIR-AIE artifact emission and binding/toolchain contracts
 
-This ordering is chosen to maximize “early feedback and stable substrate” rather than “feature completeness first”.
+This ordering is chosen to control the next risk: compositional drift as the
+system grows beyond the current proof-of-architecture milestone.
 
 ---
 
-## 3) Compatibility strategy (if legacy adoption is required)
+## 3) Compatibility strategy
 
 If older tools expect legacy layouts or entrypoints:
 
@@ -59,10 +58,16 @@ If older tools expect legacy layouts or entrypoints:
 
 Rationale: preserving compatibility through artifacts keeps the compiler internally clean and makes extensions retargetable.
 
+For the next phase, compatibility should remain artifact-boundary-only. Do not
+reintroduce legacy internal APIs to accelerate feature work.
+
 ---
 
-## 4) Risks to avoid (lessons encoded in the design)
+## 4) Risks to avoid in the next phase
 
 - implementing backend-specific features as hidden pipeline branches instead of capability-gated passes
 - letting analyses live in memory-only caches (creates irreproducible behavior and breaks agent loops)
 - allowing passes to depend on implicit ordering rather than explicit `requires/provides/invalidates`
+- treating the current default pipeline as if it were already a solved
+  composition layer
+- adding agent automation without emitting explicit provenance and policy inputs

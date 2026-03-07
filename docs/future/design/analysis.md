@@ -13,6 +13,24 @@ The redo’s core thesis:
 The design lives under `docs/design/`, and the current implementation now
 lands incrementally in the `htp/` package and `examples/`.
 
+## 0.1 What is already proved in code
+
+The current repository is no longer “docs only”. The following architectural
+claims are now backed by code:
+
+- Python-space remains canonical and every stage is replayable in `sim`
+- staged semantic artifacts exist (`kernel_ir`, `workload_ir`, `types`,
+  `layout`, `effects`, `schedule`)
+- passes distinguish AST mutation from analysis production
+- extension-owned islands exist without making MLIR a native semantic owner
+- two materially different backends now consume the common substrate:
+  - PTO via `a2a3sim`
+  - NV-GPU via CUDA device execution
+
+This matters because the remaining future design scope is no longer
+“foundational substrate work”. The next phase is about making the architecture
+more composable, more autonomous, and broader in semantic coverage.
+
 ---
 
 ## 1. Positioning (what HTP is)
@@ -74,6 +92,29 @@ Real compiler work is:
 If “LLM agents as maintainers” is an intended mode of development, the framework must encode explicit invariants and leave
 verifiable evidence by construction; otherwise agents (and humans) are forced into pass-order folklore and partial logs.
 
+## 2.1 What is still missing after the current implementation phase
+
+The remaining gaps are narrower and more concrete than at the start of the
+redo:
+
+1. **No capability solver yet**
+   - pass ordering is explicit, but pipeline satisfiability is still fixed by
+     the current default pipeline rather than solved from declared contracts
+2. **Agent-native tooling is architectural but not productized**
+   - staged replay, structured diagnostics, and artifacts exist
+   - semantic diff, minimize, verify, and provenance-oriented agent flows are
+     not yet first-class tools
+3. **Semantic breadth is still selective**
+   - the typed substrate is real, but the implemented operation surface is much
+     smaller than the full target described in `features.md`
+4. **MLIR round-trip is still narrow**
+   - the existing extension proves the boundary, not the full island design
+5. **Optional extension backends remain design-only**
+   - especially AIE / MLIR-AIE
+
+These are the next design/research targets because they build on the now-proved
+substrate rather than replacing it.
+
 ---
 
 ## 3. Design methodology (how we redo it)
@@ -124,6 +165,20 @@ This matters for agent-based (and human) compiler development because it creates
 Design implication: intermediate IR forms and extensions must remain executable (typically by lowering internal constructs
 to runtime shim calls with sim semantics). External toolchains consume emitted artifacts; round-trip islands reuse MLIR
 passes but must reify back to Python AST.
+
+### 3.2.2 Why the next step is solver/productization, not another substrate rewrite
+
+The current implementation has already shown that a common semantic substrate
+can serve both PTO and NV-GPU. The next failure mode is therefore not “missing
+IR”; it is **composition drift**:
+
+- more dialects and passes will be added,
+- more extension-owned flows will appear,
+- more agent-driven changes will touch those flows.
+
+Without a solver and agent-facing tooling, the system risks regressing into
+“explicit but still manually orchestrated” infrastructure. That is better than
+implicit pass soup, but it is not the full HTP claim.
 
 #### 3.2.2 Agent-native by construction (machine-consumable contracts)
 
@@ -212,3 +267,16 @@ Everything else is extension territory.
 - `docs/design/examples.md` — end-to-end examples across backends
 - `docs/design/feats/` — deep dives per feature
 - `docs/design/impls/` — deep dives per implementation component
+
+## 8. Recommended next-phase focus
+
+The recommended order for broader design/research work is now:
+
+1. capability solver
+2. built-in agent loop and agent-facing tools
+3. richer semantic surface (especially channels/process/dataflow breadth)
+4. richer MLIR round-trip extensions
+5. optional extension backends such as AIE
+
+That order follows the current code reality: the substrate is proven, so the
+next risk is uncontrolled growth rather than missing foundations.

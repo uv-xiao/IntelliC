@@ -17,6 +17,24 @@ HTP’s broader design stance is stronger:
 
 The loop is one consumer of that substrate; the substrate is an architectural requirement.
 
+## Current implementation boundary
+
+The current codebase already provides much of the raw substrate the loop would
+consume:
+
+- replayable stages
+- structured pass traces
+- staged semantic payloads and analyses
+- backend artifact validation
+- real end-to-end examples on PTO and NV-GPU
+
+What is still missing is the **product layer**:
+
+- explicit CLI/tool surfaces for diff/minimize/verify/explain
+- a provenance schema for autonomous runs
+- policy-controlled bounded edit corridors
+- automation around stage bisect and semantic diff
+
 ## Core idea: agents consume and produce artifact packages
 
 The unit of interaction is the **artifact package**:
@@ -69,6 +87,13 @@ This is critical for long-term autonomy: the agent must reason from evidence, no
 7. **Promote**
    - optionally open a PR / land the change depending on repo policy
 
+For the first implementation, keep the loop narrower than the full design:
+
+1. observe/localize over existing artifact packages
+2. propose bounded edits in compiler code/docs only
+3. verify with the repo’s existing `pytest` + `pre-commit` gates
+4. record provenance in a manifest extension or sidecar report
+
 ### 2) Tool API the agent requires
 
 HTP should expose a stable API/CLI surface for the agent:
@@ -81,6 +106,17 @@ HTP should expose a stable API/CLI surface for the agent:
 - `htp explain <diagnostic>` (contract-oriented explanation)
 
 The built-in agent loop is then a thin orchestrator over these tools.
+
+Recommended landing order:
+
+1. `htp replay`
+2. `htp verify`
+3. `htp diff --semantic`
+4. `htp explain`
+5. `htp minimize`
+
+That order follows what is already implemented vs what still needs dedicated
+tooling logic.
 
 ### 2.1 Why replay is mandatory for autonomy
 
@@ -128,6 +164,9 @@ Recommended policies:
   - golden artifact diffs
   - and target-specific correctness tests
 - perf regressions must be either eliminated or explicitly acknowledged in the agent report
+
+This is also where the repository-level `AGENTS.md` guidance should eventually
+be reflected into machine-readable policy files rather than only prose.
 
 ## Verification gates (non-negotiable, ordered)
 
@@ -179,6 +218,15 @@ The artifact manifest should record agent activity under an extension namespace,
 
 This makes agent work auditable and makes future agents “inherit evidence” rather than repeating mistakes.
 
+Recommended first landing:
+
+- `extensions.agent.run_id`
+- `extensions.agent.goal`
+- `extensions.agent.gates`
+- `extensions.agent.evidence`
+
+Leave richer search-trace fields for a second phase.
+
 ## Why the agent loop is healthier in HTP than in MLIR-first stacks
 
 The loop depends on HTP’s design choices:
@@ -206,3 +254,13 @@ engineer the implicit invariants that live in pass ordering and dialect conventi
 - Pass tracing: `docs/design/impls/02_pass_manager.md`
 - Manifest schema: `docs/design/impls/04_artifact_manifest.md`
 - Debug requirements: `docs/design/feats/09_debuggability.md`
+
+## Recommended acceptance criteria for the first landing
+
+- an agent can consume an existing artifact package and replay a chosen stage
+- verification can be invoked in one standard command
+- semantic diff is available for at least:
+  - manifest
+  - capabilities
+  - type/layout/effect/schedule payloads
+- a structured agent provenance record is emitted for the run

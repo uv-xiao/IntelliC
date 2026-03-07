@@ -1,5 +1,14 @@
 # HTP (Heterogeneous Tile Programming) — Feature Catalog (WHAT)
 
+This document describes the broader target feature surface, not only the parts
+already implemented in `htp/`.
+
+Status shorthand used below:
+
+- **implemented**: backed by current code and `docs/design/`
+- **partial**: some substrate exists, but the full feature surface here does not
+- **future**: design target only
+
 ## 0. Feature principles
 
 - **Extensibility-first**: every major axis must be extensible (dialects, intrinsics, layout facets, passes, pipelines, backends, bindings).
@@ -20,6 +29,11 @@ HTP needs a small, stable type system that all dialects build on:
   - `Buffer[shape..., dtype, space]` where `space ∈ {global, smem, ub, lds, sram, ...}`
 
 Layout facets and effects refine these types; dialects must not invent incompatible “parallel worlds” of types.
+
+Current status: **partial**.
+- implemented: scalar/buffer/tensor-like semantic payloads and staged
+  type/layout/effect state
+- missing: the full shared user-facing type system and broader op/type surface
 
 ---
 
@@ -43,6 +57,8 @@ Design decision (extensibility): `@kernel` is *not* a compiler hardcode. It is p
 (`Dialect.CoreKernel`) and is replaceable/extendable via the dialect registry. All kernel dialects must lower into the
 canonical `KernelDef` AST form (see `docs/design/impls/01_ir_model.md`).
 
+Current status: **partial**.
+
 ### 1.2 WSP: workload vs schedule programming
 
 Two interlocked but separate layers:
@@ -54,6 +70,8 @@ Rationale: preserve the “workload first; schedule later” workflow across bac
 
 Design decision: WSP is a dialect package. It defines syntax (`@workload`, `@schedule`) plus typing rules and
 canonicalization/lowering passes into a canonical WSP graph/loop form.
+
+Current status: **future**.
 
 ### 1.3 CSP: process/channel pipelines
 
@@ -68,6 +86,8 @@ Rationale: pipelines are the natural representation for megakernels and serving 
 Design decision: CSP is a dialect package. It defines process/channel syntax and effect typing rules, and it must lower
 into a canonical CSP graph form consumable by backends.
 
+Current status: **future**.
+
 ### 1.4 Serving routine programming (host orchestration)
 
 - A “routine” is a program that composes:
@@ -80,9 +100,15 @@ Rationale: serving is “things above kernels” and must be in scope.
 
 Design decision: “serving routines” are not a separate dialect. They are compositions of CoreKernel + WSP + CSP plus
 ordinary Python orchestration constructs, with explicit compilation boundaries.
+
+Current status: **future**.
 ---
 
 ## 2. Layout system (unified, multi-facet)
+
+Current status: **partial**.
+- implemented: staged layout/effect payloads and target-specific layout metadata
+- missing: the full facet-product user/programming model and legality algebra
 
 ### 2.1 Distribution facet (Dato/Axe)
 
@@ -117,6 +143,8 @@ backend portability is achieved by:
 
 ## 3. Intrinsics & dialect libraries
 
+Current status: **future**.
+
 ### 3.1 Intrinsic sets with typed contracts
 
 Intrinsics are declared with:
@@ -141,6 +169,12 @@ Rationale: CSP and WSP should be optional and independently evolvable.
 ---
 
 ## 4. Pass system and compiler pipeline
+
+Current status: **partial**.
+- implemented: pass contracts, staged analyses, replayable stages, one extension
+  island path
+- missing: capability-solved pipeline construction and the broader dialect
+  lowering ecosystem
 
 ### 4.1 AST passes (primary)
 
@@ -181,9 +215,15 @@ This is not a “compilation island” in the IR sense; it is a codegen artifact
 
 Rationale: extensibility without “if backend == …” branching.
 
+Current status: **future**.
+
 ---
 
 ## 5. Backends and artifacts
+
+Current status: **partial**.
+- implemented: PTO + NV-GPU package emission, validation, build/run/replay
+- future: broader backend set and richer extension-owned codegen/toolchain paths
 
 ### 5.1 Backend abstraction
 
@@ -238,6 +278,8 @@ Design constraint:
   - compute tile mapping, FIFO/stream wiring, host runtime glue
 - Reuse known mapping concepts (kernel grid mapping + layout annotations).
 
+Current status: **future**.
+
 ---
 
 ## 7. Debuggability and introspection
@@ -248,6 +290,10 @@ Design constraint:
   - stream protocol mismatches
   - missing backend handlers/capabilities
 - Optional execution tracing hooks in bindings.
+
+Current status: **partial**.
+- implemented: pass traces, staged artifacts, structured diagnostics, replay
+- missing: semantic diff/minimize/explain as first-class user tools
 
 ---
 

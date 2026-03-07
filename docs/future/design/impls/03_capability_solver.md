@@ -12,6 +12,21 @@ The solver replaces two failure-prone patterns:
 
 with a small, explicit constraint language over capabilities, layout/effect invariants, and required artifact outputs.
 
+## Current implementation boundary
+
+The current codebase already has the inputs a solver should consume:
+
+- explicit pass contracts in `htp/passes/contracts.py` and `htp/passes/*`
+- staged semantic/type/layout/effect/schedule payloads
+- backend validation and artifact contracts
+- one fixed default pipeline under `htp/pipeline/defaults.py`
+
+What is missing is the solver itself and the transition from “one explicitly
+wired pipeline” to “legal pipeline instance chosen from declared contracts”.
+
+This document therefore describes the **next implementation layer**, not a
+replacement for the current pass manager.
+
 ---
 
 ## 1) What a “capability” is (minimum definition)
@@ -62,6 +77,15 @@ Includes:
 - output artifact contract requirements
 - pass parameters (fixed or solver-bound)
 
+For the first implementation, keep pipeline templates intentionally narrow:
+
+- one default core pipeline
+- a small number of optional extension-owned additions
+- backend-specific finalization steps
+
+The goal of v1 solver work is not broad search. It is **deterministic legality
+checking plus explainable failure**.
+
 ---
 
 ## 3) Outputs
@@ -73,6 +97,12 @@ One of:
 
 The solver’s job is not “pick the fastest pipeline”; its baseline job is:
 > reject impossible pipelines early with actionable reasons.
+
+In current HTP terms, the first concrete solver should answer questions like:
+
+- can this package legally take the MLIR CSE extension path?
+- does this target/backend have the required handlers and layout/effect support?
+- which pass or extension boundary first becomes unsatisfied?
 
 ---
 
@@ -98,6 +128,14 @@ If any step fails, emit a failure report that points to:
 - *where* it became missing (which pass boundary),
 - and *how* it could be provided (candidate providers, when known).
 
+Recommended implementation order:
+
+1. build `CapabilityState` from the already-staged semantic/type/layout/effect
+   payloads
+2. validate the current fixed default pipeline through the solver
+3. make extension-owned optional steps solver-visible
+4. only then add bounded alternative-choice support
+
 ---
 
 ## 5) Handling analysis capabilities (important for long-term correctness)
@@ -116,6 +154,10 @@ This is how the solver prevents “stale analysis reuse” across long pipelines
 Worked example of analysis + transform staging:
 
 - `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
+
+This maps cleanly to the current implementation because important analyses are
+already staged and pass outputs are explicit. The solver should consume staged
+facts, not hidden in-memory caches.
 
 ---
 
@@ -146,6 +188,10 @@ Emit a structured report (path recorded in the manifest), e.g. `ir/solver_failur
 
 This file is a first-class debugging substrate for humans and agents: it is the “explainable unsat core”.
 
+For the first landing, the `providers` and `unsat_core` fields can be
+best-effort. The non-negotiable part is stable missing-capability /
+artifact-contract reporting.
+
 ---
 
 ## 7) Future extensions (solver evolution without breaking contracts)
@@ -169,3 +215,16 @@ Once satisfiable, selection can be optimized by a cost model:
 - runtime estimates (perf pipelines for deployment)
 
 Crucially, cost-based selection is layered on top of satisfiability; it never replaces contract checking.
+
+## Recommended acceptance criteria for the first solver landing
+
+- the current default pipeline can be reconstructed and validated via solver
+  state rather than handwritten assumptions
+- MLIR CSE extension entry conditions are solver-visible
+- backend artifact requirements are checked before package emission finalization
+- failures produce stable `ir/solver_failure.json`
+- tests cover:
+  - missing capability
+  - stale analysis invalidation
+  - missing backend handler
+  - missing final artifact contract
