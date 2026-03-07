@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from htp.backends.pto.arch import arch_for
-from htp.backends.pto.emit import PTO_PROJECT_DIR, PTO_TOOLCHAIN_PATH
+from htp.backends.pto.emit import PTO_CODEGEN_SCHEMA_ID, PTO_PROJECT_DIR, PTO_TOOLCHAIN_PATH, PTO_TOOLCHAIN_SCHEMA_ID
 
 from .base import BuildResult, LoadResult, ManifestBinding, ValidationResult
 
@@ -135,6 +135,14 @@ class PTOBinding(ManifestBinding):
                 }
             )
             return diagnostics
+        if codegen_index.get("schema") != PTO_CODEGEN_SCHEMA_ID:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_CODEGEN_INDEX",
+                    "detail": f"pto_codegen.json must declare schema {PTO_CODEGEN_SCHEMA_ID!r}.",
+                }
+            )
+            return diagnostics
 
         try:
             toolchain_manifest = json.loads((self.package_dir / toolchain_manifest_path).read_text())
@@ -143,6 +151,14 @@ class PTOBinding(ManifestBinding):
                 {
                     "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
                     "detail": str(exc),
+                }
+            )
+            return diagnostics
+        if toolchain_manifest.get("schema") != PTO_TOOLCHAIN_SCHEMA_ID:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
+                    "detail": f"build/toolchain.json must declare schema {PTO_TOOLCHAIN_SCHEMA_ID!r}.",
                 }
             )
             return diagnostics
@@ -475,10 +491,34 @@ class PTOBinding(ManifestBinding):
             toolchain_manifest = outputs.get("toolchain_manifest")
             if not isinstance(kernel_config, str):
                 diagnostics.append(self._missing_metadata_diagnostic("outputs.kernel_config"))
+            elif kernel_config != DEFAULT_KERNEL_CONFIG:
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                        "detail": "manifest.json outputs.kernel_config must use the canonical PTO artifact path.",
+                        "manifest_field": "outputs.kernel_config",
+                    }
+                )
             if not isinstance(codegen_index, str):
                 diagnostics.append(self._missing_metadata_diagnostic("outputs.pto_codegen_index"))
+            elif codegen_index != DEFAULT_CODEGEN_INDEX:
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                        "detail": "manifest.json outputs.pto_codegen_index must use the canonical PTO artifact path.",
+                        "manifest_field": "outputs.pto_codegen_index",
+                    }
+                )
             if not isinstance(toolchain_manifest, str):
                 diagnostics.append(self._missing_metadata_diagnostic("outputs.toolchain_manifest"))
+            elif toolchain_manifest != DEFAULT_TOOLCHAIN_MANIFEST:
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                        "detail": "manifest.json outputs.toolchain_manifest must use the canonical PTO artifact path.",
+                        "manifest_field": "outputs.toolchain_manifest",
+                    }
+                )
 
         manifest_pto_extension = self._pto_extension()
         if manifest_pto_extension is None:

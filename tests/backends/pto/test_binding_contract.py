@@ -371,6 +371,112 @@ def test_pto_binding_reports_toolchain_contract_mismatch(tmp_path):
     ]
 
 
+def test_pto_binding_rejects_schema_drift(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    codegen_index_path = package_dir / "codegen" / "pto" / "pto_codegen.json"
+    codegen_index = json.loads(codegen_index_path.read_text())
+    codegen_index["schema"] = "bogus"
+    codegen_index_path.write_text(json.dumps(codegen_index, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_INVALID_CODEGEN_INDEX",
+            "detail": "pto_codegen.json must declare schema 'htp.pto.codegen.v1'.",
+        },
+    ]
+
+
+def test_pto_binding_rejects_toolchain_schema_drift(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    toolchain_manifest_path = package_dir / "build" / "toolchain.json"
+    toolchain_manifest = json.loads(toolchain_manifest_path.read_text())
+    toolchain_manifest["schema"] = "bogus"
+    toolchain_manifest_path.write_text(json.dumps(toolchain_manifest, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
+            "detail": "build/toolchain.json must declare schema 'htp.pto.toolchain.v1'.",
+        },
+    ]
+
+
+def test_pto_binding_rejects_noncanonical_output_paths(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    manifest_path = package_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["outputs"]["kernel_config"] = "alt/kernel_config.py"
+    manifest["outputs"]["pto_codegen_index"] = "alt/pto_codegen.json"
+    manifest["outputs"]["toolchain_manifest"] = "alt/toolchain.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+            "detail": "manifest.json outputs.kernel_config must use the canonical PTO artifact path.",
+            "manifest_field": "outputs.kernel_config",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+            "detail": "manifest.json outputs.pto_codegen_index must use the canonical PTO artifact path.",
+            "manifest_field": "outputs.pto_codegen_index",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+            "detail": "manifest.json outputs.toolchain_manifest must use the canonical PTO artifact path.",
+            "manifest_field": "outputs.toolchain_manifest",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+            "detail": "Missing required PTO artifact path: alt/kernel_config.py",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+            "detail": "Missing required PTO artifact path: alt/pto_codegen.json",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+            "detail": "Missing required PTO artifact path: alt/toolchain.json",
+        },
+    ]
+
+
 def test_pto_binding_reports_device_compiler_contract_mismatch(tmp_path):
     package_dir = tmp_path / "out"
     package_dir.mkdir()
