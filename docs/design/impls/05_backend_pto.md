@@ -55,7 +55,8 @@ that declares:
 
 - `KERNELS`: list of `{func_id, source, core_type}`
 - `ORCHESTRATION`: `{source, function_name}`
-- optional `RUNTIME_CONFIG`: knobs like `aicpu_thread_num`, `block_dim`
+- `RUNTIME_CONFIG`: runtime selection plus knobs such as `runtime`, `aicpu_thread_num`, `block_dim`, and the selected
+  `platform`
 
 HTP should emit this file as the adapter so existing build/run tooling can compile and register kernels without
 HTP-specific logic.
@@ -82,6 +83,13 @@ Capture:
 - required CANN / compiler versions (if `a2a3`)
 - `PTO_ISA_ROOT` expectations (or auto-clone behavior)
 - compile flags that affect ABI/semantics
+- `runtime_name`
+- derived build outputs under `build/pto/`:
+  - `build/pto/runtime/libhost_runtime.so`
+  - `build/pto/runtime/libaicpu_runtime.so`
+  - `build/pto/runtime/aicore_runtime.bin`
+  - `build/pto/orchestration/<entry>_orchestration.so`
+  - `build/pto/kernels/<func_id>.bin`
 
 This file is referenced from the top-level `manifest.json` via `extensions.pto.*`.
 
@@ -96,7 +104,7 @@ Recommended fields:
 - `extensions.pto.pto_isa_contract`: `pto-isa:<ver-or-git>` (when relevant)
 - `extensions.pto.kernel_project_dir`: `codegen/pto`
 - `extensions.pto.orchestration_entry`: `{source, function_name}`
-- `extensions.pto.runtime_config`: resolved `aicpu_thread_num`, `block_dim`, etc.
+- `extensions.pto.runtime_config`: resolved `runtime`, `aicpu_thread_num`, `block_dim`, etc.
 
 ---
 
@@ -160,6 +168,14 @@ The binding must:
    - build failures in toolchain/runtime integration,
    - run failures in host/device launch,
 4) preserve replay even when external execution is unavailable.
+
+The current v1 implementation uses:
+
+- `RuntimeBuilder(platform)` to materialize host/AICPU/AICore runtime binaries,
+- `KernelCompiler.compile_orchestration(...)` for orchestration `.so`,
+- `KernelCompiler.compile_incore(...)` for per-kernel objects,
+- `bind_host_binary(...)`, `set_device(...)`, `Runtime.initialize(...)`, `launch_runtime(...)`, and
+  `Runtime.finalize()` for package execution.
 
 The binding should write build/run logs into:
 

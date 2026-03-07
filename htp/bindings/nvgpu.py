@@ -15,6 +15,7 @@ from htp.backends.nvgpu.emit import (
 )
 from htp.runtime.errors import ReplayDiagnosticError
 
+from . import nvgpu_cuda_adapter
 from .base import BuildResult, LoadResult, ManifestBinding, RunResult, ValidationResult
 
 DEFAULT_CODEGEN_INDEX = (NVGPU_PROJECT_DIR / "nvgpu_codegen.json").as_posix()
@@ -89,6 +90,34 @@ class NVGPULoadResult(LoadResult):
             )
 
         launch_path = self.package_dir / launch_entry["source"]
+        if self.mode == "device":
+            logical_entry = expected_entry if expected_entry is not None else function_name
+            ok, result, adapter_diagnostics = nvgpu_cuda_adapter.run_package(
+                self.package_dir,
+                self.manifest,
+                entry=logical_entry,
+                args=args,
+                kwargs={} if kwargs is None else kwargs,
+            )
+            diagnostics.extend(adapter_diagnostics)
+            log_path = self._write_operation_log(
+                kind="run",
+                mode=self.mode,
+                stage_id=stage_id,
+                entry=function_name,
+                trace=trace,
+                ok=ok and not diagnostics,
+                diagnostics=diagnostics,
+            )
+            return RunResult(
+                ok=ok and not diagnostics,
+                mode=self.mode,
+                entry=function_name,
+                result=result,
+                diagnostics=diagnostics,
+                log_path=log_path,
+            )
+
         try:
             module = _load_python_module(launch_path, module_name=f"htp_nvgpu_launch_{stage_id}")
         except Exception as exc:
@@ -214,7 +243,6 @@ class NVGPUBinding(ManifestBinding):
         force: bool = False,
         cache_dir: Path | None = None,
     ) -> BuildResult:
-        del force
         del cache_dir
 
         validation = self.validate()
@@ -232,7 +260,16 @@ class NVGPUBinding(ManifestBinding):
             if launch_entry is not None:
                 built_outputs.append(launch_entry["source"])
             built_outputs.extend(_kernel_sources(self.package_dir / codegen_index_path))
-            built_outputs.extend(_derived_outputs(self.package_dir / toolchain_manifest_path))
+            if mode == "device":
+                adapter_outputs, adapter_diagnostics = nvgpu_cuda_adapter.build_package(
+                    self.package_dir,
+                    self.manifest,
+                    force=force,
+                )
+                built_outputs.extend(adapter_outputs)
+                diagnostics.extend(adapter_diagnostics)
+            else:
+                built_outputs.extend(_derived_outputs(self.package_dir / toolchain_manifest_path))
         session = self.load(mode=mode)
         log_path = session._write_log(
             kind="build",

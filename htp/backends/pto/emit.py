@@ -61,6 +61,7 @@ def emit_package(
                 "function_name": plan.orchestration.function_name,
             },
             "runtime_config": {
+                "runtime": plan.runtime_config["runtime"],
                 "aicpu_thread_num": plan.runtime_config["aicpu_thread_num"],
                 "block_dim": plan.runtime_config["block_dim"],
             },
@@ -113,6 +114,7 @@ def _codegen_index(plan: PTOCodegenPlan) -> dict[str, Any]:
             {
                 "kernel_id": kernel.kernel_id,
                 "func_id": kernel.func_id,
+                "symbol_name": kernel.symbol_name,
                 "source": kernel.source,
                 "core_type": kernel.core_type,
             }
@@ -153,6 +155,7 @@ def _toolchain_payload(plan: PTOCodegenPlan) -> dict[str, Any]:
         "backend": plan.backend,
         "variant": plan.variant,
         "platform": plan.variant,
+        "runtime_name": plan.runtime_config["runtime"],
         "pto_runtime_contract": plan.pto_runtime_contract,
         "pto_isa_contract": plan.pto_isa_contract,
         "compiler_contract": None if plan.variant == "a2a3sim" else "cann:stub",
@@ -160,14 +163,20 @@ def _toolchain_payload(plan: PTOCodegenPlan) -> dict[str, Any]:
             "PTO_ISA_ROOT": "auto",
         },
         "compile_flags": [],
+        "derived_outputs": [
+            "build/pto/runtime/libhost_runtime.so",
+            "build/pto/runtime/libaicpu_runtime.so",
+            "build/pto/runtime/aicore_runtime.bin",
+            f"build/pto/orchestration/{plan.entrypoint}_orchestration.so",
+            *[f"build/pto/kernels/{kernel.func_id}.bin" for kernel in plan.kernels],
+        ],
     }
 
 
 def _orchestration_source(plan: PTOCodegenPlan) -> str:
     return "\n".join(
         (
-            f"int {plan.orchestration.function_name}() {{",
-            "  return 0;",
+            f'extern "C" void {plan.orchestration.function_name}() {{',
             "}",
             "",
         )
@@ -177,8 +186,7 @@ def _orchestration_source(plan: PTOCodegenPlan) -> str:
 def _kernel_source(plan: PTOCodegenPlan, kernel: Any) -> str:
     return "\n".join(
         (
-            f"int {kernel.func_id}() {{",
-            f"  return {len(plan.kernels)};",
+            f'extern "C" void {kernel.symbol_name}() {{',
             "}",
             "",
         )

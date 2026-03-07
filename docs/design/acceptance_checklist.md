@@ -90,6 +90,7 @@ For PTO:
   as PyPTO/Simpler-style `CodeRunner`).
 - toolchain/runtime pins are recorded under `extensions.pto.*`.
 - the binding-to-`pto-runtime` adapter boundary is specified for both `a2a3sim` and `a2a3`.
+- `build/pto/` derived outputs and `runtime_name` are specified and validated against the package contract.
 
 For NV-GPU:
 
@@ -97,6 +98,8 @@ For NV-GPU:
 - Ampere and Blackwell are specified as profiles of one backend, not separate compiler stacks.
 - toolchain/runtime pins are recorded under `extensions.nvgpu.*`.
 - `.cu` is explicitly authoritative, while `nvcc`/`nvrtc`/loader policy is specified as binding-owned execution logic.
+- `build/nvgpu/*.ptx|*.cubin` derived outputs are specified and the device path is allowed to materialize them through
+  a binding-owned adapter.
 
 For optional extension backends/toolchains such as AIE:
 

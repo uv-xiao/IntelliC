@@ -62,6 +62,7 @@ Required semantics:
   - CUDA toolkit / driver contract
   - codegen mode (`cuda_source` for v1)
   - architecture targets (`sm80`, `sm90+`, blackwell-specific profile ids when finalized in implementation)
+  - declared derived outputs under `build/nvgpu/` (`.ptx`, `.cubin`)
 
 ---
 
@@ -142,6 +143,13 @@ The NV-GPU binding must:
 4) support `mode="sim"` via replay/reference semantics rather than requiring a GPU,
 5) surface structured traces, logs, and stable diagnostics using the common binding API.
 
+The current v1 implementation is intentionally narrow:
+
+- `build(mode="device")` uses `nvcc` to materialize `.ptx` and `.cubin` from the authoritative `.cu` source,
+- `run(mode="device")` loads the produced `.cubin` through a minimal CUDA driver adapter and launches the kernel,
+- only zero-argument kernels are executed through the device adapter in v1,
+- `mode="sim"` remains the Python-space replay path and does not require CUDA.
+
 ### 5.1 Source-first rule
 
 The key rule is:
@@ -159,6 +167,9 @@ For v1/v-next integration, the binding may support multiple backends behind one 
 - later other loader/compiler paths if needed.
 
 Those are binding implementation strategies, not backend identity changes.
+
+In the current implementation, `nvcc` + CUDA driver loading is the concrete adapter pair. The contract is designed so
+`nvrtc` can be added later without changing package ownership or emitted source artifacts.
 
 The common replay rule still holds:
 

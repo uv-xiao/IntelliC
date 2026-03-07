@@ -1,0 +1,21 @@
+{
+  "schema": "htp.pto.toolchain.v1",
+  "backend": "pto",
+  "variant": "a2a3sim",
+  "platform": "a2a3sim",
+  "runtime_name": "host_build_graph",
+  "pto_runtime_contract": "pto-runtime:dev",
+  "pto_isa_contract": "pto-isa:a2a3sim",
+  "compiler_contract": null,
+  "env": {
+    "PTO_ISA_ROOT": "auto"
+  },
+  "compile_flags": [],
+  "derived_outputs": [
+    "build/pto/runtime/libhost_runtime.so",
+    "build/pto/runtime/libaicpu_runtime.so",
+    "build/pto/runtime/aicore_runtime.bin",
+    "build/pto/orchestration/demo_kernel_orchestration.so",
+    "build/pto/kernels/0.bin"
+  ]
+}

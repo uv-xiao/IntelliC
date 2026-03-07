@@ -52,6 +52,7 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
             "function_name": "demo_kernel_orchestrate",
         },
         "runtime_config": {
+            "runtime": "host_build_graph",
             "aicpu_thread_num": 1,
             "block_dim": 1,
         },
@@ -69,7 +70,7 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
     kernel_config = _load_module(kernel_config_path)
     assert kernel_config.KERNELS == [
         {
-            "func_id": "demo_kernel_0",
+            "func_id": 0,
             "source": "kernels/aiv/demo_kernel.cpp",
             "core_type": "aiv",
         }
@@ -79,6 +80,7 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
         "function_name": "demo_kernel_orchestrate",
     }
     assert kernel_config.RUNTIME_CONFIG == {
+        "runtime": "host_build_graph",
         "platform": "a2a3sim",
         "aicpu_thread_num": 1,
         "block_dim": 1,
@@ -96,7 +98,8 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
         "kernels": [
             {
                 "kernel_id": "demo_kernel.kernel0",
-                "func_id": "demo_kernel_0",
+                "func_id": 0,
+                "symbol_name": "demo_kernel_kernel0",
                 "source": "codegen/pto/kernels/aiv/demo_kernel.cpp",
                 "core_type": "aiv",
             }
@@ -107,6 +110,7 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
         "backend": "pto",
         "variant": "a2a3sim",
         "platform": "a2a3sim",
+        "runtime_name": "host_build_graph",
         "pto_runtime_contract": "pto-runtime:dev",
         "pto_isa_contract": "pto-isa:a2a3sim",
         "compiler_contract": None,
@@ -114,6 +118,13 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
             "PTO_ISA_ROOT": "auto",
         },
         "compile_flags": [],
+        "derived_outputs": [
+            "build/pto/runtime/libhost_runtime.so",
+            "build/pto/runtime/libaicpu_runtime.so",
+            "build/pto/runtime/aicore_runtime.bin",
+            "build/pto/orchestration/demo_kernel_orchestration.so",
+            "build/pto/kernels/0.bin",
+        ],
     }
 
 

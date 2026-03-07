@@ -10,7 +10,8 @@
   "kernels": [
     {
       "kernel_id": "demo_kernel.kernel0",
-      "func_id": "demo_kernel_0",
+      "func_id": 0,
+      "symbol_name": "demo_kernel_kernel0",
       "source": "codegen/pto/kernels/aiv/demo_kernel.cpp",
       "core_type": "aiv"
     }

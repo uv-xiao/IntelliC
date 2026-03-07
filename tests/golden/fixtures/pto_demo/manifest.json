@@ -54,6 +54,7 @@
         "function_name": "demo_kernel_orchestrate"
       },
       "runtime_config": {
+        "runtime": "host_build_graph",
         "aicpu_thread_num": 1,
         "block_dim": 1
       },

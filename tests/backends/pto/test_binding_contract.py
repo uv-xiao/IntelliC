@@ -96,6 +96,14 @@ def test_pto_binding_reports_manifest_pto_metadata_mismatch(tmp_path):
             "detail": "manifest.json extensions.pto.orchestration_entry does not match kernel_config.py ORCHESTRATION.",
             "manifest_field": "extensions.pto.orchestration_entry",
         },
+        {
+            "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+            "detail": "build/toolchain.json runtime_name does not match manifest.json extensions.pto.runtime_config.runtime.",
+            "toolchain_field": "build/toolchain.json.runtime_name",
+            "toolchain_value": "host_build_graph",
+            "manifest_field": "extensions.pto.runtime_config.runtime",
+            "manifest_value": None,
+        },
     ]
 
 
@@ -571,7 +579,7 @@ def test_pto_binding_rejects_nonmapping_kernel_entries(tmp_path):
             (
                 "KERNELS = [1]",
                 "ORCHESTRATION = {'source': 'orchestration/demo_kernel_orchestration.cpp', 'function_name': 'demo_kernel_orchestrate'}",
-                "RUNTIME_CONFIG = {'platform': 'a2a3sim', 'aicpu_thread_num': 1, 'block_dim': 1}",
+                "RUNTIME_CONFIG = {'runtime': 'host_build_graph', 'platform': 'a2a3sim', 'aicpu_thread_num': 1, 'block_dim': 1}",
                 "",
             )
         )

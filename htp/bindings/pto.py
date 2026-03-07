@@ -14,6 +14,7 @@ from htp.backends.pto.emit import (
     PTO_TOOLCHAIN_SCHEMA_ID,
 )
 
+from . import pto_runtime_adapter
 from .base import BuildResult, LoadResult, ManifestBinding, RunResult, ValidationResult
 
 DEFAULT_KERNEL_CONFIG = (PTO_PROJECT_DIR / "kernel_config.py").as_posix()
@@ -33,37 +34,31 @@ class PTOLoadResult(LoadResult):
         if not _has_pto_contract(self.package_dir, self.manifest):
             return super().run(entry, args=args, kwargs=kwargs, trace=trace)
 
-        del args
-        del kwargs
-
-        diagnostics = list(self.diagnostics)
-        if not diagnostics:
-            diagnostics.append(
-                {
-                    "code": "HTP.BINDINGS.PTO_RUN_REQUIRES_EXTERNAL_TOOLCHAIN",
-                    "detail": (
-                        "PTO package execution is owned by the external PTO toolchain; "
-                        "use replay(stage_id) for staged Python execution."
-                    ),
-                    "entry": entry,
-                    "mode": self.mode,
-                    "toolchain_manifest": DEFAULT_TOOLCHAIN_MANIFEST,
-                }
-            )
         stage_id = self._resolve_current_stage_id()
+        ok, result, adapter_diagnostics = pto_runtime_adapter.run_package(
+            self.package_dir,
+            self.manifest,
+            mode=self.mode,
+            entry=entry,
+            args=args,
+            kwargs={} if kwargs is None else kwargs,
+        )
+        diagnostics = list(self.diagnostics)
+        diagnostics.extend(adapter_diagnostics)
         log_path = self._write_operation_log(
             kind="run",
             mode=self.mode,
             stage_id=stage_id,
             entry=entry,
             trace=trace,
-            ok=False,
+            ok=ok and not diagnostics,
             diagnostics=diagnostics,
         )
         return RunResult(
-            ok=False,
+            ok=ok and not diagnostics,
             mode=self.mode,
             entry=entry,
+            result=result,
             diagnostics=diagnostics,
             log_path=log_path,
         )
@@ -123,14 +118,21 @@ class PTOBinding(ManifestBinding):
         force: bool = False,
         cache_dir: Path | None = None,
     ) -> BuildResult:
-        del force
         del cache_dir
 
         validation = self.validate()
         mode_diagnostics = self._mode_diagnostics(mode)
         diagnostics = [*validation.diagnostics, *mode_diagnostics]
+        built_outputs: list[str] = []
+        if not diagnostics:
+            built_outputs, adapter_diagnostics = pto_runtime_adapter.build_package(
+                self.package_dir,
+                self.manifest,
+                mode=mode,
+                force=force,
+            )
+            diagnostics.extend(adapter_diagnostics)
         session = self.load(mode=mode)
-        built_outputs = [] if diagnostics else list(self._required_paths())
         log_path = session._write_log(
             kind="build",
             stem=f"build_{self.backend}_{mode}",
@@ -138,7 +140,7 @@ class PTOBinding(ManifestBinding):
                 f"backend={self.backend}",
                 f"mode={mode}",
                 f"platform={self._platform_for_mode(mode)}",
-                f"validated={not diagnostics}",
+                f"validated={validation.ok and not mode_diagnostics}",
                 f"built_outputs={tuple(built_outputs)!r}",
             ),
         )
@@ -257,6 +259,13 @@ class PTOBinding(ManifestBinding):
                     "detail": "kernel_config.py KERNELS entries must be mappings.",
                 }
             )
+        elif not all(isinstance(kernel.get("func_id"), int) for kernel in kernels):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_KERNEL_CONFIG",
+                    "detail": "kernel_config.py KERNELS func_id values must be integers.",
+                }
+            )
         if not isinstance(orchestration, Mapping):
             diagnostics.append(
                 {
@@ -269,6 +278,13 @@ class PTOBinding(ManifestBinding):
                 {
                     "code": "HTP.BINDINGS.PTO_INVALID_KERNEL_CONFIG",
                     "detail": "kernel_config.py must define RUNTIME_CONFIG as a mapping.",
+                }
+            )
+        elif not isinstance(runtime_config.get("runtime"), str):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_KERNEL_CONFIG",
+                    "detail": "kernel_config.py RUNTIME_CONFIG.runtime must be a string.",
                 }
             )
         if diagnostics:
@@ -759,6 +775,39 @@ class PTOBinding(ManifestBinding):
                     "toolchain_field": f"{toolchain_manifest_path}.pto_runtime_contract",
                     "toolchain_value": toolchain_manifest.get("pto_runtime_contract"),
                     "expected_value": self._expected_runtime_contract(),
+                }
+            )
+        runtime_name = manifest_pto_extension.get("runtime_config", {}).get("runtime")
+        if toolchain_manifest.get("runtime_name") != runtime_name:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                    "detail": "build/toolchain.json runtime_name does not match manifest.json extensions.pto.runtime_config.runtime.",
+                    "toolchain_field": f"{toolchain_manifest_path}.runtime_name",
+                    "toolchain_value": toolchain_manifest.get("runtime_name"),
+                    "manifest_field": "extensions.pto.runtime_config.runtime",
+                    "manifest_value": runtime_name,
+                }
+            )
+        derived_outputs = toolchain_manifest.get("derived_outputs")
+        try:
+            expected_outputs = pto_runtime_adapter.declared_outputs(self.package_dir, self.manifest)
+        except Exception as exc:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
+                    "detail": f"Unable to derive PTO build outputs from the package contract: {exc}",
+                }
+            )
+            return diagnostics
+        if derived_outputs != expected_outputs:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                    "detail": "build/toolchain.json derived_outputs does not match the PTO adapter contract.",
+                    "toolchain_field": f"{toolchain_manifest_path}.derived_outputs",
+                    "toolchain_value": derived_outputs,
+                    "expected_value": expected_outputs,
                 }
             )
 

@@ -120,8 +120,9 @@ Bindings may add backend-specific fields under a namespaced extension object, bu
 For v1 specifically:
 
 - NV-GPU `build()` reports the emitted `.cu` source, launch Python, codegen index, toolchain manifest, and any declared
-  derived outputs.
-- PTO `build()` reports the emitted contract files (`kernel_config.py`, `pto_codegen.json`, `build/toolchain.json`).
+  derived outputs; `build(mode="device")` is the point where those derived outputs are materialized through `nvcc`.
+- PTO `build()` reports the materialized `build/pto/` outputs produced through `pto-runtime` (`libhost_runtime.so`,
+  `libaicpu_runtime.so`, `aicore_runtime.bin`, orchestration `.so`, per-kernel binaries).
 
 The broader rule is:
 
@@ -178,6 +179,11 @@ used, for example:
 - selected toolchain/runtime mode,
 - selected adapter (`nvcc`, `nvrtc`, `pto-runtime`, etc.),
 - and relevant emitted binary paths when materialized.
+
+The current v1 adapters are:
+
+- PTO: `pto-runtime` builder/compiler/bindings integration,
+- NV-GPU: `nvcc` for build materialization and a minimal CUDA driver loader for device launch.
 
 ---
 
