@@ -25,6 +25,7 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
         backend == "pto"
         or (isinstance(outputs, dict) and any(key in outputs for key in ("kernel_config", "pto_codegen_index", "toolchain_manifest")))
         or (isinstance(extensions, dict) and "pto" in extensions)
+        or (package_path / "codegen" / "pto").exists()
     )
     if has_pto_markers:
         from .pto import PTOBinding
