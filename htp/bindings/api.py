@@ -17,14 +17,28 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
         return binding_override(package_path, manifest)
 
     backend, variant = manifest_target(manifest)
+    if backend == "nvgpu":
+        from .nvgpu import NVGPUBinding
+
+        return NVGPUBinding(
+            package_dir=package_path,
+            manifest=manifest,
+            backend="nvgpu",
+            variant=variant,
+        )
+    if backend == "pto":
+        from .pto import PTOBinding
+
+        return PTOBinding(
+            package_dir=package_path,
+            manifest=manifest,
+            backend="pto",
+            variant=variant,
+        )
     outputs = manifest.get("outputs")
     extensions = manifest.get("extensions")
     has_pto_markers = (
-        backend == "pto"
-        or (
-            isinstance(outputs, dict)
-            and any(key in outputs for key in ("kernel_config", "pto_codegen_index", "toolchain_manifest"))
-        )
+        (isinstance(outputs, dict) and any(key in outputs for key in ("kernel_config", "pto_codegen_index")))
         or (isinstance(extensions, dict) and "pto" in extensions)
         or (package_path / "codegen" / "pto").exists()
         or (package_path / "build" / "toolchain.json").exists()
@@ -37,6 +51,21 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
             manifest=manifest,
             backend="pto",
             variant=variant,
+        )
+
+    has_nvgpu_markers = (
+        (isinstance(outputs, dict) and "nvgpu_codegen_index" in outputs)
+        or (isinstance(extensions, dict) and "nvgpu" in extensions)
+        or (package_path / "codegen" / "nvgpu").exists()
+    )
+    if has_nvgpu_markers:
+        from .nvgpu import NVGPUBinding
+
+        return NVGPUBinding(
+            package_dir=package_path,
+            manifest=manifest,
+            backend="nvgpu",
+            variant="cuda" if variant is None else variant,
         )
 
     if backend is None:
