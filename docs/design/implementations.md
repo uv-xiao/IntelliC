@@ -176,8 +176,8 @@ To keep the system extensible for years, HTP should be built around a small numb
 - `htp.intrinsics`: intrinsic sets and backend handler registries
 - `htp.backends`: backend plugins (ArchModel + codegen emitters)
 - `htp.bindings`: build/load/run integrations (pto-runtime, NV-GPU toolchains/runtimes, MLIR-AIE toolchains, etc.)
-- `htp.runtime`: the normative replay shim surface (`default_runtime`, `call_kernel`, `intrinsics.invoke`,
-  `extensions.invoke`, `raise_stub`)
+- `htp.runtime`: the normative replay shim surface for stage programs only (`default_runtime`, `call_kernel`,
+  `intrinsics.invoke`, `extensions.invoke`, `raise_stub`)
 - `htp.agent`: agent loop, policy, and verification orchestration (developer tooling)
 
 Design rule: anything that affects semantics or legality must be visible at these seams as typed layout/effects,
@@ -261,8 +261,8 @@ codegen/pto/
     toolchain.json
 ```
 
-Key design point: `kernel_config.py` is the runner-facing bridge (existing tooling expects it); HTP keeps a stable
-`pto_codegen.json` above runner-specific ids.
+Key design point: `kernel_config.py` is the runner-facing bridge; HTP keeps a stable `pto_codegen.json` above
+runner-specific ids, while the binding maps that package into the actual `pto-runtime` compile/load/run path.
 
 Deep dive: `docs/design/impls/05_backend_pto.md`.
 
@@ -280,6 +280,9 @@ codegen/nvgpu/
 ```
 
 Deep dive: `docs/design/impls/13_backend_nvgpu.md`.
+
+Key design point: `.cu` remains authoritative; adapter choice (`nvcc`, `nvrtc`, loader/runtime path) lives in the
+binding rather than in the core compiler.
 
 ### 4.3 Optional extension backend: AIE (MLIR-AIE)
 

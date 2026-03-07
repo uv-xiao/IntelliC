@@ -102,16 +102,64 @@ Recommended fields:
 
 ## 4) Binding expectations
 
-The PTO binding must:
+The PTO binding is the HTP-owned adapter around a real external execution implementation.
+
+The ownership split must be explicit:
+
+- HTP owns:
+  - the emitted package contract,
+  - manifest validation,
+  - translation from `manifest.json` + `kernel_config.py` + `pto_codegen.json` into an execution plan,
+  - normalized `validate/build/load/run/replay` result records,
+  - and replay through staged Python artifacts.
+- `pto-runtime` owns:
+  - compilation of runtime components,
+  - compilation of incore kernels and orchestration,
+  - host-side loading and launch,
+  - and device/simulation execution mechanics.
+
+The local implementation references are:
+
+- `references/pto-runtime/python/kernel_compiler.py`
+- `references/pto-runtime/python/runtime_compiler.py`
+- `references/pto-runtime/python/runtime_builder.py`
+- `references/pto-runtime/python/bindings.py`
+
+### 4.1 `mode="sim"` (`a2a3sim`)
+
+For simulation, the binding should integrate with the real `pto-runtime` simulation path rather than treating PTO as a
+permanent stub:
+
+- incore kernels compile through the simulation toolchain path (`g++-15`-style host simulation build),
+- orchestration compiles as a host shared library,
+- runtime components build for the `a2a3sim` platform,
+- `run()` uses the `pto-runtime` host bindings to initialize, launch, and finalize the runtime.
+
+Replay still remains separate:
+
+- `replay(stage_id)` executes HTP’s staged `program.py`,
+- `run(entry)` executes the built PTO package through `pto-runtime`.
+
+### 4.2 `mode="device"` (`a2a3`)
+
+For hardware execution, the binding should map HTP package artifacts into the real device-oriented `pto-runtime` path:
+
+- incore kernels compile with `ccec` and PTO ISA headers,
+- orchestration compiles with the platform-appropriate host/device toolchain,
+- runtime components build for `a2a3`,
+- `run()` loads binaries and launches through the `pto-runtime` host API.
+
+### 4.3 Result contract
+
+The binding must:
 
 1) validate that `codegen/pto/kernel_config.py` exists and is internally consistent,
-2) in `mode="sim"`:
-   - produce structured lifecycle records for validate/build/load/replay,
-   - keep replay available through the staged Python artifacts,
-   - report `run()` as an explicit external-toolchain boundary unless a real PTO runner is installed,
-3) in `mode="device"`:
-   - build using platform `a2a3` (CANN toolchain required),
-   - load generated binaries and execute via `pto-runtime` host runtime when available.
+2) expose structured lifecycle records for `validate/build/load/run/replay`,
+3) distinguish:
+   - replay failures in HTP stage artifacts,
+   - build failures in toolchain/runtime integration,
+   - run failures in host/device launch,
+4) preserve replay even when external execution is unavailable.
 
 The binding should write build/run logs into:
 
@@ -189,11 +237,27 @@ This is the same structural split demonstrated in the warp specialization + pipe
 
 ---
 
-## 8) What “ready to implement” means here
+## 8) Producer-side alignment with PyPTO
+
+HTP’s PTO package shape should continue to align with the current producer-side conventions visible in `references/pypto/`,
+especially:
+
+- orchestration vs incore function separation,
+- emitted `kernel_config.py`,
+- `ir.compile()`-style output structure under `kernels/` and `orchestration/`,
+- and the assumption that orchestration is host-side code which dispatches incore kernels.
+
+The point is not to copy PyPTO internals. The point is to keep the HTP-emitted package compatible with the existing PTO
+tooling ecosystem.
+
+---
+
+## 9) What “ready to implement” means here
 
 The PTO backend is “design-complete” when the following are explicit and testable:
 
 - which PTO capabilities exist (ArchModel declaration + capability tags),
 - which intrinsic handlers and sim/stub policies are implemented (`lower|emit`, plus simulator coverage),
 - how portable async/effect protocols are discharged (which pass ids, what invariants they establish),
-- and the exact artifact contract under `codegen/pto/` (validated by golden artifact tests).
+- the exact artifact contract under `codegen/pto/` (validated by golden artifact tests),
+- and the exact adapter boundary from HTP package → `pto-runtime` compile/load/run operations.

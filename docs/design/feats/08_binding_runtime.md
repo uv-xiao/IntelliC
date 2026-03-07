@@ -27,6 +27,14 @@ Design constraint:
 
 - stages always provide `program.py` and are runnable in `mode="sim"` (they may be stubbed with explicit diagnostics)
 
+The runtime story has two separate layers:
+
+- `htp.runtime`: replay/runtime support for stage programs and structured replay diagnostics
+- backend bindings: real package execution integration against external runtimes/toolchains
+
+HTP should keep these separate so the canonical Python-space pipeline remains debuggable even when external execution is
+not available.
+
 ## Runtime separation
 
 HTP should not embed device runtimes; it integrates with:
@@ -35,6 +43,12 @@ HTP should not embed device runtimes; it integrates with:
 - NV-GPU build/runtime tooling
 - MLIR-AIE build/run tooling for AIE extensions
 - future backends via binding plugins
+
+Concretely:
+
+- PTO package execution should map onto the current `pto-runtime` builder/compiler/bindings stack.
+- NV-GPU package execution should follow an adapter-based model similar to the source-first integration pattern used by
+  TileLang.
 
 Deep dive:
 - binding interface: `docs/design/impls/07_binding_interface.md`

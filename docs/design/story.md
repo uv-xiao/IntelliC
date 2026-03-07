@@ -163,6 +163,12 @@ Backends are plugins. Each backend must provide:
 - intrinsic handlers (lower/emit) plus simulator/stub semantics for replay,
 - and an artifact contract.
 
+Execution ownership is split deliberately:
+
+- HTP core owns semantics, staged artifacts, and replay,
+- bindings own package execution,
+- external runtimes/toolchains consume emitted artifacts without becoming the semantic owner of the compiler.
+
 HTP uses two different optional extension patterns, which must not be conflated:
 
 1) **IR round-trip compilation islands** (internal):
@@ -171,11 +177,12 @@ HTP uses two different optional extension patterns, which must not be conflated:
    - contract: provided by extension packages; must reify back into Python AST and preserve the “runnable in sim”
      invariant
 
-2) **External toolchains** (one-way artifact emission):
-   - emit MLIR (or other IR) as artifacts under `codegen/<backend>/...`
-   - purpose: vendor compilers/build systems consume these artifacts to produce executables
-   - contract: provided by backend/toolchain extensions; does *not* require semantic reification MLIR → AST; HTP keeps
-     replayability via stage programs and/or reference semantics
+2) **External toolchains** (one-way artifact emission or binding-owned package execution):
+   - emit MLIR (or other IR) as artifacts under `codegen/<backend>/...`, or emit source packages that bindings hand to
+     real runtime/toolchain integrations
+   - purpose: vendor compilers/build systems or runtime integrations consume these artifacts to produce executables
+   - contract: provided by backend/toolchain extensions and bindings; does *not* require semantic reification MLIR →
+     AST; HTP keeps replayability via stage programs and/or reference semantics
 
 The core runtime only provides the extension hook; it does not natively bake MLIR into HTP:
 
@@ -184,6 +191,13 @@ The core runtime only provides the extension hook; it does not natively bake MLI
 
 External toolchains remain explicit and auditable because the emitted MLIR and toolchain pins live in the artifact
 package, not because they are treated as “the IR”.
+
+Concrete examples:
+
+- PTO: HTP emits the authoritative PTO package, and the binding maps it into the real `pto-runtime` compile/load/run
+  path for `a2a3sim` or `a2a3`.
+- NV-GPU: HTP emits authoritative `.cu` + launch metadata, and the binding selects the concrete execution adapter
+  (`nvcc`, `nvrtc`, loader/runtime integration) without changing the core compiler model.
 
 Deep dives:
 

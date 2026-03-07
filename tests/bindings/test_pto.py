@@ -1,4 +1,3 @@
-import htp.runtime as runtime_api
 from htp.backends.pto.emit import emit_package
 from htp.bindings.api import bind
 

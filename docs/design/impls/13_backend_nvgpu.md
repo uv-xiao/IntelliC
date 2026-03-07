@@ -112,13 +112,53 @@ Examples:
 
 ## 5) Binding expectations
 
+The NV-GPU binding is where source artifacts become executable kernels. The binding must keep source ownership separate
+from execution policy.
+
+The ownership split must be:
+
+- HTP owns:
+  - `.cu` as the authoritative device artifact,
+  - `nvgpu_codegen.json` as the stable package index,
+  - launch metadata in the package manifest,
+  - replay through stage artifacts.
+- the NV-GPU binding owns:
+  - selection of compilation path (`nvcc`, `nvrtc`, or later other adapters),
+  - module loading,
+  - kernel launch,
+  - and runtime/profiler integration.
+
+The practical reference pattern is `references/tilelang/`, especially:
+
+- `tilelang/jit/` for adapter-owned execution,
+- `tilelang/contrib/nvcc.py` and `tilelang/contrib/nvrtc.py` for compile-path separation,
+- `tilelang/__init__.py` for lazy runtime/library loading behavior.
+
 The NV-GPU binding must:
 
 1) validate `codegen/nvgpu/` against the artifact contract,
 2) keep `.cu` authoritative and report derived outputs separately under `build/`,
-3) execute `run()` through the emitted Python host launch glue in both `sim` and `device` modes,
+3) choose an execution adapter without making that adapter the semantic owner of the compiler,
 4) support `mode="sim"` via replay/reference semantics rather than requiring a GPU,
-4) surface structured traces, logs, and stable diagnostics using the common binding API.
+5) surface structured traces, logs, and stable diagnostics using the common binding API.
+
+### 5.1 Source-first rule
+
+The key rule is:
+
+- `get_kernel_source()`-style source visibility is a first-class contract,
+- compiled binaries (`.ptx`, `.cubin`, loaded modules) are derived artifacts,
+- execution adapters consume source artifacts and manifest metadata rather than replacing them as the canonical form.
+
+### 5.2 Execution adapter choices
+
+For v1/v-next integration, the binding may support multiple backends behind one package contract:
+
+- offline `nvcc`,
+- runtime `nvrtc`,
+- later other loader/compiler paths if needed.
+
+Those are binding implementation strategies, not backend identity changes.
 
 The common replay rule still holds:
 

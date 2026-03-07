@@ -89,12 +89,14 @@ For PTO:
 - `codegen/pto/kernel_config.py` contract is specified and sufficient for binding integration (via existing runners such
   as PyPTO/Simpler-style `CodeRunner`).
 - toolchain/runtime pins are recorded under `extensions.pto.*`.
+- the binding-to-`pto-runtime` adapter boundary is specified for both `a2a3sim` and `a2a3`.
 
 For NV-GPU:
 
 - `codegen/nvgpu/` file contract is specified.
 - Ampere and Blackwell are specified as profiles of one backend, not separate compiler stacks.
 - toolchain/runtime pins are recorded under `extensions.nvgpu.*`.
+- `.cu` is explicitly authoritative, while `nvcc`/`nvrtc`/loader policy is specified as binding-owned execution logic.
 
 For optional extension backends/toolchains such as AIE:
 

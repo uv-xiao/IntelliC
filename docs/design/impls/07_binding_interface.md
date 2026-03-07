@@ -11,6 +11,12 @@ Bindings are also the execution substrate for:
 - artifact contract validation,
 - and trace/log collection.
 
+The most important distinction is that bindings unify three different activities under one API surface:
+
+- **stage replay**,
+- **backend package execution**,
+- **build/materialization**.
+
 ---
 
 ## 1) Binding lifecycle
@@ -21,6 +27,26 @@ Bindings are also the execution substrate for:
 4) **Run**: execute entrypoints with typed marshalling and trace hooks.
 5) **Replay**: execute a specific stage’s `ir/stages/<id>/program.py` (always runnable in `mode="sim"`; may be stubbed).
 6) **Report**: emit structured run records, diagnostics, and log pointers into the package.
+
+### 1.1 Stage replay vs package execution
+
+These must not be conflated:
+
+- **Replay**
+  - imports and executes HTP-emitted `ir/stages/<id>/program.py`
+  - is always Python-space
+  - exists for verification, debugging, and localization
+  - remains available even if no external runtime/toolchain is installed
+
+- **Package execution**
+  - executes the backend package as a backend package
+  - may involve external compilers, shared libraries, runtime APIs, or device launch
+  - is binding-owned integration work, not pass/runtime-core semantics
+
+- **Build/materialization**
+  - prepares backend artifacts for later execution
+  - may produce shared libraries, `.ptx`, `.cubin`, or other binaries
+  - must keep authoritative HTP source/package artifacts intact
 
 ---
 
@@ -56,10 +82,9 @@ Notes:
 - `mode="device"` uses device runtimes/toolchains and may require environment setup.
 - stages always provide `program.py` and are runnable in `mode="sim"` (possibly stubbed with explicit diagnostics).
 - for backend packages, `run()` is binding-owned:
-  - NV-GPU runs through the emitted Python host launch entry (`extensions.nvgpu.launch_entry`) and then through
-    `htp.runtime.call_kernel(...)`
-  - PTO does **not** claim native Python execution of the external orchestration artifact; `run()` must return a
-    structured external-toolchain diagnostic and direct users to `replay(stage_id)` for staged Python execution
+  - PTO maps the package into the `pto-runtime` compile/load/run surface for both `a2a3sim` and `a2a3`
+  - NV-GPU maps the package into a binding-owned execution adapter (`nvcc`, `nvrtc`, loader, launch wrapper, profiler)
+  - `htp.runtime` remains the replay/runtime surface for stage programs, not the owner of external execution integration
 
 ### 3.1 Return records
 
@@ -97,6 +122,12 @@ For v1 specifically:
 - NV-GPU `build()` reports the emitted `.cu` source, launch Python, codegen index, toolchain manifest, and any declared
   derived outputs.
 - PTO `build()` reports the emitted contract files (`kernel_config.py`, `pto_codegen.json`, `build/toolchain.json`).
+
+The broader rule is:
+
+- authoritative HTP artifacts are source/package-facing,
+- derived toolchain artifacts are build-facing,
+- both are visible through normalized result records.
 
 ---
 
@@ -140,6 +171,13 @@ logs/
 ```
 
 and surface the corresponding path in the replay result record.
+
+For real external execution, bindings should also surface enough information to reconstruct the adapter path that was
+used, for example:
+
+- selected toolchain/runtime mode,
+- selected adapter (`nvcc`, `nvrtc`, `pto-runtime`, etc.),
+- and relevant emitted binary paths when materialized.
 
 ---
 
