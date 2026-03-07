@@ -97,3 +97,54 @@ def test_pto_binding_reports_manifest_pto_metadata_mismatch(tmp_path):
             "manifest_field": "extensions.pto.orchestration_entry",
         },
     ]
+
+
+def test_pto_binding_reports_target_and_codegen_metadata_mismatch(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    manifest_path = package_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["target"]["variant"] = "a2a3"
+    manifest["target"]["hardware_profile"] = "ascend:a2a3"
+    manifest["extensions"]["pto"]["platform"] = "a2a3sim"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+    codegen_index_path = package_dir / "codegen" / "pto" / "pto_codegen.json"
+    codegen_index = json.loads(codegen_index_path.read_text())
+    codegen_index["backend"] = "other-backend"
+    codegen_index["variant"] = "a2a3sim"
+    codegen_index_path.write_text(json.dumps(codegen_index, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+            "detail": "PTO metadata backend does not agree across manifest target and pto_codegen.json.",
+            "field": "backend",
+            "manifest_field": "target.backend",
+            "codegen_field": "codegen/pto/pto_codegen.json.backend",
+            "manifest_value": "pto",
+            "codegen_value": "other-backend",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+            "detail": "PTO metadata variant/platform does not agree across manifest target, manifest extensions, and pto_codegen.json.",
+            "field": "variant",
+            "manifest_field": "target.variant",
+            "extension_field": "extensions.pto.platform",
+            "codegen_field": "codegen/pto/pto_codegen.json.variant",
+            "manifest_value": "a2a3",
+            "extension_value": "a2a3sim",
+            "codegen_value": "a2a3sim",
+        },
+    ]

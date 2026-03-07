@@ -172,7 +172,42 @@ class PTOBinding(ManifestBinding):
             )
 
         manifest_pto_extension = self._pto_extension()
+        codegen_backend = codegen_index.get("backend") if isinstance(codegen_index.get("backend"), str) else None
+        if self.backend != codegen_backend:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                    "detail": "PTO metadata backend does not agree across manifest target and pto_codegen.json.",
+                    "field": "backend",
+                    "manifest_field": "target.backend",
+                    "codegen_field": f"{codegen_index_path}.backend",
+                    "manifest_value": self.backend,
+                    "codegen_value": codegen_backend,
+                }
+            )
+
         if manifest_pto_extension is not None:
+            extension_platform = (
+                manifest_pto_extension.get("platform")
+                if isinstance(manifest_pto_extension.get("platform"), str)
+                else None
+            )
+            codegen_variant = codegen_index.get("variant") if isinstance(codegen_index.get("variant"), str) else None
+            if self.variant != extension_platform or self.variant != codegen_variant:
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                        "detail": "PTO metadata variant/platform does not agree across manifest target, manifest extensions, and pto_codegen.json.",
+                        "field": "variant",
+                        "manifest_field": "target.variant",
+                        "extension_field": "extensions.pto.platform",
+                        "codegen_field": f"{codegen_index_path}.variant",
+                        "manifest_value": self.variant,
+                        "extension_value": extension_platform,
+                        "codegen_value": codegen_variant,
+                    }
+                )
+
             manifest_runtime_config = manifest_pto_extension.get("runtime_config")
             expected_manifest_runtime_config = {
                 key: value for key, value in dict(runtime_config).items() if key != "platform"
