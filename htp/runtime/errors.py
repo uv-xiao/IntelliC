@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, NoReturn
 
 
 _STUB_REASON_BY_CODE = {
@@ -23,6 +23,11 @@ _STUB_FIX_HINTS_BY_CODE = {
         "Inspect the emitted backend artifacts referenced by the stub.",
     ),
 }
+
+_MISSING_KERNEL_FIX_HINTS = (
+    "Register a replay kernel handler on the runtime before invoking the stage.",
+    "Pass the configured runtime explicitly, or install the handler on htp.runtime.default_runtime().",
+)
 
 
 class ReplayDiagnosticError(RuntimeError):
@@ -56,7 +61,7 @@ def raise_stub(
     kind: str,
     artifact_ref: str | None = None,
     detail: str | None = None,
-) -> None:
+) -> NoReturn:
     fix_hints = _STUB_FIX_HINTS_BY_CODE.get(code, _STUB_FIX_HINTS_BY_CODE["HTP.REPLAY.STUB_HIT"])
     payload: dict[str, Any] = {
         "node_id": node_id,
@@ -73,4 +78,27 @@ def raise_stub(
     raise ReplayDiagnosticError(code, payload=payload, fix_hints=fix_hints)
 
 
-__all__ = ["ReplayDiagnosticError", "raise_stub"]
+def raise_missing_kernel(
+    kernel_id: str,
+    *,
+    artifacts: Mapping[str, object],
+    detail: str | None = None,
+) -> NoReturn:
+    payload: dict[str, Any] = {
+        "node_id": f"kernel::{kernel_id}",
+        "entity_id": kernel_id,
+        "kind": "kernel",
+        "reason": "missing_kernel_registration",
+        "artifacts": dict(artifacts),
+        "next_actions": list(_MISSING_KERNEL_FIX_HINTS),
+    }
+    if detail is not None:
+        payload["detail"] = detail
+    raise ReplayDiagnosticError(
+        "HTP.REPLAY.MISSING_KERNEL_HANDLER",
+        payload=payload,
+        fix_hints=_MISSING_KERNEL_FIX_HINTS,
+    )
+
+
+__all__ = ["ReplayDiagnosticError", "raise_missing_kernel", "raise_stub"]

@@ -1,5 +1,7 @@
 from types import ModuleType
 
+import pytest
+
 import htp.runtime as runtime_api
 
 
@@ -128,3 +130,35 @@ def run(*args, mode="sim", runtime=None, trace=None, **kwargs):
             },
         ),
     ]
+
+
+def test_missing_kernel_registration_reports_runtime_setup_diagnostic():
+    runtime = runtime_api.Runtime()
+
+    with pytest.raises(runtime_api.ReplayDiagnosticError) as excinfo:
+        runtime_api.call_kernel(
+            "demo.kernel",
+            args=(1, 2),
+            mode="sim",
+            artifacts={"program": "ir/stages/s01/program.py"},
+            runtime=runtime,
+        )
+
+    error = excinfo.value
+    assert error.code == "HTP.REPLAY.MISSING_KERNEL_HANDLER"
+    assert error.payload == {
+        "node_id": "kernel::demo.kernel",
+        "entity_id": "demo.kernel",
+        "kind": "kernel",
+        "reason": "missing_kernel_registration",
+        "artifacts": {"program": "ir/stages/s01/program.py"},
+        "detail": "No replay handler registered for kernel 'demo.kernel'",
+        "next_actions": [
+            "Register a replay kernel handler on the runtime before invoking the stage.",
+            "Pass the configured runtime explicitly, or install the handler on htp.runtime.default_runtime().",
+        ],
+    }
+    assert error.fix_hints == (
+        "Register a replay kernel handler on the runtime before invoking the stage.",
+        "Pass the configured runtime explicitly, or install the handler on htp.runtime.default_runtime().",
+    )

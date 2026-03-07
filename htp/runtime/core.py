@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
-from .errors import raise_stub
+from .errors import raise_missing_kernel, raise_stub
 
 KernelHandler = Callable[..., object]
 IntrinsicHandler = Callable[..., object]
@@ -41,11 +41,9 @@ class Runtime:
     ) -> object:
         handler = self.kernel_handlers.get(kernel_id)
         if handler is None:
-            raise_stub(
-                "HTP.REPLAY.STUB_HIT",
-                node_id=f"kernel::{kernel_id}",
-                entity_id=kernel_id,
-                kind="kernel",
+            raise_missing_kernel(
+                kernel_id,
+                artifacts=artifacts,
                 detail=f"No replay handler registered for kernel '{kernel_id}'",
             )
         return handler(args=args, mode=mode, artifacts=artifacts, trace=trace)

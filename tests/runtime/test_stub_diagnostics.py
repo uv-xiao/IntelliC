@@ -1,3 +1,5 @@
+from typing import NoReturn, get_type_hints
+
 import pytest
 
 from htp.runtime import ReplayDiagnosticError, raise_stub
@@ -33,3 +35,7 @@ def test_raise_stub_produces_structured_diagnostic():
         "Route replay through an owning extension if simulation is toolchain-specific.",
     )
     assert "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC" in str(error)
+
+
+def test_raise_stub_is_typed_as_non_returning():
+    assert get_type_hints(raise_stub)["return"] is NoReturn
