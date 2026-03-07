@@ -19,78 +19,52 @@ Backed by current code and verification:
 - real PTO `a2a3sim` vector-add execution
 - real NV-GPU GEMM execution on device
 
-## Next-phase priorities
+## Landed priorities
 
-### Priority 1 — Capability solver
+The following priorities are now implemented:
 
-Why first:
+- capability solver
+- agent-facing tooling
+- semantic breadth expansion baseline
+- MLIR round-trip expansion baseline
+- optional AIE extension backend
 
-- the substrate is explicit, but composition is still manually wired
-- future growth now risks pipeline drift more than missing semantics
+## Remaining broader priorities
 
-Required deliverables:
+### Priority 1 — Solver evolution
 
-- `CapabilityState` model
-- solver-visible pipeline templates
-- `ir/solver_failure.json`
-- tests for missing capability / stale analysis / missing final artifact
+- richer extension/package composition rules
+- backend-owned capability declarations instead of the current local tables
+- broader alternative-choice support
 
-### Priority 2 — Agent-facing tooling
+### Priority 2 — Agent-loop productization
 
-Why second:
-
-- the agent-native substrate already exists in raw form
-- it should become a real product surface before feature growth widens the
-  system further
-
-Required deliverables:
-
-- `htp replay`
-- `htp verify`
-- `htp diff --semantic`
-- `htp explain`
-- structured `extensions.agent.*` provenance
+- autonomous patch / verify / promote loop
+- policy files and bounded edit corridors
+- minimization and richer decision-trace provenance
 
 ### Priority 3 — Semantic breadth expansion
 
-Why third:
-
-- the current typed substrate is real but selective
-- broader semantics should land on top of solver-visible, agent-visible
-  contracts
-
 Required deliverables:
 
-- richer kernel op set
-- richer workload/dataflow/channel/process semantics
-- stronger legality and effect checking
+- more kernel ops
+- more workload/dataflow/channel/process semantics
+- stronger legality and effect checking than the current baseline
 
 ### Priority 4 — MLIR round-trip expansion
 
-Why fourth:
-
-- the extension boundary is already proved
-- broader MLIR use should come after the solver and agent tooling so extension
-  composition remains controlled
-
 Required deliverables:
 
-- explicit eligible-subset matcher
 - richer exporter/importer tables
-- round-trip validation tests
+- more than the current scalar elementwise subset
+- deeper round-trip validation
 
 ### Priority 5 — Optional extension backends
 
-Why fifth:
-
-- additional backends should consume the matured composition layer rather than
-  forcing it prematurely
-
 Required deliverables:
 
-- AIE / MLIR-AIE artifact contract
-- binding/toolchain contract
-- example and validation path
+- AIE device/toolchain execution
+- additional extension backends beyond AIE
 
 ## Acceptance rule for this phase
 

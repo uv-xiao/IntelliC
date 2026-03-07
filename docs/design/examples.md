@@ -41,3 +41,15 @@ Flow:
 ## Future examples
 
 Design-only examples and roadmap material were moved to `docs/future/design/`.
+
+## Tooling surface
+
+The implemented package-level tooling is now:
+
+1. `htp replay <package>`
+2. `htp verify <package>`
+3. `htp diff --semantic <left> <right>`
+4. `htp explain <diagnostic-code>`
+
+These commands are thin wrappers over `htp/tools.py` and operate on emitted
+artifact packages rather than hidden compiler state.

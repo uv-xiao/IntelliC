@@ -29,6 +29,15 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
             backend="nvgpu",
             variant=variant,
         )
+    if backend == "aie":
+        from .aie import AIEBinding
+
+        return AIEBinding(
+            package_dir=package_path,
+            manifest=manifest,
+            backend="aie",
+            variant=variant,
+        )
     if backend == "pto":
         from .pto import PTOBinding
 
@@ -68,6 +77,21 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
             manifest=manifest,
             backend="pto",
             variant=variant,
+        )
+
+    has_aie_markers = (
+        (isinstance(outputs, dict) and "aie_codegen_index" in outputs)
+        or (isinstance(extensions, dict) and "aie" in extensions)
+        or (package_path / "codegen" / "aie").exists()
+    )
+    if has_aie_markers:
+        from .aie import AIEBinding
+
+        return AIEBinding(
+            package_dir=package_path,
+            manifest=manifest,
+            backend="aie",
+            variant="mlir-aie" if variant is None else variant,
         )
 
     if backend is None:

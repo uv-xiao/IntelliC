@@ -13,10 +13,13 @@ Unimplemented or research-only material lives under `docs/future/design/`.
 
 - `docs/design/impls/01_ir_model.md` — AST-first staged IR and identity contracts
 - `docs/design/impls/02_pass_manager.md` — pass execution and stage emission
+- `docs/design/impls/03_capability_solver.md` — solver preflight and unsat reporting
 - `docs/design/impls/04_artifact_manifest.md` — artifact and manifest schemas
 - `docs/design/impls/05_backend_pto.md` — PTO package/build/run contract
+- `docs/design/impls/06_backend_aie.md` — AIE extension backend artifact contract
 - `docs/design/impls/07_binding_interface.md` — validate/build/load/run/replay lifecycle
 - `docs/design/impls/08_testing.md` — verification expectations
+- `docs/design/impls/10_agentic_tooling.md` — replay/verify/diff/explain tooling
 - `docs/design/impls/13_backend_nvgpu.md` — NV-GPU package/build/run contract
 
 ## Runnable examples

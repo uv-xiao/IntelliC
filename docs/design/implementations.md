@@ -6,17 +6,21 @@ avoids roadmap-only features; those live in `docs/future/design/`.
 ## 1. Top-level flow
 
 1. `htp.compile_program(...)` captures a Python-level program description.
-2. The default pass pipeline stages runnable Python artifacts under `ir/stages/`.
-3. Backend emitters write package-owned sources under `codegen/<backend>/`.
-4. Bindings validate, build, load, run, and replay from the emitted package.
+2. The capability solver validates the default pipeline and emits `ir/solver_failure.json` on unsat.
+3. The default pass pipeline stages runnable Python artifacts under `ir/stages/`.
+4. Backend emitters write package-owned sources under `codegen/<backend>/`.
+5. Bindings validate, build, load, run, and replay from the emitted package.
+6. Agent-facing tools consume artifact packages through replay/verify/diff/explain.
 
 Implementation anchors:
 
 - compiler entrypoint: `htp/compiler.py`
+- solver: `htp/solver.py`
 - default pipeline: `htp/pipeline/defaults.py`
 - pass manager: `htp/passes/manager.py`
 - manifest emission: `htp/artifacts/manifest.py`
 - binding selection: `htp/bindings/api.py`
+- tool API / CLI: `htp/tools.py`, `htp/__main__.py`
 
 ## 2. Canonical representation
 
@@ -25,10 +29,12 @@ programs.
 
 - identity and maps live in `htp/ir/`
 - typed semantic state lives in `htp/ir/semantics.py`
+- op registry and semantic broadening live in `htp/ir/op_specs.py`
 - every stage emits `program.py` for `sim` replay
 - every stage also emits semantic payloads (`kernel_ir.json`, `workload_ir.json`,
   `types.json`, `layout.json`, `effects.json`, `schedule.json`)
 - analyses are emitted as artifacts alongside the stage program
+- island metadata can be emitted directly from pass results
 
 See `docs/design/impls/01_ir_model.md` and `docs/design/impls/02_pass_manager.md`.
 
@@ -100,6 +106,14 @@ HTP owns `.cu` source artifacts; the binding owns `nvcc` materialization and
 CUDA-driver launch. The current implemented example path is a real GEMM kernel
 running on CUDA with explicit tensor/scalar arguments.
 
+### AIE extension backend
+
+- emitter: `htp_ext/aie/emit.py`
+- binding: `htp/bindings/aie.py`
+
+HTP now has an extension-owned MLIR-AIE artifact path. It emits `codegen/aie/`
+artifacts plus `extensions.aie.*` metadata and keeps replay in Python `sim`.
+
 ## 6. Replay versus backend execution
 
 HTP keeps two execution surfaces distinct:
@@ -115,6 +129,11 @@ This distinction is part of the public contract and is documented in
 The only extension package in tree today is:
 
 - `htp_ext/mlir_cse/`
+- `htp_ext/aie/`
 
-It is an optional extension and not part of the core compiler contract.
-Anything not backed by code in `htp/` or `htp_ext/` is considered future work.
+Implemented extension-owned seams now include:
+
+- MLIR CSE round-trip package emission with solver-visible eligibility
+- AIE artifact emission with binding validation
+
+Anything not backed by code in `htp/` or `htp_ext/` remains future work.
