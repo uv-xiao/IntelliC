@@ -17,7 +17,7 @@ from htp.passes.program_model import (
 )
 from htp.runtime import Runtime, extensions
 
-from .export import analyze_program, eligibility_for, export_program
+from .export import analyze_program, eligibility_for, export_program, normalize_expr_program
 from .import_ import import_program
 
 EXTENSION_ID = "htp_ext.mlir_cse"
@@ -34,9 +34,10 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
     if not eligibility["ok"]:
         raise ValueError(f"Program is not eligible for MLIR CSE island: {eligibility['reasons']}")
 
-    module_text, ledger = export_program(program)
-    imported_program, import_summary = import_program(program)
-    analysis = analyze_program(program)
+    normalized_program = normalize_expr_program(program)
+    module_text, ledger = export_program(normalized_program)
+    imported_program, import_summary = import_program(normalized_program)
+    analysis = analyze_program(normalized_program)
     _write_extension_artifacts(
         package_path,
         module_text=module_text,
@@ -52,7 +53,7 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
         import_summary=import_summary,
     )
 
-    export_program_state = _semanticize_expr_program(program)
+    export_program_state = _semanticize_expr_program(normalized_program)
     import_program_state = _semanticize_expr_program(imported_program)
 
     export_payloads = stage_payloads_from_program(export_program_state)

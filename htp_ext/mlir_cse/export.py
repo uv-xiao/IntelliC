@@ -3,14 +3,19 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from htp.passes.program_model import canonicalize_program
+
 
 def eligibility_for(program: Mapping[str, Any]) -> dict[str, Any]:
-    exprs = program.get("exprs")
+    normalized = normalize_expr_program(program)
+    exprs = normalized.get("exprs")
     reasons: list[str] = []
-    ok = isinstance(program.get("entry"), str) and isinstance(exprs, list)
-    result = program.get("result")
+    ok = isinstance(normalized.get("entry"), str) and isinstance(exprs, list)
+    result = normalized.get("result")
     if not ok:
-        reasons.append("program requires a string entry and a list of exprs")
+        reasons.append(
+            "program requires a string entry and a list of exprs or a canonical scalar elementwise kernel"
+        )
     else:
         if not isinstance(result, str) or not result:
             ok = False
@@ -33,19 +38,20 @@ def eligibility_for(program: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "schema": "htp_ext.mlir_cse.eligibility.v1",
         "ok": ok,
-        "entry": program.get("entry"),
+        "entry": normalized.get("entry"),
         "result": result,
         "reasons": reasons,
     }
 
 
 def export_program(program: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
-    analysis = analyze_program(program)
-    exprs = program.get("exprs", [])
+    normalized = normalize_expr_program(program)
+    analysis = analyze_program(normalized)
+    exprs = normalized.get("exprs", [])
     arguments = ", ".join(f"%{name}: i32" for name in analysis["inputs"])
     lines = [
         "module {",
-        f"  func.func @{program['entry']}({arguments}) -> i32 {{",
+        f"  func.func @{normalized['entry']}({arguments}) -> i32 {{",
     ]
     value_names = {name: f"%{name}" for name in analysis["inputs"]}
     ledger_ops = []
@@ -63,24 +69,25 @@ def export_program(program: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
                 "op": expr["op"],
                 "lhs": expr["lhs"],
                 "rhs": expr["rhs"],
-                "entity_id": f"{program['entry']}:E{index}",
+                "entity_id": f"{normalized['entry']}:E{index}",
             }
         )
-    lines.append(f"    return {value_names[program['result']]} : i32")
+    lines.append(f"    return {value_names[normalized['result']]} : i32")
     lines.append("  }")
     lines.append("}")
     ledger = {
         "schema": "htp_ext.mlir_cse.ledger.v1",
-        "entry": program["entry"],
+        "entry": normalized["entry"],
         "inputs": analysis["inputs"],
-        "result": program["result"],
+        "result": normalized["result"],
         "ops": ledger_ops,
     }
     return "\n".join(lines) + "\n", ledger
 
 
 def analyze_program(program: Mapping[str, Any]) -> dict[str, Any]:
-    exprs = program.get("exprs", [])
+    normalized = normalize_expr_program(program)
+    exprs = normalized.get("exprs", [])
     defined: list[str] = []
     available: set[str] = set()
     inputs: list[str] = []
@@ -99,4 +106,35 @@ def analyze_program(program: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-__all__ = ["analyze_program", "eligibility_for", "export_program"]
+def normalize_expr_program(program: Mapping[str, Any]) -> dict[str, Any]:
+    if isinstance(program.get("exprs"), list):
+        return dict(program)
+    canonical = canonicalize_program(program)
+    kernel = canonical["kernel"]
+    exprs: list[dict[str, Any]] = []
+    result: str | None = None
+    for op in kernel.get("ops", ()):
+        if str(op.get("op")) != "elementwise_binary" or str(op.get("dtype")) != "i32":
+            return dict(program)
+        if str(op.get("operator")) not in {"add", "mul"}:
+            return dict(program)
+        if op.get("shape") not in ([], ()):
+            return dict(program)
+        exprs.append(
+            {
+                "target": str(op["out"]),
+                "op": str(op["operator"]),
+                "lhs": str(op["lhs"]),
+                "rhs": str(op["rhs"]),
+            }
+        )
+        result = str(op["out"])
+    normalized = {
+        "entry": str(canonical["entry"]),
+        "exprs": exprs,
+        "result": str(program.get("result", result or "")),
+    }
+    return normalized
+
+
+__all__ = ["analyze_program", "eligibility_for", "export_program", "normalize_expr_program"]

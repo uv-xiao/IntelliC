@@ -125,3 +125,76 @@ def test_mlir_cse_extension_rejects_missing_result_symbol(tmp_path):
         assert "non-empty string result symbol" in str(exc)
     else:
         raise AssertionError("emit_package should reject missing result symbols")
+
+
+def test_mlir_cse_extension_accepts_canonical_kernel_subset(tmp_path):
+    package_dir = tmp_path / "mlir_cse_kernel_pkg"
+    package_dir.mkdir()
+
+    manifest = emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "kernel": {
+                "name": "demo_kernel",
+                "args": [
+                    {"name": "lhs", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
+                    {"name": "rhs", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
+                    {"name": "scale", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
+                ],
+                "ops": [
+                    {
+                        "op": "elementwise_binary",
+                        "operator": "add",
+                        "lhs": "lhs",
+                        "rhs": "rhs",
+                        "out": "sum0",
+                        "shape": [],
+                        "dtype": "i32",
+                    },
+                    {
+                        "op": "elementwise_binary",
+                        "operator": "add",
+                        "lhs": "lhs",
+                        "rhs": "rhs",
+                        "out": "sum1",
+                        "shape": [],
+                        "dtype": "i32",
+                    },
+                    {
+                        "op": "elementwise_binary",
+                        "operator": "mul",
+                        "lhs": "sum1",
+                        "rhs": "scale",
+                        "out": "out",
+                        "shape": [],
+                        "dtype": "i32",
+                    },
+                ],
+            },
+            "workload": {
+                "entry": "demo_kernel",
+                "tasks": [
+                    {
+                        "task_id": "task0",
+                        "kind": "kernel_call",
+                        "kernel": "demo_kernel",
+                        "args": ["lhs", "rhs", "scale"],
+                    }
+                ],
+                "channels": [],
+                "dependencies": [],
+            },
+            "result": "out",
+        },
+    )
+
+    assert manifest["stages"]["current"] == "s02"
+    import_summary = json.loads((package_dir / "extensions" / "mlir_cse" / "import_summary.json").read_text())
+    assert import_summary["rewrites"] == [
+        {
+            "eliminated_target": "sum1",
+            "reused_target": "sum0",
+            "signature": "add(lhs, rhs)",
+        }
+    ]

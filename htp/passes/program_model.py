@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from htp.ir.op_specs import get_op_spec, op_effects
 from htp.ir.semantics import KernelArg, KernelIR, KernelOp, WorkloadIR, WorkloadTask, to_payload
 from htp.schemas import IDS_BINDINGS_SCHEMA_ID, IDS_ENTITIES_SCHEMA_ID
 
@@ -73,10 +74,7 @@ def build_semantic_model(
             inputs=_op_inputs(op),
             outputs=_op_outputs(op),
             attrs=_op_attrs(op),
-            effects={
-                "reads": _op_inputs(op),
-                "writes": _op_outputs(op),
-            },
+            effects=op_effects(str(op["op"]), dict(op)),
         )
         for index, op in enumerate(kernel.get("ops", ()))
     )
@@ -112,6 +110,7 @@ def build_type_layout_effects(
     target: Mapping[str, str],
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     backend = target["backend"]
+    _validate_dtype_contracts(kernel_ir, target=target)
     types = {
         "schema": TYPES_SCHEMA_ID,
         "values": {
@@ -143,7 +142,7 @@ def build_type_layout_effects(
             for op in kernel_ir.get("ops", ())
         },
         "barriers": _barriers_for_kernel(kernel_ir),
-        "channels": [dict(channel) for channel in workload_ir.get("channels", ())],
+        "channels": _channel_effects(workload_ir, kernel_ir),
     }
     return types, layout, effects
 
@@ -257,6 +256,30 @@ def _normalize_workload_surface(
     workload: Mapping[str, Any],
     kernel: Mapping[str, Any],
 ) -> dict[str, Any]:
+    task_ids = {
+        str(task["task_id"])
+        for task in workload.get("tasks", ())
+        if isinstance(task, Mapping) and "task_id" in task
+    }
+    normalized_dependencies = []
+    for dependency in workload.get("dependencies", ()):
+        dep = dict(dependency)
+        src = str(dep.get("src", ""))
+        dst = str(dep.get("dst", ""))
+        if src not in task_ids or dst not in task_ids:
+            raise ValueError(
+                f"HTP.WORKLOAD.UNKNOWN_TASK: dependency {src!r}->{dst!r} references unknown task."
+            )
+        normalized_dependencies.append(dep)
+    normalized_channels = []
+    for channel in workload.get("channels", ()):
+        channel_payload = dict(channel)
+        if not isinstance(channel_payload.get("name"), str) or not channel_payload["name"]:
+            raise ValueError("HTP.WORKLOAD.INVALID_CHANNEL: channels require a non-empty string name.")
+        if not isinstance(channel_payload.get("dtype"), str) or not channel_payload["dtype"]:
+            raise ValueError("HTP.WORKLOAD.INVALID_CHANNEL: channels require a non-empty string dtype.")
+        channel_payload.setdefault("kind", "fifo")
+        normalized_channels.append(channel_payload)
     return {
         "entry": str(workload.get("entry", entry)),
         "tasks": [
@@ -268,8 +291,8 @@ def _normalize_workload_surface(
             }
             for task in workload.get("tasks", ())
         ],
-        "channels": [dict(channel) for channel in workload.get("channels", ())],
-        "dependencies": [dict(dep) for dep in workload.get("dependencies", ())],
+        "channels": normalized_channels,
+        "dependencies": normalized_dependencies,
         "kernel": str(kernel.get("name", entry)),
     }
 
@@ -339,20 +362,16 @@ def _default_workload(entry: str, kernel: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _op_inputs(op: Mapping[str, Any]) -> tuple[str, ...]:
-    if op.get("op") in {"matmul", "elementwise_binary"}:
-        return (str(op["lhs"]), str(op["rhs"]))
-    if op.get("op") == "channel_send":
-        return (str(op["value"]),)
-    if op.get("op") == "channel_recv":
-        return (str(op["channel"]),)
+    effects = op_effects(str(op.get("op")), dict(op))
+    if effects["reads"]:
+        return effects["reads"]
     return tuple(str(name) for name in op.get("inputs", ()))
 
 
 def _op_outputs(op: Mapping[str, Any]) -> tuple[str, ...]:
-    if op.get("op") in {"matmul", "elementwise_binary"}:
-        return (str(op["out"]),)
-    if op.get("op") == "channel_recv":
-        return (str(op["out"]),)
+    effects = op_effects(str(op.get("op")), dict(op))
+    if effects["writes"]:
+        return effects["writes"]
     return tuple(str(name) for name in op.get("outputs", ()))
 
 
@@ -400,25 +419,56 @@ def _tiling_for_kernel(kernel_ir: Mapping[str, Any], backend: str) -> dict[str, 
 def _barriers_for_kernel(kernel_ir: Mapping[str, Any]) -> list[dict[str, str]]:
     barriers: list[dict[str, str]] = []
     for op in kernel_ir.get("ops", ()):
-        if str(op.get("op")) in {"async_copy", "mma"}:
+        if get_op_spec(str(op.get("op"))).barrier_after:
             barriers.append({"after": str(op["op_id"]), "reason": "pipeline_ready"})
     return barriers
 
 
 def _phase_for_op(kind: str) -> str:
-    if kind in {"async_copy", "load", "load_tile"}:
-        return "producer"
-    if kind in {"store", "store_tile"}:
-        return "consumer"
-    if kind in {"channel_send", "channel_recv", "barrier", "await"}:
-        return "sync"
-    return "compute"
+    return get_op_spec(kind).phase
 
 
 def _latency_for_op(kind: str) -> int:
-    if kind in {"matmul", "mma"}:
-        return 2
-    return 1
+    return get_op_spec(kind).latency
+
+
+def _channel_effects(workload_ir: Mapping[str, Any], kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
+    channel_records = []
+    for channel in workload_ir.get("channels", ()):
+        name = str(channel["name"])
+        producers = [
+            str(op["op_id"])
+            for op in kernel_ir.get("ops", ())
+            if name in op.get("effects", {}).get("channel_writes", ())
+        ]
+        consumers = [
+            str(op["op_id"])
+            for op in kernel_ir.get("ops", ())
+            if name in op.get("effects", {}).get("channel_reads", ())
+        ]
+        channel_records.append(
+            {
+                "name": name,
+                "dtype": str(channel["dtype"]),
+                "kind": str(channel.get("kind", "fifo")),
+                "producers": producers,
+                "consumers": consumers,
+            }
+        )
+    return channel_records
+
+
+def _validate_dtype_contracts(kernel_ir: Mapping[str, Any], *, target: Mapping[str, str]) -> None:
+    backend = target["backend"]
+    for argument in kernel_ir.get("args", ()):
+        if argument.get("kind") != "buffer":
+            continue
+        dtype = str(argument["dtype"])
+        name = str(argument["name"])
+        if backend == "nvgpu" and dtype != "f32":
+            raise ValueError(
+                f"HTP.TYPECHECK.UNSUPPORTED_BUFFER_DTYPE: nvgpu buffer {name!r} requires 'f32', got {dtype!r}."
+            )
 
 
 def _entities_payload(

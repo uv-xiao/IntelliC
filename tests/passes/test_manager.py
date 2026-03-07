@@ -217,3 +217,33 @@ def test_pass_manager_requires_runnable_py_to_match_contract(tmp_path):
                 },
             ),
         )
+
+
+def test_pass_manager_threads_island_records_into_stage_graph(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    initial_stage = write_stage(
+        package_dir,
+        StageSpec(
+            stage_id="s00",
+            pass_id=None,
+            runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+        ),
+    )
+    manager = PassManager(package_dir=package_dir, stages=[initial_stage], current_stage="s00")
+    contract = PassContract(
+        pass_id="pkg::mlir_roundtrip@1",
+        owner="pkg",
+        kind="mixed",
+        ast_effect="mutates",
+    )
+
+    stage_record = manager.run(
+        contract,
+        lambda stage_before: PassResult(
+            runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+            islands=({"island_id": "mlir_cse", "dir": "ir/stages/s01/islands/mlir_cse"},),
+        ),
+    )
+
+    assert stage_record["islands"] == [{"island_id": "mlir_cse", "dir": "ir/stages/s01/islands/mlir_cse"}]

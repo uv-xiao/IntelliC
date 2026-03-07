@@ -15,6 +15,7 @@ from htp.passes.trace import build_pass_trace_event, emit_pass_trace_event
 class PassResult:
     runnable_py: RunnablePySpec
     analyses: dict[str, dict[str, Any]] = field(default_factory=dict)
+    islands: tuple[dict[str, str], ...] = ()
     diagnostics: tuple[dict[str, Any], ...] = ()
     program_ast_payload: dict[str, Any] = field(default_factory=dict)
     kernel_ir_payload: dict[str, Any] = field(default_factory=dict)
@@ -71,6 +72,7 @@ class PassManager:
                 pass_id=contract.pass_id,
                 runnable_py=result.runnable_py,
                 analyses=analyses,
+                islands=result.islands,
                 program_ast_payload=result.program_ast_payload,
                 kernel_ir_payload=result.kernel_ir_payload,
                 workload_ir_payload=result.workload_ir_payload,
