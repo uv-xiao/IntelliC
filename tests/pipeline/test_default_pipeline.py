@@ -1,5 +1,6 @@
 import json
 
+from htp.bindings.api import bind
 from htp.pipeline.defaults import MANDATORY_PASS_IDS, run_default_pipeline
 
 
@@ -55,3 +56,7 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
 
     assert result.program["analysis"]["schedule"]["ticks"] == schedule_plan["ticks"]
     assert result.program["package"]["emitted"] is True
+    replay = bind(package_dir).load(mode="sim").replay("s05")
+    assert replay.ok is True
+    assert replay.result["package"]["emitted"] is True
+    assert replay.result["entry"] == "demo_kernel"

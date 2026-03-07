@@ -3,6 +3,7 @@ def test_public_packages_import():
     import htp.artifacts
     import htp.backends
     import htp.bindings
+    import htp.compiler
     import htp.ir
     import htp.passes
     import htp.pipeline
@@ -14,6 +15,7 @@ def test_public_packages_import():
     assert htp.runtime.__name__ == "htp.runtime"
     assert htp.bindings.__name__ == "htp.bindings"
     assert htp.backends.__name__ == "htp.backends"
+    assert htp.compiler.__name__ == "htp.compiler"
 
 
 def test_schema_constants():

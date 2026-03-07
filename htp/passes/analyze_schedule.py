@@ -7,6 +7,7 @@ from typing import Any
 from htp.artifacts.stages import RunnablePySpec
 from htp.passes.contracts import AnalysisOutput, PassContract
 from htp.passes.manager import PassResult
+from htp.passes.replay_program import render_program_state_module
 
 PASS_ID = "htp::analyze_schedule@1"
 ANALYSIS_ID = "htp::SchedulePlan@1"
@@ -53,7 +54,11 @@ def run(
     next_program["analysis"] = analysis_state
 
     return next_program, PassResult(
-        runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+        runnable_py=RunnablePySpec(
+            status="preserves",
+            modes=("sim",),
+            program_text=render_program_state_module(next_program),
+        ),
         analyses={
             ANALYSIS_PATH: schedule_plan,
         },

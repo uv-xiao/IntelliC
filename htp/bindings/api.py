@@ -71,6 +71,18 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
         )
 
     if backend is None:
+        stages = manifest.get("stages")
+        if isinstance(stages, dict) and isinstance(stages.get("graph"), list):
+            return binding_from_manifest(
+                package_path,
+                {
+                    **manifest,
+                    "target": {
+                        **(manifest.get("target") or {}),
+                        "backend": "generic",
+                    },
+                },
+            )
         raise ValueError("Manifest target.backend is required for binding selection")
 
     return binding_from_manifest(package_path, manifest)

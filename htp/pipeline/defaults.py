@@ -110,6 +110,10 @@ def _example_program() -> dict[str, Any]:
         "package": {
             "emitted": False,
         },
+        "target": {
+            "backend": "pto",
+            "option": "a2a3sim",
+        },
     }
 
 

@@ -7,6 +7,7 @@ from typing import Any
 from htp.artifacts.stages import RunnablePySpec
 from htp.passes.contracts import PassContract
 from htp.passes.manager import PassResult
+from htp.passes.replay_program import render_program_state_module
 
 PASS_ID = "htp::emit_package@1"
 
@@ -33,7 +34,11 @@ def run(
     }
 
     return next_program, PassResult(
-        runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+        runnable_py=RunnablePySpec(
+            status="preserves",
+            modes=("sim",),
+            program_text=render_program_state_module(next_program),
+        ),
         time_ms=0.1,
     )
 

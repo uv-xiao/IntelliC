@@ -1,14 +1,23 @@
-# HTP (Heterogeneous Tile Programming) — Docs Branch
+# HTP (Heterogeneous Tile Programming)
 
-This is an **orphan docs-only** branch that contains:
+This repository contains both the HTP design material and a live Python implementation of the initial framework
+substrate.
 
-- The HTP redo design: `docs/design/`
-- Research and reference notes: `docs/research/`, `docs/reference/`
-- Historical PTO-WSP v9/v10 design docs (reference only): `docs/reference/pto-wsp/`
-- External reference checkouts (gitignored): `references/` (including `references/pto-runtime/`)
+## Current implementation scope
 
-No PTO-WSP implementation code is kept on this branch.
+Implemented today:
+
+- staged artifact model and manifest writing
+- pass contracts, pass manager, and pass trace
+- replay/runtime surface with structured diagnostics
+- binding API with PTO and NV-GPU bindings
+- PTO backend artifact emission
+- NV-GPU backend artifact emission with `.cu` as the primary source artifact
+- extension-owned MLIR CSE island example in `htp_ext/mlir_cse/`
+- end-to-end compile entrypoint via `htp.compile_program(...)`
 
 ## Start here
 
-- `docs/design/README.md`
+- design: `docs/design/README.md`
+- implementation: `htp/`
+- tests: `tests/`
