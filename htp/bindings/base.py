@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -150,9 +151,16 @@ class LoadResult:
 
     def _stage_record(self, stage_id: str) -> dict[str, Any]:
         stages = self.manifest.get("stages", {})
-        for stage in stages.get("graph", ()):
+        if not isinstance(stages, Mapping):
+            raise ValueError("Manifest stages must be a mapping with a graph list.")
+        graph = stages.get("graph", ())
+        if not isinstance(graph, list):
+            raise ValueError("Manifest stages.graph must be a list.")
+        for stage in graph:
+            if not isinstance(stage, Mapping):
+                raise ValueError("Manifest stages.graph entries must be mappings.")
             if stage.get("id") == stage_id:
-                return stage
+                return dict(stage)
         raise KeyError(f"Unknown stage id: {stage_id}")
 
     def _write_log(self, *, kind: str, stem: str, lines: tuple[str, ...]) -> str:
@@ -191,8 +199,24 @@ class LoadResult:
                     "stage_id": stage_id,
                 }
             ]
+        except ValueError as exc:
+            return False, None, [
+                {
+                    "code": "HTP.BINDINGS.MALFORMED_STAGE_GRAPH",
+                    "detail": str(exc),
+                    "stage_id": stage_id,
+                }
+            ]
 
         runnable_py = stage.get("runnable_py", {})
+        if not isinstance(runnable_py, Mapping):
+            return False, None, [
+                {
+                    "code": "HTP.BINDINGS.MALFORMED_RUNNABLE_PY",
+                    "detail": f"Stage {stage_id!r} has a non-mapping runnable_py record.",
+                    "stage_id": stage_id,
+                }
+            ]
         supported_modes = tuple(runnable_py.get("modes", ()))
         if supported_modes and mode not in supported_modes:
             return False, None, [

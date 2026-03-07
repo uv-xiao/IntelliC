@@ -186,3 +186,45 @@ def run(*args, **kwargs):
     second = session.replay("s01")
 
     assert first.log_path != second.log_path
+
+
+def test_replay_returns_structured_diagnostic_for_malformed_stages_shape(tmp_path):
+    package_dir = tmp_path / "package"
+    package_dir.mkdir()
+    (package_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema": "htp.manifest.v1",
+                "target": {"backend": "pto", "variant": "a2a3sim"},
+                "stages": "broken",
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+    session = htp.bind(package_dir).load(mode="sim")
+    result = session.replay("s01")
+
+    assert result.ok is False
+    assert result.diagnostics[0]["code"] == "HTP.BINDINGS.MALFORMED_STAGE_GRAPH"
+
+
+def test_replay_returns_structured_diagnostic_for_malformed_runnable_py_shape(tmp_path):
+    package_dir = tmp_path / "package"
+    package_dir.mkdir()
+    _write_manifest(
+        package_dir,
+        stage_records=[
+            {
+                "id": "s01",
+                "runnable_py": ["not", "a", "mapping"],
+            }
+        ],
+    )
+
+    session = htp.bind(package_dir).load(mode="sim")
+    result = session.replay("s01")
+
+    assert result.ok is False
+    assert result.diagnostics[0]["code"] == "HTP.BINDINGS.MALFORMED_RUNNABLE_PY"
