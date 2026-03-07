@@ -4,6 +4,8 @@ import shutil
 import time
 from pathlib import Path
 
+import numpy as np
+
 from htp.backends.pto.emit import emit_package
 from htp.bindings import pto_runtime_adapter
 from htp.bindings.validate import load_manifest
@@ -29,7 +31,7 @@ class _FakeKernelCompiler:
         assert Path(source_path).name == "demo_kernel.cpp"
         assert core_type == "aiv"
         assert extra_include_dirs is not None
-        assert pto_isa_root is None
+        assert pto_isa_root is None or Path(pto_isa_root).name in {"pto-isa", "pto-isa-lh"}
         return b"kernel-binary"
 
 
@@ -47,6 +49,8 @@ class _FakeRuntimeBuilder:
 
 class _FakeBindingsModule:
     ARG_SCALAR = 0
+    ARG_INPUT_PTR = 1
+    ARG_OUTPUT_PTR = 2
 
     @staticmethod
     def bind_host_binary(binary: bytes):
@@ -64,9 +68,11 @@ class _FakeBindingsModule:
             ):
                 assert orch_so_binary == b"orch-binary"
                 assert orch_func_name == "demo_kernel_orchestrate"
-                assert func_args == [7]
-                assert arg_types == [0]
-                assert arg_sizes == [0]
+                assert len(func_args) == 7
+                assert all(isinstance(value, int) and value > 0 for value in func_args[:3])
+                assert func_args[3:] == [64, 64, 64, 16]
+                assert arg_types == [1, 1, 2, 0, 0, 0, 0]
+                assert arg_sizes == [64, 64, 64, 0, 0, 0, 0]
                 assert kernel_binaries == [(0, b"kernel-binary")]
 
             def finalize(self):
@@ -136,12 +142,15 @@ def test_pto_runtime_adapter_runs_built_package(tmp_path, monkeypatch):
         ),
     )
 
+    lhs = np.arange(16, dtype=np.float32)
+    rhs = np.arange(16, dtype=np.float32)
+    out = np.zeros(16, dtype=np.float32)
     ok, result, diagnostics = pto_runtime_adapter.run_package(
         package_dir,
         manifest,
         mode="sim",
         entry="demo_kernel",
-        args=(7,),
+        args=(lhs, rhs, out, lhs.size),
         kwargs=None,
     )
 
@@ -159,6 +168,7 @@ def test_pto_runtime_adapter_runs_built_package(tmp_path, monkeypatch):
             "build/pto/orchestration/demo_kernel_orchestration.so",
             "build/pto/kernels/0.bin",
         ],
+        "output_names": ["out"],
     }
 
 
@@ -186,6 +196,41 @@ def test_pto_runtime_adapter_reports_missing_reference_runtime(tmp_path, monkeyp
         {
             "code": "HTP.BINDINGS.PTO_REFERENCE_UNAVAILABLE",
             "detail": "missing reference runtime",
+        }
+    ]
+
+
+def test_pto_runtime_adapter_rejects_invalid_runtime_args(tmp_path, monkeypatch):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(package_dir, program={"entry": "demo_kernel", "ops": ["compute_tile"]})
+    manifest = load_manifest(package_dir)
+
+    monkeypatch.setattr(
+        pto_runtime_adapter,
+        "_load_reference_modules",
+        lambda: (
+            type("RuntimeBuilderModule", (), {"RuntimeBuilder": _FakeRuntimeBuilder}),
+            _FakeBindingsModule,
+        ),
+    )
+
+    ok, result, diagnostics = pto_runtime_adapter.run_package(
+        package_dir,
+        manifest,
+        mode="sim",
+        entry="demo_kernel",
+        args=("bad", "args", "for", "pto"),
+        kwargs=None,
+    )
+
+    assert ok is False
+    assert result is None
+    assert diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_RUN_ERROR",
+            "detail": "PTO buffer argument 'lhs' expects a numpy.ndarray, received str.",
+            "mode": "sim",
         }
     ]
 

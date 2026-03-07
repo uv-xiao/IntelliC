@@ -7,7 +7,7 @@ from typing import Any
 
 from htp.schemas import MANIFEST_SCHEMA_ID
 
-from .lower import NVGPUCodegenPlan, lower_program
+from .lower import NVGPUCodegenPlan, NVGPUKernelSpec, lower_program
 
 NVGPU_CODEGEN_SCHEMA_ID = "htp.nvgpu.codegen.v1"
 NVGPU_TOOLCHAIN_SCHEMA_ID = "htp.nvgpu.toolchain.v1"
@@ -83,7 +83,7 @@ def _write_codegen_tree(package_dir: Path, plan: NVGPUCodegenPlan) -> None:
     for kernel in plan.kernels:
         kernel_path = package_dir / kernel.source
         kernel_path.parent.mkdir(parents=True, exist_ok=True)
-        kernel_path.write_text(_kernel_source(plan, kernel))
+        kernel_path.write_text(_kernel_source(kernel))
 
     codegen_index_path.parent.mkdir(parents=True, exist_ok=True)
     codegen_index_path.write_text(json.dumps(_codegen_index(plan), indent=2) + "\n")
@@ -110,6 +110,22 @@ def _codegen_index(plan: NVGPUCodegenPlan) -> dict[str, Any]:
                 "thread_block": list(kernel.thread_block),
                 "shared_memory_bytes": kernel.shared_memory_bytes,
                 "capabilities": list(kernel.capabilities),
+                "params": [
+                    {
+                        "name": param.name,
+                        "kind": param.kind,
+                        "dtype": param.dtype,
+                        "role": param.role,
+                        "shape": list(param.shape),
+                    }
+                    for param in kernel.params
+                ],
+                "launch": {
+                    "kind": kernel.launch.kind,
+                    "extents": list(kernel.launch.extents),
+                },
+                "op": kernel.op,
+                "attrs": dict(kernel.attrs),
             }
             for kernel in plan.kernels
         ],
@@ -135,15 +151,16 @@ def _toolchain_payload(plan: NVGPUCodegenPlan) -> dict[str, Any]:
 
 def _launch_source(plan: NVGPUCodegenPlan) -> str:
     kernel = plan.kernels[0]
+    argument_names = ", ".join(param.name for param in kernel.params)
     return "\n".join(
         (
             "from htp.runtime import call_kernel, default_runtime",
             "",
-            f'def {plan.launch.function_name}(*args, mode="sim", trace=None, runtime=None):',
+            f'def {plan.launch.function_name}({argument_names}, mode="sim", trace=None, runtime=None):',
             "    resolved_runtime = default_runtime() if runtime is None else runtime",
             "    return call_kernel(",
             f'        "{kernel.kernel_id}",',
-            "        args=args,",
+            f"        args=({argument_names},),",
             "        mode=mode,",
             "        trace=trace,",
             "        runtime=resolved_runtime,",
@@ -152,6 +169,7 @@ def _launch_source(plan: NVGPUCodegenPlan) -> str:
             f'            "variant": "{plan.variant}",',
             f'            "hardware_profile": "{plan.hardware_profile}",',
             f'            "kernel_source": "{kernel.source}",',
+            f'            "kernel_params": {json.dumps([param.name for param in kernel.params])},',
             "        },",
             "    )",
             "",
@@ -159,14 +177,47 @@ def _launch_source(plan: NVGPUCodegenPlan) -> str:
     )
 
 
-def _kernel_source(plan: NVGPUCodegenPlan, kernel: Any) -> str:
+def _kernel_source(kernel: NVGPUKernelSpec) -> str:
+    if kernel.op == "matmul":
+        return _matmul_kernel_source(kernel)
+    return _elementwise_binary_source(kernel)
+
+
+def _matmul_kernel_source(kernel: NVGPUKernelSpec) -> str:
     return "\n".join(
         (
             "#include <cuda_runtime.h>",
             "",
-            f'extern "C" __global__ void {kernel.func_id}() {{',
-            f"  // profile: {plan.profile}",
-            "  (void)threadIdx.x;",
+            f'extern "C" __global__ void {kernel.func_id}(const float* A, const float* B, float* C, int M, int N, int K) {{',
+            "  const int row = blockIdx.y * blockDim.y + threadIdx.y;",
+            "  const int col = blockIdx.x * blockDim.x + threadIdx.x;",
+            "  if (row >= M || col >= N) {",
+            "    return;",
+            "  }",
+            "  float accum = 0.0f;",
+            "  for (int k = 0; k < K; ++k) {",
+            "    accum += A[row * K + k] * B[k * N + col];",
+            "  }",
+            "  C[row * N + col] = accum;",
+            "}",
+            "",
+        )
+    )
+
+
+def _elementwise_binary_source(kernel: NVGPUKernelSpec) -> str:
+    operator = str(kernel.attrs.get("operator", "add"))
+    expression = "lhs[idx] + rhs[idx]" if operator == "add" else "lhs[idx] * rhs[idx]"
+    return "\n".join(
+        (
+            "#include <cuda_runtime.h>",
+            "",
+            f'extern "C" __global__ void {kernel.func_id}(const float* lhs, const float* rhs, float* out, int size) {{',
+            "  const int idx = blockIdx.x * blockDim.x + threadIdx.x;",
+            "  if (idx >= size) {",
+            "    return;",
+            "  }",
+            f"  out[idx] = {expression};",
             "}",
             "",
         )

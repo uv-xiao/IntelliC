@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import importlib
 import importlib.util
 import json
@@ -11,6 +12,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -26,6 +29,15 @@ class PTOContract:
     orchestration_function: str
     kernels: tuple[dict[str, Any], ...]
     toolchain_manifest: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class MarshaledPTOArgs:
+    func_args: list[int]
+    arg_types: list[int]
+    arg_sizes: list[int]
+    output_names: tuple[str, ...]
+    array_refs: tuple[np.ndarray[Any, Any], ...]
 
 
 def build_package(
@@ -120,7 +132,7 @@ def run_package(
             [
                 _diagnostic(
                     "HTP.BINDINGS.PTO_UNSUPPORTED_KEYWORD_ARGS",
-                    "PTO package execution only supports positional scalar arguments in v1.",
+                    "PTO package execution only supports positional buffer/scalar arguments.",
                 )
             ],
         )
@@ -151,7 +163,7 @@ def run_package(
         Runtime = bindings_module.bind_host_binary((package_dir / built_outputs[0]).read_bytes())
         bindings_module.set_device(0)
         runtime = Runtime()
-        func_args, arg_types, arg_sizes = _marshal_scalar_args(args, bindings_module)
+        marshaled = _marshal_runtime_args(contract, args, bindings_module)
         kernel_binaries = [
             (int(kernel["func_id"]), (package_dir / _kernel_output_path(int(kernel["func_id"]))).read_bytes())
             for kernel in contract.kernels
@@ -159,9 +171,9 @@ def run_package(
         runtime.initialize(
             (package_dir / built_outputs[3]).read_bytes(),
             contract.orchestration_function,
-            func_args=func_args,
-            arg_types=arg_types,
-            arg_sizes=arg_sizes,
+            func_args=marshaled.func_args,
+            arg_types=marshaled.arg_types,
+            arg_sizes=marshaled.arg_sizes,
             kernel_binaries=kernel_binaries,
         )
         bindings_module.launch_runtime(
@@ -184,6 +196,7 @@ def run_package(
             "platform": contract.platform,
             "runtime_name": contract.runtime_name,
             "built_outputs": built_outputs,
+            "output_names": list(marshaled.output_names),
         },
         [],
     )
@@ -211,7 +224,20 @@ def load_contract(package_dir: Path, manifest: Mapping[str, Any]) -> PTOContract
     toolchain_manifest = json.loads((package_dir / output_toolchain_manifest).read_text())
     runtime_config = dict(getattr(kernel_config, "RUNTIME_CONFIG"))
     orchestration = dict(getattr(kernel_config, "ORCHESTRATION"))
-    kernels = tuple(dict(kernel) for kernel in getattr(kernel_config, "KERNELS"))
+    kernels_by_func_id = {
+        int(kernel["func_id"]): dict(kernel) for kernel in getattr(kernel_config, "KERNELS")
+    }
+    index_kernels = codegen_index.get("kernels", ())
+    kernels = tuple(
+        {
+            **kernels_by_func_id[int(kernel["func_id"])],
+            **dict(kernel),
+        }
+        for kernel in index_kernels
+        if isinstance(kernel, Mapping) and int(kernel["func_id"]) in kernels_by_func_id
+    )
+    if not kernels:
+        kernels = tuple(dict(kernel) for kernel in getattr(kernel_config, "KERNELS"))
     return PTOContract(
         package_dir=package_dir,
         entrypoint=str(codegen_index["entrypoint"]),
@@ -225,45 +251,139 @@ def load_contract(package_dir: Path, manifest: Mapping[str, Any]) -> PTOContract
     )
 
 
-def _marshal_scalar_args(
+def _marshal_runtime_args(
+    contract: PTOContract,
     args: tuple[Any, ...],
     bindings_module: Any,
-) -> tuple[list[int] | None, list[int] | None, list[int] | None]:
-    if not args:
-        return None, None, None
-    marshaled: list[int] = []
-    for argument in args:
-        if isinstance(argument, bool):
-            marshaled.append(int(argument))
-            continue
-        if isinstance(argument, int):
-            marshaled.append(argument)
-            continue
+) -> MarshaledPTOArgs:
+    kernel = _primary_kernel(contract)
+    params = tuple(kernel.get("params", ()))
+    if len(args) != len(params):
         raise TypeError(
-            "PTO package execution only supports integer-like scalar arguments in v1; "
-            f"received {argument.__class__.__name__}."
+            f"PTO entry {contract.entrypoint!r} expects {len(params)} runtime arguments "
+            f"({', '.join(str(param.get('name', '?')) for param in params)}), got {len(args)}."
         )
-    arg_types = [bindings_module.ARG_SCALAR for _ in marshaled]
-    arg_sizes = [0 for _ in marshaled]
-    return marshaled, arg_types, arg_sizes
+
+    buffer_args: list[int] = []
+    buffer_arg_types: list[int] = []
+    buffer_arg_sizes: list[int] = []
+    scalar_values: list[int] = []
+    output_names: list[str] = []
+    array_refs: list[np.ndarray[Any, Any]] = []
+
+    for param, argument in zip(params, args, strict=True):
+        kind = str(param.get("kind", "scalar"))
+        role = str(param.get("role")) if param.get("role") is not None else None
+        name = str(param.get("name", "arg"))
+        if kind == "buffer":
+            array = _as_contiguous_array(argument, dtype=str(param.get("dtype", "f32")), name=name)
+            buffer_args.append(int(array.ctypes.data))
+            buffer_arg_types.append(
+                bindings_module.ARG_OUTPUT_PTR
+                if role in {"output", "inout"}
+                else bindings_module.ARG_INPUT_PTR
+            )
+            buffer_arg_sizes.append(int(array.nbytes))
+            array_refs.append(array)
+            if role in {"output", "inout"}:
+                output_names.append(name)
+            continue
+
+        scalar_bits = _marshal_scalar_value(argument, dtype=str(param.get("dtype", "i32")), name=name)
+        scalar_values.append(scalar_bits)
+
+    func_args = [*buffer_args, *buffer_arg_sizes, *scalar_values]
+    arg_types = [
+        *buffer_arg_types,
+        *[bindings_module.ARG_SCALAR for _ in buffer_arg_sizes],
+        *[bindings_module.ARG_SCALAR for _ in scalar_values],
+    ]
+    arg_sizes = [
+        *buffer_arg_sizes,
+        *[0 for _ in buffer_arg_sizes],
+        *[0 for _ in scalar_values],
+    ]
+    return MarshaledPTOArgs(
+        func_args=func_args,
+        arg_types=arg_types,
+        arg_sizes=arg_sizes,
+        output_names=tuple(output_names),
+        array_refs=tuple(array_refs),
+    )
+
+
+def _primary_kernel(contract: PTOContract) -> dict[str, Any]:
+    if not contract.kernels:
+        raise ValueError(f"PTO package {contract.package_dir} does not declare any kernels")
+    return contract.kernels[0]
+
+
+def _as_contiguous_array(argument: Any, *, dtype: str, name: str) -> np.ndarray[Any, Any]:
+    expected_dtype = _numpy_dtype_for(dtype)
+    if not isinstance(argument, np.ndarray):
+        raise TypeError(
+            f"PTO buffer argument {name!r} expects a numpy.ndarray, received {argument.__class__.__name__}."
+        )
+    if argument.dtype != expected_dtype:
+        raise TypeError(
+            f"PTO buffer argument {name!r} expects dtype {expected_dtype}, received {argument.dtype}."
+        )
+    return np.ascontiguousarray(argument)
+
+
+def _numpy_dtype_for(dtype: str) -> np.dtype[Any]:
+    mapping = {
+        "f32": np.dtype(np.float32),
+        "f64": np.dtype(np.float64),
+        "i32": np.dtype(np.int32),
+        "i64": np.dtype(np.int64),
+    }
+    if dtype not in mapping:
+        raise TypeError(f"Unsupported PTO numpy dtype {dtype!r}.")
+    return mapping[dtype]
+
+
+def _marshal_scalar_value(argument: Any, *, dtype: str, name: str) -> int:
+    if isinstance(argument, bool):
+        return int(argument)
+    if dtype in {"i32", "i64"}:
+        if not isinstance(argument, int):
+            raise TypeError(
+                f"PTO scalar argument {name!r} expects integer dtype {dtype}, received {argument.__class__.__name__}."
+            )
+        return int(argument)
+    if dtype == "f32":
+        value = ctypes.c_float(float(argument))
+        return int(ctypes.c_uint32.from_buffer_copy(value).value)
+    if dtype == "f64":
+        value = ctypes.c_double(float(argument))
+        return int(ctypes.c_uint64.from_buffer_copy(value).value)
+    raise TypeError(f"Unsupported PTO scalar dtype {dtype!r} for argument {name!r}.")
 
 
 def _resolve_project_path(package_dir: Path, source: str) -> Path:
     source_path = Path(source)
     if source_path.is_absolute():
         return source_path
+    if source_path.parts[:2] == ("codegen", "pto"):
+        return package_dir / source_path
     codegen_project_dir = package_dir / "codegen" / "pto"
     return codegen_project_dir / source_path
 
 
 def _resolve_pto_isa_root(contract: PTOContract) -> str | None:
-    if contract.platform == "a2a3sim":
-        return None
     env = contract.toolchain_manifest.get("env")
     requested = env.get("PTO_ISA_ROOT") if isinstance(env, Mapping) else None
     if isinstance(requested, str) and requested not in {"", "auto"}:
         return requested
-    return os.environ.get("PTO_ISA_ROOT") or os.environ.get("HTP_PTO_ISA_ROOT")
+    env_override = os.environ.get("PTO_ISA_ROOT") or os.environ.get("HTP_PTO_ISA_ROOT")
+    if env_override:
+        return env_override
+    for candidate in _candidate_pto_isa_roots():
+        include_dir = candidate / "include"
+        if include_dir.is_dir():
+            return str(candidate)
+    return None
 
 
 def _configure_sim_kernel_compiler(kernel_compiler: Any, platform: str) -> None:
@@ -366,4 +486,12 @@ def _candidate_reference_python_dirs() -> tuple[Path, ...]:
     return (
         REPO_ROOT / "3rdparty" / "pto-runtime" / "python",
         REPO_ROOT / "references" / "pto-runtime" / "python",
+    )
+
+
+def _candidate_pto_isa_roots() -> tuple[Path, ...]:
+    return (
+        REPO_ROOT / "3rdparty" / "pto-isa",
+        REPO_ROOT / "references" / "pto-isa",
+        REPO_ROOT / "references" / "pto-isa-lh",
     )

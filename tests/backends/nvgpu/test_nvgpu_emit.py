@@ -38,7 +38,7 @@ def test_nvgpu_emit_prefers_cu_source_artifacts(tmp_path):
             "source": "host/demo_kernel_launch.py",
             "function_name": "launch_demo_kernel",
         },
-        "cuda_runtime_contract": "cuda-runtime:stub",
+        "cuda_runtime_contract": "cuda-runtime:driver",
         "codegen_mode": "cuda_source",
         "toolchain_manifest": "build/toolchain.json",
     }
@@ -66,9 +66,20 @@ def test_nvgpu_emit_prefers_cu_source_artifacts(tmp_path):
                 "kernel_id": "demo_kernel.kernel0",
                 "func_id": "demo_kernel_kernel0",
                 "source": "codegen/nvgpu/kernels/demo_kernel.cu",
-                "thread_block": [128, 1, 1],
+                "thread_block": [16, 16, 1],
                 "shared_memory_bytes": 0,
                 "capabilities": ["cp.async", "mma.sync"],
+                "params": [
+                    {"name": "A", "kind": "buffer", "dtype": "f32", "role": "input", "shape": ["M", "K"]},
+                    {"name": "B", "kind": "buffer", "dtype": "f32", "role": "input", "shape": ["K", "N"]},
+                    {"name": "C", "kind": "buffer", "dtype": "f32", "role": "output", "shape": ["M", "N"]},
+                    {"name": "M", "kind": "scalar", "dtype": "i32", "role": "shape", "shape": []},
+                    {"name": "N", "kind": "scalar", "dtype": "i32", "role": "shape", "shape": []},
+                    {"name": "K", "kind": "scalar", "dtype": "i32", "role": "shape", "shape": []},
+                ],
+                "launch": {"kind": "grid_2d", "extents": ["M", "N"]},
+                "op": "matmul",
+                "attrs": {"dtype": "f32", "m": "M", "n": "N", "k": "K"},
             }
         ],
     }
@@ -78,13 +89,18 @@ def test_nvgpu_emit_prefers_cu_source_artifacts(tmp_path):
         "variant": "cuda",
         "hardware_profile": "nvidia:ampere:sm80",
         "codegen_mode": "cuda_source",
-        "cuda_runtime_contract": "cuda-runtime:stub",
+        "cuda_runtime_contract": "cuda-runtime:driver",
         "cuda_arches": ["sm80"],
         "derived_outputs": [
             "build/nvgpu/demo_kernel.ptx",
             "build/nvgpu/demo_kernel.cubin",
         ],
     }
+    assert "const int row = blockIdx.y * blockDim.y + threadIdx.y;" in kernel_source.read_text()
+    assert (
+        'def launch_demo_kernel(A, B, C, M, N, K, mode="sim", trace=None, runtime=None):'
+        in host_source.read_text()
+    )
 
     report = bind(package_dir).validate()
     assert report.ok is True

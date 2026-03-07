@@ -1,3 +1,5 @@
+import numpy as np
+
 from htp.backends.pto.emit import emit_package
 from htp.bindings import pto_runtime_adapter
 from htp.bindings.api import bind
@@ -10,7 +12,26 @@ def test_pto_build_returns_structured_result(tmp_path, monkeypatch):
         package_dir,
         program={
             "entry": "demo_kernel",
-            "ops": ["compute_tile"],
+            "kernel": {
+                "name": "demo_kernel",
+                "args": [
+                    {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                    {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                    {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
+                    {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
+                ],
+                "ops": [
+                    {
+                        "op": "elementwise_binary",
+                        "operator": "add",
+                        "lhs": "lhs",
+                        "rhs": "rhs",
+                        "out": "out",
+                        "shape": ["size"],
+                        "dtype": "f32",
+                    }
+                ],
+            },
         },
     )
 
@@ -51,7 +72,26 @@ def test_pto_run_executes_through_adapter(tmp_path, monkeypatch):
         package_dir,
         program={
             "entry": "demo_kernel",
-            "ops": ["compute_tile"],
+            "kernel": {
+                "name": "demo_kernel",
+                "args": [
+                    {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                    {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                    {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
+                    {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
+                ],
+                "ops": [
+                    {
+                        "op": "elementwise_binary",
+                        "operator": "add",
+                        "lhs": "lhs",
+                        "rhs": "rhs",
+                        "out": "out",
+                        "shape": ["size"],
+                        "dtype": "f32",
+                    }
+                ],
+            },
         },
     )
 
@@ -60,17 +100,25 @@ def test_pto_run_executes_through_adapter(tmp_path, monkeypatch):
         "run_package",
         lambda *args, **kwargs: (
             True,
-            {"adapter": "pto-runtime", "platform": "a2a3sim"},
+            {"adapter": "pto-runtime", "platform": "a2a3sim", "output_names": ["out"]},
             [],
         ),
     )
 
     session = bind(package_dir).load(mode="sim")
-    result = session.run("demo_kernel")
+    result = session.run(
+        "demo_kernel",
+        args=(
+            np.arange(16, dtype=np.float32),
+            np.arange(16, dtype=np.float32),
+            np.zeros(16, dtype=np.float32),
+            16,
+        ),
+    )
 
     assert result.ok is True
     assert result.mode == "sim"
     assert result.entry == "demo_kernel"
-    assert result.result == {"adapter": "pto-runtime", "platform": "a2a3sim"}
+    assert result.result == {"adapter": "pto-runtime", "platform": "a2a3sim", "output_names": ["out"]}
     assert result.diagnostics == []
     assert result.log_path is not None

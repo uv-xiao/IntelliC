@@ -102,6 +102,42 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
                 "symbol_name": "kernel_entry",
                 "source": "codegen/pto/kernels/aiv/demo_kernel.cpp",
                 "core_type": "aiv",
+                "params": [
+                    {
+                        "name": "lhs",
+                        "kind": "buffer",
+                        "dtype": "f32",
+                        "role": "input",
+                        "shape": ["size"],
+                    },
+                    {
+                        "name": "rhs",
+                        "kind": "buffer",
+                        "dtype": "f32",
+                        "role": "input",
+                        "shape": ["size"],
+                    },
+                    {
+                        "name": "out",
+                        "kind": "buffer",
+                        "dtype": "f32",
+                        "role": "output",
+                        "shape": ["size"],
+                    },
+                    {
+                        "name": "size",
+                        "kind": "scalar",
+                        "dtype": "i32",
+                        "role": "shape",
+                        "shape": [],
+                    },
+                ],
+                "op": "elementwise_binary",
+                "attrs": {
+                    "operator": "add",
+                    "shape": ["size"],
+                    "dtype": "f32",
+                },
             }
         ],
     }
@@ -130,11 +166,9 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
         'extern "C" int demo_kernel_orchestrate(Runtime* runtime, uint64_t* args, int arg_count)'
         in orchestration_source.read_text()
     )
-    assert "runtime->add_task(nullptr, 0, 0, CoreType::AIV);" in orchestration_source.read_text()
-    assert (
-        'extern "C" __aicore__ __attribute__((always_inline)) void kernel_entry(__gm__ int64_t* args)'
-        in kernel_source.read_text()
-    )
+    assert "runtime->add_task(kernel_args, 4, 0, CoreType::AIV);" in orchestration_source.read_text()
+    assert 'extern "C" __aicore__ void kernel_entry(int64_t* args)' in kernel_source.read_text()
+    assert "out[index] = lhs[index] + rhs[index];" in kernel_source.read_text()
 
 
 def test_pto_emit_preserves_existing_manifest_target_metadata(tmp_path):

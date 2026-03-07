@@ -4,12 +4,54 @@ import json
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from htp import bind, compile_program
 
 PYPT0_VECTOR_ADD_PROGRAM: dict[str, Any] = {
     "entry": "vector_add",
-    "ops": ["load_tile", "compute_tile", "store_tile"],
+    "kernel": {
+        "name": "vector_add",
+        "args": [
+            {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+            {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+            {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
+            {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
+        ],
+        "ops": [
+            {
+                "op": "elementwise_binary",
+                "operator": "add",
+                "lhs": "lhs",
+                "rhs": "rhs",
+                "out": "out",
+                "shape": ["size"],
+                "dtype": "f32",
+            }
+        ],
+    },
+    "workload": {
+        "entry": "vector_add",
+        "tasks": [
+            {
+                "task_id": "task0",
+                "kind": "kernel_call",
+                "kernel": "vector_add",
+                "args": ["lhs", "rhs", "out", "size"],
+            }
+        ],
+        "channels": [],
+        "dependencies": [],
+    },
 }
+
+
+def make_inputs(size: int = 128 * 128) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    lhs = np.linspace(0.0, 1.0, size, dtype=np.float32)
+    rhs = np.linspace(1.0, 2.0, size, dtype=np.float32)
+    out = np.zeros(size, dtype=np.float32)
+    expected = lhs + rhs
+    return lhs, rhs, out, expected
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
@@ -71,23 +113,18 @@ def build_package(output_dir: Path | str) -> dict[str, Any]:
 
 
 def run_package(output_dir: Path | str) -> dict[str, Any]:
-    """Attempt package execution through `pto-runtime`.
+    """Execute the PTO package through `pto-runtime` in `a2a3sim`."""
 
-    This step is environment-dependent because the local machine must
-    provide the PTO runtime checkout under `3rdparty/pto-runtime/` (or the
-    compatibility fallback `references/pto-runtime/`) and compatible host
-    compilation tools. In v1, the package execution path is a smoke run:
-    HTP emits the correct PTO ABI and launches a real `host_build_graph`
-    task through `pto-runtime`, but the binding still avoids rich tensor
-    marshaling.
-    """
-
-    result = bind(Path(output_dir)).load(mode="sim").run("vector_add")
+    lhs, rhs, out, expected = make_inputs()
+    result = bind(Path(output_dir)).load(mode="sim").run("vector_add", args=(lhs, rhs, out, lhs.size))
+    max_abs_error = float(np.max(np.abs(out - expected))) if result.ok else None
     return {
         "ok": result.ok,
         "entry": result.entry,
         "result": result.result,
         "diagnostics": list(result.diagnostics),
+        "max_abs_error": max_abs_error,
+        "checksum": float(out.sum()) if result.ok else None,
     }
 
 

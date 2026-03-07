@@ -50,6 +50,7 @@ def test_pto_example_runs_a2a3sim_end_to_end(tmp_path):
     assert summary["build"]["ok"] is True
     assert summary["run"] is not None
     assert summary["run"]["ok"] is True
+    assert summary["run"]["max_abs_error"] == 0.0
 
 
 @pytest.mark.skipif(
@@ -62,3 +63,4 @@ def test_nvgpu_example_runs_real_device_path(tmp_path):
     assert summary["device_build"]["ok"] is True
     assert summary["device_run"] is not None
     assert summary["device_run"]["ok"] is True
+    assert summary["device_run"]["max_abs_error"] == 0.0

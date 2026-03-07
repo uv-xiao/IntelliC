@@ -4,23 +4,54 @@ import json
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 import htp.runtime as runtime_api
 from htp import bind, compile_program
 
 ARKNIFE_GEMM_PROGRAM: dict[str, Any] = {
     "entry": "gemm_tile",
-    "ops": ["load", "mma", "store"],
+    "kernel": {
+        "name": "gemm_tile",
+        "args": [
+            {"name": "A", "kind": "buffer", "dtype": "f32", "shape": ["M", "K"], "role": "input"},
+            {"name": "B", "kind": "buffer", "dtype": "f32", "shape": ["K", "N"], "role": "input"},
+            {"name": "C", "kind": "buffer", "dtype": "f32", "shape": ["M", "N"], "role": "output"},
+            {"name": "M", "kind": "scalar", "dtype": "i32", "role": "shape"},
+            {"name": "N", "kind": "scalar", "dtype": "i32", "role": "shape"},
+            {"name": "K", "kind": "scalar", "dtype": "i32", "role": "shape"},
+        ],
+        "ops": [
+            {"op": "matmul", "lhs": "A", "rhs": "B", "out": "C", "m": "M", "n": "N", "k": "K", "dtype": "f32"}
+        ],
+    },
+    "workload": {
+        "entry": "gemm_tile",
+        "tasks": [
+            {
+                "task_id": "task0",
+                "kind": "kernel_call",
+                "kernel": "gemm_tile",
+                "args": ["A", "B", "C", "M", "N", "K"],
+            }
+        ],
+        "channels": [],
+        "dependencies": [],
+    },
 }
 
 
+def make_inputs(
+    m: int = 32, n: int = 32, k: int = 32
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int, int, int]:
+    rng = np.random.default_rng(0)
+    a = rng.standard_normal((m, k), dtype=np.float32)
+    b = rng.standard_normal((k, n), dtype=np.float32)
+    c = np.zeros((m, n), dtype=np.float32)
+    return a, b, c, m, n, k
+
+
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
-    """Compile an Arknife-inspired GEMM tile to the NV-GPU backend.
-
-    The example is intentionally aligned with Arknife's explicit hardware
-    thinking: a block-level tile kernel, an explicit Ampere profile, and a
-    source-first `.cu` package contract.
-    """
-
     package = compile_program(
         package_dir=Path(output_dir),
         target="nvgpu-ampere",
@@ -28,57 +59,42 @@ def compile_example(output_dir: Path | str) -> dict[str, Any]:
     )
     return {
         "package_dir": package.package_dir.as_posix(),
-        "target": {
-            "backend": package.target.backend,
-            "option": package.target.option,
-        },
+        "target": {"backend": package.target.backend, "option": package.target.option},
         "manifest_path": (package.package_dir / "manifest.json").as_posix(),
     }
 
 
 def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
-    """Replay the latest Python stage for the NV-GPU package."""
-
     package_dir = Path(output_dir)
     session = bind(package_dir).load(mode="sim")
     stage_id = session.manifest["stages"]["current"]
     result = session.replay(stage_id, trace="basic")
-    return {
-        "ok": result.ok,
-        "stage_id": stage_id,
-        "entry": result.entry,
-        "diagnostics": result.diagnostics,
-    }
+    return {"ok": result.ok, "stage_id": stage_id, "entry": result.entry, "diagnostics": result.diagnostics}
 
 
 def run_sim_package(output_dir: Path | str) -> dict[str, Any]:
-    """Run the package in `sim` using a registered replay kernel handler."""
-
-    # Register a deterministic handler on the shared replay runtime so the
-    # example can execute without CUDA or `nvcc`.
     runtime = runtime_api.default_runtime()
-    runtime.register_kernel(
-        "gemm_tile.kernel0",
-        lambda *, args, mode, artifacts, trace=None: {
-            "args": list(args),
-            "mode": mode,
-            "trace": trace,
-            "artifacts": dict(artifacts),
-        },
-    )
-    result = bind(Path(output_dir)).load(mode="sim").run("gemm_tile", trace="basic")
+
+    def _gemm_handler(*, args, mode, artifacts, trace=None):
+        del mode, artifacts, trace
+        a, b, c, m, n, k = args
+        c[:, :] = np.matmul(a.reshape(m, k), b.reshape(k, n))
+        return {"shape": [m, n], "checksum": float(c.sum())}
+
+    runtime.register_kernel("gemm_tile.kernel0", _gemm_handler)
+    a, b, c, m, n, k = make_inputs()
+    result = bind(Path(output_dir)).load(mode="sim").run("gemm_tile", args=(a, b, c, m, n, k), trace="basic")
+    reference = a @ b
     return {
         "ok": result.ok,
         "entry": result.entry,
         "result": result.result,
         "diagnostics": list(result.diagnostics),
-        "runtime_hint": "register the same handler on htp.runtime.default_runtime() in an interactive session",
+        "max_abs_error": float(np.max(np.abs(c - reference))),
     }
 
 
 def build_device_package(output_dir: Path | str) -> dict[str, Any]:
-    """Materialize `.ptx`/`.cubin` if `nvcc` is available."""
-
     result = bind(Path(output_dir)).build(mode="device")
     return {
         "ok": result.ok,
@@ -89,24 +105,22 @@ def build_device_package(output_dir: Path | str) -> dict[str, Any]:
 
 
 def run_device_package(output_dir: Path | str) -> dict[str, Any]:
-    """Attempt the real device path through the CUDA driver adapter."""
-
-    result = bind(Path(output_dir)).load(mode="device").run("gemm_tile")
+    a, b, c, m, n, k = make_inputs()
+    result = bind(Path(output_dir)).load(mode="device").run("gemm_tile", args=(a, b, c, m, n, k))
+    reference = a @ b
+    max_abs_error = float(np.max(np.abs(c - reference)))
     return {
-        "ok": result.ok,
+        "ok": result.ok and max_abs_error < 1e-4,
         "entry": result.entry,
         "result": result.result,
         "diagnostics": list(result.diagnostics),
+        "max_abs_error": max_abs_error,
     }
 
 
 def run_demo(output_dir: Path | str) -> dict[str, Any]:
-    """Run the full NV-GPU example workflow and return a JSON-friendly summary."""
-
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    # The device path is optional; the example still proves the full contract
-    # through compile + replay + sim package execution on any developer machine.
     compile_summary = compile_example(output_path)
     replay_summary = replay_latest_stage(output_path)
     sim_summary = run_sim_package(output_path)
