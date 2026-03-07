@@ -20,7 +20,11 @@ class PTOBinding(ManifestBinding):
     def validate(self) -> ValidationResult:
         base_report = super().validate()
         missing_files = list(base_report.missing_files)
-        diagnostics = list(base_report.diagnostics)
+        diagnostics = [
+            diagnostic
+            for diagnostic in base_report.diagnostics
+            if diagnostic.get("code") != "HTP.BINDINGS.MISSING_BACKEND"
+        ]
         required_paths = self._required_paths()
         diagnostics.extend(self._validate_required_metadata(required_paths=required_paths))
 
