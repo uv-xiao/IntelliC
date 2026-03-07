@@ -57,7 +57,7 @@ class ReplayResult:
 
 
 @dataclass(frozen=True)
-class BindingSession:
+class LoadResult:
     package_dir: Path
     manifest: dict[str, Any]
     backend: str
@@ -222,9 +222,9 @@ class ManifestBinding:
             diagnostics=validation.diagnostics,
         )
 
-    def load(self, *, mode: str = "sim") -> BindingSession:
+    def load(self, *, mode: str = "sim") -> LoadResult:
         validation = self.validate()
-        return BindingSession(
+        return LoadResult(
             package_dir=self.package_dir,
             manifest=self.manifest,
             backend=self.backend,
@@ -256,9 +256,13 @@ def binding_from_manifest(package_dir: Path | str, manifest: dict[str, Any]) -> 
     )
 
 
+BindingSession = LoadResult
+
+
 __all__ = [
     "BindingSession",
     "BuildResult",
+    "LoadResult",
     "ManifestBinding",
     "ReplayResult",
     "RunResult",
