@@ -1,0 +1,9 @@
+{
+  "stage_id": "s01",
+  "pass": "pkg::emit_package@1",
+  "runnable_py": "preserves",
+  "modes": [
+    "sim"
+  ],
+  "backend": "pto"
+}

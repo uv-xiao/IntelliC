@@ -1,0 +1,18 @@
+{
+  "schema": "htp.pto.codegen.v1",
+  "backend": "pto",
+  "variant": "a2a3sim",
+  "entrypoint": "demo_kernel",
+  "orchestration": {
+    "source": "codegen/pto/orchestration/demo_kernel_orchestration.cpp",
+    "function_name": "demo_kernel_orchestrate"
+  },
+  "kernels": [
+    {
+      "kernel_id": "demo_kernel.kernel0",
+      "func_id": "demo_kernel_0",
+      "source": "codegen/pto/kernels/aiv/demo_kernel.cpp",
+      "core_type": "aiv"
+    }
+  ]
+}

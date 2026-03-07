@@ -1,0 +1,10 @@
+{
+  "stubs": [
+    {
+      "code": "HTP.REPLAY.STUB_EXTERNAL_TOOLCHAIN_ONLY",
+      "artifact_ref": "codegen/nvgpu/nvgpu_codegen.json",
+      "detail": "The emitted CUDA kernel has no sim lowering in the golden fixture."
+    }
+  ],
+  "schema": "htp.replay.stubs.v1"
+}

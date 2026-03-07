@@ -1,0 +1,89 @@
+{
+  "schema": "htp.manifest.v1",
+  "stages": {
+    "current": "s01",
+    "graph": [
+      {
+        "id": "s01",
+        "pass": "pkg::emit_package@1",
+        "dir": "ir/stages/s01",
+        "runnable_py": {
+          "status": "preserves",
+          "modes": [
+            "sim"
+          ],
+          "program_py": "ir/stages/s01/program.py",
+          "stubs": null
+        },
+        "analysis_index": "ir/stages/s01/analysis/index.json",
+        "ids": {
+          "entities": "ir/stages/s01/ids/entities.json",
+          "bindings": "ir/stages/s01/ids/bindings.json"
+        },
+        "maps": {
+          "entity_map": null,
+          "binding_map": null
+        },
+        "islands": [],
+        "digests": {
+          "ast_hash": null,
+          "types_hash": null,
+          "effects_hash": null,
+          "analysis_hash": null
+        },
+        "summary": "ir/stages/s01/summary.json"
+      },
+      {
+        "id": "s02",
+        "pass": "pkg::backend_stub@1",
+        "dir": "ir/stages/s02",
+        "runnable_py": {
+          "status": "stubbed",
+          "modes": [
+            "sim"
+          ],
+          "program_py": "ir/stages/s02/program.py",
+          "stubs": "ir/stages/s02/replay/stubs.json"
+        },
+        "analysis_index": "ir/stages/s02/analysis/index.json",
+        "ids": {
+          "entities": "ir/stages/s02/ids/entities.json",
+          "bindings": "ir/stages/s02/ids/bindings.json"
+        },
+        "maps": {
+          "entity_map": null,
+          "binding_map": null
+        },
+        "islands": [],
+        "digests": {
+          "ast_hash": null,
+          "types_hash": null,
+          "effects_hash": null,
+          "analysis_hash": null
+        },
+        "summary": "ir/stages/s02/summary.json"
+      }
+    ]
+  },
+  "target": {
+    "backend": "nvgpu",
+    "variant": "cuda",
+    "hardware_profile": "nvidia:ampere:sm80"
+  },
+  "outputs": {
+    "nvgpu_codegen_index": "codegen/nvgpu/nvgpu_codegen.json",
+    "toolchain_manifest": "build/toolchain.json"
+  },
+  "extensions": {
+    "nvgpu": {
+      "kernel_project_dir": "codegen/nvgpu",
+      "launch_entry": {
+        "source": "host/demo_kernel_launch.py",
+        "function_name": "launch_demo_kernel"
+      },
+      "cuda_runtime_contract": "cuda-runtime:stub",
+      "codegen_mode": "cuda_source",
+      "toolchain_manifest": "build/toolchain.json"
+    }
+  }
+}
