@@ -8,6 +8,8 @@ def test_public_packages_import():
     import htp.passes
     import htp.pipeline
     import htp.runtime
+    import htp.solver
+    import htp.tools
 
     assert htp.passes.__name__ == "htp.passes"
     assert htp.pipeline.__name__ == "htp.pipeline"
@@ -16,6 +18,8 @@ def test_public_packages_import():
     assert htp.bindings.__name__ == "htp.bindings"
     assert htp.backends.__name__ == "htp.backends"
     assert htp.compiler.__name__ == "htp.compiler"
+    assert htp.solver.__name__ == "htp.solver"
+    assert htp.tools.__name__ == "htp.tools"
 
 
 def test_schema_constants():

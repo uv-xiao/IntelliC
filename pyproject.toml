@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
 
+[project.scripts]
+htp = "htp.__main__:main"
+
 [project.optional-dependencies]
 dev = [
     "pre-commit>=3.7.0",
@@ -18,10 +21,11 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["htp"]
+packages = ["htp", "htp_ext", "htp_ext.aie", "htp_ext.mlir_cse"]
 
 [tool.setuptools.package-dir]
 htp = "htp"
+htp_ext = "htp_ext"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
