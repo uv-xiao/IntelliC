@@ -24,6 +24,7 @@ class PTOOrchestrationSpec:
 class PTOCodegenPlan:
     backend: str
     variant: str
+    hardware_profile: str
     entrypoint: str
     kernels: tuple[PTOKernelSpec, ...]
     orchestration: PTOOrchestrationSpec
@@ -49,6 +50,7 @@ def lower_program(program: Mapping[str, Any], *, variant: str | None = None) -> 
     return PTOCodegenPlan(
         backend=arch.backend,
         variant=arch.variant,
+        hardware_profile=arch.hardware_profile,
         entrypoint=entrypoint,
         kernels=(kernel,),
         orchestration=orchestration,

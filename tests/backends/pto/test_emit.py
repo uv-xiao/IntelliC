@@ -33,7 +33,11 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
     kernel_source = package_dir / "codegen" / "pto" / "kernels" / "aiv" / "demo_kernel.cpp"
 
     assert manifest == json.loads((package_dir / "manifest.json").read_text())
-    assert manifest["target"] == {"backend": "pto", "variant": "a2a3sim"}
+    assert manifest["target"] == {
+        "backend": "pto",
+        "variant": "a2a3sim",
+        "hardware_profile": "ascend:a2a3sim",
+    }
     assert manifest["outputs"] == {
         "kernel_config": "codegen/pto/kernel_config.py",
         "pto_codegen_index": "codegen/pto/pto_codegen.json",
@@ -91,4 +95,37 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
                 "core_type": "aiv",
             }
         ],
+    }
+
+
+def test_pto_emit_preserves_existing_manifest_target_metadata(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    (package_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "target": {
+                    "existing_target": "keep-me",
+                    "hardware_profile": "stale-profile",
+                }
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+    manifest = emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+        variant="a2a3",
+    )
+
+    assert manifest["target"] == {
+        "existing_target": "keep-me",
+        "backend": "pto",
+        "variant": "a2a3",
+        "hardware_profile": "ascend:a2a3",
     }

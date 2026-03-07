@@ -27,10 +27,15 @@ def emit_package(
     manifest = _load_manifest(package_path)
     manifest["schema"] = MANIFEST_SCHEMA_ID
     manifest.setdefault("stages", {"current": "s00", "graph": []})
-    manifest["target"] = {
-        "backend": plan.backend,
-        "variant": plan.variant,
-    }
+    target = dict(manifest.get("target", {})) if isinstance(manifest.get("target"), Mapping) else {}
+    target.update(
+        {
+            "backend": plan.backend,
+            "variant": plan.variant,
+            "hardware_profile": plan.hardware_profile,
+        }
+    )
+    manifest["target"] = target
 
     outputs = dict(manifest.get("outputs", {}))
     outputs.update(

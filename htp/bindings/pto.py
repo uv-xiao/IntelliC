@@ -171,6 +171,37 @@ class PTOBinding(ManifestBinding):
                 }
             )
 
+        manifest_pto_extension = self._pto_extension()
+        if manifest_pto_extension is not None:
+            manifest_runtime_config = manifest_pto_extension.get("runtime_config")
+            expected_manifest_runtime_config = {
+                key: value for key, value in dict(runtime_config).items() if key != "platform"
+            }
+            if manifest_runtime_config is not None and (
+                not isinstance(manifest_runtime_config, Mapping)
+                or dict(manifest_runtime_config) != expected_manifest_runtime_config
+            ):
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                        "detail": "manifest.json extensions.pto.runtime_config does not match kernel_config.py RUNTIME_CONFIG.",
+                        "manifest_field": "extensions.pto.runtime_config",
+                    }
+                )
+
+            manifest_orchestration_entry = manifest_pto_extension.get("orchestration_entry")
+            if manifest_orchestration_entry is not None and (
+                not isinstance(manifest_orchestration_entry, Mapping)
+                or dict(manifest_orchestration_entry) != dict(orchestration)
+            ):
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                        "detail": "manifest.json extensions.pto.orchestration_entry does not match kernel_config.py ORCHESTRATION.",
+                        "manifest_field": "extensions.pto.orchestration_entry",
+                    }
+                )
+
         for kernel in kernels:
             source = kernel.get("source")
             if isinstance(source, str) and not (self._project_dir() / source).exists():
@@ -216,14 +247,21 @@ class PTOBinding(ManifestBinding):
 
         return (self.package_dir / PTO_PROJECT_DIR).exists()
 
-    def _project_dir(self) -> Path:
+    def _pto_extension(self) -> Mapping[str, Any] | None:
         extensions = self.manifest.get("extensions")
-        if isinstance(extensions, Mapping):
-            pto_extension = extensions.get("pto")
-            if isinstance(pto_extension, Mapping):
-                project_dir = pto_extension.get("kernel_project_dir")
-                if isinstance(project_dir, str):
-                    return self.package_dir / project_dir
+        if not isinstance(extensions, Mapping):
+            return None
+        pto_extension = extensions.get("pto")
+        if not isinstance(pto_extension, Mapping):
+            return None
+        return pto_extension
+
+    def _project_dir(self) -> Path:
+        pto_extension = self._pto_extension()
+        if pto_extension is not None:
+            project_dir = pto_extension.get("kernel_project_dir")
+            if isinstance(project_dir, str):
+                return self.package_dir / project_dir
         return self.package_dir / PTO_PROJECT_DIR
 
     def _project_relative(self, path: str) -> str:
