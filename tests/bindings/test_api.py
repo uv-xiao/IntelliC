@@ -54,10 +54,23 @@ def test_bind_returns_binding_for_manifest_backend(tmp_path):
         assert binding.variant == "a2a3sim"
 
         report = binding.validate()
-        assert report.ok is True
+        assert report.ok is False
         assert report.backend == "pto"
         assert report.variant == "a2a3sim"
-        assert report.missing_files == []
+        assert report.missing_files == [
+            "codegen/pto/kernel_config.py",
+            "codegen/pto/pto_codegen.json",
+        ]
+        assert report.diagnostics == [
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+                "detail": "Missing required PTO artifact path: codegen/pto/kernel_config.py",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+                "detail": "Missing required PTO artifact path: codegen/pto/pto_codegen.json",
+            },
+        ]
 
 
 def test_load_returns_normalized_load_result_shape(tmp_path):
@@ -71,8 +84,17 @@ def test_load_returns_normalized_load_result_shape(tmp_path):
         session = bind_api(package_dir).load(mode="sim")
 
         assert session.__class__.__name__ == "LoadResult"
-        assert session.ok is True
+        assert session.ok is False
         assert session.mode == "sim"
         assert session.backend == "pto"
         assert session.variant == "a2a3sim"
-        assert session.diagnostics == []
+        assert session.diagnostics == [
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+                "detail": "Missing required PTO artifact path: codegen/pto/kernel_config.py",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+                "detail": "Missing required PTO artifact path: codegen/pto/pto_codegen.json",
+            },
+        ]

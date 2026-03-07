@@ -270,6 +270,9 @@ class PTOBinding(ManifestBinding):
         )
 
     def _should_enforce_pto_contract(self) -> bool:
+        if self.backend == "pto":
+            return True
+
         outputs = self.manifest.get("outputs")
         if isinstance(outputs, Mapping) and (
             isinstance(outputs.get("kernel_config"), str) or isinstance(outputs.get("pto_codegen_index"), str)
