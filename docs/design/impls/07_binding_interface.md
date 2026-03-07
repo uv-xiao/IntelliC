@@ -55,6 +55,11 @@ Notes:
 - `mode="sim"` uses backend simulators where possible (e.g. `pto-runtime` `a2a3sim`).
 - `mode="device"` uses device runtimes/toolchains and may require environment setup.
 - stages always provide `program.py` and are runnable in `mode="sim"` (possibly stubbed with explicit diagnostics).
+- for backend packages, `run()` is binding-owned:
+  - NV-GPU runs through the emitted Python host launch entry (`extensions.nvgpu.launch_entry`) and then through
+    `htp.runtime.call_kernel(...)`
+  - PTO does **not** claim native Python execution of the external orchestration artifact; `run()` must return a
+    structured external-toolchain diagnostic and direct users to `replay(stage_id)` for staged Python execution
 
 ### 3.1 Return records
 
@@ -86,6 +91,12 @@ Notes:
 - `stage_id` (for replay)
 
 Bindings may add backend-specific fields under a namespaced extension object, but the fields above must always exist.
+
+For v1 specifically:
+
+- NV-GPU `build()` reports the emitted `.cu` source, launch Python, codegen index, toolchain manifest, and any declared
+  derived outputs.
+- PTO `build()` reports the emitted contract files (`kernel_config.py`, `pto_codegen.json`, `build/toolchain.json`).
 
 ---
 

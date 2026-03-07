@@ -14,11 +14,59 @@ from htp.backends.pto.emit import (
     PTO_TOOLCHAIN_SCHEMA_ID,
 )
 
-from .base import BuildResult, LoadResult, ManifestBinding, ValidationResult
+from .base import BuildResult, LoadResult, ManifestBinding, RunResult, ValidationResult
 
 DEFAULT_KERNEL_CONFIG = (PTO_PROJECT_DIR / "kernel_config.py").as_posix()
 DEFAULT_CODEGEN_INDEX = (PTO_PROJECT_DIR / "pto_codegen.json").as_posix()
 DEFAULT_TOOLCHAIN_MANIFEST = PTO_TOOLCHAIN_PATH.as_posix()
+
+
+class PTOLoadResult(LoadResult):
+    def run(
+        self,
+        entry: str,
+        *,
+        args: tuple[Any, ...] = (),
+        kwargs: dict[str, Any] | None = None,
+        trace: str = "off",
+    ) -> RunResult:
+        if not _has_pto_contract(self.package_dir, self.manifest):
+            return super().run(entry, args=args, kwargs=kwargs, trace=trace)
+
+        del args
+        del kwargs
+
+        diagnostics = list(self.diagnostics)
+        if not diagnostics:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_RUN_REQUIRES_EXTERNAL_TOOLCHAIN",
+                    "detail": (
+                        "PTO package execution is owned by the external PTO toolchain; "
+                        "use replay(stage_id) for staged Python execution."
+                    ),
+                    "entry": entry,
+                    "mode": self.mode,
+                    "toolchain_manifest": DEFAULT_TOOLCHAIN_MANIFEST,
+                }
+            )
+        stage_id = self._resolve_current_stage_id()
+        log_path = self._write_operation_log(
+            kind="run",
+            mode=self.mode,
+            stage_id=stage_id,
+            entry=entry,
+            trace=trace,
+            ok=False,
+            diagnostics=diagnostics,
+        )
+        return RunResult(
+            ok=False,
+            mode=self.mode,
+            entry=entry,
+            diagnostics=diagnostics,
+            log_path=log_path,
+        )
 
 
 class PTOBinding(ManifestBinding):
@@ -105,7 +153,7 @@ class PTOBinding(ManifestBinding):
     def load(self, *, mode: str = "sim") -> LoadResult:
         validation = self.validate()
         diagnostics = [*validation.diagnostics, *self._mode_diagnostics(mode)]
-        return LoadResult(
+        return PTOLoadResult(
             package_dir=self.package_dir,
             manifest=self.manifest,
             backend=self.backend,
@@ -809,6 +857,22 @@ def _load_python_module(path: Path, *, module_name: str) -> Any:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _has_pto_contract(package_dir: Path, manifest: Mapping[str, Any]) -> bool:
+    outputs = manifest.get("outputs")
+    if isinstance(outputs, Mapping) and (
+        isinstance(outputs.get("kernel_config"), str)
+        or isinstance(outputs.get("pto_codegen_index"), str)
+        or isinstance(outputs.get("toolchain_manifest"), str)
+    ):
+        return True
+
+    extensions = manifest.get("extensions")
+    if isinstance(extensions, Mapping) and isinstance(extensions.get("pto"), Mapping):
+        return True
+
+    return (package_dir / PTO_PROJECT_DIR).exists()
 
 
 __all__ = ["PTOBinding"]

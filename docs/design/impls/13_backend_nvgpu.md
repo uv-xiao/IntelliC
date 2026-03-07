@@ -115,8 +115,9 @@ Examples:
 The NV-GPU binding must:
 
 1) validate `codegen/nvgpu/` against the artifact contract,
-2) build kernels and launch glue for `mode="device"`,
-3) support `mode="sim"` via replay/reference semantics rather than requiring a GPU,
+2) keep `.cu` authoritative and report derived outputs separately under `build/`,
+3) execute `run()` through the emitted Python host launch glue in both `sim` and `device` modes,
+4) support `mode="sim"` via replay/reference semantics rather than requiring a GPU,
 4) surface structured traces, logs, and stable diagnostics using the common binding API.
 
 The common replay rule still holds:

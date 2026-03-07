@@ -7,6 +7,7 @@ from typing import Any
 from htp.artifacts.stages import RunnablePySpec
 from htp.passes.contracts import PassContract
 from htp.passes.manager import PassResult
+from htp.passes.program_model import scheduled_ops_from_plan
 from htp.passes.replay_program import render_program_state_module
 
 PASS_ID = "htp::apply_schedule@1"
@@ -29,10 +30,14 @@ def run(
 
     next_program = deepcopy(dict(program))
     schedule_plan = dict(next_program["analysis"]["schedule"])
+    scheduled_ops = scheduled_ops_from_plan(schedule_plan)
     next_program["schedule"] = {
         "applied": True,
         "ticks": list(schedule_plan["ticks"]),
+        "pipeline_depth": schedule_plan["pipeline_depth"],
+        "ordered_ops": [op["op_id"] for op in scheduled_ops],
     }
+    next_program["scheduled_ops"] = scheduled_ops
 
     return next_program, PassResult(
         runnable_py=RunnablePySpec(
@@ -40,7 +45,7 @@ def run(
             modes=("sim",),
             program_text=render_program_state_module(next_program),
         ),
-        digests={"ast_hash": "demo-scheduled-ast-v1"},
+        digests={"ast_hash": "demo-scheduled-ast-v2"},
         time_ms=0.2,
     )
 

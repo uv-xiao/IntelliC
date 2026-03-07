@@ -7,6 +7,7 @@ from typing import Any
 from htp.artifacts.stages import RunnablePySpec
 from htp.passes.contracts import PassContract
 from htp.passes.manager import PassResult
+from htp.passes.program_model import build_type_layout_effects, normalize_target
 from htp.passes.replay_program import render_program_state_module
 
 PASS_ID = "htp::typecheck_layout_effects@1"
@@ -31,18 +32,15 @@ def run(
     del stage_before
 
     next_program = deepcopy(dict(program))
-    next_program["types"] = {
-        "tile": "f32[16x16]",
-    }
-    next_program["layout"] = {
-        "distribution": "block(1,1)",
-        "memory": "shared",
-        "hardware": "demo.device",
-    }
-    next_program["effects"] = {
-        "barriers": ["tile-ready"],
-        "collectives": [],
-    }
+    canonical_ast = next_program.get("canonical_ast", {})
+    canonical_ops = canonical_ast.get("ops", ())
+    types, layout, effects = build_type_layout_effects(
+        canonical_ops,
+        target=normalize_target(next_program),
+    )
+    next_program["types"] = types
+    next_program["layout"] = layout
+    next_program["effects"] = effects
 
     return next_program, PassResult(
         runnable_py=RunnablePySpec(
@@ -51,8 +49,8 @@ def run(
             program_text=render_program_state_module(next_program),
         ),
         digests={
-            "types_hash": "demo-types-v1",
-            "effects_hash": "demo-effects-v1",
+            "types_hash": "demo-types-v2",
+            "effects_hash": "demo-effects-v2",
         },
         time_ms=0.3,
     )

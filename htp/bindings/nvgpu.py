@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 from collections.abc import Mapping
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from htp.backends.nvgpu.arch import arch_for
@@ -12,11 +13,158 @@ from htp.backends.nvgpu.emit import (
     NVGPU_TOOLCHAIN_PATH,
     NVGPU_TOOLCHAIN_SCHEMA_ID,
 )
+from htp.runtime.errors import ReplayDiagnosticError
 
-from .base import ManifestBinding, ValidationResult
+from .base import BuildResult, LoadResult, ManifestBinding, RunResult, ValidationResult
 
 DEFAULT_CODEGEN_INDEX = (NVGPU_PROJECT_DIR / "nvgpu_codegen.json").as_posix()
 DEFAULT_TOOLCHAIN_MANIFEST = NVGPU_TOOLCHAIN_PATH.as_posix()
+
+
+class NVGPULoadResult(LoadResult):
+    def run(
+        self,
+        entry: str,
+        *,
+        args: tuple[Any, ...] = (),
+        kwargs: dict[str, Any] | None = None,
+        trace: str = "off",
+    ) -> RunResult:
+        stage_id = self._resolve_current_stage_id()
+        diagnostics = list(self.diagnostics)
+        launch_entry = _resolve_launch_entry(self.manifest)
+        if launch_entry is None:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.NVGPU_MISSING_LAUNCH_ENTRY",
+                    "detail": "manifest.json extensions.nvgpu.launch_entry is required to run NV-GPU packages.",
+                    "manifest_field": "extensions.nvgpu.launch_entry",
+                }
+            )
+            log_path = self._write_operation_log(
+                kind="run",
+                mode=self.mode,
+                stage_id=stage_id,
+                entry=entry,
+                trace=trace,
+                ok=False,
+                diagnostics=diagnostics,
+            )
+            return RunResult(
+                ok=False,
+                mode=self.mode,
+                entry=entry,
+                diagnostics=diagnostics,
+                log_path=log_path,
+            )
+
+        expected_entry = _entrypoint_name(self.package_dir, self.manifest)
+        function_name = launch_entry["function_name"]
+        if entry not in {function_name, expected_entry}:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
+                    "detail": f"Entrypoint {entry!r} is not defined for the NV-GPU package.",
+                    "entry": entry,
+                    "available_entries": [
+                        name for name in (expected_entry, function_name) if name is not None
+                    ],
+                }
+            )
+            log_path = self._write_operation_log(
+                kind="run",
+                mode=self.mode,
+                stage_id=stage_id,
+                entry=entry,
+                trace=trace,
+                ok=False,
+                diagnostics=diagnostics,
+            )
+            return RunResult(
+                ok=False,
+                mode=self.mode,
+                entry=entry,
+                diagnostics=diagnostics,
+                log_path=log_path,
+            )
+
+        launch_path = self.package_dir / launch_entry["source"]
+        try:
+            module = _load_python_module(launch_path, module_name=f"htp_nvgpu_launch_{stage_id}")
+        except Exception as exc:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.NVGPU_RUN_LOAD_ERROR",
+                    "detail": str(exc),
+                    "entry": entry,
+                    "launch_source": launch_entry["source"],
+                    "exception_type": exc.__class__.__name__,
+                }
+            )
+            log_path = self._write_operation_log(
+                kind="run",
+                mode=self.mode,
+                stage_id=stage_id,
+                entry=entry,
+                trace=trace,
+                ok=False,
+                diagnostics=diagnostics,
+            )
+            return RunResult(
+                ok=False,
+                mode=self.mode,
+                entry=entry,
+                diagnostics=diagnostics,
+                log_path=log_path,
+            )
+
+        try:
+            result = getattr(module, function_name)(
+                *args,
+                mode=self.mode,
+                trace=trace,
+                **({} if kwargs is None else kwargs),
+            )
+        except ReplayDiagnosticError as exc:
+            diagnostic = dict(exc.payload)
+            diagnostic["code"] = exc.code
+            if exc.fix_hints:
+                diagnostic["fix_hints"] = list(exc.fix_hints)
+            diagnostics.append(diagnostic)
+            ok = False
+            result = None
+        except Exception as exc:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.NVGPU_RUN_EXECUTION_ERROR",
+                    "detail": str(exc),
+                    "entry": function_name,
+                    "launch_source": launch_entry["source"],
+                    "exception_type": exc.__class__.__name__,
+                }
+            )
+            ok = False
+            result = None
+        else:
+            ok = not diagnostics
+
+        log_path = self._write_operation_log(
+            kind="run",
+            mode=self.mode,
+            stage_id=stage_id,
+            entry=function_name,
+            trace=trace,
+            ok=ok,
+            diagnostics=diagnostics,
+        )
+        return RunResult(
+            ok=ok,
+            mode=self.mode,
+            entry=function_name,
+            result=result,
+            diagnostics=diagnostics,
+            log_path=log_path,
+        )
 
 
 class NVGPUBinding(ManifestBinding):
@@ -57,6 +205,64 @@ class NVGPUBinding(ManifestBinding):
             variant=self.variant,
             diagnostics=diagnostics,
             missing_files=missing_files,
+        )
+
+    def build(
+        self,
+        *,
+        mode: str = "sim",
+        force: bool = False,
+        cache_dir: Path | None = None,
+    ) -> BuildResult:
+        del force
+        del cache_dir
+
+        validation = self.validate()
+        diagnostics = [*validation.diagnostics, *self._mode_diagnostics(mode)]
+        built_outputs: list[str] = []
+        if validation.ok:
+            codegen_index_path, toolchain_manifest_path = self._required_paths()
+            built_outputs.extend(
+                [
+                    codegen_index_path,
+                    toolchain_manifest_path,
+                ]
+            )
+            launch_entry = _resolve_launch_entry(self.manifest)
+            if launch_entry is not None:
+                built_outputs.append(launch_entry["source"])
+            built_outputs.extend(_kernel_sources(self.package_dir / codegen_index_path))
+            built_outputs.extend(_derived_outputs(self.package_dir / toolchain_manifest_path))
+        session = self.load(mode=mode)
+        log_path = session._write_log(
+            kind="build",
+            stem=f"build_{self.backend}_{mode}",
+            lines=(
+                f"backend={self.backend}",
+                f"mode={mode}",
+                f"validated={validation.ok}",
+                f"built_outputs={tuple(built_outputs)!r}",
+            ),
+        )
+        return BuildResult(
+            ok=not diagnostics,
+            mode=mode,
+            built_outputs=built_outputs,
+            log_paths=[log_path],
+            diagnostics=diagnostics,
+        )
+
+    def load(self, *, mode: str = "sim") -> LoadResult:
+        validation = self.validate()
+        diagnostics = [*validation.diagnostics, *self._mode_diagnostics(mode)]
+        return NVGPULoadResult(
+            package_dir=self.package_dir,
+            manifest=self.manifest,
+            backend=self.backend,
+            variant=self.variant,
+            mode=mode,
+            diagnostics=diagnostics,
+            ok=not diagnostics,
         )
 
     def _required_paths(self) -> tuple[str, str]:
@@ -347,6 +553,18 @@ class NVGPUBinding(ManifestBinding):
             return True
         return self._nvgpu_extension() is not None or (self.package_dir / NVGPU_PROJECT_DIR).exists()
 
+    def _mode_diagnostics(self, mode: str) -> list[dict[str, Any]]:
+        if mode in {"sim", "device"}:
+            return []
+        return [
+            {
+                "code": "HTP.BINDINGS.INVALID_MODE",
+                "detail": f"Unsupported NV-GPU binding mode: {mode!r}.",
+                "mode": mode,
+                "supported_modes": ["sim", "device"],
+            }
+        ]
+
     @staticmethod
     def _missing_metadata_diagnostic(field: str) -> dict[str, Any]:
         return {
@@ -357,3 +575,72 @@ class NVGPUBinding(ManifestBinding):
 
 
 __all__ = ["NVGPUBinding"]
+
+
+def _resolve_launch_entry(manifest: Mapping[str, Any]) -> dict[str, str] | None:
+    extensions = manifest.get("extensions")
+    if not isinstance(extensions, Mapping):
+        return None
+    nvgpu = extensions.get("nvgpu")
+    if not isinstance(nvgpu, Mapping):
+        return None
+    launch_entry = nvgpu.get("launch_entry")
+    if not isinstance(launch_entry, Mapping):
+        return None
+    source = launch_entry.get("source")
+    function_name = launch_entry.get("function_name")
+    if not isinstance(source, str) or not isinstance(function_name, str):
+        return None
+    return {"source": str(NVGPU_PROJECT_DIR / source), "function_name": function_name}
+
+
+def _entrypoint_name(package_dir: Path, manifest: Mapping[str, Any]) -> str | None:
+    outputs = manifest.get("outputs")
+    if not isinstance(outputs, Mapping):
+        return None
+    codegen_index_path = outputs.get("nvgpu_codegen_index")
+    if not isinstance(codegen_index_path, str):
+        return None
+    try:
+        codegen_index = json.loads((package_dir / codegen_index_path).read_text())
+    except Exception:
+        return None
+    entrypoint = codegen_index.get("entrypoint")
+    if not isinstance(entrypoint, str):
+        return None
+    return entrypoint
+
+
+def _kernel_sources(codegen_index_path: Path) -> list[str]:
+    try:
+        codegen_index = json.loads(codegen_index_path.read_text())
+    except Exception:
+        return []
+    kernels = codegen_index.get("kernels")
+    if not isinstance(kernels, list):
+        return []
+    return [
+        str(kernel["source"])
+        for kernel in kernels
+        if isinstance(kernel, Mapping) and isinstance(kernel.get("source"), str)
+    ]
+
+
+def _derived_outputs(toolchain_manifest_path: Path) -> list[str]:
+    try:
+        toolchain_manifest = json.loads(toolchain_manifest_path.read_text())
+    except Exception:
+        return []
+    derived_outputs = toolchain_manifest.get("derived_outputs")
+    if not isinstance(derived_outputs, list):
+        return []
+    return [str(path) for path in derived_outputs if isinstance(path, str)]
+
+
+def _load_python_module(module_path: Path, *, module_name: str) -> Any:
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load Python module from {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module

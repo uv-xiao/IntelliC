@@ -106,11 +106,12 @@ The PTO binding must:
 
 1) validate that `codegen/pto/kernel_config.py` exists and is internally consistent,
 2) in `mode="sim"`:
-   - build using `pto-runtime` platform `a2a3sim`,
-   - run via `pto-runtime`’s simulation runner,
+   - produce structured lifecycle records for validate/build/load/replay,
+   - keep replay available through the staged Python artifacts,
+   - report `run()` as an explicit external-toolchain boundary unless a real PTO runner is installed,
 3) in `mode="device"`:
    - build using platform `a2a3` (CANN toolchain required),
-   - load generated binaries and execute via `pto-runtime` host runtime.
+   - load generated binaries and execute via `pto-runtime` host runtime when available.
 
 The binding should write build/run logs into:
 

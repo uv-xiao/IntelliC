@@ -113,7 +113,7 @@ def test_load_returns_normalized_load_result_shape(tmp_path):
 
         session = bind_api(package_dir).load(mode="sim")
 
-        assert session.__class__.__name__ == "LoadResult"
+        assert session.__class__.__name__ in {"LoadResult", "PTOLoadResult"}
         assert session.ok is False
         assert session.mode == "sim"
         assert session.backend == "pto"

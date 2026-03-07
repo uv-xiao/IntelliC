@@ -7,6 +7,7 @@ from typing import Any
 from htp.artifacts.stages import RunnablePySpec
 from htp.passes.contracts import PassContract
 from htp.passes.manager import PassResult
+from htp.passes.program_model import canonicalize_ops, normalize_target
 from htp.passes.replay_program import render_program_state_module
 
 PASS_ID = "htp::ast_canonicalize@1"
@@ -27,16 +28,12 @@ def run(
     del stage_before
 
     next_program = deepcopy(dict(program))
+    target = normalize_target(next_program)
     next_program["canonicalized"] = True
     next_program["canonical_ast"] = {
         "entry": next_program["entry"],
-        "ops": [
-            {
-                "op_id": f"op{index}",
-                "op": op_name,
-            }
-            for index, op_name in enumerate(next_program["ops"])
-        ],
+        "target": target,
+        "ops": canonicalize_ops(list(next_program.get("ops", ()))),
     }
 
     return next_program, PassResult(

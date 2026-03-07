@@ -31,6 +31,14 @@ def run(
     next_program["package"] = {
         "emitted": True,
         "entry": next_program["entry"],
+        "entrypoint": next_program["entry"],
+        "target_backend": next_program.get("target", {}).get("backend", "generic"),
+        "scheduled_tick_count": len(next_program.get("schedule", {}).get("ticks", ())),
+        "has_barrier": any(
+            tick.get("op") == "barrier"
+            for tick in next_program.get("schedule", {}).get("ticks", ())
+            if isinstance(tick, Mapping)
+        ),
     }
 
     return next_program, PassResult(

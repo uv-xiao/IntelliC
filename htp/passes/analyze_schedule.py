@@ -7,6 +7,7 @@ from typing import Any
 from htp.artifacts.stages import RunnablePySpec
 from htp.passes.contracts import AnalysisOutput, PassContract
 from htp.passes.manager import PassResult
+from htp.passes.program_model import build_schedule_plan, normalize_target
 from htp.passes.replay_program import render_program_state_module
 
 PASS_ID = "htp::analyze_schedule@1"
@@ -35,18 +36,13 @@ def run(
 ) -> tuple[dict[str, Any], PassResult]:
     del stage_before
 
-    ticks = [
-        {
-            "tick": tick,
-            "op": op_name,
-        }
-        for tick, op_name in enumerate(program["ops"])
-    ]
-    schedule_plan = {
-        "schema": ANALYSIS_SCHEMA,
-        "entry": program["entry"],
-        "ticks": ticks,
-    }
+    canonical_ast = program.get("canonical_ast", {})
+    schedule_plan = build_schedule_plan(
+        entry=program["entry"],
+        canonical_ops=canonical_ast.get("ops", ()),
+        effects=program.get("effects", {}),
+        target=normalize_target(program),
+    )
 
     next_program = deepcopy(dict(program))
     analysis_state = dict(next_program.get("analysis", {}))
