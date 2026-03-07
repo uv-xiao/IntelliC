@@ -125,3 +125,123 @@ def test_nvgpu_emit_preserves_existing_manifest_target_metadata(tmp_path):
         "variant": "cuda",
         "hardware_profile": "nvidia:blackwell:sm100",
     }
+
+
+def test_bind_prefers_nvgpu_binding_when_backend_is_missing(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["mma"],
+        },
+        profile="ampere",
+    )
+
+    manifest_path = package_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    del manifest["target"]["backend"]
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+    binding = bind(package_dir)
+    report = binding.validate()
+
+    assert binding.__class__.__name__ == "NVGPUBinding"
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.NVGPU_METADATA_MISMATCH",
+            "detail": "Manifest target.backend does not match NV-GPU binding selection.",
+            "field": "backend",
+            "manifest_field": "target.backend",
+            "manifest_value": None,
+            "expected_value": "nvgpu",
+        }
+    ]
+
+
+def test_bind_prefers_nvgpu_binding_over_shared_toolchain_marker(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["mma"],
+        },
+        profile="ampere",
+    )
+
+    manifest_path = package_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    del manifest["target"]["backend"]
+    manifest.pop("outputs")
+    manifest["extensions"] = {}
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+    binding = bind(package_dir)
+    report = binding.validate()
+
+    assert binding.__class__.__name__ == "NVGPUBinding"
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.NVGPU_MISSING_METADATA",
+            "detail": "manifest.json outputs.nvgpu_codegen_index is required for NV-GPU packages.",
+            "manifest_field": "outputs.nvgpu_codegen_index",
+        },
+        {
+            "code": "HTP.BINDINGS.NVGPU_MISSING_METADATA",
+            "detail": "manifest.json outputs.toolchain_manifest is required for NV-GPU packages.",
+            "manifest_field": "outputs.toolchain_manifest",
+        },
+        {
+            "code": "HTP.BINDINGS.NVGPU_MISSING_METADATA",
+            "detail": "manifest.json extensions.nvgpu is required for NV-GPU packages.",
+            "manifest_field": "extensions.nvgpu",
+        },
+        {
+            "code": "HTP.BINDINGS.NVGPU_METADATA_MISMATCH",
+            "detail": "Manifest target.backend does not match NV-GPU binding selection.",
+            "field": "backend",
+            "manifest_field": "target.backend",
+            "manifest_value": None,
+            "expected_value": "nvgpu",
+        },
+    ]
+
+
+def test_nvgpu_binding_validates_launch_entry_parity(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["mma"],
+        },
+        profile="ampere",
+    )
+
+    manifest_path = package_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["extensions"]["nvgpu"]["launch_entry"]["source"] = "host/wrong_launch.py"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.NVGPU_METADATA_MISMATCH",
+            "detail": "manifest.json extensions.nvgpu.launch_entry.source does not match nvgpu_codegen.json launch.source after project-relative normalization.",
+            "manifest_field": "extensions.nvgpu.launch_entry.source",
+            "manifest_value": "host/wrong_launch.py",
+            "codegen_field": "codegen/nvgpu/nvgpu_codegen.json.launch.source",
+            "codegen_value": "codegen/nvgpu/host/demo_kernel_launch.py",
+        }
+    ]

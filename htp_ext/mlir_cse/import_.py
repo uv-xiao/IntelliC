@@ -38,6 +38,14 @@ def import_program(program: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str
     imported_program = {
         "entry": program["entry"],
         "exprs": imported_exprs,
+        "inputs": tuple(
+            dict.fromkeys(
+                operand
+                for expr in imported_exprs
+                for operand in (expr["lhs"], expr["rhs"])
+                if operand not in {item["target"] for item in imported_exprs}
+            )
+        ),
         "result": aliases.get(program["result"], program["result"]),
     }
     summary = {

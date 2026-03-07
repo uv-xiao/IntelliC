@@ -9,7 +9,7 @@ from htp.artifacts.manifest import write_manifest
 from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
 from htp.runtime import Runtime, extensions
 
-from .export import eligibility_for, export_program
+from .export import analyze_program, eligibility_for, export_program
 from .import_ import import_program
 
 EXTENSION_ID = "htp_ext.mlir_cse"
@@ -26,6 +26,7 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
 
     module_text, ledger = export_program(program)
     imported_program, import_summary = import_program(program)
+    analysis = analyze_program(program)
     _write_extension_artifacts(
         package_path,
         module_text=module_text,
@@ -61,7 +62,7 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
             runnable_py=RunnablePySpec(
                 status="preserves",
                 modes=("sim",),
-                program_text=_import_stage_program(imported_program, import_summary),
+                program_text=_import_stage_program(imported_program, import_summary, analysis["inputs"]),
             ),
             summary_payload={
                 "stage_id": "s02",
@@ -137,7 +138,9 @@ def _export_stage_program() -> str:
     )
 
 
-def _import_stage_program(program: Mapping[str, Any], summary: Mapping[str, Any]) -> str:
+def _import_stage_program(
+    program: Mapping[str, Any], summary: Mapping[str, Any], inputs: tuple[str, ...]
+) -> str:
     return "\n".join(
         (
             "from htp.runtime import default_runtime, extensions",
@@ -146,16 +149,18 @@ def _import_stage_program(program: Mapping[str, Any], summary: Mapping[str, Any]
             "",
             "PROGRAM = " + repr(dict(program)),
             "SUMMARY = " + repr(dict(summary)),
+            "INPUTS = " + repr(inputs),
             "",
-            'def run(*, x, y, z, runtime=None, mode="sim", trace=None):',
+            'def run(*, runtime=None, mode="sim", trace=None, **kwargs):',
             "    resolved_runtime = default_runtime() if runtime is None else runtime",
+            "    values = {name: kwargs[name] for name in INPUTS}",
             "    return extensions.invoke(",
             f"        {EXTENSION_ID!r},",
             '        "replay_cse",',
             "        payload={",
             '            "program": PROGRAM,',
             '            "summary": SUMMARY,',
-            '            "values": {"x": x, "y": y, "z": z},',
+            '            "values": values,',
             "        },",
             "        mode=mode,",
             "        trace=trace,",

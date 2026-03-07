@@ -14,9 +14,9 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
         program={
             "entry": "demo_kernel",
             "exprs": [
-                {"target": "tmp0", "op": "add", "lhs": "x", "rhs": "y"},
-                {"target": "tmp1", "op": "add", "lhs": "x", "rhs": "y"},
-                {"target": "out", "op": "mul", "lhs": "tmp1", "rhs": "z"},
+                {"target": "sum0", "op": "add", "lhs": "lhs", "rhs": "rhs"},
+                {"target": "sum1", "op": "add", "lhs": "lhs", "rhs": "rhs"},
+                {"target": "out", "op": "mul", "lhs": "sum1", "rhs": "scale"},
             ],
             "result": "out",
         },
@@ -39,12 +39,15 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
     import_summary = json.loads((package_dir / "extensions" / "mlir_cse" / "import_summary.json").read_text())
     assert import_summary["rewrites"] == [
         {
-            "eliminated_target": "tmp1",
-            "reused_target": "tmp0",
-            "signature": "add(x, y)",
+            "eliminated_target": "sum1",
+            "reused_target": "sum0",
+            "signature": "add(lhs, rhs)",
         }
     ]
     assert import_summary["result"] == "out"
+    module_text = (package_dir / "extensions" / "mlir_cse" / "module.mlir").read_text()
+    assert "func.func @demo_kernel(%lhs: i32, %rhs: i32, %scale: i32) -> i32" in module_text
+    assert "return %v2 : i32" in module_text
 
     runtime = Runtime()
     register_replay_handler(runtime=runtime)
@@ -53,9 +56,9 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
     result = session.replay(
         "s02",
         kwargs={
-            "x": 2,
-            "y": 3,
-            "z": 5,
+            "lhs": 2,
+            "rhs": 3,
+            "scale": 5,
             "runtime": runtime,
         },
     )
@@ -65,10 +68,30 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
         "result": 25,
         "rewrites": [
             {
-                "eliminated_target": "tmp1",
-                "reused_target": "tmp0",
-                "signature": "add(x, y)",
+                "eliminated_target": "sum1",
+                "reused_target": "sum0",
+                "signature": "add(lhs, rhs)",
             }
         ],
         "entry": "demo_kernel",
     }
+
+
+def test_mlir_cse_extension_rejects_missing_result_symbol(tmp_path):
+    package_dir = tmp_path / "mlir_cse_pkg"
+    package_dir.mkdir()
+
+    try:
+        emit_package(
+            package_dir,
+            program={
+                "entry": "bad_kernel",
+                "exprs": [
+                    {"target": "sum0", "op": "add", "lhs": "lhs", "rhs": "rhs"},
+                ],
+            },
+        )
+    except ValueError as exc:
+        assert "non-empty string result symbol" in str(exc)
+    else:
+        raise AssertionError("emit_package should reject missing result symbols")

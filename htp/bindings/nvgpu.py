@@ -120,6 +120,9 @@ class NVGPUBinding(ManifestBinding):
         toolchain_manifest_path: str,
     ) -> list[dict[str, Any]]:
         diagnostics: list[dict[str, Any]] = []
+        target = self.manifest.get("target")
+        manifest_backend = target.get("backend") if isinstance(target, Mapping) else None
+        target_hardware_profile = target.get("hardware_profile") if isinstance(target, Mapping) else None
         try:
             codegen_index = json.loads((self.package_dir / codegen_index_path).read_text())
         except Exception as exc:
@@ -158,15 +161,26 @@ class NVGPUBinding(ManifestBinding):
                 }
             ]
 
-        backend = codegen_index.get("backend")
-        if backend != "nvgpu":
+        if manifest_backend != "nvgpu":
             diagnostics.append(
                 {
                     "code": "HTP.BINDINGS.NVGPU_METADATA_MISMATCH",
                     "detail": "Manifest target.backend does not match NV-GPU binding selection.",
                     "field": "backend",
                     "manifest_field": "target.backend",
-                    "manifest_value": self.backend,
+                    "manifest_value": manifest_backend,
+                    "expected_value": "nvgpu",
+                }
+            )
+        backend = codegen_index.get("backend")
+        if backend != "nvgpu":
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.NVGPU_METADATA_MISMATCH",
+                    "detail": "nvgpu_codegen.json backend does not match the NV-GPU binding contract.",
+                    "field": "backend",
+                    "codegen_field": f"{codegen_index_path}.backend",
+                    "codegen_value": backend,
                     "expected_value": "nvgpu",
                 }
             )
@@ -177,9 +191,6 @@ class NVGPUBinding(ManifestBinding):
                     "detail": "nvgpu_codegen.json variant must be 'cuda'.",
                 }
             )
-
-        target = self.manifest.get("target")
-        target_hardware_profile = target.get("hardware_profile") if isinstance(target, Mapping) else None
         if codegen_index.get("hardware_profile") != target_hardware_profile:
             diagnostics.append(
                 {
@@ -192,8 +203,8 @@ class NVGPUBinding(ManifestBinding):
                 }
             )
 
-        extension = self._nvgpu_extension() or {}
-        if extension.get("toolchain_manifest") != toolchain_manifest_path:
+        extension = self._nvgpu_extension()
+        if extension is not None and extension.get("toolchain_manifest") != toolchain_manifest_path:
             diagnostics.append(
                 {
                     "code": "HTP.BINDINGS.NVGPU_METADATA_MISMATCH",
@@ -274,6 +285,40 @@ class NVGPUBinding(ManifestBinding):
                     "expected_value": [*expected_arch.cuda_arches],
                 }
             )
+        if extension is not None and isinstance(launch, Mapping):
+            project_dir = str(extension.get("kernel_project_dir"))
+            launch_entry = extension.get("launch_entry")
+            if isinstance(launch_entry, Mapping):
+                launch_source = launch.get("source")
+                if isinstance(launch_source, str):
+                    launch_source_path = PurePosixPath(launch_source)
+                    project_dir_path = PurePosixPath(project_dir)
+                    try:
+                        normalized_launch_source = launch_source_path.relative_to(project_dir_path).as_posix()
+                    except ValueError:
+                        normalized_launch_source = None
+                    if launch_entry.get("source") != normalized_launch_source:
+                        diagnostics.append(
+                            {
+                                "code": "HTP.BINDINGS.NVGPU_METADATA_MISMATCH",
+                                "detail": "manifest.json extensions.nvgpu.launch_entry.source does not match nvgpu_codegen.json launch.source after project-relative normalization.",
+                                "manifest_field": "extensions.nvgpu.launch_entry.source",
+                                "manifest_value": launch_entry.get("source"),
+                                "codegen_field": f"{codegen_index_path}.launch.source",
+                                "codegen_value": launch_source,
+                            }
+                        )
+                if launch_entry.get("function_name") != launch.get("function_name"):
+                    diagnostics.append(
+                        {
+                            "code": "HTP.BINDINGS.NVGPU_METADATA_MISMATCH",
+                            "detail": "manifest.json extensions.nvgpu.launch_entry.function_name does not match nvgpu_codegen.json launch.function_name.",
+                            "manifest_field": "extensions.nvgpu.launch_entry.function_name",
+                            "manifest_value": launch_entry.get("function_name"),
+                            "codegen_field": f"{codegen_index_path}.launch.function_name",
+                            "codegen_value": launch.get("function_name"),
+                        }
+                    )
         return diagnostics
 
     def _expected_arch(self):
