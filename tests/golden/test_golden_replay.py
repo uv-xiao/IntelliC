@@ -1,6 +1,5 @@
-from tests.conftest import copy_golden_fixture
-
 import htp
+from tests.conftest import copy_golden_fixture
 
 
 def test_golden_packages_replay_in_sim(tmp_path):

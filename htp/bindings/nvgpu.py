@@ -179,9 +179,7 @@ class NVGPUBinding(ManifestBinding):
             )
 
         target = self.manifest.get("target")
-        target_hardware_profile = (
-            target.get("hardware_profile") if isinstance(target, Mapping) else None
-        )
+        target_hardware_profile = target.get("hardware_profile") if isinstance(target, Mapping) else None
         if codegen_index.get("hardware_profile") != target_hardware_profile:
             diagnostics.append(
                 {

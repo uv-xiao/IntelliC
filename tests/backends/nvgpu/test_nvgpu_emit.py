@@ -1,8 +1,7 @@
 import json
-from pathlib import Path
 
-from htp.bindings.api import bind
 from htp.backends.nvgpu.emit import emit_package
+from htp.bindings.api import bind
 
 
 def test_nvgpu_emit_prefers_cu_source_artifacts(tmp_path):

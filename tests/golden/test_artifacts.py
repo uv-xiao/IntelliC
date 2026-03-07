@@ -1,8 +1,6 @@
 import json
-from pathlib import Path
 
 from htp.bindings.api import bind
-
 from tests.conftest import copy_golden_fixture
 
 

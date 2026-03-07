@@ -1,5 +1,6 @@
 from htp.runtime import call_kernel, default_runtime
 
+
 def launch_demo_kernel(*args, mode="sim", trace=None, runtime=None):
     resolved_runtime = default_runtime() if runtime is None else runtime
     return call_kernel(

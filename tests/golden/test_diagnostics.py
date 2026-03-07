@@ -1,6 +1,5 @@
-from tests.conftest import copy_golden_fixture
-
 import htp
+from tests.conftest import copy_golden_fixture
 
 
 def test_diagnostic_contains_fix_hints_ref(tmp_path):

@@ -2,6 +2,7 @@ from htp.runtime import ReplayDiagnosticError
 
 STAGE_ID = "s02"
 
+
 def run(*args, **kwargs):
     raise ReplayDiagnosticError(
         "HTP.REPLAY.STUB_EXTERNAL_TOOLCHAIN_ONLY",
