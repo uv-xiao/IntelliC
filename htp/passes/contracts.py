@@ -143,7 +143,7 @@ class PassContract:
         outputs: tuple[str, ...] | list[str] | None = None,
         deterministic: bool = True,
         diagnostics: tuple[DiagnosticContract, ...] | list[DiagnosticContract] | None = None,
-    ) -> "PassContract":
+    ) -> PassContract:
         return cls(
             pass_id=pass_id,
             owner=owner,

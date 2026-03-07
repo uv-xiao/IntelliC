@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable
+from typing import Any
 
 from htp.artifacts.manifest import write_manifest
 from htp.artifacts.stages import AnalysisSpec, RunnablePySpec, StageSpec, write_stage

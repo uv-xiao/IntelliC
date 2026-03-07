@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .base import ManifestBinding, binding_from_manifest
 from .validate import load_manifest, manifest_target
@@ -20,9 +21,13 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
     extensions = manifest.get("extensions")
     has_pto_markers = (
         backend == "pto"
-        or (isinstance(outputs, dict) and any(key in outputs for key in ("kernel_config", "pto_codegen_index", "toolchain_manifest")))
+        or (
+            isinstance(outputs, dict)
+            and any(key in outputs for key in ("kernel_config", "pto_codegen_index", "toolchain_manifest"))
+        )
         or (isinstance(extensions, dict) and "pto" in extensions)
         or (package_path / "codegen" / "pto").exists()
+        or (package_path / "build" / "toolchain.json").exists()
     )
     if has_pto_markers:
         from .pto import PTOBinding

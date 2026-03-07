@@ -11,7 +11,9 @@ def test_binding_map_records_split_and_introduced_bindings():
 
     entity_map = EntityMap(pass_id="pkg::pass@1", stage_before="s06", stage_after="s07")
     entity_map.record(before=loop_entity, after=[k1_entity, k0_entity], reason="split_unrolled")
-    entity_map.record(before=None, after=[temp_entity], reason="introduced_pingpong_buffer", origin=[loop_entity])
+    entity_map.record(
+        before=None, after=[temp_entity], reason="introduced_pingpong_buffer", origin=[loop_entity]
+    )
 
     bindings = BindingRegistry("module::matmul")
     function_scope = bindings.add_scope("function")

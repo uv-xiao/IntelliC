@@ -1,12 +1,12 @@
 def test_public_packages_import():
     import htp
+    import htp.artifacts
+    import htp.backends
+    import htp.bindings
     import htp.ir
     import htp.passes
     import htp.pipeline
-    import htp.artifacts
     import htp.runtime
-    import htp.bindings
-    import htp.backends
 
     assert htp.passes.__name__ == "htp.passes"
     assert htp.pipeline.__name__ == "htp.pipeline"

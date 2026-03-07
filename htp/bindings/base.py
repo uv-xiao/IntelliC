@@ -9,8 +9,8 @@ from typing import Any
 from uuid import uuid4
 
 from htp.runtime.errors import ReplayDiagnosticError
-from .validate import CONTRACT_REFS, collect_missing_files, manifest_target, validation_diagnostics
 
+from .validate import CONTRACT_REFS, collect_missing_files, manifest_target, validation_diagnostics
 
 Diagnostic = dict[str, Any]
 
@@ -192,85 +192,121 @@ class LoadResult:
         try:
             stage = self._stage_record(stage_id)
         except KeyError:
-            return False, None, [
-                {
-                    "code": "HTP.BINDINGS.STAGE_NOT_FOUND",
-                    "detail": f"Unknown stage id: {stage_id}",
-                    "stage_id": stage_id,
-                }
-            ]
+            return (
+                False,
+                None,
+                [
+                    {
+                        "code": "HTP.BINDINGS.STAGE_NOT_FOUND",
+                        "detail": f"Unknown stage id: {stage_id}",
+                        "stage_id": stage_id,
+                    }
+                ],
+            )
         except ValueError as exc:
-            return False, None, [
-                {
-                    "code": "HTP.BINDINGS.MALFORMED_STAGE_GRAPH",
-                    "detail": str(exc),
-                    "stage_id": stage_id,
-                }
-            ]
+            return (
+                False,
+                None,
+                [
+                    {
+                        "code": "HTP.BINDINGS.MALFORMED_STAGE_GRAPH",
+                        "detail": str(exc),
+                        "stage_id": stage_id,
+                    }
+                ],
+            )
 
         runnable_py = stage.get("runnable_py", {})
         if not isinstance(runnable_py, Mapping):
-            return False, None, [
-                {
-                    "code": "HTP.BINDINGS.MALFORMED_RUNNABLE_PY",
-                    "detail": f"Stage {stage_id!r} has a non-mapping runnable_py record.",
-                    "stage_id": stage_id,
-                }
-            ]
+            return (
+                False,
+                None,
+                [
+                    {
+                        "code": "HTP.BINDINGS.MALFORMED_RUNNABLE_PY",
+                        "detail": f"Stage {stage_id!r} has a non-mapping runnable_py record.",
+                        "stage_id": stage_id,
+                    }
+                ],
+            )
         modes_value = runnable_py.get("modes", ())
-        if modes_value is None or isinstance(modes_value, (str, bytes)) or not isinstance(modes_value, Iterable):
-            return False, None, [
-                {
-                    "code": "HTP.BINDINGS.MALFORMED_RUNNABLE_MODES",
-                    "detail": f"Stage {stage_id!r} has a non-iterable runnable_py.modes value.",
-                    "stage_id": stage_id,
-                }
-            ]
+        if (
+            modes_value is None
+            or isinstance(modes_value, (str, bytes))
+            or not isinstance(modes_value, Iterable)
+        ):
+            return (
+                False,
+                None,
+                [
+                    {
+                        "code": "HTP.BINDINGS.MALFORMED_RUNNABLE_MODES",
+                        "detail": f"Stage {stage_id!r} has a non-iterable runnable_py.modes value.",
+                        "stage_id": stage_id,
+                    }
+                ],
+            )
         supported_modes = tuple(modes_value)
         if supported_modes and mode not in supported_modes:
-            return False, None, [
-                {
-                    "code": "HTP.BINDINGS.UNSUPPORTED_REPLAY_MODE",
-                    "detail": f"Stage {stage_id!r} does not support replay mode {mode!r}.",
-                    "stage_id": stage_id,
-                }
-            ]
+            return (
+                False,
+                None,
+                [
+                    {
+                        "code": "HTP.BINDINGS.UNSUPPORTED_REPLAY_MODE",
+                        "detail": f"Stage {stage_id!r} does not support replay mode {mode!r}.",
+                        "stage_id": stage_id,
+                    }
+                ],
+            )
 
         program_relpath = runnable_py.get("program_py")
         if not isinstance(program_relpath, str):
-            return False, None, [
-                {
-                    "code": f"HTP.BINDINGS.{kind.upper()}_LOAD_ERROR",
-                    "detail": f"Stage {stage_id!r} is missing runnable_py.program_py.",
-                    "stage_id": stage_id,
-                }
-            ]
+            return (
+                False,
+                None,
+                [
+                    {
+                        "code": f"HTP.BINDINGS.{kind.upper()}_LOAD_ERROR",
+                        "detail": f"Stage {stage_id!r} is missing runnable_py.program_py.",
+                        "stage_id": stage_id,
+                    }
+                ],
+            )
 
         program_path = self.package_dir / program_relpath
         try:
             module = _load_program_module(program_path, stage_id=stage_id)
         except Exception as exc:
-            return False, None, [
-                {
-                    "code": f"HTP.BINDINGS.{kind.upper()}_LOAD_ERROR",
-                    "detail": str(exc),
-                    "stage_id": stage_id,
-                    "entry": entry_name,
-                    "program_py": program_relpath,
-                    "exception_type": exc.__class__.__name__,
-                }
-            ]
+            return (
+                False,
+                None,
+                [
+                    {
+                        "code": f"HTP.BINDINGS.{kind.upper()}_LOAD_ERROR",
+                        "detail": str(exc),
+                        "stage_id": stage_id,
+                        "entry": entry_name,
+                        "program_py": program_relpath,
+                        "exception_type": exc.__class__.__name__,
+                    }
+                ],
+            )
 
         if not hasattr(module, entry_name):
-            return False, None, [
-                {
-                    "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
-                    "detail": f"Entrypoint {entry_name!r} is not defined for stage {stage_id!r}.",
-                    "stage_id": stage_id,
-                    "entry": entry_name,
-                    "program_py": program_relpath,
-                }
-            ]
+            return (
+                False,
+                None,
+                [
+                    {
+                        "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
+                        "detail": f"Entrypoint {entry_name!r} is not defined for stage {stage_id!r}.",
+                        "stage_id": stage_id,
+                        "entry": entry_name,
+                        "program_py": program_relpath,
+                    }
+                ],
+            )
 
         try:
             result = getattr(module, entry_name)(*args, **({} if kwargs is None else kwargs))
@@ -281,16 +317,20 @@ class LoadResult:
                 diagnostic["fix_hints"] = list(exc.fix_hints)
             return False, None, [diagnostic]
         except Exception as exc:
-            return False, None, [
-                {
-                    "code": f"HTP.BINDINGS.{kind.upper()}_EXECUTION_ERROR",
-                    "detail": str(exc),
-                    "stage_id": stage_id,
-                    "entry": entry_name,
-                    "program_py": program_relpath,
-                    "exception_type": exc.__class__.__name__,
-                }
-            ]
+            return (
+                False,
+                None,
+                [
+                    {
+                        "code": f"HTP.BINDINGS.{kind.upper()}_EXECUTION_ERROR",
+                        "detail": str(exc),
+                        "stage_id": stage_id,
+                        "entry": entry_name,
+                        "program_py": program_relpath,
+                        "exception_type": exc.__class__.__name__,
+                    }
+                ],
+            )
 
         return True, result, []
 

@@ -40,7 +40,9 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
         ],
     }
 
-    schedule_plan = json.loads((package_dir / "ir" / "stages" / "s03" / "analysis" / "schedule_plan.json").read_text())
+    schedule_plan = json.loads(
+        (package_dir / "ir" / "stages" / "s03" / "analysis" / "schedule_plan.json").read_text()
+    )
     assert schedule_plan == {
         "schema": "htp.analysis.schedule_plan.v1",
         "entry": "demo_kernel",

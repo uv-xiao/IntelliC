@@ -1,0 +1,19 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        exclude: ^docs/(reference|research)/
+      - id: end-of-file-fixer
+        exclude: ^docs/(reference|research)/
+      - id: trailing-whitespace
+        exclude: ^docs/(reference|research)/
+      - id: check-added-large-files
+        exclude: ^docs/(reference|research)/
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.0
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format

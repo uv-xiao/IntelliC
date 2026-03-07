@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any
 
 from htp.artifacts.stages import RunnablePySpec
 from htp.passes.contracts import AnalysisOutput, PassContract
@@ -28,7 +29,9 @@ CONTRACT = PassContract.analysis(
 )
 
 
-def run(program: Mapping[str, Any], *, stage_before: Mapping[str, object]) -> tuple[dict[str, Any], PassResult]:
+def run(
+    program: Mapping[str, Any], *, stage_before: Mapping[str, object]
+) -> tuple[dict[str, Any], PassResult]:
     del stage_before
 
     ticks = [

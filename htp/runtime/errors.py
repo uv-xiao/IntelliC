@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any, NoReturn
 
-
 _STUB_REASON_BY_CODE = {
     "HTP.REPLAY.STUB_HIT": "intentionally_unimplemented",
     "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC": "missing_simulator",

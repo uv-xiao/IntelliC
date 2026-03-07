@@ -1,7 +1,7 @@
-from contextlib import contextmanager
-import json
 import importlib
+import json
 import sys
+from contextlib import contextmanager
 
 
 def _write_manifest(package_dir):
@@ -349,4 +349,78 @@ def test_bind_prefers_pto_binding_when_target_backend_is_missing(tmp_path):
                 "manifest_value": None,
                 "expected_value": "pto",
             }
+        ]
+
+
+def test_bind_prefers_pto_binding_when_only_toolchain_manifest_remains(tmp_path):
+    with _import_fresh_htp():
+        from htp.backends.pto.emit import emit_package
+        from htp.bindings.api import bind as bind_api
+
+        package_dir = tmp_path / "package"
+        package_dir.mkdir()
+        emit_package(
+            package_dir,
+            program={
+                "entry": "demo_kernel",
+                "ops": ["compute_tile"],
+            },
+        )
+
+        manifest_path = package_dir / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        del manifest["target"]["backend"]
+        manifest.pop("outputs")
+        manifest["extensions"] = {}
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+        for path in (package_dir / "codegen" / "pto").rglob("*"):
+            if path.is_file():
+                path.unlink()
+        for path in sorted((package_dir / "codegen" / "pto").glob("**/*"), reverse=True):
+            if path.is_dir():
+                path.rmdir()
+        (package_dir / "codegen" / "pto").rmdir()
+
+        binding = bind_api(package_dir)
+        report = binding.validate()
+
+        assert binding.__class__.__name__ == "PTOBinding"
+        assert report.ok is False
+        assert report.diagnostics == [
+            {
+                "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                "detail": "Manifest target.backend does not match PTO binding selection.",
+                "field": "backend",
+                "manifest_field": "target.backend",
+                "manifest_value": None,
+                "expected_value": "pto",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json outputs.kernel_config is required for PTO packages.",
+                "manifest_field": "outputs.kernel_config",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json outputs.pto_codegen_index is required for PTO packages.",
+                "manifest_field": "outputs.pto_codegen_index",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json outputs.toolchain_manifest is required for PTO packages.",
+                "manifest_field": "outputs.toolchain_manifest",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json extensions.pto is required for PTO packages.",
+                "manifest_field": "extensions.pto",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+                "detail": "Missing required PTO artifact path: codegen/pto/kernel_config.py",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+                "detail": "Missing required PTO artifact path: codegen/pto/pto_codegen.json",
+            },
         ]

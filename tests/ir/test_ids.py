@@ -9,7 +9,7 @@ def test_entities_registry_is_deterministic():
     def build_payloads():
         entities = EntityRegistry("module::matmul_tile")
         loop_entity = entities.add("For", role="loop_k", node_kind="For", node_ordinal=7)
-        mma_entity = entities.add("Call", role="mma", node_kind="Call", node_ordinal=31)
+        entities.add("Call", role="mma", node_kind="Call", node_ordinal=31)
 
         bindings = BindingRegistry("module::matmul_tile")
         function_scope = bindings.add_scope("function")
@@ -56,9 +56,7 @@ def test_entities_registry_is_deterministic():
                 "site_entity_id": "module::matmul_tile:E0",
             }
         ],
-        "name_uses": [
-            {"node_id": "module::matmul_tile:Name:19", "binding_id": "module::matmul_tile:S1:B0"}
-        ],
+        "name_uses": [{"node_id": "module::matmul_tile:Name:19", "binding_id": "module::matmul_tile:S1:B0"}],
     }
 
 

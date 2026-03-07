@@ -37,7 +37,9 @@ def iter_contract_paths(manifest: Mapping[str, Any]) -> Iterable[str]:
         yield from _stage_contract_paths(stage)
 
 
-def validation_diagnostics(manifest: Mapping[str, Any], missing_files: tuple[str, ...]) -> tuple[dict[str, str], ...]:
+def validation_diagnostics(
+    manifest: Mapping[str, Any], missing_files: tuple[str, ...]
+) -> tuple[dict[str, str], ...]:
     diagnostics: list[dict[str, str]] = []
     backend, _variant = manifest_target(manifest)
     if backend is None:

@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from htp.backends.pto.arch import arch_for
-from htp.backends.pto.emit import PTO_CODEGEN_SCHEMA_ID, PTO_PROJECT_DIR, PTO_TOOLCHAIN_PATH, PTO_TOOLCHAIN_SCHEMA_ID
+from htp.backends.pto.emit import (
+    PTO_CODEGEN_SCHEMA_ID,
+    PTO_PROJECT_DIR,
+    PTO_TOOLCHAIN_PATH,
+    PTO_TOOLCHAIN_SCHEMA_ID,
+)
 
 from .base import BuildResult, LoadResult, ManifestBinding, ValidationResult
 
@@ -42,7 +47,8 @@ class PTOBinding(ManifestBinding):
                     )
 
         has_blocking_metadata = any(
-            diagnostic.get("code") in {"HTP.BINDINGS.PTO_MISSING_METADATA", "HTP.BINDINGS.PTO_INVALID_TARGET_VARIANT"}
+            diagnostic.get("code")
+            in {"HTP.BINDINGS.PTO_MISSING_METADATA", "HTP.BINDINGS.PTO_INVALID_TARGET_VARIANT"}
             for diagnostic in diagnostics
         )
         if self._should_enforce_pto_contract() and not missing_files and not has_blocking_metadata:
@@ -119,7 +125,9 @@ class PTOBinding(ManifestBinding):
         diagnostics: list[dict[str, Any]] = []
 
         try:
-            kernel_config = _load_python_module(self.package_dir / kernel_config_path, module_name="htp_pto_kernel_config")
+            kernel_config = _load_python_module(
+                self.package_dir / kernel_config_path, module_name="htp_pto_kernel_config"
+            )
         except Exception as exc:
             diagnostics.append(
                 {
@@ -257,7 +265,9 @@ class PTOBinding(ManifestBinding):
             "source": self._project_relative(str(index_orchestration.get("source", "")))
             if isinstance(index_orchestration, Mapping)
             else None,
-            "function_name": index_orchestration.get("function_name") if isinstance(index_orchestration, Mapping) else None,
+            "function_name": index_orchestration.get("function_name")
+            if isinstance(index_orchestration, Mapping)
+            else None,
         }
         if dict(orchestration) != normalized_index_orchestration:
             diagnostics.append(
@@ -272,7 +282,9 @@ class PTOBinding(ManifestBinding):
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto"))
             return diagnostics
 
-        codegen_backend = codegen_index.get("backend") if isinstance(codegen_index.get("backend"), str) else None
+        codegen_backend = (
+            codegen_index.get("backend") if isinstance(codegen_index.get("backend"), str) else None
+        )
         if self.backend != codegen_backend:
             diagnostics.append(
                 {
@@ -291,8 +303,12 @@ class PTOBinding(ManifestBinding):
             if isinstance(manifest_pto_extension.get("platform"), str)
             else None
         )
-        codegen_variant = codegen_index.get("variant") if isinstance(codegen_index.get("variant"), str) else None
-        kernel_platform = runtime_config.get("platform") if isinstance(runtime_config.get("platform"), str) else None
+        codegen_variant = (
+            codegen_index.get("variant") if isinstance(codegen_index.get("variant"), str) else None
+        )
+        kernel_platform = (
+            runtime_config.get("platform") if isinstance(runtime_config.get("platform"), str) else None
+        )
         if (
             self.variant != extension_platform
             or self.variant != codegen_variant
@@ -345,7 +361,10 @@ class PTOBinding(ManifestBinding):
             expected_manifest_runtime_config = {
                 key: value for key, value in dict(runtime_config).items() if key != "platform"
             }
-            if not isinstance(manifest_runtime_config, Mapping) or dict(manifest_runtime_config) != expected_manifest_runtime_config:
+            if (
+                not isinstance(manifest_runtime_config, Mapping)
+                or dict(manifest_runtime_config) != expected_manifest_runtime_config
+            ):
                 diagnostics.append(
                     {
                         "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
@@ -357,7 +376,9 @@ class PTOBinding(ManifestBinding):
         manifest_orchestration_entry = manifest_pto_extension.get("orchestration_entry")
         if manifest_orchestration_entry is None:
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.orchestration_entry"))
-        elif not isinstance(manifest_orchestration_entry, Mapping) or dict(manifest_orchestration_entry) != dict(orchestration):
+        elif not isinstance(manifest_orchestration_entry, Mapping) or dict(
+            manifest_orchestration_entry
+        ) != dict(orchestration):
             diagnostics.append(
                 {
                     "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
@@ -384,7 +405,10 @@ class PTOBinding(ManifestBinding):
                     }
                 )
         orchestration_source = orchestration.get("source")
-        if isinstance(orchestration_source, str) and not (self._project_dir() / orchestration_source).exists():
+        if (
+            isinstance(orchestration_source, str)
+            and not (self._project_dir() / orchestration_source).exists()
+        ):
             diagnostics.append(
                 {
                     "code": "HTP.BINDINGS.PTO_INVALID_KERNEL_CONFIG",
@@ -496,13 +520,25 @@ class PTOBinding(ManifestBinding):
                     "expected_value": self.backend,
                 }
             )
+        variant_is_valid = self._has_valid_variant()
         if self.variant is None:
             diagnostics.append(self._missing_metadata_diagnostic("target.variant"))
+        elif not variant_is_valid:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_TARGET_VARIANT",
+                    "detail": f"Unsupported PTO variant {self.variant!r}; expected one of: a2a3sim, a2a3",
+                    "manifest_field": "target.variant",
+                    "manifest_value": self.variant,
+                }
+            )
 
-        target_hardware_profile = target.get("hardware_profile") if isinstance(target.get("hardware_profile"), str) else None
+        target_hardware_profile = (
+            target.get("hardware_profile") if isinstance(target.get("hardware_profile"), str) else None
+        )
         if target_hardware_profile is None:
             diagnostics.append(self._missing_metadata_diagnostic("target.hardware_profile"))
-        elif self.variant is not None:
+        elif self.variant is not None and variant_is_valid:
             try:
                 expected_profile = arch_for(self.variant).hardware_profile
             except ValueError as exc:
@@ -580,8 +616,36 @@ class PTOBinding(ManifestBinding):
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.toolchain_manifest"))
         if not isinstance(manifest_pto_extension.get("pto_runtime_contract"), str):
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.pto_runtime_contract"))
+        elif (
+            self.variant is not None
+            and variant_is_valid
+            and manifest_pto_extension.get("pto_runtime_contract") != self._expected_runtime_contract()
+        ):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                    "detail": "manifest.json extensions.pto.pto_runtime_contract does not match the PTO variant contract.",
+                    "manifest_field": "extensions.pto.pto_runtime_contract",
+                    "manifest_value": manifest_pto_extension.get("pto_runtime_contract"),
+                    "expected_value": self._expected_runtime_contract(),
+                }
+            )
         if not isinstance(manifest_pto_extension.get("pto_isa_contract"), str):
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.pto_isa_contract"))
+        elif (
+            self.variant is not None
+            and variant_is_valid
+            and manifest_pto_extension.get("pto_isa_contract") != self._expected_isa_contract()
+        ):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                    "detail": "manifest.json extensions.pto.pto_isa_contract does not match the PTO variant contract.",
+                    "manifest_field": "extensions.pto.pto_isa_contract",
+                    "manifest_value": manifest_pto_extension.get("pto_isa_contract"),
+                    "expected_value": self._expected_isa_contract(),
+                }
+            )
         if manifest_pto_extension.get("runtime_config") is None:
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.runtime_config"))
         if manifest_pto_extension.get("orchestration_entry") is None:
@@ -609,7 +673,10 @@ class PTOBinding(ManifestBinding):
                     "toolchain_value": toolchain_manifest.get("backend"),
                 }
             )
-        if toolchain_manifest.get("variant") != self.variant or toolchain_manifest.get("platform") != self.variant:
+        if (
+            toolchain_manifest.get("variant") != self.variant
+            or toolchain_manifest.get("platform") != self.variant
+        ):
             diagnostics.append(
                 {
                     "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
@@ -633,6 +700,19 @@ class PTOBinding(ManifestBinding):
                     "manifest_field": "extensions.pto.pto_runtime_contract",
                 }
             )
+        elif (
+            self.variant is not None
+            and toolchain_manifest.get("pto_runtime_contract") != self._expected_runtime_contract()
+        ):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                    "detail": "build/toolchain.json pto_runtime_contract does not match the PTO variant contract.",
+                    "toolchain_field": f"{toolchain_manifest_path}.pto_runtime_contract",
+                    "toolchain_value": toolchain_manifest.get("pto_runtime_contract"),
+                    "expected_value": self._expected_runtime_contract(),
+                }
+            )
 
         isa_contract = manifest_pto_extension.get("pto_isa_contract")
         if toolchain_manifest.get("pto_isa_contract") != isa_contract:
@@ -641,6 +721,19 @@ class PTOBinding(ManifestBinding):
                     "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
                     "detail": "build/toolchain.json pto_isa_contract does not match manifest.json extensions.pto.pto_isa_contract.",
                     "manifest_field": "extensions.pto.pto_isa_contract",
+                }
+            )
+        elif (
+            self.variant is not None
+            and toolchain_manifest.get("pto_isa_contract") != self._expected_isa_contract()
+        ):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                    "detail": "build/toolchain.json pto_isa_contract does not match the PTO variant contract.",
+                    "toolchain_field": f"{toolchain_manifest_path}.pto_isa_contract",
+                    "toolchain_value": toolchain_manifest.get("pto_isa_contract"),
+                    "expected_value": self._expected_isa_contract(),
                 }
             )
 
@@ -685,6 +778,21 @@ class PTOBinding(ManifestBinding):
         if not isinstance(target, Mapping):
             return {}
         return target
+
+    def _expected_runtime_contract(self) -> str:
+        return "pto-runtime:dev"
+
+    def _expected_isa_contract(self) -> str:
+        return f"pto-isa:{self.variant}"
+
+    def _has_valid_variant(self) -> bool:
+        if self.variant is None:
+            return False
+        try:
+            arch_for(self.variant)
+        except ValueError:
+            return False
+        return True
 
     def _missing_metadata_diagnostic(self, field: str) -> dict[str, Any]:
         return {

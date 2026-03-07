@@ -253,6 +253,13 @@ def test_pto_binding_reports_target_and_codegen_metadata_mismatch(tmp_path):
     assert report.diagnostics == [
         {
             "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+            "detail": "manifest.json extensions.pto.pto_isa_contract does not match the PTO variant contract.",
+            "manifest_field": "extensions.pto.pto_isa_contract",
+            "manifest_value": "pto-isa:a2a3sim",
+            "expected_value": "pto-isa:a2a3",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
             "detail": "PTO metadata backend does not agree across manifest target and pto_codegen.json.",
             "field": "backend",
             "manifest_field": "target.backend",
@@ -283,6 +290,13 @@ def test_pto_binding_reports_target_and_codegen_metadata_mismatch(tmp_path):
             "manifest_value": "a2a3",
             "toolchain_variant_value": "a2a3sim",
             "toolchain_platform_value": "a2a3sim",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+            "detail": "build/toolchain.json pto_isa_contract does not match the PTO variant contract.",
+            "toolchain_field": "build/toolchain.json.pto_isa_contract",
+            "toolchain_value": "pto-isa:a2a3sim",
+            "expected_value": "pto-isa:a2a3",
         },
         {
             "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
@@ -364,9 +378,74 @@ def test_pto_binding_reports_toolchain_contract_mismatch(tmp_path):
     assert report.ok is False
     assert report.diagnostics == [
         {
+            "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+            "detail": "manifest.json extensions.pto.pto_runtime_contract does not match the PTO variant contract.",
+            "manifest_field": "extensions.pto.pto_runtime_contract",
+            "manifest_value": "pto-runtime:other",
+            "expected_value": "pto-runtime:dev",
+        },
+        {
             "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
             "detail": "build/toolchain.json pto_runtime_contract does not match manifest.json extensions.pto.pto_runtime_contract.",
             "manifest_field": "extensions.pto.pto_runtime_contract",
+        },
+    ]
+
+
+def test_pto_binding_rejects_noncanonical_contract_ids(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    manifest_path = package_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["extensions"]["pto"]["pto_runtime_contract"] = "pto-runtime:not-real"
+    manifest["extensions"]["pto"]["pto_isa_contract"] = "pto-isa:not-real"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+    toolchain_manifest_path = package_dir / "build" / "toolchain.json"
+    toolchain_manifest = json.loads(toolchain_manifest_path.read_text())
+    toolchain_manifest["pto_runtime_contract"] = "pto-runtime:not-real"
+    toolchain_manifest["pto_isa_contract"] = "pto-isa:not-real"
+    toolchain_manifest_path.write_text(json.dumps(toolchain_manifest, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+            "detail": "manifest.json extensions.pto.pto_runtime_contract does not match the PTO variant contract.",
+            "manifest_field": "extensions.pto.pto_runtime_contract",
+            "manifest_value": "pto-runtime:not-real",
+            "expected_value": "pto-runtime:dev",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+            "detail": "manifest.json extensions.pto.pto_isa_contract does not match the PTO variant contract.",
+            "manifest_field": "extensions.pto.pto_isa_contract",
+            "manifest_value": "pto-isa:not-real",
+            "expected_value": "pto-isa:a2a3sim",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+            "detail": "build/toolchain.json pto_runtime_contract does not match the PTO variant contract.",
+            "toolchain_field": "build/toolchain.json.pto_runtime_contract",
+            "toolchain_value": "pto-runtime:not-real",
+            "expected_value": "pto-runtime:dev",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+            "detail": "build/toolchain.json pto_isa_contract does not match the PTO variant contract.",
+            "toolchain_field": "build/toolchain.json.pto_isa_contract",
+            "toolchain_value": "pto-isa:not-real",
+            "expected_value": "pto-isa:a2a3sim",
         },
     ]
 

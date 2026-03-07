@@ -1,4 +1,4 @@
-from .arch import BACKEND, DEFAULT_VARIANT, PTOArch, SUPPORTED_VARIANTS, arch_for, normalize_variant
+from .arch import BACKEND, DEFAULT_VARIANT, SUPPORTED_VARIANTS, PTOArch, arch_for, normalize_variant
 from .emit import PTO_CODEGEN_SCHEMA_ID, PTO_PROJECT_DIR, emit_package
 from .lower import PTOCodegenPlan, PTOKernelSpec, PTOOrchestrationSpec, lower_program
 

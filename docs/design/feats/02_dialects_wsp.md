@@ -35,4 +35,3 @@ Support an authoring workflow where:
   - memory placement decisions
 
 Backends interpret schedule metadata differently, but the schedule must be validated against backend capability contracts.
-
