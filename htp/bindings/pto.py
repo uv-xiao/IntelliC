@@ -172,6 +172,10 @@ class PTOBinding(ManifestBinding):
             )
 
         manifest_pto_extension = self._pto_extension()
+        if manifest_pto_extension is None:
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto"))
+            return diagnostics
+
         codegen_backend = codegen_index.get("backend") if isinstance(codegen_index.get("backend"), str) else None
         if self.backend != codegen_backend:
             diagnostics.append(
@@ -186,36 +190,39 @@ class PTOBinding(ManifestBinding):
                 }
             )
 
-        if manifest_pto_extension is not None:
-            extension_platform = (
-                manifest_pto_extension.get("platform")
-                if isinstance(manifest_pto_extension.get("platform"), str)
-                else None
+        extension_platform = (
+            manifest_pto_extension.get("platform")
+            if isinstance(manifest_pto_extension.get("platform"), str)
+            else None
+        )
+        codegen_variant = codegen_index.get("variant") if isinstance(codegen_index.get("variant"), str) else None
+        if self.variant != extension_platform or self.variant != codegen_variant:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                    "detail": "PTO metadata variant/platform does not agree across manifest target, manifest extensions, and pto_codegen.json.",
+                    "field": "variant",
+                    "manifest_field": "target.variant",
+                    "extension_field": "extensions.pto.platform",
+                    "codegen_field": f"{codegen_index_path}.variant",
+                    "manifest_value": self.variant,
+                    "extension_value": extension_platform,
+                    "codegen_value": codegen_variant,
+                }
             )
-            codegen_variant = codegen_index.get("variant") if isinstance(codegen_index.get("variant"), str) else None
-            if self.variant != extension_platform or self.variant != codegen_variant:
-                diagnostics.append(
-                    {
-                        "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
-                        "detail": "PTO metadata variant/platform does not agree across manifest target, manifest extensions, and pto_codegen.json.",
-                        "field": "variant",
-                        "manifest_field": "target.variant",
-                        "extension_field": "extensions.pto.platform",
-                        "codegen_field": f"{codegen_index_path}.variant",
-                        "manifest_value": self.variant,
-                        "extension_value": extension_platform,
-                        "codegen_value": codegen_variant,
-                    }
-                )
 
-            manifest_runtime_config = manifest_pto_extension.get("runtime_config")
+        manifest_kernel_project_dir = manifest_pto_extension.get("kernel_project_dir")
+        if not isinstance(manifest_kernel_project_dir, str):
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.kernel_project_dir"))
+
+        manifest_runtime_config = manifest_pto_extension.get("runtime_config")
+        if manifest_runtime_config is None:
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.runtime_config"))
+        else:
             expected_manifest_runtime_config = {
                 key: value for key, value in dict(runtime_config).items() if key != "platform"
             }
-            if manifest_runtime_config is not None and (
-                not isinstance(manifest_runtime_config, Mapping)
-                or dict(manifest_runtime_config) != expected_manifest_runtime_config
-            ):
+            if not isinstance(manifest_runtime_config, Mapping) or dict(manifest_runtime_config) != expected_manifest_runtime_config:
                 diagnostics.append(
                     {
                         "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
@@ -224,18 +231,17 @@ class PTOBinding(ManifestBinding):
                     }
                 )
 
-            manifest_orchestration_entry = manifest_pto_extension.get("orchestration_entry")
-            if manifest_orchestration_entry is not None and (
-                not isinstance(manifest_orchestration_entry, Mapping)
-                or dict(manifest_orchestration_entry) != dict(orchestration)
-            ):
-                diagnostics.append(
-                    {
-                        "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
-                        "detail": "manifest.json extensions.pto.orchestration_entry does not match kernel_config.py ORCHESTRATION.",
-                        "manifest_field": "extensions.pto.orchestration_entry",
-                    }
-                )
+        manifest_orchestration_entry = manifest_pto_extension.get("orchestration_entry")
+        if manifest_orchestration_entry is None:
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.orchestration_entry"))
+        elif not isinstance(manifest_orchestration_entry, Mapping) or dict(manifest_orchestration_entry) != dict(orchestration):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                    "detail": "manifest.json extensions.pto.orchestration_entry does not match kernel_config.py ORCHESTRATION.",
+                    "manifest_field": "extensions.pto.orchestration_entry",
+                }
+            )
 
         for kernel in kernels:
             source = kernel.get("source")
@@ -312,6 +318,13 @@ class PTOBinding(ManifestBinding):
         if mode == "device":
             return "a2a3"
         return "a2a3sim" if self.variant is None else self.variant
+
+    def _missing_metadata_diagnostic(self, field: str) -> dict[str, Any]:
+        return {
+            "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+            "detail": f"manifest.json {field} is required for PTO packages.",
+            "manifest_field": field,
+        }
 
 
 def _load_python_module(path: Path, *, module_name: str) -> Any:
