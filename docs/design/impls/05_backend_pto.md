@@ -190,9 +190,11 @@ runtime expects:
 
 - kernel binaries export the unified symbol `kernel_entry`,
 - host orchestration exports `extern "C" int <name>(Runtime*, uint64_t*, int)`,
-- the v1 example emits a minimal single-task `host_build_graph` smoke run so the
-  real `a2a3sim` runtime path is exercised even before richer tensor marshaling
-  lands in the binding.
+- `a2a3sim` uses a simulation-specific kernel source path (plain C++ loops for
+  vector-style kernels) so local host compilation remains viable without making
+  PTO ISA the native owner of simulation semantics,
+- the v1 example performs real buffer/scalar marshaling from `numpy` arrays into
+  the `host_build_graph` ABI and validates `out = lhs + rhs` numerically.
 
 The binding should write build/run logs into:
 

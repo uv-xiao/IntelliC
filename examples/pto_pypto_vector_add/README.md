@@ -23,5 +23,5 @@ Notes:
 - build/run require the local `3rdparty/pto-runtime/` checkout (or the
   compatibility fallback `references/pto-runtime/`) and the host
   compilers that `pto-runtime` expects;
-- the current v1 execution path is a real PTO smoke run over the
-  `host_build_graph` ABI rather than a full tensor-marshaling demo.
+- the current example performs real `numpy.float32` buffer marshaling into the
+  `host_build_graph` ABI and validates `out = lhs + rhs` in `a2a3sim`.

@@ -16,6 +16,7 @@ vector-add flow, but uses HTP’s artifact-first pipeline:
 
 The example is designed so replay always works. Package execution is also real
 when the local PTO reference runtime is available under `3rdparty/pto-runtime/`
-(or the compatibility fallback `references/pto-runtime/`), but the current v1 example is
-an execution smoke test over the `host_build_graph` ABI rather than a full
-tensor-marshaling numerical validation.
+(or the compatibility fallback `references/pto-runtime/`): HTP marshals
+`numpy.float32` input/output buffers plus the logical `size` scalar into the
+`host_build_graph` ABI, and `a2a3sim` returns the numerically validated
+`out = lhs + rhs` result.

@@ -6,7 +6,8 @@ hardware abstraction story:
 - compile a block-level GEMM tile to the `nvgpu` backend,
 - replay the final Python stage in `sim`,
 - run the package in `sim` with a registered kernel handler,
-- optionally materialize `.ptx` / `.cubin` and launch the zero-argument kernel
+- optionally materialize `.ptx` / `.cubin` and launch the GEMM kernel with real
+  tensor and shape arguments
   on a CUDA device.
 
 Run it from the repo root:

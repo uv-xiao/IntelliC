@@ -24,8 +24,10 @@ The canonical compiler form is staged Python-space state plus emitted replay
 programs.
 
 - identity and maps live in `htp/ir/`
-- pass-local and stage-local state lives in `htp/ir/state.py`
+- typed semantic state lives in `htp/ir/semantics.py`
 - every stage emits `program.py` for `sim` replay
+- every stage also emits semantic payloads (`kernel_ir.json`, `workload_ir.json`,
+  `types.json`, `layout.json`, `effects.json`, `schedule.json`)
 - analyses are emitted as artifacts alongside the stage program
 
 See `docs/design/impls/01_ir_model.md` and `docs/design/impls/02_pass_manager.md`.
@@ -35,15 +37,23 @@ See `docs/design/impls/01_ir_model.md` and `docs/design/impls/02_pass_manager.md
 The default pipeline today is:
 
 1. `ast_canonicalize`
-2. `typecheck_layout_effects`
-3. `analyze_schedule`
-4. `apply_schedule`
-5. `emit_package`
+2. `semantic_model`
+3. `typecheck_layout_effects`
+4. `analyze_schedule`
+5. `apply_schedule`
+6. `emit_package`
 
 These passes live in `htp/passes/` and emit:
 
 - `ir/pass_trace.jsonl`
 - `ir/stages/<id>/program.py`
+- `ir/stages/<id>/program.pyast.json`
+- `ir/stages/<id>/kernel_ir.json`
+- `ir/stages/<id>/workload_ir.json`
+- `ir/stages/<id>/types.json`
+- `ir/stages/<id>/layout.json`
+- `ir/stages/<id>/effects.json`
+- `ir/stages/<id>/schedule.json`
 - `ir/stages/<id>/analysis/index.json`
 - `ir/stages/<id>/ids/*.json`
 - `ir/stages/<id>/summary.json`
@@ -76,7 +86,8 @@ The normative schemas and validators live in:
 
 HTP emits a PTO package and delegates real build/run work to the local
 `pto-runtime` checkout, preferring `3rdparty/pto-runtime/` and falling back to
-`references/pto-runtime/`.
+`references/pto-runtime/`. The current implemented example path is a numerically
+validated `a2a3sim` vector add over marshaled `numpy.float32` buffers.
 
 ### NV-GPU
 
@@ -86,7 +97,8 @@ HTP emits a PTO package and delegates real build/run work to the local
 - CUDA adapter: `htp/bindings/nvgpu_cuda_adapter.py`
 
 HTP owns `.cu` source artifacts; the binding owns `nvcc` materialization and
-CUDA-driver launch.
+CUDA-driver launch. The current implemented example path is a real GEMM kernel
+running on CUDA with explicit tensor/scalar arguments.
 
 ## 6. Replay versus backend execution
 

@@ -13,7 +13,8 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/backends/pto/lower.py` — PTO codegen plan
 - `htp/backends/pto/emit.py` — PTO artifact emission
 - `htp/bindings/pto.py` — PTO validation / build / run / replay
-- `htp/bindings/pto_runtime_adapter.py` — real `pto-runtime` integration
+- `htp/bindings/pto_runtime_adapter.py` — real `pto-runtime` integration, including
+  `numpy` buffer/scalar marshaling for `a2a3sim`
 - `3rdparty/pto-runtime/` — preferred external runtime checkout used by PTO execution
 
 ## NV-GPU path
@@ -36,3 +37,4 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `tests/backends/nvgpu/`
 - `tests/bindings/`
 - `tests/golden/`
+- `tests/examples/`

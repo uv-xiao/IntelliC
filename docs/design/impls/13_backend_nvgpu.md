@@ -154,7 +154,9 @@ The current v1 implementation is intentionally narrow:
 
 - `build(mode="device")` uses `nvcc` to materialize `.ptx` and `.cubin` from the authoritative `.cu` source,
 - `run(mode="device")` loads the produced `.cubin` through a minimal CUDA driver adapter and launches the kernel,
-- only zero-argument kernels are executed through the device adapter in v1,
+- tensor/scalar argument marshaling is implemented for the current elementwise
+  and GEMM kernels, with the Arknife GEMM example serving as the real-device
+  numerical reference path,
 - `mode="sim"` remains the Python-space replay path and does not require CUDA.
 
 ### 5.1 Source-first rule

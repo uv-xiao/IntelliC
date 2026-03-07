@@ -14,7 +14,7 @@ This example turns the Arknife hardware-model story into concrete HTP code:
 4. optionally build `.ptx` / `.cubin` with `nvcc` and launch the kernel on a
    CUDA device.
 
-The device path is intentionally narrow in v1: it is a source-first,
-zero-argument launch path that proves the binding-owned build/load/run seam.
-On machines with `nvcc` and a working CUDA driver, the current example runs the
-real-device path end-to-end.
+The device path is intentionally narrow in v1 but numerically real: it is a
+source-first GEMM launch path with explicit tensor/scalar arguments, and on
+machines with `nvcc` and a working CUDA driver it runs the real-device path
+end-to-end.

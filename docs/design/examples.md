@@ -18,9 +18,9 @@ Flow:
 3. build the PTO package through the binding adapter
 4. run the package through the real `pto-runtime` `host_build_graph` simulation path
 
-This example is intentionally a smoke path for runtime integration: it proves
-the emitted PTO ABI and the build/run seam without yet implementing rich tensor
-marshaling in the binding.
+This example is now a real numerical path: the binding marshals
+`numpy.float32` input/output buffers and the logical `size` scalar into the
+`host_build_graph` ABI, and `a2a3sim` returns the validated vector-add output.
 
 ## NV-GPU example
 
