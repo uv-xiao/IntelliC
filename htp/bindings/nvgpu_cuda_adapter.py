@@ -79,28 +79,40 @@ def run_package(
 ) -> tuple[bool, Any, list[dict[str, Any]]]:
     contract = load_contract(package_dir, manifest)
     if kwargs:
-        return False, None, [
-            {
-                "code": "HTP.BINDINGS.NVGPU_UNSUPPORTED_KEYWORD_ARGS",
-                "detail": "NV-GPU device execution only supports positional arguments in v1.",
-            }
-        ]
+        return (
+            False,
+            None,
+            [
+                {
+                    "code": "HTP.BINDINGS.NVGPU_UNSUPPORTED_KEYWORD_ARGS",
+                    "detail": "NV-GPU device execution only supports positional arguments in v1.",
+                }
+            ],
+        )
     if args:
-        return False, None, [
-            {
-                "code": "HTP.BINDINGS.NVGPU_UNSUPPORTED_ARGUMENTS",
-                "detail": "NV-GPU device execution only supports zero-argument kernels in v1.",
-            }
-        ]
+        return (
+            False,
+            None,
+            [
+                {
+                    "code": "HTP.BINDINGS.NVGPU_UNSUPPORTED_ARGUMENTS",
+                    "detail": "NV-GPU device execution only supports zero-argument kernels in v1.",
+                }
+            ],
+        )
     if entry != contract.entrypoint:
-        return False, None, [
-            {
-                "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
-                "detail": f"Entrypoint {entry!r} is not defined for the NV-GPU package.",
-                "entry": entry,
-                "available_entries": [contract.entrypoint],
-            }
-        ]
+        return (
+            False,
+            None,
+            [
+                {
+                    "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
+                    "detail": f"Entrypoint {entry!r} is not defined for the NV-GPU package.",
+                    "entry": entry,
+                    "available_entries": [contract.entrypoint],
+                }
+            ],
+        )
 
     built_outputs, build_diagnostics = build_package(package_dir, manifest, force=False)
     if build_diagnostics:
@@ -115,14 +127,18 @@ def run_package(
             thread_block=kernel.thread_block,
         )
     except Exception as exc:
-        return False, None, [
-            {
-                "code": "HTP.BINDINGS.NVGPU_RUNTIME_UNAVAILABLE",
-                "detail": str(exc),
-                "kernel": kernel.func_id,
-                "cubin": cubin_path.as_posix(),
-            }
-        ]
+        return (
+            False,
+            None,
+            [
+                {
+                    "code": "HTP.BINDINGS.NVGPU_RUNTIME_UNAVAILABLE",
+                    "detail": str(exc),
+                    "kernel": kernel.func_id,
+                    "cubin": cubin_path.as_posix(),
+                }
+            ],
+        )
     return (
         True,
         {

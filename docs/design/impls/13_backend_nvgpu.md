@@ -17,6 +17,13 @@ Local design reference:
 
 - `docs/reference/19_arknife.md`
 
+Current implementation anchors:
+
+- emitter: `htp/backends/nvgpu/emit.py`
+- binding: `htp/bindings/nvgpu.py`
+- device adapter: `htp/bindings/nvgpu_cuda_adapter.py`
+- runnable example: `examples/nvgpu_arknife_gemm/demo.py`
+
 ---
 
 ## 1) Backend identity

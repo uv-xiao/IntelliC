@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 REFERENCE_PYTHON_DIR = Path(__file__).resolve().parents[2] / "references" / "pto-runtime" / "python"
 
 
@@ -57,7 +56,7 @@ def build_package(
         )
         kernel_binaries = {}
         for kernel in contract.kernels:
-            source_path = contract.package_dir / str(kernel["source"])
+            source_path = _resolve_project_path(contract.package_dir, str(kernel["source"]))
             kernel_binaries[int(kernel["func_id"])] = kernel_compiler.compile_incore(
                 str(source_path),
                 core_type=str(kernel["core_type"]),
@@ -109,21 +108,29 @@ def run_package(
 ) -> tuple[bool, Any, list[dict[str, Any]]]:
     contract = load_contract(package_dir, manifest)
     if kwargs:
-        return False, None, [
-            _diagnostic(
-                "HTP.BINDINGS.PTO_UNSUPPORTED_KEYWORD_ARGS",
-                "PTO package execution only supports positional scalar arguments in v1.",
-            )
-        ]
+        return (
+            False,
+            None,
+            [
+                _diagnostic(
+                    "HTP.BINDINGS.PTO_UNSUPPORTED_KEYWORD_ARGS",
+                    "PTO package execution only supports positional scalar arguments in v1.",
+                )
+            ],
+        )
     if entry != contract.entrypoint:
-        return False, None, [
-            {
-                "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
-                "detail": f"Entrypoint {entry!r} is not defined for the PTO package.",
-                "entry": entry,
-                "available_entries": [contract.entrypoint],
-            }
-        ]
+        return (
+            False,
+            None,
+            [
+                {
+                    "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
+                    "detail": f"Entrypoint {entry!r} is not defined for the PTO package.",
+                    "entry": entry,
+                    "available_entries": [contract.entrypoint],
+                }
+            ],
+        )
 
     built_outputs, build_diagnostics = build_package(package_dir, manifest, mode=mode, force=False)
     if build_diagnostics:
@@ -191,7 +198,9 @@ def load_contract(package_dir: Path, manifest: Mapping[str, Any]) -> PTOContract
         output_codegen_index = str(outputs.get("pto_codegen_index", output_codegen_index))
         output_toolchain_manifest = str(outputs.get("toolchain_manifest", output_toolchain_manifest))
 
-    kernel_config = _load_python_module(package_dir / output_kernel_config, module_name="htp_pto_kernel_config_runtime")
+    kernel_config = _load_python_module(
+        package_dir / output_kernel_config, module_name="htp_pto_kernel_config_runtime"
+    )
     codegen_index = json.loads((package_dir / output_codegen_index).read_text())
     toolchain_manifest = json.loads((package_dir / output_toolchain_manifest).read_text())
     runtime_config = dict(getattr(kernel_config, "RUNTIME_CONFIG"))

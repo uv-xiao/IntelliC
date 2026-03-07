@@ -10,7 +10,8 @@ The redo’s core thesis:
 2. Extensibility only works if the framework can **type-check composition across extensions** (dialects, intrinsics, layouts, passes, pipelines, backends, bindings).
 3. Therefore HTP must be designed as an **AST-first, artifact-first, capability-typed compiler framework**, not as an incremental evolution of a single-backend compiler.
 
-This is a docs-only design under `docs/design/`.
+The design lives under `docs/design/`, and the current implementation now
+lands incrementally in the `htp/` package and `examples/`.
 
 ---
 
@@ -35,16 +36,13 @@ HTP also treats **LLM-based compiler development** as a native target of the fra
 - intermediate programs are replayable (sim) so agents can verify behavior stage-by-stage,
 - and extension surfaces are bounded so autonomous edits remain safe and reviewable.
 
-## 1.1 Naming and repo reality (docs-only)
+## 1.1 Naming and repo reality
 
 This redo uses the name **HTP** consistently in design documents to reflect the multi-backend, multi-level ambition.
 
-- The repository and Python module may still be named `pto-wsp` / `pto_wsp` today.
-- This redo does not rename code; it establishes the *target architecture* and terminology.
-- A future execution plan must provide:
-  - a new `htp` package,
-  - remove all `pto_wsp`s,
-  - no deprecated allowed, all removed.
+- The target architecture is named **HTP**, and the active implementation now
+  lives under the `htp/` package.
+- Historical PTO-WSP materials remain only as archived references.
 
 ---
 

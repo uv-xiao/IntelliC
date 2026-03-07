@@ -19,7 +19,9 @@ def test_nvgpu_cuda_adapter_builds_ptx_and_cubin(tmp_path, monkeypatch):
 
     monkeypatch.setattr(nvgpu_cuda_adapter, "_find_nvcc", lambda: "/usr/local/cuda/bin/nvcc")
 
-    def fake_run_nvcc(nvcc_path: str, source_path: Path, output_path: Path, cuda_arch: str, *, target_format: str) -> None:
+    def fake_run_nvcc(
+        nvcc_path: str, source_path: Path, output_path: Path, cuda_arch: str, *, target_format: str
+    ) -> None:
         assert nvcc_path.endswith("nvcc")
         assert source_path.name == "demo_kernel.cu"
         assert cuda_arch == "sm80"

@@ -11,6 +11,7 @@ Read order for details:
 - WHAT (feature surfaces + contracts): `docs/design/features.md`
 - HOW (architecture + components): `docs/design/implementations.md`
 - E2E examples: `docs/design/examples.md`
+- Code map: `docs/design/code_map.md`
 - Deep evidence report (Triton/JAX/TileLang/MLIR): `docs/design/reports/retargetable_extensibility_report.md`
 
 ---
@@ -38,6 +39,11 @@ The first implementation target is also now explicit: HTP v1 should prove the de
 different backends—**PTO/Ascend** and **NV-GPU** (starting with Ampere and Blackwell profiles, using Arknife-style
 hardware modeling as the reference shape)—while keeping MLIR-based round-trips and vendor toolchain integrations as
 **extensions**, not native semantic owners of the core compiler.
+
+Those two proof points now have concrete runnable examples in:
+
+- `examples/pto_pypto_vector_add/demo.py`
+- `examples/nvgpu_arknife_gemm/demo.py`
 
 ---
 

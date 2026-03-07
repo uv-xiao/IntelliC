@@ -17,6 +17,13 @@ The most important distinction is that bindings unify three different activities
 - **backend package execution**,
 - **build/materialization**.
 
+Current implementation anchors:
+
+- binding selection: `htp/bindings/api.py`
+- base binding lifecycle: `htp/bindings/base.py`
+- PTO binding path: `htp/bindings/pto.py`
+- NV-GPU binding path: `htp/bindings/nvgpu.py`
+
 ---
 
 ## 1) Binding lifecycle

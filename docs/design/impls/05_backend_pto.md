@@ -12,6 +12,13 @@ orchestration “project” and let the binding invoke `pto-runtime`’s builder
 
 Local reference checkout (gitignored): `references/pto-runtime/`.
 
+Current implementation anchors:
+
+- emitter: `htp/backends/pto/emit.py`
+- binding: `htp/bindings/pto.py`
+- runtime adapter: `htp/bindings/pto_runtime_adapter.py`
+- runnable example: `examples/pto_pypto_vector_add/demo.py`
+
 ---
 
 ## 1) Backend identity

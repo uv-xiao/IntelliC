@@ -48,7 +48,15 @@ class _FakeBindingsModule:
         assert binary == b"host-runtime"
 
         class _Runtime:
-            def initialize(self, orch_so_binary, orch_func_name, func_args=None, arg_types=None, arg_sizes=None, kernel_binaries=None):
+            def initialize(
+                self,
+                orch_so_binary,
+                orch_func_name,
+                func_args=None,
+                arg_types=None,
+                arg_sizes=None,
+                kernel_binaries=None,
+            ):
                 assert orch_so_binary == b"orch-binary"
                 assert orch_func_name == "demo_kernel_orchestrate"
                 assert func_args == [7]

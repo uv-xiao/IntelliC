@@ -3,6 +3,7 @@ __old_pto_wsp/
 
 # Build/test caches
 build/
+artifacts/
 .pytest_cache/
 .ruff_cache/
 __pycache__/

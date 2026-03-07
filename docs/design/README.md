@@ -1,4 +1,4 @@
-# HTP Redo (docs-only) — Index
+# HTP Design — Index
 
 This folder is the **redo design** described by `docs/design/REDO.md`.
 
@@ -9,6 +9,7 @@ This folder is the **redo design** described by `docs/design/REDO.md`.
 - `docs/design/implementations.md` — architecture and contracts (HOW)
 - `docs/design/story.md` — cohesive end-to-end narrative (WHY→WHAT→HOW)
 - `docs/design/examples.md` — end-to-end examples
+- `docs/design/code_map.md` — where the current implementation lives
 
 ## Completeness criteria
 
@@ -26,6 +27,8 @@ Notable deep dives:
 - MLIR round-trip island contract: `docs/design/impls/12_mlir_roundtrip_island.md`
 - NV-GPU backend contract: `docs/design/impls/13_backend_nvgpu.md`
 
-## Scope note
+## Runnable examples
 
-This redo is **docs-only**: it does not rename packages, move code, or change build scripts yet.
+- `examples/pto_pypto_vector_add/` — PyPTO-inspired PTO example
+- `examples/nvgpu_arknife_gemm/` — Arknife-inspired NV-GPU example
+- `docs/examples/` — standalone walkthroughs for those runnable examples

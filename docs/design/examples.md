@@ -7,7 +7,12 @@ This file provides end-to-end examples across:
 - serving routine orchestration
 - multiple backends (PTO simulation/device; NV-GPU; optional AIE/MLIR-AIE extension)
 
-The code is illustrative pseudo-Python: it prioritizes semantics and contracts over exact API names.
+The examples below remain design-oriented pseudo-code, but they now have concrete implementation anchors:
+
+- PyPTO-inspired PTO example: `examples/pto_pypto_vector_add/demo.py`
+- Arknife-inspired NV-GPU example: `examples/nvgpu_arknife_gemm/demo.py`
+- Standalone walkthroughs: `docs/examples/pto_pypto_vector_add.md`, `docs/examples/nvgpu_arknife_gemm.md`
+- Full design-to-code map: `docs/design/code_map.md`
 
 ---
 

@@ -169,3 +169,5 @@ For optional extension backends/toolchains such as AIE:
 - MLIR-based round-trips are extensions; the core compiler only provides the extension mechanism.
 - The examples document covers kernel/backend, CSP pipeline, optional extension backend, multi-backend serving, compiler
   extension, and staged warp-specialization-style optimization stories.
+- The currently implemented proof examples are discoverable through `docs/design/code_map.md`, `docs/examples/`, and
+  `examples/`.

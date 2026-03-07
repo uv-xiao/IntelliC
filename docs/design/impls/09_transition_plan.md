@@ -1,27 +1,27 @@
-# Impl: Transition Plan (docs-only in this redo)
+# Impl: Transition Plan
 
-This redo intentionally produces **design documents only** under `docs/design/`. No production code is migrated or kept
-from the old PTO-WSP codebase on this branch.
+This design started as a documentation-first redo, but the repository now also
+contains an active `htp/` implementation and runnable examples under
+`examples/`.
 
 The purpose of this document is to make the eventual implementation transition executable and low-risk by being explicit
 about ordering, compatibility expectations, and verification gates.
 
 ---
 
-## 1) Scope and non-goals (for the docs-only redo)
+## 1) Scope and non-goals
 
 In scope:
 
-- a complete “ready to implement” design under `docs/design/`
+- keeping the implementation aligned with the design contracts under `docs/design/`
 - explicit backend artifact contracts
 - explicit pass/pipeline contracts (including analysis vs transform effects)
-- acceptance checklist for design completeness
+- runnable examples and verification gates
 
 Out of scope:
 
-- any real compiler implementation in this branch
-- shipping toolchain integrations
-- performance work
+- preserving legacy PTO-WSP internals
+- performance tuning beyond contract-proving examples
 
 ---
 

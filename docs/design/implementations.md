@@ -13,6 +13,12 @@ HTP is a Python-driven compiler framework with:
 
 This file describes components and data flow; implementation deep dives are in `docs/design/impls/`.
 
+Implementation anchors:
+
+- code map: `docs/design/code_map.md`
+- PTO example: `examples/pto_pypto_vector_add/demo.py`
+- NV-GPU example: `examples/nvgpu_arknife_gemm/demo.py`
+
 Related design references already captured in this repo:
 
 - Artifact packaging patterns: `docs/reference/18_pypto.md`
@@ -311,7 +317,7 @@ Deep dive: `docs/design/impls/06_backend_aie.md`.
 - “effect mismatch”: stream protocol mismatch; pending collectives not discharged.
 - “backend handler missing”: intrinsic lacks lowering/emitter for backend.
 
-### 5.2 Testing strategy (docs-only requirement)
+### 5.2 Testing strategy
 
 - Golden artifact tests: compile example → compare manifest + key emitted files.
 - Type-check tests: known-bad programs produce stable diagnostics.
