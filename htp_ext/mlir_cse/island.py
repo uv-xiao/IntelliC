@@ -7,6 +7,14 @@ from typing import Any
 
 from htp.artifacts.manifest import write_manifest
 from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
+from htp.passes.program_model import (
+    build_schedule_plan,
+    build_semantic_model,
+    build_type_layout_effects,
+    canonicalize_program,
+    scheduled_ops_from_plan,
+    stage_payloads_from_program,
+)
 from htp.runtime import Runtime, extensions
 
 from .export import analyze_program, eligibility_for, export_program
@@ -14,6 +22,8 @@ from .import_ import import_program
 
 EXTENSION_ID = "htp_ext.mlir_cse"
 EXTENSION_DIR = Path("extensions") / "mlir_cse"
+EXPORT_STAGE_DIR = Path("ir") / "stages" / "s01" / "islands" / "mlir_cse"
+IMPORT_STAGE_DIR = Path("ir") / "stages" / "s02" / "islands" / "mlir_cse"
 
 
 def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict[str, Any]:
@@ -34,17 +44,40 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
         ledger=ledger,
         import_summary=import_summary,
     )
+    _write_stage_island_artifacts(
+        package_path,
+        module_text=module_text,
+        eligibility=eligibility,
+        ledger=ledger,
+        import_summary=import_summary,
+    )
+
+    export_program_state = _semanticize_expr_program(program)
+    import_program_state = _semanticize_expr_program(imported_program)
+
+    export_payloads = stage_payloads_from_program(export_program_state)
+    import_payloads = stage_payloads_from_program(import_program_state)
 
     stage_export = write_stage(
         package_path,
         StageSpec(
             stage_id="s01",
             pass_id="htp_ext.mlir_cse::export@1",
+            islands=(({"island_id": "mlir_cse", "dir": EXPORT_STAGE_DIR.as_posix()}),),
             runnable_py=RunnablePySpec(
                 status="preserves",
                 modes=("sim",),
                 program_text=_export_stage_program(),
             ),
+            program_ast_payload=export_payloads["program_ast_payload"],
+            kernel_ir_payload=export_payloads["kernel_ir_payload"],
+            workload_ir_payload=export_payloads["workload_ir_payload"],
+            types_payload=export_payloads["types_payload"],
+            layout_payload=export_payloads["layout_payload"],
+            effects_payload=export_payloads["effects_payload"],
+            schedule_payload=export_payloads["schedule_payload"],
+            entities_payload=export_payloads["entities_payload"],
+            bindings_payload=export_payloads["bindings_payload"],
             summary_payload={
                 "stage_id": "s01",
                 "pass": "htp_ext.mlir_cse::export@1",
@@ -59,11 +92,21 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
         StageSpec(
             stage_id="s02",
             pass_id="htp_ext.mlir_cse::import@1",
+            islands=(({"island_id": "mlir_cse", "dir": IMPORT_STAGE_DIR.as_posix()}),),
             runnable_py=RunnablePySpec(
                 status="preserves",
                 modes=("sim",),
                 program_text=_import_stage_program(imported_program, import_summary, analysis["inputs"]),
             ),
+            program_ast_payload=import_payloads["program_ast_payload"],
+            kernel_ir_payload=import_payloads["kernel_ir_payload"],
+            workload_ir_payload=import_payloads["workload_ir_payload"],
+            types_payload=import_payloads["types_payload"],
+            layout_payload=import_payloads["layout_payload"],
+            effects_payload=import_payloads["effects_payload"],
+            schedule_payload=import_payloads["schedule_payload"],
+            entities_payload=import_payloads["entities_payload"],
+            bindings_payload=import_payloads["bindings_payload"],
             summary_payload={
                 "stage_id": "s02",
                 "pass": "htp_ext.mlir_cse::import@1",
@@ -124,6 +167,95 @@ def _write_extension_artifacts(
     (extension_dir / "eligibility.json").write_text(json.dumps(dict(eligibility), indent=2) + "\n")
     (extension_dir / "ledger.json").write_text(json.dumps(dict(ledger), indent=2) + "\n")
     (extension_dir / "import_summary.json").write_text(json.dumps(dict(import_summary), indent=2) + "\n")
+
+
+def _write_stage_island_artifacts(
+    package_path: Path,
+    *,
+    module_text: str,
+    eligibility: Mapping[str, Any],
+    ledger: Mapping[str, Any],
+    import_summary: Mapping[str, Any],
+) -> None:
+    export_dir = package_path / EXPORT_STAGE_DIR
+    import_dir = package_path / IMPORT_STAGE_DIR
+    export_dir.mkdir(parents=True, exist_ok=True)
+    import_dir.mkdir(parents=True, exist_ok=True)
+    (export_dir / "module.mlir").write_text(module_text)
+    (export_dir / "eligibility.json").write_text(json.dumps(dict(eligibility), indent=2) + "\n")
+    (export_dir / "ledger.json").write_text(json.dumps(dict(ledger), indent=2) + "\n")
+    (import_dir / "import_summary.json").write_text(json.dumps(dict(import_summary), indent=2) + "\n")
+
+
+def _semanticize_expr_program(expr_program: Mapping[str, Any]) -> dict[str, Any]:
+    analysis = analyze_program(expr_program)
+    kernel = {
+        "name": str(expr_program["entry"]),
+        "args": [
+            {"name": name, "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"}
+            for name in analysis["inputs"]
+        ],
+        "ops": [
+            {
+                "op": "elementwise_binary",
+                "operator": expr["op"],
+                "lhs": expr["lhs"],
+                "rhs": expr["rhs"],
+                "out": expr["target"],
+                "shape": [],
+                "dtype": "i32",
+            }
+            for expr in expr_program["exprs"]
+        ],
+    }
+    workload = {
+        "entry": str(expr_program["entry"]),
+        "tasks": [
+            {
+                "task_id": "task0",
+                "kind": "kernel_call",
+                "kernel": str(expr_program["entry"]),
+                "args": list(analysis["inputs"]),
+            }
+        ],
+        "channels": [],
+        "dependencies": [],
+    }
+    state = {
+        "entry": str(expr_program["entry"]),
+        "kernel": kernel,
+        "workload": workload,
+        "analysis": {},
+        "package": {"emitted": False},
+        "target": {"backend": "ext-demo", "option": "sim"},
+    }
+    state["canonical_ast"] = canonicalize_program(state)
+    kernel_ir, workload_ir, entities_payload, bindings_payload = build_semantic_model(state["canonical_ast"])
+    state["kernel_ir"] = kernel_ir
+    state["workload_ir"] = workload_ir
+    state["entities_payload"] = entities_payload
+    state["bindings_payload"] = bindings_payload
+    types, layout, effects = build_type_layout_effects(
+        kernel_ir, workload_ir, target={"backend": "ext-demo", "option": "sim"}
+    )
+    state["types"] = types
+    state["layout"] = layout
+    state["effects"] = effects
+    schedule_plan = build_schedule_plan(
+        entry=state["entry"],
+        kernel_ir=kernel_ir,
+        effects=effects,
+        target={"backend": "ext-demo", "option": "sim"},
+    )
+    state["analysis"]["schedule"] = schedule_plan
+    state["schedule"] = {
+        "schema": "htp.schedule.v1",
+        "applied": True,
+        "ticks": list(schedule_plan["ticks"]),
+        "pipeline_depth": schedule_plan["pipeline_depth"],
+        "ordered_ops": [item["op_id"] for item in scheduled_ops_from_plan(schedule_plan)],
+    }
+    return state
 
 
 def _export_stage_program() -> str:

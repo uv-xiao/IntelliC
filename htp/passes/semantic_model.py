@@ -7,19 +7,19 @@ from typing import Any
 from htp.artifacts.stages import RunnablePySpec
 from htp.passes.contracts import PassContract
 from htp.passes.manager import PassResult
-from htp.passes.program_model import scheduled_ops_from_plan, stage_payloads_from_program
+from htp.passes.program_model import build_semantic_model, stage_payloads_from_program
 from htp.passes.replay_program import render_program_state_module
 
-PASS_ID = "htp::apply_schedule@1"
+PASS_ID = "htp::semantic_model@1"
 
 CONTRACT = PassContract(
     pass_id=PASS_ID,
     owner="htp",
-    kind="transform",
-    ast_effect="mutates",
-    requires=("Analysis.SchedulePlan@1",),
-    provides=("Schedule.Applied@1",),
-    outputs=("ir.ast", "ir.schedule"),
+    kind="mixed",
+    ast_effect="preserves",
+    requires=("Invariant.ASTCanonical@1",),
+    provides=("Semantic.ModelBuilt@1",),
+    outputs=("ir.kernel", "ir.workload", "ids.entities", "ids.bindings"),
 )
 
 
@@ -29,16 +29,11 @@ def run(
     del stage_before
 
     next_program = deepcopy(dict(program))
-    schedule_plan = dict(next_program["analysis"]["schedule"])
-    scheduled_ops = scheduled_ops_from_plan(schedule_plan)
-    next_program["schedule"] = {
-        "schema": "htp.schedule.v1",
-        "applied": True,
-        "ticks": list(schedule_plan["ticks"]),
-        "pipeline_depth": schedule_plan["pipeline_depth"],
-        "ordered_ops": [op["op_id"] for op in scheduled_ops],
-    }
-    next_program["scheduled_ops"] = scheduled_ops
+    kernel_ir, workload_ir, entities_payload, bindings_payload = build_semantic_model(next_program["canonical_ast"])
+    next_program["kernel_ir"] = kernel_ir
+    next_program["workload_ir"] = workload_ir
+    next_program["entities_payload"] = entities_payload
+    next_program["bindings_payload"] = bindings_payload
     stage_payloads = stage_payloads_from_program(next_program)
 
     return next_program, PassResult(
@@ -56,8 +51,8 @@ def run(
         layout_payload=stage_payloads["layout_payload"],
         effects_payload=stage_payloads["effects_payload"],
         schedule_payload=stage_payloads["schedule_payload"],
-        digests={"ast_hash": "demo-scheduled-ast-v2"},
-        time_ms=0.2,
+        digests={"ast_hash": "semantic-model-v1"},
+        time_ms=0.3,
     )
 
 

@@ -102,8 +102,8 @@ def build_pass_trace_event(
         },
         dumps={
             "program_py": stage_after_record["runnable_py"]["program_py"],
-            "program_pyast": None,
-            "metadata": {},
+            "program_pyast": stage_after_record["program_pyast"],
+            "metadata": dict(stage_after_record.get("semantic", {})),
             "ids": {
                 "entities": stage_after_record["ids"]["entities"],
                 "bindings": stage_after_record["ids"]["bindings"],

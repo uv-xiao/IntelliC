@@ -70,10 +70,17 @@ def _stage_graph(manifest: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
 
 
 def _stage_contract_paths(stage: Mapping[str, Any]) -> Iterable[str]:
-    for key in ("dir", "analysis_index", "summary"):
+    for key in ("dir", "analysis_index", "summary", "program_pyast"):
         value = stage.get(key)
         if isinstance(value, str):
             yield value
+
+    semantic = stage.get("semantic")
+    if isinstance(semantic, Mapping):
+        for key in ("kernel_ir", "workload_ir", "types", "layout", "effects", "schedule"):
+            value = semantic.get(key)
+            if isinstance(value, str):
+                yield value
 
     runnable_py = stage.get("runnable_py")
     if isinstance(runnable_py, Mapping):
@@ -86,6 +93,14 @@ def _stage_contract_paths(stage: Mapping[str, Any]) -> Iterable[str]:
     if isinstance(ids, Mapping):
         for key in ("entities", "bindings"):
             value = ids.get(key)
+            if isinstance(value, str):
+                yield value
+    islands = stage.get("islands")
+    if isinstance(islands, list):
+        for island in islands:
+            if not isinstance(island, Mapping):
+                continue
+            value = island.get("dir")
             if isinstance(value, str):
                 yield value
 

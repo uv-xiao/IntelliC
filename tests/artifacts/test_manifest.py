@@ -50,6 +50,15 @@ def test_manifest_contains_normalized_stage_records(tmp_path):
                 "stubs": None,
             },
             "analysis_index": "ir/stages/s00/analysis/index.json",
+            "program_pyast": "ir/stages/s00/program.pyast.json",
+            "semantic": {
+                "kernel_ir": "ir/stages/s00/kernel_ir.json",
+                "workload_ir": "ir/stages/s00/workload_ir.json",
+                "types": "ir/stages/s00/types.json",
+                "layout": "ir/stages/s00/layout.json",
+                "effects": "ir/stages/s00/effects.json",
+                "schedule": "ir/stages/s00/schedule.json",
+            },
             "ids": {
                 "entities": "ir/stages/s00/ids/entities.json",
                 "bindings": "ir/stages/s00/ids/bindings.json",
@@ -78,6 +87,15 @@ def test_manifest_contains_normalized_stage_records(tmp_path):
                 "stubs": "ir/stages/s01/replay/stubs.json",
             },
             "analysis_index": "ir/stages/s01/analysis/index.json",
+            "program_pyast": "ir/stages/s01/program.pyast.json",
+            "semantic": {
+                "kernel_ir": "ir/stages/s01/kernel_ir.json",
+                "workload_ir": "ir/stages/s01/workload_ir.json",
+                "types": "ir/stages/s01/types.json",
+                "layout": "ir/stages/s01/layout.json",
+                "effects": "ir/stages/s01/effects.json",
+                "schedule": "ir/stages/s01/schedule.json",
+            },
             "ids": {
                 "entities": "ir/stages/s01/ids/entities.json",
                 "bindings": "ir/stages/s01/ids/bindings.json",

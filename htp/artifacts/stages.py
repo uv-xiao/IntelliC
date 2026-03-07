@@ -34,6 +34,14 @@ class StageSpec:
     pass_id: str | None
     runnable_py: RunnablePySpec
     analyses: tuple[AnalysisSpec, ...] = ()
+    islands: tuple[dict[str, str], ...] = ()
+    program_ast_payload: dict[str, Any] = field(default_factory=dict)
+    kernel_ir_payload: dict[str, Any] = field(default_factory=dict)
+    workload_ir_payload: dict[str, Any] = field(default_factory=dict)
+    types_payload: dict[str, Any] = field(default_factory=dict)
+    layout_payload: dict[str, Any] = field(default_factory=dict)
+    effects_payload: dict[str, Any] = field(default_factory=dict)
+    schedule_payload: dict[str, Any] = field(default_factory=dict)
     entities_payload: dict[str, Any] = field(default_factory=dict)
     bindings_payload: dict[str, Any] = field(default_factory=dict)
     entity_map_payload: dict[str, Any] | None = None
@@ -62,6 +70,13 @@ def write_stage(package_dir: Path, stage: StageSpec) -> dict[str, object]:
     ids_dir.mkdir(parents=True, exist_ok=True)
 
     _write_text(stage_dir / "program.py", _program_text(stage))
+    _write_json(stage_dir / "program.pyast.json", _program_ast_payload(stage))
+    _write_json(stage_dir / "kernel_ir.json", _kernel_ir_payload(stage))
+    _write_json(stage_dir / "workload_ir.json", _workload_ir_payload(stage))
+    _write_json(stage_dir / "types.json", _types_payload(stage))
+    _write_json(stage_dir / "layout.json", _layout_payload(stage))
+    _write_json(stage_dir / "effects.json", _effects_payload(stage))
+    _write_json(stage_dir / "schedule.json", _schedule_payload(stage))
     _write_json(stage_dir / "summary.json", _summary_payload(stage))
     _write_json(stage_dir / "ids" / "entities.json", _entities_payload(stage))
     _write_json(stage_dir / "ids" / "bindings.json", _bindings_payload(stage))
@@ -98,6 +113,15 @@ def write_stage(package_dir: Path, stage: StageSpec) -> dict[str, object]:
             ),
         },
         "analysis_index": _relative_path(stage_dir / "analysis" / "index.json", package_dir),
+        "program_pyast": _relative_path(stage_dir / "program.pyast.json", package_dir),
+        "semantic": {
+            "kernel_ir": _relative_path(stage_dir / "kernel_ir.json", package_dir),
+            "workload_ir": _relative_path(stage_dir / "workload_ir.json", package_dir),
+            "types": _relative_path(stage_dir / "types.json", package_dir),
+            "layout": _relative_path(stage_dir / "layout.json", package_dir),
+            "effects": _relative_path(stage_dir / "effects.json", package_dir),
+            "schedule": _relative_path(stage_dir / "schedule.json", package_dir),
+        },
         "ids": {
             "entities": _relative_path(stage_dir / "ids" / "entities.json", package_dir),
             "bindings": _relative_path(stage_dir / "ids" / "bindings.json", package_dir),
@@ -114,7 +138,7 @@ def write_stage(package_dir: Path, stage: StageSpec) -> dict[str, object]:
                 else None
             ),
         },
-        "islands": [],
+        "islands": [dict(island) for island in stage.islands],
         "digests": _digests_payload(stage),
         "summary": _relative_path(stage_dir / "summary.json", package_dir),
     }
@@ -135,6 +159,48 @@ def _analysis_index_payload(package_dir: Path, stage: StageSpec) -> dict[str, ob
             for analysis in stage.analyses
         ],
     }
+
+
+def _program_ast_payload(stage: StageSpec) -> dict[str, Any]:
+    if stage.program_ast_payload:
+        return stage.program_ast_payload
+    return {"schema": "htp.program_ast.v1", "program": {}}
+
+
+def _kernel_ir_payload(stage: StageSpec) -> dict[str, Any]:
+    if stage.kernel_ir_payload:
+        return stage.kernel_ir_payload
+    return {"schema": "htp.kernel_ir.v1", "entry": "", "args": [], "buffers": [], "ops": []}
+
+
+def _workload_ir_payload(stage: StageSpec) -> dict[str, Any]:
+    if stage.workload_ir_payload:
+        return stage.workload_ir_payload
+    return {"schema": "htp.workload_ir.v1", "entry": "", "tasks": [], "channels": [], "dependencies": []}
+
+
+def _types_payload(stage: StageSpec) -> dict[str, Any]:
+    if stage.types_payload:
+        return stage.types_payload
+    return {"schema": "htp.types.v1", "values": {}, "buffers": {}}
+
+
+def _layout_payload(stage: StageSpec) -> dict[str, Any]:
+    if stage.layout_payload:
+        return stage.layout_payload
+    return {"schema": "htp.layout.v1", "memory_spaces": {}, "threading": {}, "tiling": {}}
+
+
+def _effects_payload(stage: StageSpec) -> dict[str, Any]:
+    if stage.effects_payload:
+        return stage.effects_payload
+    return {"schema": "htp.effects.v1", "reads": {}, "writes": {}, "barriers": [], "channels": []}
+
+
+def _schedule_payload(stage: StageSpec) -> dict[str, Any]:
+    if stage.schedule_payload:
+        return stage.schedule_payload
+    return {"schema": "htp.schedule.v1", "ticks": [], "ordered_ops": [], "pipeline_depth": 0}
 
 
 def _entities_payload(stage: StageSpec) -> dict[str, Any]:

@@ -15,9 +15,11 @@ from htp.passes import (
     apply_schedule,
     ast_canonicalize,
     emit_package,
+    semantic_model,
     typecheck_layout_effects,
 )
 from htp.passes.contracts import PassContract
+from htp.passes.program_model import stage_payloads_from_program
 
 
 @dataclass(frozen=True)
@@ -37,6 +39,7 @@ class DefaultPipelineResult:
 
 MANDATORY_PASSES = (
     _PipelinePass(contract=ast_canonicalize.CONTRACT, run=ast_canonicalize.run),
+    _PipelinePass(contract=semantic_model.CONTRACT, run=semantic_model.run),
     _PipelinePass(contract=typecheck_layout_effects.CONTRACT, run=typecheck_layout_effects.run),
     _PipelinePass(contract=analyze_schedule.CONTRACT, run=analyze_schedule.run),
     _PipelinePass(contract=apply_schedule.CONTRACT, run=apply_schedule.run),
@@ -54,12 +57,22 @@ def run_default_pipeline(
     package_path.mkdir(parents=True, exist_ok=True)
 
     program_state = deepcopy(dict(program or _example_program()))
+    initial_payloads = stage_payloads_from_program(program_state)
     initial_stage = write_stage(
         package_path,
         StageSpec(
             stage_id="s00",
             pass_id=None,
             runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+            program_ast_payload=initial_payloads["program_ast_payload"],
+            kernel_ir_payload=initial_payloads["kernel_ir_payload"],
+            workload_ir_payload=initial_payloads["workload_ir_payload"],
+            types_payload=initial_payloads["types_payload"],
+            layout_payload=initial_payloads["layout_payload"],
+            effects_payload=initial_payloads["effects_payload"],
+            schedule_payload=initial_payloads["schedule_payload"],
+            entities_payload=initial_payloads["entities_payload"],
+            bindings_payload=initial_payloads["bindings_payload"],
         ),
     )
     write_manifest(package_path, current_stage="s00", stages=[initial_stage])
@@ -100,20 +113,43 @@ def run_default_pipeline(
 
 def _example_program() -> dict[str, Any]:
     return {
-        "entry": "demo_kernel",
-        "ops": [
-            "load_tile",
-            "compute_tile",
-            "store_tile",
-        ],
+        "entry": "vector_add",
+        "kernel": {
+            "name": "vector_add",
+            "args": [
+                {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
+                {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
+            ],
+            "ops": [
+                {
+                    "op": "elementwise_binary",
+                    "operator": "add",
+                    "lhs": "lhs",
+                    "rhs": "rhs",
+                    "out": "out",
+                    "shape": ["size"],
+                    "dtype": "f32",
+                }
+            ],
+        },
+        "workload": {
+            "entry": "vector_add",
+            "tasks": [
+                {
+                    "task_id": "task0",
+                    "kind": "kernel_call",
+                    "kernel": "vector_add",
+                    "args": ["lhs", "rhs", "out", "size"],
+                }
+            ],
+            "channels": [],
+            "dependencies": [],
+        },
         "analysis": {},
-        "package": {
-            "emitted": False,
-        },
-        "target": {
-            "backend": "pto",
-            "option": "a2a3sim",
-        },
+        "package": {"emitted": False},
+        "target": {"backend": "pto", "option": "a2a3sim"},
     }
 
 

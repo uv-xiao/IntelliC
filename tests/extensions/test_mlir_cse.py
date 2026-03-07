@@ -30,11 +30,20 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
         "eligibility": "extensions/mlir_cse/eligibility.json",
         "import_summary": "extensions/mlir_cse/import_summary.json",
     }
+    assert manifest["stages"]["graph"][0]["islands"] == [
+        {"island_id": "mlir_cse", "dir": "ir/stages/s01/islands/mlir_cse"}
+    ]
+    assert manifest["stages"]["graph"][1]["islands"] == [
+        {"island_id": "mlir_cse", "dir": "ir/stages/s02/islands/mlir_cse"}
+    ]
 
     assert (package_dir / "extensions" / "mlir_cse" / "module.mlir").is_file()
     assert (package_dir / "extensions" / "mlir_cse" / "ledger.json").is_file()
     assert (package_dir / "extensions" / "mlir_cse" / "eligibility.json").is_file()
     assert (package_dir / "extensions" / "mlir_cse" / "import_summary.json").is_file()
+    assert (package_dir / "ir" / "stages" / "s01" / "islands" / "mlir_cse" / "module.mlir").is_file()
+    assert (package_dir / "ir" / "stages" / "s01" / "islands" / "mlir_cse" / "ledger.json").is_file()
+    assert (package_dir / "ir" / "stages" / "s02" / "islands" / "mlir_cse" / "import_summary.json").is_file()
 
     import_summary = json.loads((package_dir / "extensions" / "mlir_cse" / "import_summary.json").read_text())
     assert import_summary["rewrites"] == [
@@ -75,6 +84,27 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
         ],
         "entry": "demo_kernel",
     }
+    kernel_ir = json.loads((package_dir / "ir" / "stages" / "s02" / "kernel_ir.json").read_text())
+    assert kernel_ir["ops"] == [
+        {
+            "op_id": "op0",
+            "entity_id": "demo_kernel:E3",
+            "op": "elementwise_binary",
+            "inputs": ["lhs", "rhs"],
+            "outputs": ["sum0"],
+            "attrs": {"dtype": "i32", "operator": "add", "shape": []},
+            "effects": {"reads": ["lhs", "rhs"], "writes": ["sum0"]},
+        },
+        {
+            "op_id": "op1",
+            "entity_id": "demo_kernel:E4",
+            "op": "elementwise_binary",
+            "inputs": ["sum0", "scale"],
+            "outputs": ["out"],
+            "attrs": {"dtype": "i32", "operator": "mul", "shape": []},
+            "effects": {"reads": ["sum0", "scale"], "writes": ["out"]},
+        },
+    ]
 
 
 def test_mlir_cse_extension_rejects_missing_result_symbol(tmp_path):

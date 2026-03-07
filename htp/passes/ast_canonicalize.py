@@ -7,7 +7,7 @@ from typing import Any
 from htp.artifacts.stages import RunnablePySpec
 from htp.passes.contracts import PassContract
 from htp.passes.manager import PassResult
-from htp.passes.program_model import canonicalize_ops, normalize_target
+from htp.passes.program_model import canonicalize_program, stage_payloads_from_program
 from htp.passes.replay_program import render_program_state_module
 
 PASS_ID = "htp::ast_canonicalize@1"
@@ -28,13 +28,9 @@ def run(
     del stage_before
 
     next_program = deepcopy(dict(program))
-    target = normalize_target(next_program)
     next_program["canonicalized"] = True
-    next_program["canonical_ast"] = {
-        "entry": next_program["entry"],
-        "target": target,
-        "ops": canonicalize_ops(list(next_program.get("ops", ()))),
-    }
+    next_program["canonical_ast"] = canonicalize_program(next_program)
+    stage_payloads = stage_payloads_from_program(next_program)
 
     return next_program, PassResult(
         runnable_py=RunnablePySpec(
@@ -42,6 +38,15 @@ def run(
             modes=("sim",),
             program_text=render_program_state_module(next_program),
         ),
+        entities_payload=stage_payloads["entities_payload"],
+        bindings_payload=stage_payloads["bindings_payload"],
+        program_ast_payload=stage_payloads["program_ast_payload"],
+        kernel_ir_payload=stage_payloads["kernel_ir_payload"],
+        workload_ir_payload=stage_payloads["workload_ir_payload"],
+        types_payload=stage_payloads["types_payload"],
+        layout_payload=stage_payloads["layout_payload"],
+        effects_payload=stage_payloads["effects_payload"],
+        schedule_payload=stage_payloads["schedule_payload"],
         digests={"ast_hash": "demo-canonical-ast-v1"},
         time_ms=0.2,
     )

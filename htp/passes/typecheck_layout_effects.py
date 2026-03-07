@@ -7,7 +7,7 @@ from typing import Any
 from htp.artifacts.stages import RunnablePySpec
 from htp.passes.contracts import PassContract
 from htp.passes.manager import PassResult
-from htp.passes.program_model import build_type_layout_effects, normalize_target
+from htp.passes.program_model import build_type_layout_effects, normalize_target, stage_payloads_from_program
 from htp.passes.replay_program import render_program_state_module
 
 PASS_ID = "htp::typecheck_layout_effects@1"
@@ -17,7 +17,7 @@ CONTRACT = PassContract(
     owner="htp",
     kind="mixed",
     ast_effect="preserves",
-    requires=("Invariant.ASTCanonical@1",),
+    requires=("Semantic.ModelBuilt@1",),
     provides=(
         "Type.LayoutChecked@1",
         "Type.EffectsChecked@1",
@@ -32,15 +32,15 @@ def run(
     del stage_before
 
     next_program = deepcopy(dict(program))
-    canonical_ast = next_program.get("canonical_ast", {})
-    canonical_ops = canonical_ast.get("ops", ())
     types, layout, effects = build_type_layout_effects(
-        canonical_ops,
+        next_program.get("kernel_ir", {}),
+        next_program.get("workload_ir", {}),
         target=normalize_target(next_program),
     )
     next_program["types"] = types
     next_program["layout"] = layout
     next_program["effects"] = effects
+    stage_payloads = stage_payloads_from_program(next_program)
 
     return next_program, PassResult(
         runnable_py=RunnablePySpec(
@@ -48,10 +48,16 @@ def run(
             modes=("sim",),
             program_text=render_program_state_module(next_program),
         ),
-        digests={
-            "types_hash": "demo-types-v2",
-            "effects_hash": "demo-effects-v2",
-        },
+        entities_payload=stage_payloads["entities_payload"],
+        bindings_payload=stage_payloads["bindings_payload"],
+        program_ast_payload=stage_payloads["program_ast_payload"],
+        kernel_ir_payload=stage_payloads["kernel_ir_payload"],
+        workload_ir_payload=stage_payloads["workload_ir_payload"],
+        types_payload=stage_payloads["types_payload"],
+        layout_payload=stage_payloads["layout_payload"],
+        effects_payload=stage_payloads["effects_payload"],
+        schedule_payload=stage_payloads["schedule_payload"],
+        digests={"types_hash": "demo-types-v2", "effects_hash": "demo-effects-v2"},
         time_ms=0.3,
     )
 

@@ -38,6 +38,48 @@ def test_stage_without_analyses_emits_empty_analysis_index(tmp_path):
         "schema": "htp.analysis.index.v1",
         "analyses": [],
     }
+    assert json.loads((package_dir / "ir/stages/s00/program.pyast.json").read_text()) == {
+        "schema": "htp.program_ast.v1",
+        "program": {},
+    }
+    assert json.loads((package_dir / "ir/stages/s00/kernel_ir.json").read_text()) == {
+        "schema": "htp.kernel_ir.v1",
+        "entry": "",
+        "args": [],
+        "buffers": [],
+        "ops": [],
+    }
+    assert json.loads((package_dir / "ir/stages/s00/workload_ir.json").read_text()) == {
+        "schema": "htp.workload_ir.v1",
+        "entry": "",
+        "tasks": [],
+        "channels": [],
+        "dependencies": [],
+    }
+    assert json.loads((package_dir / "ir/stages/s00/types.json").read_text()) == {
+        "schema": "htp.types.v1",
+        "values": {},
+        "buffers": {},
+    }
+    assert json.loads((package_dir / "ir/stages/s00/layout.json").read_text()) == {
+        "schema": "htp.layout.v1",
+        "memory_spaces": {},
+        "threading": {},
+        "tiling": {},
+    }
+    assert json.loads((package_dir / "ir/stages/s00/effects.json").read_text()) == {
+        "schema": "htp.effects.v1",
+        "reads": {},
+        "writes": {},
+        "barriers": [],
+        "channels": [],
+    }
+    assert json.loads((package_dir / "ir/stages/s00/schedule.json").read_text()) == {
+        "schema": "htp.schedule.v1",
+        "ticks": [],
+        "ordered_ops": [],
+        "pipeline_depth": 0,
+    }
 
 
 @pytest.mark.parametrize(
