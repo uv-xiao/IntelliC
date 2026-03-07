@@ -17,6 +17,4 @@ The intent is narrow:
 - keep replay in `sim` runnable,
 - keep bindings and backends explicit and testable.
 
-## Commands
-
-- `.agent/commands/init.md` — strict repo initialization and coding guidance for any new agent session
+The repo-wide default guidance now lives in `AGENTS.md`.
