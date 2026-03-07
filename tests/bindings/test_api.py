@@ -188,3 +188,32 @@ def test_load_rejects_mode_platform_mismatch(tmp_path):
                 "expected_platform": "a2a3",
             }
         ]
+
+
+def test_load_rejects_invalid_mode(tmp_path):
+    with _import_fresh_htp():
+        from htp.backends.pto.emit import emit_package
+        from htp.bindings.api import bind as bind_api
+
+        package_dir = tmp_path / "package"
+        package_dir.mkdir()
+        emit_package(
+            package_dir,
+            program={
+                "entry": "demo_kernel",
+                "ops": ["compute_tile"],
+            },
+            variant="a2a3sim",
+        )
+
+        session = bind_api(package_dir).load(mode="banana")
+
+        assert session.ok is False
+        assert session.diagnostics == [
+            {
+                "code": "HTP.BINDINGS.INVALID_MODE",
+                "detail": "Unsupported PTO binding mode: 'banana'.",
+                "mode": "banana",
+                "supported_modes": ["sim", "device"],
+            }
+        ]

@@ -37,8 +37,11 @@ class PTOBinding(ManifestBinding):
                         }
                     )
 
-        has_missing_metadata = any(diagnostic.get("code") == "HTP.BINDINGS.PTO_MISSING_METADATA" for diagnostic in diagnostics)
-        if self._should_enforce_pto_contract() and not missing_files and not has_missing_metadata:
+        has_blocking_metadata = any(
+            diagnostic.get("code") in {"HTP.BINDINGS.PTO_MISSING_METADATA", "HTP.BINDINGS.PTO_INVALID_TARGET_VARIANT"}
+            for diagnostic in diagnostics
+        )
+        if self._should_enforce_pto_contract() and not missing_files and not has_blocking_metadata:
             diagnostics.extend(
                 self._validate_pto_contract(
                     kernel_config_path=required_paths[0],
@@ -401,6 +404,15 @@ class PTOBinding(ManifestBinding):
         return "a2a3sim"
 
     def _mode_diagnostics(self, mode: str) -> list[dict[str, Any]]:
+        if mode not in {"sim", "device"}:
+            return [
+                {
+                    "code": "HTP.BINDINGS.INVALID_MODE",
+                    "detail": f"Unsupported PTO binding mode: {mode!r}.",
+                    "mode": mode,
+                    "supported_modes": ["sim", "device"],
+                }
+            ]
         expected_platform = self._platform_for_mode(mode)
         if self.variant == expected_platform:
             return []
@@ -428,18 +440,29 @@ class PTOBinding(ManifestBinding):
         if target_hardware_profile is None:
             diagnostics.append(self._missing_metadata_diagnostic("target.hardware_profile"))
         elif self.variant is not None:
-            expected_profile = arch_for(self.variant).hardware_profile
-            if target_hardware_profile != expected_profile:
+            try:
+                expected_profile = arch_for(self.variant).hardware_profile
+            except ValueError as exc:
                 diagnostics.append(
                     {
-                        "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
-                        "detail": "PTO metadata hardware_profile does not agree with target.variant.",
-                        "field": "hardware_profile",
-                        "manifest_field": "target.hardware_profile",
-                        "manifest_value": target_hardware_profile,
-                        "expected_value": expected_profile,
+                        "code": "HTP.BINDINGS.PTO_INVALID_TARGET_VARIANT",
+                        "detail": str(exc),
+                        "manifest_field": "target.variant",
+                        "manifest_value": self.variant,
                     }
                 )
+            else:
+                if target_hardware_profile != expected_profile:
+                    diagnostics.append(
+                        {
+                            "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                            "detail": "PTO metadata hardware_profile does not agree with target.variant.",
+                            "field": "hardware_profile",
+                            "manifest_field": "target.hardware_profile",
+                            "manifest_value": target_hardware_profile,
+                            "expected_value": expected_profile,
+                        }
+                    )
 
         outputs = self.manifest.get("outputs")
         if not isinstance(outputs, Mapping):
@@ -531,6 +554,36 @@ class PTOBinding(ManifestBinding):
                     "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
                     "detail": "build/toolchain.json pto_isa_contract does not match manifest.json extensions.pto.pto_isa_contract.",
                     "manifest_field": "extensions.pto.pto_isa_contract",
+                }
+            )
+
+        expected_compiler_contract = None if self.variant == "a2a3sim" else "cann:stub"
+        if toolchain_manifest.get("compiler_contract") != expected_compiler_contract:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                    "detail": "build/toolchain.json compiler_contract does not match the PTO variant contract.",
+                    "toolchain_field": f"{toolchain_manifest_path}.compiler_contract",
+                    "expected_value": expected_compiler_contract,
+                    "toolchain_value": toolchain_manifest.get("compiler_contract"),
+                }
+            )
+
+        env_payload = toolchain_manifest.get("env")
+        if not isinstance(env_payload, Mapping) or "PTO_ISA_ROOT" not in env_payload:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
+                    "detail": "build/toolchain.json env must be a mapping containing PTO_ISA_ROOT.",
+                }
+            )
+
+        compile_flags = toolchain_manifest.get("compile_flags")
+        if not isinstance(compile_flags, list):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
+                    "detail": "build/toolchain.json compile_flags must be a list.",
                 }
             )
 

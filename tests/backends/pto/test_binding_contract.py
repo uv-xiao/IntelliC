@@ -284,6 +284,13 @@ def test_pto_binding_reports_target_and_codegen_metadata_mismatch(tmp_path):
             "toolchain_variant_value": "a2a3sim",
             "toolchain_platform_value": "a2a3sim",
         },
+        {
+            "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+            "detail": "build/toolchain.json compiler_contract does not match the PTO variant contract.",
+            "toolchain_field": "build/toolchain.json.compiler_contract",
+            "expected_value": "cann:stub",
+            "toolchain_value": None,
+        },
     ]
 
 
@@ -360,6 +367,67 @@ def test_pto_binding_reports_toolchain_contract_mismatch(tmp_path):
             "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
             "detail": "build/toolchain.json pto_runtime_contract does not match manifest.json extensions.pto.pto_runtime_contract.",
             "manifest_field": "extensions.pto.pto_runtime_contract",
+        },
+    ]
+
+
+def test_pto_binding_reports_device_compiler_contract_mismatch(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+        variant="a2a3",
+    )
+
+    toolchain_manifest_path = package_dir / "build" / "toolchain.json"
+    toolchain_manifest = json.loads(toolchain_manifest_path.read_text())
+    toolchain_manifest["compiler_contract"] = None
+    toolchain_manifest_path.write_text(json.dumps(toolchain_manifest, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+            "detail": "build/toolchain.json compiler_contract does not match the PTO variant contract.",
+            "toolchain_field": "build/toolchain.json.compiler_contract",
+            "expected_value": "cann:stub",
+            "toolchain_value": None,
+        },
+    ]
+
+
+def test_pto_binding_reports_invalid_target_variant(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    manifest_path = package_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["target"]["variant"] = "banana"
+    manifest["target"]["hardware_profile"] = "ascend:banana"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_INVALID_TARGET_VARIANT",
+            "detail": "Unsupported PTO variant 'banana'; expected one of: a2a3sim, a2a3",
+            "manifest_field": "target.variant",
+            "manifest_value": "banana",
         },
     ]
 
