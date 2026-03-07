@@ -80,7 +80,9 @@ def test_canonicalize_program_rejects_dependency_on_unknown_task():
                 },
                 "workload": {
                     "entry": "bad_workload",
-                    "tasks": [{"task_id": "task0", "kind": "kernel_call", "kernel": "bad_workload", "args": []}],
+                    "tasks": [
+                        {"task_id": "task0", "kind": "kernel_call", "kernel": "bad_workload", "args": []}
+                    ],
                     "channels": [],
                     "dependencies": [{"src": "task0", "dst": "task1"}],
                 },
@@ -118,7 +120,14 @@ def test_build_type_layout_effects_rejects_nvgpu_unsupported_buffer_dtype():
             },
             "workload": {
                 "entry": "bad_kernel",
-                "tasks": [{"task_id": "task0", "kind": "kernel_call", "kernel": "bad_kernel", "args": ["A", "B", "C", "M", "N", "K"]}],
+                "tasks": [
+                    {
+                        "task_id": "task0",
+                        "kind": "kernel_call",
+                        "kernel": "bad_kernel",
+                        "args": ["A", "B", "C", "M", "N", "K"],
+                    }
+                ],
                 "channels": [],
                 "dependencies": [],
             },

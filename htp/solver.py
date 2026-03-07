@@ -5,8 +5,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from htp.passes import (
+    analyze_schedule,
+    apply_schedule,
+    ast_canonicalize,
+    emit_package,
+    semantic_model,
+    typecheck_layout_effects,
+)
 from htp.passes.contracts import PassContract
-from htp.passes import analyze_schedule, apply_schedule, ast_canonicalize, emit_package, semantic_model, typecheck_layout_effects
 from htp.passes.program_model import build_semantic_model, canonicalize_program, normalize_target
 
 SOLVER_FAILURE_SCHEMA_ID = "htp.solver_failure.v1"
@@ -125,10 +132,16 @@ def solve_pipeline(
 ) -> SolverResult:
     target = normalize_target(program)
     extension_results = _collect_extension_results(program)
-    initial_capabilities = tuple(extension_capability for result in extension_results.values() for extension_capability in result["provides"])
+    initial_capabilities = tuple(
+        extension_capability
+        for result in extension_results.values()
+        for extension_capability in result["provides"]
+    )
     state = CapabilityState(capabilities=initial_capabilities, target=target)
 
-    handler_failure = _handler_failure(program, target=target, template=template, state=state, extension_results=extension_results)
+    handler_failure = _handler_failure(
+        program, target=target, template=template, state=state, extension_results=extension_results
+    )
     if handler_failure is not None:
         return handler_failure
 
@@ -147,10 +160,14 @@ def solve_pipeline(
             )
         )
         missing_layout = tuple(
-            invariant for invariant in contract.requires_layout_invariants if invariant not in layout_invariants
+            invariant
+            for invariant in contract.requires_layout_invariants
+            if invariant not in layout_invariants
         )
         missing_effects = tuple(
-            invariant for invariant in contract.requires_effect_invariants if invariant not in effect_invariants
+            invariant
+            for invariant in contract.requires_effect_invariants
+            if invariant not in effect_invariants
         )
         if missing_caps or missing_layout or missing_effects:
             failure = SolverFailure(

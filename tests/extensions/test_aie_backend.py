@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 import htp
 from htp_ext.aie import emit_package
 
@@ -18,7 +16,13 @@ def test_aie_extension_emits_artifact_contract_and_replays(tmp_path):
                 "name": "stream_add",
                 "args": [
                     {"name": "tile_in", "kind": "buffer", "dtype": "i32", "shape": ["size"], "role": "input"},
-                    {"name": "tile_out", "kind": "buffer", "dtype": "i32", "shape": ["size"], "role": "output"},
+                    {
+                        "name": "tile_out",
+                        "kind": "buffer",
+                        "dtype": "i32",
+                        "shape": ["size"],
+                        "role": "output",
+                    },
                     {"name": "size", "kind": "scalar", "dtype": "i32", "shape": [], "role": "shape"},
                 ],
                 "ops": [

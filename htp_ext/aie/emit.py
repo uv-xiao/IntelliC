@@ -94,7 +94,9 @@ def _semanticize_program(program: Mapping[str, Any], *, profile: str) -> dict[st
     state["workload_ir"] = workload_ir
     state["entities_payload"] = entities_payload
     state["bindings_payload"] = bindings_payload
-    types, layout, effects = build_type_layout_effects(kernel_ir, workload_ir, target={"backend": "aie", "option": profile})
+    types, layout, effects = build_type_layout_effects(
+        kernel_ir, workload_ir, target={"backend": "aie", "option": profile}
+    )
     state["types"] = types
     state["layout"] = layout
     state["effects"] = effects
@@ -151,9 +153,7 @@ def _write_codegen_tree(package_dir: Path, *, state: Mapping[str, Any], profile:
     for task in state["workload_ir"]["tasks"]:
         mlir_lines.append(f"    // task {task['task_id']} -> {task['kernel']}")
     for channel in channels:
-        mlir_lines.append(
-            f"    // fifo {channel['name']} dtype={channel['dtype']} kind={channel['kind']}"
-        )
+        mlir_lines.append(f"    // fifo {channel['name']} dtype={channel['dtype']} kind={channel['kind']}")
     mlir_lines.extend(("    return", "  }", "}"))
     codegen_index = {
         "schema": AIE_CODEGEN_SCHEMA_ID,

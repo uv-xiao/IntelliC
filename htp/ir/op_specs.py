@@ -34,7 +34,9 @@ OP_SPECS = {
     "load": OpSpec(name="load", phase="producer", latency=1, reads=("source",), writes=("out",)),
     "load_tile": OpSpec(name="load_tile", phase="producer", latency=1, reads=("source",), writes=("out",)),
     "store": OpSpec(name="store", phase="consumer", latency=1, reads=("value",), writes=("target",)),
-    "store_tile": OpSpec(name="store_tile", phase="consumer", latency=1, reads=("value",), writes=("target",)),
+    "store_tile": OpSpec(
+        name="store_tile", phase="consumer", latency=1, reads=("value",), writes=("target",)
+    ),
     "async_copy": OpSpec(
         name="async_copy",
         phase="producer",

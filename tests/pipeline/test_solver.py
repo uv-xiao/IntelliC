@@ -134,7 +134,14 @@ def test_solver_reports_missing_backend_handler():
     }
     program["workload"] = {
         "entry": "channel_kernel",
-        "tasks": [{"task_id": "task0", "kind": "kernel_call", "kernel": "channel_kernel", "args": ["value", "channel"]}],
+        "tasks": [
+            {
+                "task_id": "task0",
+                "kind": "kernel_call",
+                "kernel": "channel_kernel",
+                "args": ["value", "channel"],
+            }
+        ],
         "channels": [{"name": "channel", "dtype": "i32"}],
         "dependencies": [],
     }
