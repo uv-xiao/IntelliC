@@ -135,6 +135,14 @@ class PTOBinding(ManifestBinding):
                 }
             )
             return diagnostics
+        if not isinstance(codegen_index, Mapping):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_CODEGEN_INDEX",
+                    "detail": "pto_codegen.json must decode to a mapping.",
+                }
+            )
+            return diagnostics
         if codegen_index.get("schema") != PTO_CODEGEN_SCHEMA_ID:
             diagnostics.append(
                 {
@@ -151,6 +159,14 @@ class PTOBinding(ManifestBinding):
                 {
                     "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
                     "detail": str(exc),
+                }
+            )
+            return diagnostics
+        if not isinstance(toolchain_manifest, Mapping):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
+                    "detail": "build/toolchain.json must decode to a mapping.",
                 }
             )
             return diagnostics
@@ -172,6 +188,13 @@ class PTOBinding(ManifestBinding):
                 {
                     "code": "HTP.BINDINGS.PTO_INVALID_KERNEL_CONFIG",
                     "detail": "kernel_config.py must define KERNELS as a list.",
+                }
+            )
+        elif not all(isinstance(kernel, Mapping) for kernel in kernels):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_KERNEL_CONFIG",
+                    "detail": "kernel_config.py KERNELS entries must be mappings.",
                 }
             )
         if not isinstance(orchestration, Mapping):
@@ -197,6 +220,14 @@ class PTOBinding(ManifestBinding):
                 {
                     "code": "HTP.BINDINGS.PTO_INVALID_CODEGEN_INDEX",
                     "detail": "pto_codegen.json must define kernels as a list.",
+                }
+            )
+            return diagnostics
+        if not all(isinstance(kernel, Mapping) for kernel in index_kernels):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_CODEGEN_INDEX",
+                    "detail": "pto_codegen.json kernels entries must be mappings.",
                 }
             )
             return diagnostics

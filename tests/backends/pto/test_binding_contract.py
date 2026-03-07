@@ -425,6 +425,90 @@ def test_pto_binding_rejects_toolchain_schema_drift(tmp_path):
     ]
 
 
+def test_pto_binding_rejects_nonmapping_codegen_index(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    codegen_index_path = package_dir / "codegen" / "pto" / "pto_codegen.json"
+    codegen_index_path.write_text(json.dumps([], indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_INVALID_CODEGEN_INDEX",
+            "detail": "pto_codegen.json must decode to a mapping.",
+        },
+    ]
+
+
+def test_pto_binding_rejects_nonmapping_toolchain_manifest(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    toolchain_manifest_path = package_dir / "build" / "toolchain.json"
+    toolchain_manifest_path.write_text(json.dumps([], indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
+            "detail": "build/toolchain.json must decode to a mapping.",
+        },
+    ]
+
+
+def test_pto_binding_rejects_nonmapping_kernel_entries(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    kernel_config_path = package_dir / "codegen" / "pto" / "kernel_config.py"
+    kernel_config_path.write_text(
+        "\n".join(
+            (
+                "KERNELS = [1]",
+                "ORCHESTRATION = {'source': 'orchestration/demo_kernel_orchestration.cpp', 'function_name': 'demo_kernel_orchestrate'}",
+                "RUNTIME_CONFIG = {'platform': 'a2a3sim', 'aicpu_thread_num': 1, 'block_dim': 1}",
+                "",
+            )
+        )
+    )
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_INVALID_KERNEL_CONFIG",
+            "detail": "kernel_config.py KERNELS entries must be mappings.",
+        },
+    ]
+
+
 def test_pto_binding_rejects_noncanonical_output_paths(tmp_path):
     package_dir = tmp_path / "out"
     package_dir.mkdir()
