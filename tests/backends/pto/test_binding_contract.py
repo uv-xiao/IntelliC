@@ -273,6 +273,17 @@ def test_pto_binding_reports_target_and_codegen_metadata_mismatch(tmp_path):
             "kernel_config_value": "a2a3sim",
             "codegen_value": "a2a3sim",
         },
+        {
+            "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+            "detail": "PTO toolchain manifest variant/platform does not agree with manifest target.",
+            "field": "variant",
+            "manifest_field": "target.variant",
+            "toolchain_variant_field": "build/toolchain.json.variant",
+            "toolchain_platform_field": "build/toolchain.json.platform",
+            "manifest_value": "a2a3",
+            "toolchain_variant_value": "a2a3sim",
+            "toolchain_platform_value": "a2a3sim",
+        },
     ]
 
 
@@ -321,5 +332,79 @@ def test_pto_binding_reports_kernel_platform_and_hardware_profile_mismatch(tmp_p
             "extension_value": "a2a3sim",
             "kernel_config_value": "a2a3",
             "codegen_value": "a2a3sim",
+        },
+    ]
+
+
+def test_pto_binding_reports_toolchain_contract_mismatch(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    manifest_path = package_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["extensions"]["pto"]["pto_runtime_contract"] = "pto-runtime:other"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+            "detail": "build/toolchain.json pto_runtime_contract does not match manifest.json extensions.pto.pto_runtime_contract.",
+            "manifest_field": "extensions.pto.pto_runtime_contract",
+        },
+    ]
+
+
+def test_pto_binding_requires_toolchain_contract_metadata(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    manifest_path = package_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    del manifest["extensions"]["pto"]["toolchain_manifest"]
+    del manifest["extensions"]["pto"]["pto_runtime_contract"]
+    del manifest["extensions"]["pto"]["pto_isa_contract"]
+    del manifest["outputs"]["toolchain_manifest"]
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+            "detail": "manifest.json outputs.toolchain_manifest is required for PTO packages.",
+            "manifest_field": "outputs.toolchain_manifest",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+            "detail": "manifest.json extensions.pto.toolchain_manifest is required for PTO packages.",
+            "manifest_field": "extensions.pto.toolchain_manifest",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+            "detail": "manifest.json extensions.pto.pto_runtime_contract is required for PTO packages.",
+            "manifest_field": "extensions.pto.pto_runtime_contract",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+            "detail": "manifest.json extensions.pto.pto_isa_contract is required for PTO packages.",
+            "manifest_field": "extensions.pto.pto_isa_contract",
         },
     ]

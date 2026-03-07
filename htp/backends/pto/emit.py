@@ -9,7 +9,9 @@ from htp.schemas import MANIFEST_SCHEMA_ID
 from .lower import PTOCodegenPlan, lower_program
 
 PTO_CODEGEN_SCHEMA_ID = "htp.pto.codegen.v1"
+PTO_TOOLCHAIN_SCHEMA_ID = "htp.pto.toolchain.v1"
 PTO_PROJECT_DIR = PurePosixPath("codegen/pto")
+PTO_TOOLCHAIN_PATH = PurePosixPath("build/toolchain.json")
 
 
 def emit_package(
@@ -42,6 +44,7 @@ def emit_package(
         {
             "kernel_config": (PTO_PROJECT_DIR / "kernel_config.py").as_posix(),
             "pto_codegen_index": (PTO_PROJECT_DIR / "pto_codegen.json").as_posix(),
+            "toolchain_manifest": PTO_TOOLCHAIN_PATH.as_posix(),
         }
     )
     manifest["outputs"] = outputs
@@ -60,6 +63,9 @@ def emit_package(
                 "aicpu_thread_num": plan.runtime_config["aicpu_thread_num"],
                 "block_dim": plan.runtime_config["block_dim"],
             },
+            "pto_runtime_contract": plan.pto_runtime_contract,
+            "pto_isa_contract": plan.pto_isa_contract,
+            "toolchain_manifest": PTO_TOOLCHAIN_PATH.as_posix(),
         }
     )
     extensions["pto"] = pto_extension
@@ -74,6 +80,7 @@ def _write_codegen_tree(package_dir: Path, plan: PTOCodegenPlan) -> None:
     project_dir = package_dir / PTO_PROJECT_DIR
     kernel_config_path = project_dir / "kernel_config.py"
     codegen_index_path = project_dir / "pto_codegen.json"
+    toolchain_path = package_dir / PTO_TOOLCHAIN_PATH
 
     orchestration_path = package_dir / plan.orchestration.source
     orchestration_path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,6 +94,8 @@ def _write_codegen_tree(package_dir: Path, plan: PTOCodegenPlan) -> None:
     kernel_config_path.parent.mkdir(parents=True, exist_ok=True)
     kernel_config_path.write_text(_kernel_config_text(plan))
     codegen_index_path.write_text(json.dumps(_codegen_index(plan), indent=2) + "\n")
+    toolchain_path.parent.mkdir(parents=True, exist_ok=True)
+    toolchain_path.write_text(json.dumps(_toolchain_payload(plan), indent=2) + "\n")
 
 
 def _codegen_index(plan: PTOCodegenPlan) -> dict[str, Any]:
@@ -137,6 +146,22 @@ def _kernel_config_text(plan: PTOCodegenPlan) -> str:
     )
 
 
+def _toolchain_payload(plan: PTOCodegenPlan) -> dict[str, Any]:
+    return {
+        "schema": PTO_TOOLCHAIN_SCHEMA_ID,
+        "backend": plan.backend,
+        "variant": plan.variant,
+        "platform": plan.variant,
+        "pto_runtime_contract": plan.pto_runtime_contract,
+        "pto_isa_contract": plan.pto_isa_contract,
+        "compiler_contract": None if plan.variant == "a2a3sim" else "cann:stub",
+        "env": {
+            "PTO_ISA_ROOT": "auto",
+        },
+        "compile_flags": [],
+    }
+
+
 def _orchestration_source(plan: PTOCodegenPlan) -> str:
     return "\n".join(
         (
@@ -174,5 +199,7 @@ def _load_manifest(package_dir: Path) -> dict[str, Any]:
 __all__ = [
     "PTO_CODEGEN_SCHEMA_ID",
     "PTO_PROJECT_DIR",
+    "PTO_TOOLCHAIN_PATH",
+    "PTO_TOOLCHAIN_SCHEMA_ID",
     "emit_package",
 ]

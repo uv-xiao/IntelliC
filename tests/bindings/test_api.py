@@ -60,6 +60,7 @@ def test_bind_returns_binding_for_manifest_backend(tmp_path):
         assert report.missing_files == [
             "codegen/pto/kernel_config.py",
             "codegen/pto/pto_codegen.json",
+            "build/toolchain.json",
         ]
         assert report.diagnostics == [
             {
@@ -79,6 +80,11 @@ def test_bind_returns_binding_for_manifest_backend(tmp_path):
             },
             {
                 "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json outputs.toolchain_manifest is required for PTO packages.",
+                "manifest_field": "outputs.toolchain_manifest",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
                 "detail": "manifest.json extensions.pto is required for PTO packages.",
                 "manifest_field": "extensions.pto",
             },
@@ -89,6 +95,10 @@ def test_bind_returns_binding_for_manifest_backend(tmp_path):
             {
                 "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
                 "detail": "Missing required PTO artifact path: codegen/pto/pto_codegen.json",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+                "detail": "Missing required PTO artifact path: build/toolchain.json",
             },
         ]
 
@@ -126,6 +136,11 @@ def test_load_returns_normalized_load_result_shape(tmp_path):
             },
             {
                 "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json outputs.toolchain_manifest is required for PTO packages.",
+                "manifest_field": "outputs.toolchain_manifest",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
                 "detail": "manifest.json extensions.pto is required for PTO packages.",
                 "manifest_field": "extensions.pto",
             },
@@ -137,4 +152,39 @@ def test_load_returns_normalized_load_result_shape(tmp_path):
                 "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
                 "detail": "Missing required PTO artifact path: codegen/pto/pto_codegen.json",
             },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+                "detail": "Missing required PTO artifact path: build/toolchain.json",
+            },
+        ]
+
+
+def test_load_rejects_mode_platform_mismatch(tmp_path):
+    with _import_fresh_htp():
+        from htp.backends.pto.emit import emit_package
+        from htp.bindings.api import bind as bind_api
+
+        package_dir = tmp_path / "package"
+        package_dir.mkdir()
+        emit_package(
+            package_dir,
+            program={
+                "entry": "demo_kernel",
+                "ops": ["compute_tile"],
+            },
+            variant="a2a3sim",
+        )
+
+        session = bind_api(package_dir).load(mode="device")
+
+        assert session.ok is False
+        assert session.diagnostics == [
+            {
+                "code": "HTP.BINDINGS.PTO_MODE_PLATFORM_MISMATCH",
+                "detail": "PTO package variant 'a2a3sim' is not runnable in mode 'device'.",
+                "mode": "device",
+                "manifest_field": "target.variant",
+                "manifest_value": "a2a3sim",
+                "expected_platform": "a2a3",
+            }
         ]

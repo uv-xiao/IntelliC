@@ -29,6 +29,7 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
 
     kernel_config_path = package_dir / "codegen" / "pto" / "kernel_config.py"
     codegen_index_path = package_dir / "codegen" / "pto" / "pto_codegen.json"
+    toolchain_manifest_path = package_dir / "build" / "toolchain.json"
     orchestration_source = package_dir / "codegen" / "pto" / "orchestration" / "demo_kernel_orchestration.cpp"
     kernel_source = package_dir / "codegen" / "pto" / "kernels" / "aiv" / "demo_kernel.cpp"
 
@@ -41,6 +42,7 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
     assert manifest["outputs"] == {
         "kernel_config": "codegen/pto/kernel_config.py",
         "pto_codegen_index": "codegen/pto/pto_codegen.json",
+        "toolchain_manifest": "build/toolchain.json",
     }
     assert manifest["extensions"]["pto"] == {
         "platform": "a2a3sim",
@@ -53,10 +55,14 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
             "aicpu_thread_num": 1,
             "block_dim": 1,
         },
+        "pto_runtime_contract": "pto-runtime:dev",
+        "pto_isa_contract": "pto-isa:a2a3sim",
+        "toolchain_manifest": "build/toolchain.json",
     }
 
     assert kernel_config_path.is_file()
     assert codegen_index_path.is_file()
+    assert toolchain_manifest_path.is_file()
     assert orchestration_source.is_file()
     assert kernel_source.is_file()
 
@@ -95,6 +101,19 @@ def test_pto_emit_produces_kernel_config_and_index(tmp_path):
                 "core_type": "aiv",
             }
         ],
+    }
+    assert json.loads(toolchain_manifest_path.read_text()) == {
+        "schema": "htp.pto.toolchain.v1",
+        "backend": "pto",
+        "variant": "a2a3sim",
+        "platform": "a2a3sim",
+        "pto_runtime_contract": "pto-runtime:dev",
+        "pto_isa_contract": "pto-isa:a2a3sim",
+        "compiler_contract": None,
+        "env": {
+            "PTO_ISA_ROOT": "auto",
+        },
+        "compile_flags": [],
     }
 
 

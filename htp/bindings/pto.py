@@ -7,12 +7,13 @@ from pathlib import Path
 from typing import Any
 
 from htp.backends.pto.arch import arch_for
-from htp.backends.pto.emit import PTO_PROJECT_DIR
+from htp.backends.pto.emit import PTO_PROJECT_DIR, PTO_TOOLCHAIN_PATH
 
-from .base import BuildResult, ManifestBinding, ValidationResult
+from .base import BuildResult, LoadResult, ManifestBinding, ValidationResult
 
 DEFAULT_KERNEL_CONFIG = (PTO_PROJECT_DIR / "kernel_config.py").as_posix()
 DEFAULT_CODEGEN_INDEX = (PTO_PROJECT_DIR / "pto_codegen.json").as_posix()
+DEFAULT_TOOLCHAIN_MANIFEST = PTO_TOOLCHAIN_PATH.as_posix()
 
 
 class PTOBinding(ManifestBinding):
@@ -38,7 +39,13 @@ class PTOBinding(ManifestBinding):
 
         has_missing_metadata = any(diagnostic.get("code") == "HTP.BINDINGS.PTO_MISSING_METADATA" for diagnostic in diagnostics)
         if self._should_enforce_pto_contract() and not missing_files and not has_missing_metadata:
-            diagnostics.extend(self._validate_pto_contract(kernel_config_path=required_paths[0], codegen_index_path=required_paths[1]))
+            diagnostics.extend(
+                self._validate_pto_contract(
+                    kernel_config_path=required_paths[0],
+                    codegen_index_path=required_paths[1],
+                    toolchain_manifest_path=required_paths[2],
+                )
+            )
 
         return ValidationResult(
             ok=not diagnostics,
@@ -59,8 +66,10 @@ class PTOBinding(ManifestBinding):
         del cache_dir
 
         validation = self.validate()
+        mode_diagnostics = self._mode_diagnostics(mode)
+        diagnostics = [*validation.diagnostics, *mode_diagnostics]
         session = self.load(mode=mode)
-        built_outputs = [] if not validation.ok else list(self._required_paths())
+        built_outputs = [] if diagnostics else list(self._required_paths())
         log_path = session._write_log(
             kind="build",
             stem=f"build_{self.backend}_{mode}",
@@ -68,16 +77,29 @@ class PTOBinding(ManifestBinding):
                 f"backend={self.backend}",
                 f"mode={mode}",
                 f"platform={self._platform_for_mode(mode)}",
-                f"validated={validation.ok}",
+                f"validated={not diagnostics}",
                 f"built_outputs={tuple(built_outputs)!r}",
             ),
         )
         return BuildResult(
-            ok=validation.ok,
+            ok=not diagnostics,
             mode=mode,
             built_outputs=built_outputs,
             log_paths=[log_path],
-            diagnostics=validation.diagnostics,
+            diagnostics=diagnostics,
+        )
+
+    def load(self, *, mode: str = "sim") -> LoadResult:
+        validation = self.validate()
+        diagnostics = [*validation.diagnostics, *self._mode_diagnostics(mode)]
+        return LoadResult(
+            package_dir=self.package_dir,
+            manifest=self.manifest,
+            backend=self.backend,
+            variant=self.variant,
+            mode=mode,
+            diagnostics=diagnostics,
+            ok=not diagnostics,
         )
 
     def _validate_pto_contract(
@@ -85,6 +107,7 @@ class PTOBinding(ManifestBinding):
         *,
         kernel_config_path: str,
         codegen_index_path: str,
+        toolchain_manifest_path: str,
     ) -> list[dict[str, Any]]:
         diagnostics: list[dict[str, Any]] = []
 
@@ -105,6 +128,17 @@ class PTOBinding(ManifestBinding):
             diagnostics.append(
                 {
                     "code": "HTP.BINDINGS.PTO_INVALID_CODEGEN_INDEX",
+                    "detail": str(exc),
+                }
+            )
+            return diagnostics
+
+        try:
+            toolchain_manifest = json.loads((self.package_dir / toolchain_manifest_path).read_text())
+        except Exception as exc:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
                     "detail": str(exc),
                 }
             )
@@ -238,6 +272,18 @@ class PTOBinding(ManifestBinding):
                 }
             )
 
+        manifest_toolchain_manifest = manifest_pto_extension.get("toolchain_manifest")
+        if not isinstance(manifest_toolchain_manifest, str):
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.toolchain_manifest"))
+        elif manifest_toolchain_manifest != toolchain_manifest_path:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                    "detail": "manifest.json extensions.pto.toolchain_manifest does not match the PTO toolchain manifest path.",
+                    "manifest_field": "extensions.pto.toolchain_manifest",
+                }
+            )
+
         manifest_runtime_config = manifest_pto_extension.get("runtime_config")
         if manifest_runtime_config is None:
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.runtime_config"))
@@ -266,6 +312,14 @@ class PTOBinding(ManifestBinding):
                 }
             )
 
+        diagnostics.extend(
+            self._validate_toolchain_manifest(
+                toolchain_manifest=toolchain_manifest,
+                manifest_pto_extension=manifest_pto_extension,
+                toolchain_manifest_path=toolchain_manifest_path,
+            )
+        )
+
         for kernel in kernels:
             source = kernel.get("source")
             if isinstance(source, str) and not (self._project_dir() / source).exists():
@@ -286,16 +340,18 @@ class PTOBinding(ManifestBinding):
 
         return diagnostics
 
-    def _required_paths(self) -> tuple[str, str]:
+    def _required_paths(self) -> tuple[str, str, str]:
         outputs = self.manifest.get("outputs")
         if not isinstance(outputs, Mapping):
-            return DEFAULT_KERNEL_CONFIG, DEFAULT_CODEGEN_INDEX
+            return DEFAULT_KERNEL_CONFIG, DEFAULT_CODEGEN_INDEX, DEFAULT_TOOLCHAIN_MANIFEST
 
         kernel_config = outputs.get("kernel_config")
         codegen_index = outputs.get("pto_codegen_index")
+        toolchain_manifest = outputs.get("toolchain_manifest")
         return (
             kernel_config if isinstance(kernel_config, str) else DEFAULT_KERNEL_CONFIG,
             codegen_index if isinstance(codegen_index, str) else DEFAULT_CODEGEN_INDEX,
+            toolchain_manifest if isinstance(toolchain_manifest, str) else DEFAULT_TOOLCHAIN_MANIFEST,
         )
 
     def _should_enforce_pto_contract(self) -> bool:
@@ -304,7 +360,9 @@ class PTOBinding(ManifestBinding):
 
         outputs = self.manifest.get("outputs")
         if isinstance(outputs, Mapping) and (
-            isinstance(outputs.get("kernel_config"), str) or isinstance(outputs.get("pto_codegen_index"), str)
+            isinstance(outputs.get("kernel_config"), str)
+            or isinstance(outputs.get("pto_codegen_index"), str)
+            or isinstance(outputs.get("toolchain_manifest"), str)
         ):
             return True
 
@@ -340,9 +398,24 @@ class PTOBinding(ManifestBinding):
     def _platform_for_mode(self, mode: str) -> str:
         if mode == "device":
             return "a2a3"
-        return "a2a3sim" if self.variant is None else self.variant
+        return "a2a3sim"
 
-    def _validate_required_metadata(self, *, required_paths: tuple[str, str]) -> list[dict[str, Any]]:
+    def _mode_diagnostics(self, mode: str) -> list[dict[str, Any]]:
+        expected_platform = self._platform_for_mode(mode)
+        if self.variant == expected_platform:
+            return []
+        return [
+            {
+                "code": "HTP.BINDINGS.PTO_MODE_PLATFORM_MISMATCH",
+                "detail": f"PTO package variant {self.variant!r} is not runnable in mode {mode!r}.",
+                "mode": mode,
+                "manifest_field": "target.variant",
+                "manifest_value": self.variant,
+                "expected_platform": expected_platform,
+            }
+        ]
+
+    def _validate_required_metadata(self, *, required_paths: tuple[str, str, str]) -> list[dict[str, Any]]:
         if not self._should_enforce_pto_contract():
             return []
 
@@ -372,29 +445,17 @@ class PTOBinding(ManifestBinding):
         if not isinstance(outputs, Mapping):
             diagnostics.append(self._missing_metadata_diagnostic("outputs.kernel_config"))
             diagnostics.append(self._missing_metadata_diagnostic("outputs.pto_codegen_index"))
+            diagnostics.append(self._missing_metadata_diagnostic("outputs.toolchain_manifest"))
         else:
             kernel_config = outputs.get("kernel_config")
             codegen_index = outputs.get("pto_codegen_index")
+            toolchain_manifest = outputs.get("toolchain_manifest")
             if not isinstance(kernel_config, str):
                 diagnostics.append(self._missing_metadata_diagnostic("outputs.kernel_config"))
-            elif kernel_config != required_paths[0]:
-                diagnostics.append(
-                    {
-                        "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
-                        "detail": "manifest.json outputs.kernel_config does not match the PTO binding contract.",
-                        "manifest_field": "outputs.kernel_config",
-                    }
-                )
             if not isinstance(codegen_index, str):
                 diagnostics.append(self._missing_metadata_diagnostic("outputs.pto_codegen_index"))
-            elif codegen_index != required_paths[1]:
-                diagnostics.append(
-                    {
-                        "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
-                        "detail": "manifest.json outputs.pto_codegen_index does not match the PTO binding contract.",
-                        "manifest_field": "outputs.pto_codegen_index",
-                    }
-                )
+            if not isinstance(toolchain_manifest, str):
+                diagnostics.append(self._missing_metadata_diagnostic("outputs.toolchain_manifest"))
 
         manifest_pto_extension = self._pto_extension()
         if manifest_pto_extension is None:
@@ -405,10 +466,74 @@ class PTOBinding(ManifestBinding):
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.platform"))
         if not isinstance(manifest_pto_extension.get("kernel_project_dir"), str):
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.kernel_project_dir"))
+        if not isinstance(manifest_pto_extension.get("toolchain_manifest"), str):
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.toolchain_manifest"))
+        if not isinstance(manifest_pto_extension.get("pto_runtime_contract"), str):
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.pto_runtime_contract"))
+        if not isinstance(manifest_pto_extension.get("pto_isa_contract"), str):
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.pto_isa_contract"))
         if manifest_pto_extension.get("runtime_config") is None:
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.runtime_config"))
         if manifest_pto_extension.get("orchestration_entry") is None:
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.orchestration_entry"))
+        return diagnostics
+
+    def _validate_toolchain_manifest(
+        self,
+        *,
+        toolchain_manifest: dict[str, Any],
+        manifest_pto_extension: Mapping[str, Any],
+        toolchain_manifest_path: str,
+    ) -> list[dict[str, Any]]:
+        diagnostics: list[dict[str, Any]] = []
+
+        if toolchain_manifest.get("backend") != self.backend:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                    "detail": "PTO toolchain manifest backend does not agree with manifest target.",
+                    "field": "backend",
+                    "manifest_field": "target.backend",
+                    "toolchain_field": f"{toolchain_manifest_path}.backend",
+                    "manifest_value": self.backend,
+                    "toolchain_value": toolchain_manifest.get("backend"),
+                }
+            )
+        if toolchain_manifest.get("variant") != self.variant or toolchain_manifest.get("platform") != self.variant:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                    "detail": "PTO toolchain manifest variant/platform does not agree with manifest target.",
+                    "field": "variant",
+                    "manifest_field": "target.variant",
+                    "toolchain_variant_field": f"{toolchain_manifest_path}.variant",
+                    "toolchain_platform_field": f"{toolchain_manifest_path}.platform",
+                    "manifest_value": self.variant,
+                    "toolchain_variant_value": toolchain_manifest.get("variant"),
+                    "toolchain_platform_value": toolchain_manifest.get("platform"),
+                }
+            )
+
+        runtime_contract = manifest_pto_extension.get("pto_runtime_contract")
+        if toolchain_manifest.get("pto_runtime_contract") != runtime_contract:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                    "detail": "build/toolchain.json pto_runtime_contract does not match manifest.json extensions.pto.pto_runtime_contract.",
+                    "manifest_field": "extensions.pto.pto_runtime_contract",
+                }
+            )
+
+        isa_contract = manifest_pto_extension.get("pto_isa_contract")
+        if toolchain_manifest.get("pto_isa_contract") != isa_contract:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                    "detail": "build/toolchain.json pto_isa_contract does not match manifest.json extensions.pto.pto_isa_contract.",
+                    "manifest_field": "extensions.pto.pto_isa_contract",
+                }
+            )
+
         return diagnostics
 
     def _target_record(self) -> Mapping[str, Any]:

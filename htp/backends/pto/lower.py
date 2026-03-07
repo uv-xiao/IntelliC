@@ -25,6 +25,8 @@ class PTOCodegenPlan:
     backend: str
     variant: str
     hardware_profile: str
+    pto_runtime_contract: str
+    pto_isa_contract: str
     entrypoint: str
     kernels: tuple[PTOKernelSpec, ...]
     orchestration: PTOOrchestrationSpec
@@ -51,6 +53,8 @@ def lower_program(program: Mapping[str, Any], *, variant: str | None = None) -> 
         backend=arch.backend,
         variant=arch.variant,
         hardware_profile=arch.hardware_profile,
+        pto_runtime_contract="pto-runtime:dev",
+        pto_isa_contract=f"pto-isa:{arch.variant}",
         entrypoint=entrypoint,
         kernels=(kernel,),
         orchestration=orchestration,
