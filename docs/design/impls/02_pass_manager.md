@@ -194,8 +194,8 @@ A stage contains:
 - `ids/`
   - `entities.json` (node_id → entity_id, plus entity metadata)
   - `bindings.json` (binding_id registry + Name-use → binding_id links)
-- `islands/` (optional, produced by MLIR round-trip islands)
-  - `<island_id>/input.mlir`, `output.mlir`, `pipeline.txt`, `ledger.json` (see `docs/design/impls/12_mlir_roundtrip_island.md`)
+- `islands/` (optional, produced by extension-owned round-trip workflows)
+- ` <island_id>/...` (extension-defined evidence files when a stage records a non-core island)
 - `maps/` (optional, produced by major rewrites)
   - `entity_map.json` (before/after entity mapping; see `docs/design/impls/01_ir_model.md`)
   - `binding_map.json` (before/after binding mapping, when bindings change)
@@ -251,7 +251,5 @@ Design note: `pass_trace.jsonl` is the primary “agent substrate” because it 
 - structured,
 - and points to deterministic stage snapshots (both transformed IR and the analyses that justified it).
 
-Complete worked example:
-
-- Warp specialization + software pipelining staged as analysis + transforms:
-  `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
+The pass trace is designed so future extension case studies can be added
+without changing the schema.

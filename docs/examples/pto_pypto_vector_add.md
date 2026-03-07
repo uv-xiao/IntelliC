@@ -15,6 +15,7 @@ vector-add flow, but uses HTP’s artifact-first pipeline:
 4. execute the package through `pto-runtime` in `a2a3sim`.
 
 The example is designed so replay always works. Package execution is also real
-when the local PTO reference runtime is available, but the current v1 example is
+when the local PTO reference runtime is available under `3rdparty/pto-runtime/`
+(or the compatibility fallback `references/pto-runtime/`), but the current v1 example is
 an execution smoke test over the `host_build_graph` ABI rather than a full
 tensor-marshaling numerical validation.

@@ -1,296 +1,43 @@
-# HTP (Heterogeneous Tile Programming) — Examples (E2E)
+# HTP Examples — Implemented Flows
 
-This file provides end-to-end examples across:
+This file only documents the examples that run against the current
+implementation.
 
-- kernel programs
-- megakernel / dataflow pipelines
-- serving routine orchestration
-- multiple backends (PTO simulation/device; NV-GPU; optional AIE/MLIR-AIE extension)
+## PTO example
 
-The examples below remain design-oriented pseudo-code, but they now have concrete implementation anchors:
+Files:
 
-- PyPTO-inspired PTO example: `examples/pto_pypto_vector_add/demo.py`
-- Arknife-inspired NV-GPU example: `examples/nvgpu_arknife_gemm/demo.py`
-- Standalone walkthroughs: `docs/examples/pto_pypto_vector_add.md`, `docs/examples/nvgpu_arknife_gemm.md`
-- Full design-to-code map: `docs/design/code_map.md`
+- `examples/pto_pypto_vector_add/demo.py`
+- `examples/pto_pypto_vector_add/notebook.ipynb`
+- `docs/examples/pto_pypto_vector_add.md`
 
----
+Flow:
 
-## Example 1 — Kernel + WSP schedule to PTO backend
+1. compile a PTO package for `pto-a2a3sim`
+2. replay the latest staged Python program in `sim`
+3. build the PTO package through the binding adapter
+4. run the package through the real `pto-runtime` `host_build_graph` simulation path
 
-Goal: write a tile kernel and schedule it for the Ascend/PTO backend.
+This example is intentionally a smoke path for runtime integration: it proves
+the emitted PTO ABI and the build/run seam without yet implementing rich tensor
+marshaling in the binding.
 
-```python
-from htp import kernel, workload, schedule, Tile, F16, In, Out, Layout
-from htp.intrinsics import pto
+## NV-GPU example
 
-M = 1024
-N = 1024
+Files:
 
-@kernel
-def add_tile(a: In[Tile[16, 16, F16]], b: In[Tile[16, 16, F16]], c: Out[Tile[16, 16, F16]]):
-    c[:] = pto.add(a, b)
+- `examples/nvgpu_arknife_gemm/demo.py`
+- `examples/nvgpu_arknife_gemm/notebook.ipynb`
+- `docs/examples/nvgpu_arknife_gemm.md`
 
-@workload
-def add(A, B, C):
-    for i in P(0, M // 16):            # logical parallel loops
-        for j in P(0, N // 16):
-            add_tile(A.tile(i, j), B.tile(i, j), C.tile(i, j))
+Flow:
 
-@schedule(add)
-def add_sched(s):
-    s.tile("i", 4)                     # schedule directives
-    s.pipeline(depth=2)
-    s.buffer("A", space="UB")          # hardware/memory facet constraint
-    s.buffer("B", space="UB")
-    s.emit(target="pto-a2a3sim")
+1. compile an NV-GPU package for the Ampere profile
+2. replay the latest staged Python program in `sim`
+3. run the package in `sim` with a registered replay kernel handler
+4. build `.ptx` and `.cubin` from the authoritative `.cu`
+5. launch the kernel through the CUDA driver adapter on a real device
 
-pkg = add.compile(out="out/add", target="pto-a2a3sim")
-prog = htp.bind(pkg).run()
-```
+## Future examples
 
-What this demonstrates:
-
-- WSP separation: `@workload` declares logical work; `@schedule` constrains mapping/buffering/pipelining.
-- Intrinsic typing: `pto.add` is only legal in PTO-capable backends.
-- Artifact-first: `out/add/` contains manifest + IR dumps + PTO artifacts.
-
-Illustrative emitted tree (key files only):
-
-```
-out/add/
-  manifest.json
-  ir/
-    pass_trace.jsonl
-    stages/
-      s00/                      # capture stage
-        program.py              # runnable replay (sim/device)
-        program.pyast.json
-        env.json
-        types.json
-        layout.json
-        effects.json
-        schedule.json
-        ids/
-          entities.json
-          bindings.json
-        maps/                    # optional (major rewrites)
-          entity_map.json
-          binding_map.json
-      s01/                      # canonicalize
-        program.py
-        program.pyast.json
-        ...
-      s02/                      # type/layout/effect check
-        program.py
-        ...
-      s03/                      # apply schedule
-        program.py
-        ...
-      s04/                      # lower to PTO-ready form (may become stubbed for some kernels)
-        program.py
-        ...
-  codegen/
-    pto/
-      kernel_config.py
-      kernels/
-        aiv/
-        aic/                     # optional
-      orchestration/
-      ptoas/                     # optional intermediates
-      pto_codegen.json
-      build/
-        toolchain.json
-```
-
-Design intent: because the canonical IR is Python AST, every stage emits `program.py` and remains runnable in
-`mode="sim"` (it may be stubbed with explicit diagnostics). This is the primary mechanism for stage-by-stage
-replay/debugging without an IR interpreter.
-
----
-
-## Example 2 — CSP pipeline megakernel: load → compute → store
-
-Goal: create a pipeline-parallel program with bounded channels; type checking prevents protocol mismatch.
-
-```python
-from htp import process, Channel, Event, connect, consume
-
-l2c = Channel("l2c", depth=2)          # bounded FIFO
-c2s = Channel("c2s", depth=2)
-done = Event("done", depth=0)          # rendezvous
-
-loader = (
-  process("loader")
-    .produces(l2c)
-    .body(for_each(batch, lambda b:
-        send(l2c, load_tiles(b)))))
-
-computer = (
-  process("computer")
-    .consumes(l2c)
-    .produces(c2s)
-    .body(consume(l2c, lambda tiles:
-        send(c2s, fused_attention(tiles))))))
-
-storer = (
-  process("storer")
-    .consumes(c2s)
-    .body(consume(c2s, lambda out:
-        store_tiles(out)))))
-
-pipeline = connect([loader, computer, storer], [l2c, c2s])
-
-pkg = pipeline.compile(out="out/attn_pipe", target="pto-a2a3sim")
-htp.bind(pkg).run()
-```
-
-What this demonstrates:
-
-- CSP constructs remain first-class, not “lowered arrays”.
-- Channels have static types and capacity; effects can enforce put/get consistency.
-- A backend can choose how to implement channels (simulation vs device).
-
----
-
-## Example 3 — AIE backend: spatial mapping + FIFOs
-
-Goal: map a kernel region to an AIE tile grid with streams, emitting MLIR-AIE artifacts.
-
-```python
-from htp import df_region, df_kernel, Layout
-from htp.targets import aie
-
-P0, P1 = aie.grid(4, 4)
-LyA = Layout.dist("S(1)R")   # shard along mesh axis 1, replicate other dim
-LyB = Layout.dist("RS(0)")
-
-@df_region
-def top(A, B, C):
-    @df_kernel(mapping=[P0, P1], args=[A, B, C])
-    def gemm(local_A: A @ LyA, local_B: B @ LyB, local_C: C):
-        local_C[:] = aie.matmul(local_A, local_B)
-
-pkg = top.compile(out="out/aie_gemm", target="aie-xdna2")
-```
-
-Emitted artifacts:
-
-- `codegen/aie/aie.mlir` — AIE compute + FIFO wiring
-- `codegen/aie/mapping.json` — tile mapping + layout placement
-- `codegen/aie/host.*` — host-side glue for runtime invocation
-
-What this demonstrates:
-
-- AIE backend emits MLIR-AIE artifacts (`codegen/aie/aie.mlir` + sidecars) consumed by MLIR-AIE toolchains.
-- Layout annotation influences sharding/placement and FIFO decisions.
-
----
-
-## Example 4 — Serving routine: multi-backend build + runtime selection
-
-Goal: compile once into multiple packages, then choose backend at deployment time.
-
-```python
-pkg_pto = model.compile(out="out/model_pto", target="pto-a2a3")
-pkg_gpu = model.compile(out="out/model_gpu", target="nvgpu-ampere")
-pkg_aie = model.compile(out="out/model_aie", target="aie-xdna2")  # optional extension backend
-
-if platform.has_ascend():
-    htp.bind(pkg_pto).run(inputs)
-elif platform.has_nvidia_gpu():
-    htp.bind(pkg_gpu).run(inputs)
-else:
-    htp.bind(pkg_aie).run(inputs)
-```
-
-Key point: the “compile → package” boundary enables deployment-time backend choice without reauthoring the model.
-
----
-
-## Example 5 — Extending the compiler: custom pass + pipeline
-
-Goal: show how an extension author adds a pass and wires a pipeline without editing the core compiler.
-
-```python
-from htp import register_pass, register_pipeline, Capability
-
-@register_pass(
-  name="normalize_layout_v1",
-  requires={Capability("IR.ASTCanonical")},
-  provides={Capability("Type.LayoutNormalized")}
-)
-def normalize_layout(ast, ctx):
-    return ast  # match/apply rewrites + metadata normalization
-
-@register_pipeline(
-  name="pto_debug",
-  target="pto-a2a3sim",
-  passes=[
-    "ast_canonicalize",
-    "normalize_layout_v1",
-    "typecheck_layout_effects",
-    "lower_pto",
-    "emit_pto_package"
-  ]
-)
-def pto_debug_pipeline():
-    ...
-
-pkg = program.compile(out="out/debug", target="pto-a2a3sim", pipeline="pto_debug", dump_ir=True)
-print(pkg.manifest_path)  # out/debug/manifest.json
-```
-
-What this demonstrates:
-
-- Passes/pipelines are registered extension points.
-- Capability typing prevents invalid pipelines (missing `requires`).
-- Debug output is standardized (manifest + pass trace + IR dumps).
-
----
-
-## Example 6 — Warp specialization + software pipelining (complete staged example)
-
-Goal: express a “prefetch + compute” kernel intent, then request warp specialization and loop pipelining via schedule
-constraints. The pipeline must:
-
-- stage both transforms and analyses (analysis results are artifacts too),
-- keep intermediate stages runnable in Python in `mode="sim"` (possibly stubbed with explicit diagnostics),
-- and make target-specific discharge explicit and capability-gated.
-
-```python
-from htp import kernel, schedule, Tile, In, Out, f16, f32
-from htp.intrinsics import portable as I
-
-BM, BN, BK = 128, 128, 32
-
-@kernel
-def matmul_tile(A: In[Tile[BM, BK, f16]],
-                B: In[Tile[BK, BN, f16]],
-                C: Out[Tile[BM, BN, f16]]):
-    acc: Tile[BM, BN, f32] = I.zeros((BM, BN), f32)
-    for k in range(0, K, BK):
-        a = I.async_copy(A, k=k, scope="group_shared")
-        b = I.async_copy(B, k=k, scope="group_shared")
-        I.await_(a); I.await_(b)
-        acc = I.mma(acc, I.load(a), I.load(b))
-    C[:] = I.cast(acc, f16)
-
-@schedule(matmul_tile)
-def matmul_sched(s):
-    s.map(group="block", subgroup="warp")
-    s.warp_specialize(producers=2, consumers=6)
-    s.pipeline(loop="k", stages=3, buffer="pingpong")
-```
-
-What you should see in the emitted package:
-
-- `ir/stages/<id>/program.py`: runnable replay of the stage in `mode="sim"` (may be stubbed with explicit diagnostics).
-- `ir/stages/<id>/analysis/`: typed analysis outputs such as:
-  - `warp_role_plan.json` (produced before warp specialization transform)
-  - `pipeline_plan.json` (produced before pipelining transform)
-- `ir/pass_trace.jsonl`: records whether each pass mutated the AST and which analyses it produced.
-
-Complete pass-by-pass walkthrough (with explicit analysis vs transform effects):
-
-- `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
+Design-only examples and roadmap material were moved to `docs/future/design/`.

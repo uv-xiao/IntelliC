@@ -14,6 +14,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/backends/pto/emit.py` — PTO artifact emission
 - `htp/bindings/pto.py` — PTO validation / build / run / replay
 - `htp/bindings/pto_runtime_adapter.py` — real `pto-runtime` integration
+- `3rdparty/pto-runtime/` — preferred external runtime checkout used by PTO execution
 
 ## NV-GPU path
 

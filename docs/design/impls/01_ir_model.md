@@ -44,9 +44,9 @@ This implies:
 2) **Lowering is staged as “residual programs”**, not as a one-way lowering into opaque internal IR.
    - A “lowered” stage is still a Python program; it may carry extra metadata/attachments (analyses, island handles,
      backend-ready forms) but it cannot become non-executable.
-3) **External toolchains and IR islands are accelerators, not semantic owners**.
-   - Whether HTP is emitting one-way artifacts for an external toolchain (MLIR-AIE, vendor compilers) or doing an internal
-     MLIR round-trip island (AST → MLIR → passes → AST), it cannot delete the program’s sim semantics.
+3) **External toolchains and extension-owned IR islands are accelerators, not semantic owners**.
+   - Whether HTP is emitting one-way artifacts for an external toolchain or round-tripping through an optional extension,
+     it cannot delete the program’s sim semantics.
    - The stage must remain runnable by keeping (or reconstructing) a Python-level executable representation and routing
      accelerated regions through runtime shims (or explicit stubs) with defined sim behavior.
 
@@ -412,12 +412,11 @@ Required semantics:
   - dispatches to intrinsic simulator handlers in `sim`;
   - when no simulator exists but a stub policy is declared, it must call `raise_stub(...)`.
 - `extensions.invoke(...)`
-  - is the native escape hatch for optional extension packages such as MLIR round-trip islands or external toolchain
-    adapters;
+  - is the native escape hatch for optional extension packages and external toolchain adapters;
   - core HTP does not ship MLIR semantics in the runtime surface; extension packages own their own operation names and
     payload schemas behind this hook.
 - `raise_stub(...)`
-  - must raise a replay diagnostic in the stable family from `docs/design/feats/09_debuggability.md`.
+  - must raise a stable replay diagnostic rather than a raw exception.
 
 This API is intentionally small. If a new internal IR construct cannot replay through this surface, it is not yet a
 valid HTP stage construct.

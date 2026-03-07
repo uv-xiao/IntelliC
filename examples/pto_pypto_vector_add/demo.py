@@ -74,7 +74,8 @@ def run_package(output_dir: Path | str) -> dict[str, Any]:
     """Attempt package execution through `pto-runtime`.
 
     This step is environment-dependent because the local machine must
-    provide the PTO runtime reference checkout and compatible host
+    provide the PTO runtime checkout under `3rdparty/pto-runtime/` (or the
+    compatibility fallback `references/pto-runtime/`) and compatible host
     compilation tools. In v1, the package execution path is a smoke run:
     HTP emits the correct PTO ABI and launches a real `host_build_graph`
     task through `pto-runtime`, but the binding still avoids rich tensor

@@ -153,8 +153,8 @@ Run/replay failures must emit:
 - node ids (when source-level blame is possible),
 - and file pointers to relevant stage dumps and logs.
 
-For replay-time stub hits, bindings should surface the structured replay diagnostic family defined in
-`docs/design/feats/09_debuggability.md` rather than raw runtime exceptions.
+For replay-time stub hits, bindings should surface structured replay
+diagnostics rather than raw runtime exceptions.
 
 ---
 

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-REFERENCE_PYTHON_DIR = Path(__file__).resolve().parents[2] / "references" / "pto-runtime" / "python"
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass(frozen=True)
@@ -324,14 +324,13 @@ def _diagnostic(code: str, detail: str, **payload: Any) -> dict[str, Any]:
 
 @contextmanager
 def _reference_python_path():
-    if not REFERENCE_PYTHON_DIR.is_dir():
-        raise FileNotFoundError(f"Missing PTO reference python directory: {REFERENCE_PYTHON_DIR}")
-    sys.path.insert(0, str(REFERENCE_PYTHON_DIR))
+    reference_python_dir = _resolve_reference_python_dir()
+    sys.path.insert(0, str(reference_python_dir))
     try:
         yield
     finally:
         try:
-            sys.path.remove(str(REFERENCE_PYTHON_DIR))
+            sys.path.remove(str(reference_python_dir))
         except ValueError:
             pass
 
@@ -350,3 +349,21 @@ def _load_python_module(module_path: Path, *, module_name: str) -> Any:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _resolve_reference_python_dir() -> Path:
+    for candidate in _candidate_reference_python_dirs():
+        if candidate.is_dir():
+            return candidate
+    searched = ", ".join(str(candidate) for candidate in _candidate_reference_python_dirs())
+    raise FileNotFoundError(f"Missing PTO runtime python directory; searched: {searched}")
+
+
+def _candidate_reference_python_dirs() -> tuple[Path, ...]:
+    # Prefer a tracked third-party checkout for runtime integration. The older
+    # `references/` location remains as a compatibility fallback for existing
+    # developer environments.
+    return (
+        REPO_ROOT / "3rdparty" / "pto-runtime" / "python",
+        REPO_ROOT / "references" / "pto-runtime" / "python",
+    )

@@ -10,7 +10,8 @@ Emit artifacts consumable by the Ascend PTO ecosystem for:
 HTP’s PTO backend should integrate with (and largely reuse) the existing `pto-runtime` workflow: generate a kernel +
 orchestration “project” and let the binding invoke `pto-runtime`’s builder to produce runnable binaries.
 
-Local reference checkout (gitignored): `references/pto-runtime/`.
+Preferred local checkout: `3rdparty/pto-runtime/`.
+Compatibility fallback: `references/pto-runtime/`.
 
 Current implementation anchors:
 
@@ -135,10 +136,10 @@ The ownership split must be explicit:
 
 The local implementation references are:
 
-- `references/pto-runtime/python/kernel_compiler.py`
-- `references/pto-runtime/python/runtime_compiler.py`
-- `references/pto-runtime/python/runtime_builder.py`
-- `references/pto-runtime/python/bindings.py`
+- `3rdparty/pto-runtime/python/kernel_compiler.py`
+- `3rdparty/pto-runtime/python/runtime_compiler.py`
+- `3rdparty/pto-runtime/python/runtime_builder.py`
+- `3rdparty/pto-runtime/python/bindings.py`
 
 ### 4.1 `mode="sim"` (`a2a3sim`)
 
@@ -263,9 +264,8 @@ Design intent:
 > the PTO backend should not re-implement planning; it should discharge portable protocols into PTO primitives behind
 > explicit capabilities.
 
-This is the same structural split demonstrated in the warp specialization + pipelining case study:
-
-- `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
+This same structural split is why HTP keeps planning in core and backend
+discharge in backend-specific code.
 
 ---
 

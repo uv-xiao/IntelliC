@@ -20,7 +20,8 @@ The example writes outputs under `artifacts/pto_pypto_vector_add/`.
 Notes:
 
 - replay is always available because HTP stages stay runnable in `sim`;
-- build/run require the local `references/pto-runtime/` checkout and the host
+- build/run require the local `3rdparty/pto-runtime/` checkout (or the
+  compatibility fallback `references/pto-runtime/`) and the host
   compilers that `pto-runtime` expects;
 - the current v1 execution path is a real PTO smoke run over the
   `host_build_graph` ABI rather than a full tensor-marshaling demo.

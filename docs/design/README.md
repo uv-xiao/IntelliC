@@ -1,34 +1,30 @@
-# HTP Design — Index
+# HTP Design — Implemented Surface
 
-This folder is the **redo design** described by `docs/design/REDO.md`.
+`docs/design/` now tracks the design that is backed by code in this branch.
+Unimplemented or research-only material lives under `docs/future/design/`.
 
 ## Read order
 
-- `docs/design/analysis.md` — positioning and methodology (WHY)
-- `docs/design/features.md` — feature catalog (WHAT)
-- `docs/design/implementations.md` — architecture and contracts (HOW)
-- `docs/design/story.md` — cohesive end-to-end narrative (WHY→WHAT→HOW)
-- `docs/design/examples.md` — end-to-end examples
-- `docs/design/code_map.md` — where the current implementation lives
+- `docs/design/code_map.md` — implementation entrypoints and file map
+- `docs/design/implementations.md` — current architecture and contracts
+- `docs/design/examples.md` — implemented example flows
 
-## Completeness criteria
+## Implemented deep dives
 
-- `docs/design/acceptance_checklist.md`
-
-## Deep dives
-
-- Features: `docs/design/feats/`
-- Implementation components: `docs/design/impls/`
-- Retargetability evidence report: `docs/design/reports/retargetable_extensibility_report.md`
-
-Notable deep dives:
-
-- Warp specialization + pipelining case study: `docs/design/impls/11_case_study_warp_specialization_pipelining.md`
-- MLIR round-trip island contract: `docs/design/impls/12_mlir_roundtrip_island.md`
-- NV-GPU backend contract: `docs/design/impls/13_backend_nvgpu.md`
+- `docs/design/impls/01_ir_model.md` — AST-first staged IR and identity contracts
+- `docs/design/impls/02_pass_manager.md` — pass execution and stage emission
+- `docs/design/impls/04_artifact_manifest.md` — artifact and manifest schemas
+- `docs/design/impls/05_backend_pto.md` — PTO package/build/run contract
+- `docs/design/impls/07_binding_interface.md` — validate/build/load/run/replay lifecycle
+- `docs/design/impls/08_testing.md` — verification expectations
+- `docs/design/impls/13_backend_nvgpu.md` — NV-GPU package/build/run contract
 
 ## Runnable examples
 
-- `examples/pto_pypto_vector_add/` — PyPTO-inspired PTO example
-- `examples/nvgpu_arknife_gemm/` — Arknife-inspired NV-GPU example
-- `docs/examples/` — standalone walkthroughs for those runnable examples
+- `examples/pto_pypto_vector_add/`
+- `examples/nvgpu_arknife_gemm/`
+- `docs/examples/`
+
+## Future material
+
+- `docs/future/design/README.md`

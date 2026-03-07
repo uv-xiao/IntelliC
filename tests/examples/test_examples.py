@@ -37,7 +37,11 @@ def test_nvgpu_example_compiles_and_replays(tmp_path):
 
 
 @pytest.mark.skipif(
-    shutil.which("g++") is None or not Path("references/pto-runtime/python/runtime_builder.py").exists(),
+    shutil.which("g++") is None
+    or (
+        not Path("3rdparty/pto-runtime/python/runtime_builder.py").exists()
+        and not Path("references/pto-runtime/python/runtime_builder.py").exists()
+    ),
     reason="requires local pto-runtime reference checkout and host C++ toolchain",
 )
 def test_pto_example_runs_a2a3sim_end_to_end(tmp_path):

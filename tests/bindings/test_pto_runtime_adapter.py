@@ -238,3 +238,21 @@ def test_pto_runtime_adapter_rebuilds_when_codegen_sources_change(tmp_path, monk
     assert rebuild_diagnostics == []
     assert rebuilt_outputs == built_outputs
     assert kernel_output_path.stat().st_mtime > initial_mtime
+
+
+def test_pto_runtime_adapter_prefers_3rdparty_runtime_dir(monkeypatch, tmp_path):
+    thirdparty_dir = tmp_path / "3rdparty" / "pto-runtime" / "python"
+    references_dir = tmp_path / "references" / "pto-runtime" / "python"
+    thirdparty_dir.mkdir(parents=True)
+    references_dir.mkdir(parents=True)
+    monkeypatch.setattr(pto_runtime_adapter, "REPO_ROOT", tmp_path)
+
+    assert pto_runtime_adapter._resolve_reference_python_dir() == thirdparty_dir
+
+
+def test_pto_runtime_adapter_falls_back_to_references_runtime_dir(monkeypatch, tmp_path):
+    references_dir = tmp_path / "references" / "pto-runtime" / "python"
+    references_dir.mkdir(parents=True)
+    monkeypatch.setattr(pto_runtime_adapter, "REPO_ROOT", tmp_path)
+
+    assert pto_runtime_adapter._resolve_reference_python_dir() == references_dir
