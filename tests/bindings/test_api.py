@@ -63,6 +63,26 @@ def test_bind_returns_binding_for_manifest_backend(tmp_path):
         ]
         assert report.diagnostics == [
             {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json target.hardware_profile is required for PTO packages.",
+                "manifest_field": "target.hardware_profile",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json outputs.kernel_config is required for PTO packages.",
+                "manifest_field": "outputs.kernel_config",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json outputs.pto_codegen_index is required for PTO packages.",
+                "manifest_field": "outputs.pto_codegen_index",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json extensions.pto is required for PTO packages.",
+                "manifest_field": "extensions.pto",
+            },
+            {
                 "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
                 "detail": "Missing required PTO artifact path: codegen/pto/kernel_config.py",
             },
@@ -89,6 +109,26 @@ def test_load_returns_normalized_load_result_shape(tmp_path):
         assert session.backend == "pto"
         assert session.variant == "a2a3sim"
         assert session.diagnostics == [
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json target.hardware_profile is required for PTO packages.",
+                "manifest_field": "target.hardware_profile",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json outputs.kernel_config is required for PTO packages.",
+                "manifest_field": "outputs.kernel_config",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json outputs.pto_codegen_index is required for PTO packages.",
+                "manifest_field": "outputs.pto_codegen_index",
+            },
+            {
+                "code": "HTP.BINDINGS.PTO_MISSING_METADATA",
+                "detail": "manifest.json extensions.pto is required for PTO packages.",
+                "manifest_field": "extensions.pto",
+            },
             {
                 "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
                 "detail": "Missing required PTO artifact path: codegen/pto/kernel_config.py",

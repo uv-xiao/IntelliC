@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from htp.backends.pto.arch import arch_for
 from htp.backends.pto.emit import PTO_PROJECT_DIR
 
 from .base import BuildResult, ManifestBinding, ValidationResult
@@ -19,9 +20,11 @@ class PTOBinding(ManifestBinding):
         base_report = super().validate()
         missing_files = list(base_report.missing_files)
         diagnostics = list(base_report.diagnostics)
+        required_paths = self._required_paths()
+        diagnostics.extend(self._validate_required_metadata(required_paths=required_paths))
 
         if self._should_enforce_pto_contract():
-            for required_path in self._required_paths():
+            for required_path in required_paths:
                 if required_path in missing_files:
                     continue
                 if not (self.package_dir / required_path).exists():
@@ -33,8 +36,9 @@ class PTOBinding(ManifestBinding):
                         }
                     )
 
-        if self._should_enforce_pto_contract() and not missing_files:
-            diagnostics.extend(self._validate_pto_contract())
+        has_missing_metadata = any(diagnostic.get("code") == "HTP.BINDINGS.PTO_MISSING_METADATA" for diagnostic in diagnostics)
+        if self._should_enforce_pto_contract() and not missing_files and not has_missing_metadata:
+            diagnostics.extend(self._validate_pto_contract(kernel_config_path=required_paths[0], codegen_index_path=required_paths[1]))
 
         return ValidationResult(
             ok=not diagnostics,
@@ -76,9 +80,13 @@ class PTOBinding(ManifestBinding):
             diagnostics=validation.diagnostics,
         )
 
-    def _validate_pto_contract(self) -> list[dict[str, Any]]:
+    def _validate_pto_contract(
+        self,
+        *,
+        kernel_config_path: str,
+        codegen_index_path: str,
+    ) -> list[dict[str, Any]]:
         diagnostics: list[dict[str, Any]] = []
-        kernel_config_path, codegen_index_path = self._required_paths()
 
         try:
             kernel_config = _load_python_module(self.package_dir / kernel_config_path, module_name="htp_pto_kernel_config")
@@ -196,17 +204,24 @@ class PTOBinding(ManifestBinding):
             else None
         )
         codegen_variant = codegen_index.get("variant") if isinstance(codegen_index.get("variant"), str) else None
-        if self.variant != extension_platform or self.variant != codegen_variant:
+        kernel_platform = runtime_config.get("platform") if isinstance(runtime_config.get("platform"), str) else None
+        if (
+            self.variant != extension_platform
+            or self.variant != codegen_variant
+            or self.variant != kernel_platform
+        ):
             diagnostics.append(
                 {
                     "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
-                    "detail": "PTO metadata variant/platform does not agree across manifest target, manifest extensions, and pto_codegen.json.",
+                    "detail": "PTO metadata variant/platform does not agree across manifest target, manifest extensions, kernel_config.py, and pto_codegen.json.",
                     "field": "variant",
                     "manifest_field": "target.variant",
                     "extension_field": "extensions.pto.platform",
+                    "kernel_config_field": "kernel_config.py:RUNTIME_CONFIG.platform",
                     "codegen_field": f"{codegen_index_path}.variant",
                     "manifest_value": self.variant,
                     "extension_value": extension_platform,
+                    "kernel_config_value": kernel_platform,
                     "codegen_value": codegen_variant,
                 }
             )
@@ -214,6 +229,14 @@ class PTOBinding(ManifestBinding):
         manifest_kernel_project_dir = manifest_pto_extension.get("kernel_project_dir")
         if not isinstance(manifest_kernel_project_dir, str):
             diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.kernel_project_dir"))
+        elif manifest_kernel_project_dir != PTO_PROJECT_DIR.as_posix():
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                    "detail": "manifest.json extensions.pto.kernel_project_dir does not match the emitted PTO project directory.",
+                    "manifest_field": "extensions.pto.kernel_project_dir",
+                }
+            )
 
         manifest_runtime_config = manifest_pto_extension.get("runtime_config")
         if manifest_runtime_config is None:
@@ -318,6 +341,81 @@ class PTOBinding(ManifestBinding):
         if mode == "device":
             return "a2a3"
         return "a2a3sim" if self.variant is None else self.variant
+
+    def _validate_required_metadata(self, *, required_paths: tuple[str, str]) -> list[dict[str, Any]]:
+        if not self._should_enforce_pto_contract():
+            return []
+
+        diagnostics: list[dict[str, Any]] = []
+        target = self._target_record()
+        if self.variant is None:
+            diagnostics.append(self._missing_metadata_diagnostic("target.variant"))
+
+        target_hardware_profile = target.get("hardware_profile") if isinstance(target.get("hardware_profile"), str) else None
+        if target_hardware_profile is None:
+            diagnostics.append(self._missing_metadata_diagnostic("target.hardware_profile"))
+        elif self.variant is not None:
+            expected_profile = arch_for(self.variant).hardware_profile
+            if target_hardware_profile != expected_profile:
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                        "detail": "PTO metadata hardware_profile does not agree with target.variant.",
+                        "field": "hardware_profile",
+                        "manifest_field": "target.hardware_profile",
+                        "manifest_value": target_hardware_profile,
+                        "expected_value": expected_profile,
+                    }
+                )
+
+        outputs = self.manifest.get("outputs")
+        if not isinstance(outputs, Mapping):
+            diagnostics.append(self._missing_metadata_diagnostic("outputs.kernel_config"))
+            diagnostics.append(self._missing_metadata_diagnostic("outputs.pto_codegen_index"))
+        else:
+            kernel_config = outputs.get("kernel_config")
+            codegen_index = outputs.get("pto_codegen_index")
+            if not isinstance(kernel_config, str):
+                diagnostics.append(self._missing_metadata_diagnostic("outputs.kernel_config"))
+            elif kernel_config != required_paths[0]:
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                        "detail": "manifest.json outputs.kernel_config does not match the PTO binding contract.",
+                        "manifest_field": "outputs.kernel_config",
+                    }
+                )
+            if not isinstance(codegen_index, str):
+                diagnostics.append(self._missing_metadata_diagnostic("outputs.pto_codegen_index"))
+            elif codegen_index != required_paths[1]:
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
+                        "detail": "manifest.json outputs.pto_codegen_index does not match the PTO binding contract.",
+                        "manifest_field": "outputs.pto_codegen_index",
+                    }
+                )
+
+        manifest_pto_extension = self._pto_extension()
+        if manifest_pto_extension is None:
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto"))
+            return diagnostics
+
+        if not isinstance(manifest_pto_extension.get("platform"), str):
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.platform"))
+        if not isinstance(manifest_pto_extension.get("kernel_project_dir"), str):
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.kernel_project_dir"))
+        if manifest_pto_extension.get("runtime_config") is None:
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.runtime_config"))
+        if manifest_pto_extension.get("orchestration_entry") is None:
+            diagnostics.append(self._missing_metadata_diagnostic("extensions.pto.orchestration_entry"))
+        return diagnostics
+
+    def _target_record(self) -> Mapping[str, Any]:
+        target = self.manifest.get("target")
+        if not isinstance(target, Mapping):
+            return {}
+        return target
 
     def _missing_metadata_diagnostic(self, field: str) -> dict[str, Any]:
         return {
