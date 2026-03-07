@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Mapping
+
+from .arch import arch_for, normalize_variant
+
+
+@dataclass(frozen=True)
+class PTOKernelSpec:
+    kernel_id: str
+    func_id: str
+    source: str
+    core_type: str
+
+
+@dataclass(frozen=True)
+class PTOOrchestrationSpec:
+    source: str
+    function_name: str
+
+
+@dataclass(frozen=True)
+class PTOCodegenPlan:
+    backend: str
+    variant: str
+    entrypoint: str
+    kernels: tuple[PTOKernelSpec, ...]
+    orchestration: PTOOrchestrationSpec
+    runtime_config: dict[str, object]
+
+
+def lower_program(program: Mapping[str, Any], *, variant: str | None = None) -> PTOCodegenPlan:
+    entrypoint = program.get("entry")
+    if not isinstance(entrypoint, str) or not entrypoint:
+        raise ValueError("PTO codegen requires program['entry'] to be a non-empty string")
+
+    arch = arch_for(normalize_variant(variant))
+    kernel = PTOKernelSpec(
+        kernel_id=f"{entrypoint}.kernel0",
+        func_id=f"{entrypoint}_0",
+        source=f"codegen/pto/kernels/{arch.core_type}/{entrypoint}.cpp",
+        core_type=arch.core_type,
+    )
+    orchestration = PTOOrchestrationSpec(
+        source=f"codegen/pto/orchestration/{entrypoint}_orchestration.cpp",
+        function_name=f"{entrypoint}_orchestrate",
+    )
+    return PTOCodegenPlan(
+        backend=arch.backend,
+        variant=arch.variant,
+        entrypoint=entrypoint,
+        kernels=(kernel,),
+        orchestration=orchestration,
+        runtime_config={
+            "platform": arch.variant,
+            "aicpu_thread_num": 1,
+            "block_dim": 1,
+        },
+    )
+
+
+__all__ = [
+    "PTOCodegenPlan",
+    "PTOKernelSpec",
+    "PTOOrchestrationSpec",
+    "lower_program",
+]

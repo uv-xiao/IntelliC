@@ -15,9 +15,19 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
     if binding_override is not None:
         return binding_override(package_path, manifest)
 
-    backend, _variant = manifest_target(manifest)
+    backend, variant = manifest_target(manifest)
     if backend is None:
         raise ValueError("Manifest target.backend is required for binding selection")
+
+    if backend == "pto":
+        from .pto import PTOBinding
+
+        return PTOBinding(
+            package_dir=package_path,
+            manifest=manifest,
+            backend=backend,
+            variant=variant,
+        )
 
     return binding_from_manifest(package_path, manifest)
 
