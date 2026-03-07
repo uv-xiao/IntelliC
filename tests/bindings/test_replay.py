@@ -228,3 +228,26 @@ def test_replay_returns_structured_diagnostic_for_malformed_runnable_py_shape(tm
 
     assert result.ok is False
     assert result.diagnostics[0]["code"] == "HTP.BINDINGS.MALFORMED_RUNNABLE_PY"
+
+
+def test_replay_returns_structured_diagnostic_for_malformed_runnable_modes_shape(tmp_path):
+    package_dir = tmp_path / "package"
+    package_dir.mkdir()
+    _write_manifest(
+        package_dir,
+        stage_records=[
+            {
+                "id": "s01",
+                "runnable_py": {
+                    "program_py": "ir/stages/s01/program.py",
+                    "modes": None,
+                },
+            }
+        ],
+    )
+
+    session = htp.bind(package_dir).load(mode="sim")
+    result = session.replay("s01")
+
+    assert result.ok is False
+    assert result.diagnostics[0]["code"] == "HTP.BINDINGS.MALFORMED_RUNNABLE_MODES"

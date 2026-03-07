@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -217,7 +217,16 @@ class LoadResult:
                     "stage_id": stage_id,
                 }
             ]
-        supported_modes = tuple(runnable_py.get("modes", ()))
+        modes_value = runnable_py.get("modes", ())
+        if modes_value is None or isinstance(modes_value, (str, bytes)) or not isinstance(modes_value, Iterable):
+            return False, None, [
+                {
+                    "code": "HTP.BINDINGS.MALFORMED_RUNNABLE_MODES",
+                    "detail": f"Stage {stage_id!r} has a non-iterable runnable_py.modes value.",
+                    "stage_id": stage_id,
+                }
+            ]
+        supported_modes = tuple(modes_value)
         if supported_modes and mode not in supported_modes:
             return False, None, [
                 {
