@@ -29,7 +29,9 @@ def run(
     del stage_before
 
     next_program = deepcopy(dict(program))
-    kernel_ir, workload_ir, entities_payload, bindings_payload = build_semantic_model(next_program["canonical_ast"])
+    kernel_ir, workload_ir, entities_payload, bindings_payload = build_semantic_model(
+        next_program["canonical_ast"]
+    )
     next_program["kernel_ir"] = kernel_ir
     next_program["workload_ir"] = workload_ir
     next_program["entities_payload"] = entities_payload
