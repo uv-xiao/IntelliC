@@ -19,13 +19,20 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
     if backend is None:
         raise ValueError("Manifest target.backend is required for binding selection")
 
-    if backend == "pto":
+    outputs = manifest.get("outputs")
+    extensions = manifest.get("extensions")
+    has_pto_markers = (
+        backend == "pto"
+        or (isinstance(outputs, dict) and any(key in outputs for key in ("kernel_config", "pto_codegen_index", "toolchain_manifest")))
+        or (isinstance(extensions, dict) and "pto" in extensions)
+    )
+    if has_pto_markers:
         from .pto import PTOBinding
 
         return PTOBinding(
             package_dir=package_path,
             manifest=manifest,
-            backend=backend,
+            backend="pto",
             variant=variant,
         )
 

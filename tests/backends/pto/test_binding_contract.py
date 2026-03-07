@@ -509,6 +509,38 @@ def test_pto_binding_rejects_nonmapping_kernel_entries(tmp_path):
     ]
 
 
+def test_pto_binding_rejects_malformed_toolchain_env_and_flags(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "ops": ["compute_tile"],
+        },
+    )
+
+    toolchain_manifest_path = package_dir / "build" / "toolchain.json"
+    toolchain_manifest = json.loads(toolchain_manifest_path.read_text())
+    toolchain_manifest["env"] = {"PTO_ISA_ROOT": []}
+    toolchain_manifest["compile_flags"] = [1, {"bad": "flag"}]
+    toolchain_manifest_path.write_text(json.dumps(toolchain_manifest, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
+            "detail": "build/toolchain.json env must be a mapping containing string PTO_ISA_ROOT.",
+        },
+        {
+            "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
+            "detail": "build/toolchain.json compile_flags must be a list of strings.",
+        },
+    ]
+
+
 def test_pto_binding_rejects_noncanonical_output_paths(tmp_path):
     package_dir = tmp_path / "out"
     package_dir.mkdir()

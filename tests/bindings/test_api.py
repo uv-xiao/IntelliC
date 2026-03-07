@@ -217,3 +217,40 @@ def test_load_rejects_invalid_mode(tmp_path):
                 "supported_modes": ["sim", "device"],
             }
         ]
+
+
+def test_bind_prefers_pto_binding_when_pto_artifacts_exist(tmp_path):
+    with _import_fresh_htp():
+        from htp.backends.pto.emit import emit_package
+        from htp.bindings.api import bind as bind_api
+
+        package_dir = tmp_path / "package"
+        package_dir.mkdir()
+        emit_package(
+            package_dir,
+            program={
+                "entry": "demo_kernel",
+                "ops": ["compute_tile"],
+            },
+        )
+
+        manifest_path = package_dir / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["target"]["backend"] = "other-backend"
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+        binding = bind_api(package_dir)
+        report = binding.validate()
+
+        assert binding.__class__.__name__ == "PTOBinding"
+        assert report.ok is False
+        assert report.diagnostics == [
+            {
+                "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                "detail": "Manifest target.backend does not match PTO binding selection.",
+                "field": "backend",
+                "manifest_field": "target.backend",
+                "manifest_value": "other-backend",
+                "expected_value": "pto",
+            }
+        ]

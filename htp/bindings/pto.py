@@ -480,6 +480,18 @@ class PTOBinding(ManifestBinding):
 
         diagnostics: list[dict[str, Any]] = []
         target = self._target_record()
+        target_backend = target.get("backend") if isinstance(target.get("backend"), str) else None
+        if target_backend != self.backend:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.PTO_METADATA_MISMATCH",
+                    "detail": "Manifest target.backend does not match PTO binding selection.",
+                    "field": "backend",
+                    "manifest_field": "target.backend",
+                    "manifest_value": target_backend,
+                    "expected_value": self.backend,
+                }
+            )
         if self.variant is None:
             diagnostics.append(self._missing_metadata_diagnostic("target.variant"))
 
@@ -641,20 +653,24 @@ class PTOBinding(ManifestBinding):
             )
 
         env_payload = toolchain_manifest.get("env")
-        if not isinstance(env_payload, Mapping) or "PTO_ISA_ROOT" not in env_payload:
+        if (
+            not isinstance(env_payload, Mapping)
+            or not isinstance(env_payload.get("PTO_ISA_ROOT"), str)
+            or not env_payload.get("PTO_ISA_ROOT")
+        ):
             diagnostics.append(
                 {
                     "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
-                    "detail": "build/toolchain.json env must be a mapping containing PTO_ISA_ROOT.",
+                    "detail": "build/toolchain.json env must be a mapping containing string PTO_ISA_ROOT.",
                 }
             )
 
         compile_flags = toolchain_manifest.get("compile_flags")
-        if not isinstance(compile_flags, list):
+        if not isinstance(compile_flags, list) or not all(isinstance(flag, str) for flag in compile_flags):
             diagnostics.append(
                 {
                     "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
-                    "detail": "build/toolchain.json compile_flags must be a list.",
+                    "detail": "build/toolchain.json compile_flags must be a list of strings.",
                 }
             )
 
