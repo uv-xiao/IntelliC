@@ -1,0 +1,182 @@
+from __future__ import annotations
+
+import json
+
+from htp.passes.contracts import PassContract
+from htp.pipeline.defaults import MANDATORY_PASS_IDS
+from htp.solver import PipelineTemplate, solve_default_pipeline, solve_pipeline, validate_final_artifacts
+
+
+def _vector_add_program() -> dict[str, object]:
+    return {
+        "entry": "vector_add",
+        "kernel": {
+            "name": "vector_add",
+            "args": [
+                {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
+                {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
+            ],
+            "ops": [
+                {
+                    "op": "elementwise_binary",
+                    "operator": "add",
+                    "lhs": "lhs",
+                    "rhs": "rhs",
+                    "out": "out",
+                    "shape": ["size"],
+                    "dtype": "f32",
+                }
+            ],
+        },
+        "workload": {
+            "entry": "vector_add",
+            "tasks": [
+                {
+                    "task_id": "task0",
+                    "kind": "kernel_call",
+                    "kernel": "vector_add",
+                    "args": ["lhs", "rhs", "out", "size"],
+                }
+            ],
+            "channels": [],
+            "dependencies": [],
+        },
+        "analysis": {},
+        "package": {"emitted": False},
+        "target": {"backend": "pto", "option": "a2a3sim"},
+    }
+
+
+def test_solver_accepts_default_pipeline_and_tracks_capabilities():
+    result = solve_default_pipeline(program=_vector_add_program())
+
+    assert result.ok is True
+    assert result.template_id == "htp.default.v1"
+    assert result.pass_ids == list(MANDATORY_PASS_IDS)
+    assert "Package.Emitted@1" in result.capabilities
+    assert result.extension_results == {}
+
+
+def test_solver_reports_missing_capability():
+    template = PipelineTemplate(
+        template_id="test.missing_cap.v1",
+        passes=(
+            PassContract(
+                pass_id="test::requires_missing@1",
+                owner="test",
+                kind="transform",
+                ast_effect="preserves",
+                requires=("Missing.Capability@1",),
+            ),
+        ),
+        required_outputs=(),
+    )
+
+    result = solve_pipeline(program=_vector_add_program(), template=template)
+
+    assert result.ok is False
+    assert result.failure is not None
+    assert result.failure.failed_at_pass == "test::requires_missing@1"
+    assert result.failure.missing_caps == ("Missing.Capability@1",)
+
+
+def test_solver_reports_stale_analysis_after_invalidation():
+    template = PipelineTemplate(
+        template_id="test.analysis_invalidated.v1",
+        passes=(
+            PassContract.analysis(
+                pass_id="test::produce_analysis@1",
+                owner="test",
+                provides=("Analysis.SchedulePlan@1",),
+            ),
+            PassContract(
+                pass_id="test::invalidate_analysis@1",
+                owner="test",
+                kind="transform",
+                ast_effect="mutates",
+                invalidates=("Analysis.SchedulePlan@1",),
+            ),
+            PassContract(
+                pass_id="test::consume_analysis@1",
+                owner="test",
+                kind="analysis",
+                ast_effect="preserves",
+                requires=("Analysis.SchedulePlan@1",),
+                analysis_requires=("Analysis.SchedulePlan@1",),
+            ),
+        ),
+        required_outputs=(),
+    )
+
+    result = solve_pipeline(program=_vector_add_program(), template=template)
+
+    assert result.ok is False
+    assert result.failure is not None
+    assert result.failure.failed_at_pass == "test::consume_analysis@1"
+    assert result.failure.missing_caps == ("Analysis.SchedulePlan@1",)
+    assert result.failure.analysis_requirements == ("Analysis.SchedulePlan@1",)
+
+
+def test_solver_reports_missing_backend_handler():
+    program = _vector_add_program()
+    program["target"] = {"backend": "pto", "option": "a2a3sim"}
+    program["kernel"] = {
+        "name": "channel_kernel",
+        "args": [
+            {"name": "value", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
+            {"name": "channel", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
+        ],
+        "ops": [
+            {"op": "channel_send", "value": "value", "channel": "channel", "outputs": []},
+        ],
+    }
+    program["workload"] = {
+        "entry": "channel_kernel",
+        "tasks": [{"task_id": "task0", "kind": "kernel_call", "kernel": "channel_kernel", "args": ["value", "channel"]}],
+        "channels": [{"name": "channel", "dtype": "i32"}],
+        "dependencies": [],
+    }
+
+    result = solve_default_pipeline(program=program)
+
+    assert result.ok is False
+    assert result.failure is not None
+    assert result.failure.failed_at_pass == "target.handlers"
+    assert result.failure.missing_handlers == ({"backend": "pto", "op": "channel_send"},)
+
+
+def test_solver_writes_failure_report_for_missing_final_artifact(tmp_path):
+    result = solve_default_pipeline(program=_vector_add_program())
+
+    artifact_check = validate_final_artifacts(tmp_path, result)
+
+    assert artifact_check.ok is False
+    assert artifact_check.failure is not None
+    assert artifact_check.failure.failed_at_pass == "final_contract"
+    report = json.loads((tmp_path / "ir" / "solver_failure.json").read_text())
+    assert report["artifact_contract_violations"] == [
+        "codegen/pto/kernel_config.py",
+        "codegen/pto/pto_codegen.json",
+        "build/toolchain.json",
+    ]
+
+
+def test_solver_exposes_mlir_cse_extension_eligibility():
+    result = solve_default_pipeline(
+        program={
+            "entry": "expr_kernel",
+            "exprs": [
+                {"target": "sum0", "op": "add", "lhs": "lhs", "rhs": "rhs"},
+                {"target": "out", "op": "mul", "lhs": "sum0", "rhs": "scale"},
+            ],
+            "result": "out",
+            "extensions": {"requested": ["htp_ext.mlir_cse"]},
+            "target": {"backend": "nvgpu", "option": "ampere"},
+        }
+    )
+
+    assert result.ok is True
+    assert result.extension_results["htp_ext.mlir_cse"]["eligible"] is True
+    assert result.extension_results["htp_ext.mlir_cse"]["provides"] == ["Extension.MLIRCSEEligible@1"]

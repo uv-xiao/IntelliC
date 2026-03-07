@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from htp.passes import (
 )
 from htp.passes.contracts import PassContract
 from htp.passes.program_model import stage_payloads_from_program
+from htp.solver import solve_default_pipeline
 
 
 @dataclass(frozen=True)
@@ -82,11 +84,14 @@ def run_default_pipeline(
         stages=[initial_stage],
         current_stage="s00",
     )
-    capabilities: set[str] = set()
+    solver_result = solve_default_pipeline(program=program_state)
+    if not solver_result.ok:
+        failure_path = package_path / "ir" / "solver_failure.json"
+        failure_path.parent.mkdir(parents=True, exist_ok=True)
+        failure_path.write_text(json.dumps(solver_result.failure.to_json(), indent=2) + "\n")
+        raise RuntimeError(f"Default pipeline is unsatisfied: {solver_result.failure.to_json()}")
 
     for pipeline_pass in MANDATORY_PASSES:
-        _ensure_requires_satisfied(pipeline_pass.contract, capabilities)
-
         next_program: dict[str, Any] | None = None
 
         def execute(stage_before: dict[str, object]) -> PassResult:
@@ -99,8 +104,6 @@ def run_default_pipeline(
             raise RuntimeError(f"Pass {pipeline_pass.contract.pass_id} did not produce program state")
 
         program_state = next_program
-        capabilities.difference_update(pipeline_pass.contract.invalidates)
-        capabilities.update(pipeline_pass.contract.provides)
 
     return DefaultPipelineResult(
         package_dir=package_path,
@@ -151,13 +154,6 @@ def _example_program() -> dict[str, Any]:
         "package": {"emitted": False},
         "target": {"backend": "pto", "option": "a2a3sim"},
     }
-
-
-def _ensure_requires_satisfied(contract: PassContract, capabilities: set[str]) -> None:
-    missing = [requirement for requirement in contract.requires if requirement not in capabilities]
-    if missing:
-        missing_list = ", ".join(missing)
-        raise ValueError(f"Pass {contract.pass_id} is missing required capabilities: {missing_list}")
 
 
 __all__ = [

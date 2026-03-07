@@ -7,6 +7,7 @@ from typing import Any
 
 from htp.bindings.api import bind
 from htp.pipeline.defaults import DefaultPipelineResult, run_default_pipeline
+from htp.solver import solve_default_pipeline, validate_final_artifacts
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,11 @@ def compile_program(
             "option": target_spec.option,
         },
     )
+    package_path.mkdir(parents=True, exist_ok=True)
+    solver_result = solve_default_pipeline(program=pipeline_program)
+    if not solver_result.ok:
+        _write_solver_failure(package_path, solver_result)
+        raise RuntimeError(f"Solver failed for target {target!r}: {solver_result.failure.to_json()}")
     pipeline_result = run_default_pipeline(
         package_dir=package_path,
         program=pipeline_program,
@@ -57,6 +63,11 @@ def compile_program(
         target_spec=target_spec,
         program=pipeline_result.program,
     )
+    artifact_check = validate_final_artifacts(package_path, solver_result)
+    if not artifact_check.ok:
+        raise RuntimeError(
+            f"Solver final artifact check failed for target {target!r}: {artifact_check.failure.to_json()}"
+        )
     manifest = json.loads((package_path / "manifest.json").read_text())
     validation = bind(package_path).validate()
     if not validation.ok:
@@ -68,6 +79,16 @@ def compile_program(
         manifest=manifest,
         pipeline=pipeline_result,
     )
+
+
+def _write_solver_failure(package_dir: Path, solver_result: object) -> None:
+    from htp.solver import SolverResult
+
+    if not isinstance(solver_result, SolverResult) or solver_result.failure is None:
+        return
+    failure_path = package_dir / "ir" / "solver_failure.json"
+    failure_path.parent.mkdir(parents=True, exist_ok=True)
+    failure_path.write_text(json.dumps(solver_result.failure.to_json(), indent=2) + "\n")
 
 
 def _emit_backend_package(*, package_dir: Path, target_spec: TargetSpec, program: dict[str, Any]) -> None:

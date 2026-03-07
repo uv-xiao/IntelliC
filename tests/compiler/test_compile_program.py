@@ -146,3 +146,49 @@ def test_compile_program_rejects_unknown_targets(tmp_path):
         assert "Unsupported target backend" in str(exc)
     else:
         raise AssertionError("compile_program should reject unsupported backends")
+
+
+def test_compile_program_writes_solver_failure_for_unsupported_backend_op(tmp_path):
+    package_dir = tmp_path / "bad_pkg"
+
+    try:
+        htp.compile_program(
+            package_dir=package_dir,
+            target="pto-a2a3sim",
+            program={
+                "entry": "channel_kernel",
+                "kernel": {
+                    "name": "channel_kernel",
+                    "args": [
+                        {"name": "value", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
+                        {"name": "channel", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
+                    ],
+                    "ops": [
+                        {"op": "channel_send", "value": "value", "channel": "channel", "outputs": []},
+                    ],
+                },
+                "workload": {
+                    "entry": "channel_kernel",
+                    "tasks": [
+                        {
+                            "task_id": "task0",
+                            "kind": "kernel_call",
+                            "kernel": "channel_kernel",
+                            "args": ["value", "channel"],
+                        }
+                    ],
+                    "channels": [{"name": "channel", "dtype": "i32"}],
+                    "dependencies": [],
+                },
+                "analysis": {},
+                "package": {"emitted": False},
+            },
+        )
+    except RuntimeError as exc:
+        assert "solver" in str(exc).lower()
+    else:
+        raise AssertionError("compile_program should reject unsupported backend operations")
+
+    failure = json.loads((package_dir / "ir" / "solver_failure.json").read_text())
+    assert failure["failed_at_pass"] == "target.handlers"
+    assert failure["missing_handlers"] == [{"backend": "pto", "op": "channel_send"}]
