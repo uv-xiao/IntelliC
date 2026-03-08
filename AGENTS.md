@@ -100,6 +100,16 @@ Specific expectations:
 - runtime: structured replay diagnostics
 - extensions: remain out of core and replay in `sim`
 
+Quality rules:
+
+- Do not add tests that only restate trivial implementation details without protecting a contract, failure mode, or
+  regression.
+- Do not inflate test counts with redundant variants that exercise the same behavior through the same path.
+- Prefer a small set of high-signal tests that defend the contract surface and likely failure modes.
+- When adding a test, be able to state exactly which contract, bug, or regression it protects.
+- If a test becomes obsolete because the contract moved, update or remove it deliberately; do not keep low-value tests
+  as noise.
+
 Before claiming completion, run:
 
 - `pixi run verify`
@@ -120,6 +130,10 @@ Fallback only when Pixi is unavailable:
   - `py311` is the default development environment
   - `py310` and `py311` are the CI test environments
 - Do not add a second disconnected setup path for CI.
+- Do not weaken CI or remove checks just to make a failure disappear.
+- When CI fails, first assume the failure exposed a real contract, fixture, environment, or test issue and resolve the
+  root cause.
+- Any CI or test change must make correctness stronger or clearer, not merely easier to pass.
 
 ## 7. Documentation rules
 
