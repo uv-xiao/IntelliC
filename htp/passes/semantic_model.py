@@ -32,6 +32,7 @@ def run(
     kernel_ir, workload_ir, entities_payload, bindings_payload = build_semantic_model(
         next_program["canonical_ast"]
     )
+    next_program["schedule_directives"] = dict(next_program["canonical_ast"].get("schedule_directives", {}))
     next_program["kernel_ir"] = kernel_ir
     next_program["workload_ir"] = workload_ir
     next_program["entities_payload"] = entities_payload

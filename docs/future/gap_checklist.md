@@ -212,7 +212,7 @@ Source intent:
 
 Current code reality:
 
-- There are no first-class WSP or CSP dialect packages in `htp/` today.
+- WSP and CSP authoring helpers now live under `htp/wsp/` and `htp/csp/`.
 
 Checklist:
 
@@ -223,9 +223,9 @@ Checklist:
 - `[x]` Add a real CSP dialect package with typed processes and channels.
 - `[x]` Add canonical CSP lowering into the shared semantic substrate.
 - `[x]` Add typed channel capacity, element type, and protocol contracts.
-- `[ ]` Add process/channel effect checking integrated with the solver.
-- `[~]` Add examples and tests that demonstrate WSP and CSP as extension-owned
-  front-end surfaces, not only backend-oriented package construction.
+- `[x]` Add process/channel effect checking integrated with the solver.
+- `[x]` Add examples and tests that demonstrate WSP and CSP as front-end
+  authoring surfaces, not only backend-oriented package construction.
 
 ---
 
@@ -473,7 +473,7 @@ Checklist:
   artifact examples.
 - `[ ]` Turn software pipelining into a real staged pass sequence with tests and
   artifact examples.
-- `[ ]` Add CSP/process/channel example programs that exercise protocol typing.
+- `[x]` Add CSP/process/channel example programs that exercise protocol typing.
 - `[ ]` Add serving-routine examples above the current kernel-level examples.
 - `[ ]` Add extension-composition examples showing solver-visible pipeline
   choice.

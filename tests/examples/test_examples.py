@@ -6,12 +6,16 @@ from pathlib import Path
 
 import pytest
 
+from examples.csp_channel_pipeline.demo import compile_example as compile_csp_example
+from examples.csp_channel_pipeline.demo import replay_latest_stage as replay_csp_stage
 from examples.nvgpu_arknife_gemm.demo import compile_example as compile_nvgpu_example
 from examples.nvgpu_arknife_gemm.demo import replay_latest_stage as replay_nvgpu_stage
 from examples.nvgpu_arknife_gemm.demo import run_demo as run_nvgpu_demo
 from examples.pto_pypto_vector_add.demo import compile_example as compile_pto_example
 from examples.pto_pypto_vector_add.demo import replay_latest_stage as replay_pto_stage
 from examples.pto_pypto_vector_add.demo import run_demo as run_pto_demo
+from examples.wsp_warp_gemm.demo import compile_example as compile_wsp_example
+from examples.wsp_warp_gemm.demo import replay_latest_stage as replay_wsp_stage
 
 
 def test_pto_example_compiles_and_replays(tmp_path):
@@ -34,6 +38,36 @@ def test_nvgpu_example_compiles_and_replays(tmp_path):
     assert (Path(compile_summary["manifest_path"])).is_file()
     assert replay_summary["ok"] is True
     assert replay_summary["stage_id"].startswith("s")
+
+
+def test_wsp_example_compiles_and_replays(tmp_path):
+    package_dir = tmp_path / "wsp_example"
+    compile_summary = compile_wsp_example(package_dir)
+    replay_summary = replay_wsp_stage(package_dir)
+
+    assert compile_summary["target"] == {"backend": "nvgpu", "option": "ampere"}
+    assert replay_summary["ok"] is True
+    assert replay_summary["schedule"]["pipeline_depth"] >= 1
+    assert replay_summary["schedule"]["launch"]["num_warps"] == 4
+
+
+def test_csp_example_compiles_and_replays(tmp_path):
+    package_dir = tmp_path / "csp_example"
+    compile_summary = compile_csp_example(package_dir)
+    replay_summary = replay_csp_stage(package_dir)
+
+    assert compile_summary["target"] == {"backend": "nvgpu", "option": "ampere"}
+    assert replay_summary["ok"] is True
+    assert replay_summary["effects"]["protocols"] == [
+        {
+            "channel": "tiles",
+            "protocol": "fifo",
+            "capacity": 2,
+            "puts": 1,
+            "gets": 1,
+            "balanced": True,
+        }
+    ]
 
 
 @pytest.mark.skipif(
