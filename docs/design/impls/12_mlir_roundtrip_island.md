@@ -34,14 +34,21 @@ Implemented island artifacts:
 - import stage:
   - `output.mlir`
   - `import_summary.json`
+  - `entity_map.json`
+  - `binding_map.json`
 
 Implemented import/export model:
 
 - export lowers the eligible scalar elementwise subset into a textual MLIR
   module
+- eligibility is checked against canonical typed program structure, including
+  scalar-only args and the absence of channels/process graphs
 - the island runs a deterministic built-in CSE pipeline over that MLIR module
 - import parses the transformed `output.mlir` and reconstructs the reduced
   expression program from MLIR SSA plus the export ledger
+- import also emits `maps/entity_map.json` and `maps/binding_map.json` on the
+  import stage so identity preservation/rewrite evidence is staged with the
+  rest of the compiler state
 - malformed MLIR import fails explicitly instead of silently falling back to
   Python-side rewrites
 
@@ -49,8 +56,6 @@ Current scope:
 
 - eligible subset is still intentionally narrow: scalar `i32` elementwise
   add/mul kernels only
-- identity maps (`entity_map.json`, `binding_map.json`) are not emitted yet for
-  the MLIR extension
 - the pass pipeline is recorded textually (`pipeline.txt`); there is no
   external `mlir-opt` integration yet
 

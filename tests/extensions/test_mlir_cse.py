@@ -31,6 +31,8 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
         "ledger": "extensions/mlir_cse/ledger.json",
         "eligibility": "extensions/mlir_cse/eligibility.json",
         "import_summary": "extensions/mlir_cse/import_summary.json",
+        "entity_map": "extensions/mlir_cse/entity_map.json",
+        "binding_map": "extensions/mlir_cse/binding_map.json",
     }
     assert manifest["stages"]["graph"][0]["islands"] == [
         {"island_id": "mlir_cse", "dir": "ir/stages/s01/islands/mlir_cse"}
@@ -45,11 +47,15 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
     assert (package_dir / "extensions" / "mlir_cse" / "ledger.json").is_file()
     assert (package_dir / "extensions" / "mlir_cse" / "eligibility.json").is_file()
     assert (package_dir / "extensions" / "mlir_cse" / "import_summary.json").is_file()
+    assert (package_dir / "extensions" / "mlir_cse" / "entity_map.json").is_file()
+    assert (package_dir / "extensions" / "mlir_cse" / "binding_map.json").is_file()
     assert (package_dir / "ir" / "stages" / "s01" / "islands" / "mlir_cse" / "input.mlir").is_file()
     assert (package_dir / "ir" / "stages" / "s01" / "islands" / "mlir_cse" / "pipeline.txt").is_file()
     assert (package_dir / "ir" / "stages" / "s01" / "islands" / "mlir_cse" / "ledger.json").is_file()
     assert (package_dir / "ir" / "stages" / "s02" / "islands" / "mlir_cse" / "output.mlir").is_file()
     assert (package_dir / "ir" / "stages" / "s02" / "islands" / "mlir_cse" / "import_summary.json").is_file()
+    assert (package_dir / "ir" / "stages" / "s02" / "islands" / "mlir_cse" / "entity_map.json").is_file()
+    assert (package_dir / "ir" / "stages" / "s02" / "islands" / "mlir_cse" / "binding_map.json").is_file()
 
     import_summary = json.loads((package_dir / "extensions" / "mlir_cse" / "import_summary.json").read_text())
     assert import_summary["rewrites"] == [
@@ -60,6 +66,8 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
         }
     ]
     assert import_summary["result"] == "out"
+    assert import_summary["entity_counts"] == {"preserved": 2, "introduced": 0, "rewritten": 1}
+    assert import_summary["binding_counts"] == {"preserved": 3, "rewritten": 1}
     input_text = (package_dir / "extensions" / "mlir_cse" / "input.mlir").read_text()
     output_text = (package_dir / "extensions" / "mlir_cse" / "output.mlir").read_text()
     assert "func.func @demo_kernel(%lhs: i32, %rhs: i32, %scale: i32) -> i32" in input_text
