@@ -52,7 +52,7 @@ Checklist:
 
 - `[~]` Solver exists, but pipeline templates are still effectively a single
   hard-coded default template.
-- `[ ]` Move backend capability facts out of local solver tables and into
+- `[x]` Move backend capability facts out of local solver tables and into
   backend-owned declarations (`ArchModel`-style source of truth).
 - `[ ]` Make extension-provided passes and extension-provided pipelines
   first-class solver inputs rather than ad-hoc extension-specific checks.
@@ -69,7 +69,7 @@ Checklist:
 - `[ ]` Add bounded alternative choice support (OR nodes) for pipeline
   selection.
 - `[ ]` Add cost-model-based selection only after satisfiability is complete.
-- `[ ]` Unify final artifact requirements with backend/extension contracts so
+- `[~]` Unify final artifact requirements with backend/extension contracts so
   the solver does not maintain a second independent list.
 - `[ ]` Make solver-visible resumption work from existing artifact packages, not
   only from fresh in-memory compilation inputs.

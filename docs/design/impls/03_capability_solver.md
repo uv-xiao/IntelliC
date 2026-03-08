@@ -3,6 +3,7 @@
 Current code anchors:
 
 - solver model: `htp/solver.py`
+- backend declarations: `htp/backends/pto/declarations.py`, `htp/backends/nvgpu/declarations.py`
 - compiler preflight: `htp/compiler.py`
 - default template source: `htp/pipeline/defaults.py`
 - solver tests: `tests/pipeline/test_solver.py`
@@ -19,6 +20,6 @@ Current scope:
 
 - deterministic forward checking only
 - one default pipeline template
-- backend handler support is still declared in `htp/solver.py`
+- backend-required outputs, supported-op facts, and target capability tags come from backend-owned declarations
 
 This is an implemented surface, not roadmap material.
