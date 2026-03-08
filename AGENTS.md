@@ -20,6 +20,8 @@ Before starting feature work, verify the branch:
 - New feature work must happen on a feature branch named `htp/feat-<topic>`.
 - Merge back into `htp/dev` through a PR-style review flow after tests and hooks pass.
 - A feature branch is not ready for review or handoff until its PR is in a state that passes all configured CI checks.
+- Every PR description must follow `.github/pull_request_template.md`.
+- Do not open or update a PR with an ad-hoc or low-signal description; rewrite it to match the template.
 - Do not land exploratory or half-finished feature work directly on `htp/dev`.
 
 Do not begin with speculative edits.
@@ -178,3 +180,13 @@ A complete handoff states:
 - exact verification commands run
 - PR / CI status, including whether all required checks are green
 - any remaining gap or deferred scope
+
+When the handoff is a PR, the PR body must use the repository template headings:
+
+- `Summary`
+- `Why`
+- `Contracts`
+- `Tests`
+- `CI`
+- `Scope`
+- `Reviewer Notes`
