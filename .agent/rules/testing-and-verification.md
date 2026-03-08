@@ -10,11 +10,14 @@
 
 - Do not claim completion without fresh command output.
 - For Python changes, the default verification stack is:
+  - `pixi run verify`
+- Fallback only when Pixi is unavailable:
+  - `python -m pip install -e '.[dev]'`
   - `pytest`
   - `pre-commit run --all-files` when hook config changes
 - CI should stay small and deterministic:
-  - pre-commit on all files
-  - pytest on supported Python versions
+  - pre-commit through the shared Pixi environment
+  - pytest on supported Python versions via named Pixi environments
 
 ## Agent Expectations
 

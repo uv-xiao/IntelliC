@@ -101,8 +101,24 @@ Specific expectations:
 
 Before claiming completion, run:
 
+- `pixi run verify`
+
+Fallback only when Pixi is unavailable:
+
+- `python -m pip install -e '.[dev]'`
 - `pytest`
 - `pre-commit run --all-files`
+
+## 6.1 Environment rules
+
+- `pixi.toml` is the authoritative development and CI environment contract.
+- Keep `pixi.toml`, `pyproject.toml`, and `.github/workflows/ci.yml` aligned.
+- If code under `htp/`, `htp_ext/`, or `examples/` imports a dependency at runtime, it must live in
+  `[project].dependencies`, not only in a dev-only list.
+- Use the named Pixi environments when changing CI version coverage:
+  - `py311` is the default development environment
+  - `py310` and `py311` are the CI test environments
+- Do not add a second disconnected setup path for CI.
 
 ## 7. Documentation rules
 

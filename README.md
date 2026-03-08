@@ -23,3 +23,19 @@ Implemented today:
 - design: `docs/design/README.md`
 - implementation: `htp/`
 - tests: `tests/`
+
+## Environment
+
+The authoritative development environment is `pixi`.
+
+- install and test with the default Python 3.11 environment: `pixi run verify`
+- run tests on Python 3.10: `pixi run -e py310 test`
+- run lint/hooks: `pixi run lint`
+
+The fallback pip path remains supported for package consumers and simple local development:
+
+- `python -m pip install -e '.[dev]'`
+
+Runtime dependencies belong in `pyproject.toml` under `[project].dependencies`. Development-only tools belong in
+`pixi.toml` and `[project.optional-dependencies].dev`. If examples, bindings, or runtime adapters import a package at
+runtime, do not leave it as an implicit CI-only dependency.
