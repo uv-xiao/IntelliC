@@ -1,0 +1,15 @@
+{
+  "schema": "htp.nvgpu.toolchain.v1",
+  "backend": "nvgpu",
+  "variant": "cuda",
+  "hardware_profile": "nvidia:ampere:sm80",
+  "codegen_mode": "cuda_source",
+  "cuda_runtime_contract": "cuda-runtime:stub",
+  "cuda_arches": [
+    "sm80"
+  ],
+  "derived_outputs": [
+    "build/nvgpu/demo_kernel.ptx",
+    "build/nvgpu/demo_kernel.cubin"
+  ]
+}

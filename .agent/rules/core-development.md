@@ -8,6 +8,7 @@ These are the base rules for HTP development.
 
 - Treat `htp/dev` as stable and CI-passed.
 - Start new feature work on `htp/feat-<topic>` branches and merge back through a PR-style review step.
+- Do not treat a feature branch as ready until its PR passes all configured CI checks.
 - Keep the canonical compiler form in Python-space; do not introduce hidden semantic owners outside the staged artifact model.
 - Preserve runnable `sim` replay as the default invariant for stage programs.
 - Prefer explicit contracts over convention:

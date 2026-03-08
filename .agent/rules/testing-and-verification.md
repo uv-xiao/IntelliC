@@ -18,6 +18,7 @@
 - CI should stay small and deterministic:
   - pre-commit through the shared Pixi environment
   - pytest on supported Python versions via named Pixi environments
+- A PR is not complete until all configured CI checks are green, not merely locally reproduced.
 
 ## Agent Expectations
 

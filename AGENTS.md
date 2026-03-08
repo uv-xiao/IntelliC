@@ -19,6 +19,7 @@ Before starting feature work, verify the branch:
 - `htp/dev` is the stable branch and should stay CI-passed.
 - New feature work must happen on a feature branch named `htp/feat-<topic>`.
 - Merge back into `htp/dev` through a PR-style review flow after tests and hooks pass.
+- A feature branch is not ready for review or handoff until its PR is in a state that passes all configured CI checks.
 - Do not land exploratory or half-finished feature work directly on `htp/dev`.
 
 Do not begin with speculative edits.
@@ -161,4 +162,5 @@ A complete handoff states:
 - why it changed
 - which contracts were affected
 - exact verification commands run
+- PR / CI status, including whether all required checks are green
 - any remaining gap or deferred scope

@@ -11,6 +11,10 @@ __pycache__/
 *.pyc
 *.egg-info/
 
+# Tracked golden fixture contract files
+!tests/golden/fixtures/*/build/
+!tests/golden/fixtures/*/build/toolchain.json
+
 # Local tooling configs
 .ASCEND_SERVER.toml
 .worktrees/
