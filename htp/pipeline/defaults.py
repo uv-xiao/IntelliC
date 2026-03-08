@@ -13,7 +13,11 @@ from htp.passes import (
     PassManager,
     PassResult,
     analyze_schedule,
+    analyze_software_pipeline,
+    analyze_warp_specialization,
     apply_schedule,
+    apply_software_pipeline,
+    apply_warp_specialization,
     ast_canonicalize,
     emit_package,
     semantic_model,
@@ -50,6 +54,10 @@ MANDATORY_PASSES = (
     _PipelinePass(contract=typecheck_layout_effects.CONTRACT, run=typecheck_layout_effects.run),
     _PipelinePass(contract=analyze_schedule.CONTRACT, run=analyze_schedule.run),
     _PipelinePass(contract=apply_schedule.CONTRACT, run=apply_schedule.run),
+    _PipelinePass(contract=analyze_warp_specialization.CONTRACT, run=analyze_warp_specialization.run),
+    _PipelinePass(contract=apply_warp_specialization.CONTRACT, run=apply_warp_specialization.run),
+    _PipelinePass(contract=analyze_software_pipeline.CONTRACT, run=analyze_software_pipeline.run),
+    _PipelinePass(contract=apply_software_pipeline.CONTRACT, run=apply_software_pipeline.run),
     _PipelinePass(contract=emit_package.CONTRACT, run=emit_package.run),
 )
 MANDATORY_PASS_IDS = tuple(pipeline_pass.contract.pass_id for pipeline_pass in MANDATORY_PASSES)

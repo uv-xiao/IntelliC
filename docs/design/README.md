@@ -20,6 +20,7 @@ Unimplemented or research-only material lives under `docs/future/`.
 - `docs/design/impls/07_binding_interface.md` — validate/build/load/run/replay lifecycle
 - `docs/design/impls/08_testing.md` — verification expectations
 - `docs/design/impls/10_agentic_tooling.md` — replay/verify/diff/explain tooling
+- `docs/design/impls/11_warp_specialization_pipelining.md` — staged warp/pipeline pass sequence
 - `docs/design/impls/13_backend_nvgpu.md` — NV-GPU package/build/run contract
 
 ## Runnable examples

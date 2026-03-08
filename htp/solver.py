@@ -11,7 +11,11 @@ from htp.backends.pto.declarations import declaration_for as pto_declaration_for
 from htp.bindings.validate import load_manifest
 from htp.passes import (
     analyze_schedule,
+    analyze_software_pipeline,
+    analyze_warp_specialization,
     apply_schedule,
+    apply_software_pipeline,
+    apply_warp_specialization,
     ast_canonicalize,
     emit_package,
     semantic_model,
@@ -109,6 +113,10 @@ def default_pipeline_template(*, target: dict[str, str]) -> PipelineTemplate:
             typecheck_layout_effects.CONTRACT,
             analyze_schedule.CONTRACT,
             apply_schedule.CONTRACT,
+            analyze_warp_specialization.CONTRACT,
+            apply_warp_specialization.CONTRACT,
+            analyze_software_pipeline.CONTRACT,
+            apply_software_pipeline.CONTRACT,
             emit_package.CONTRACT,
         ),
         required_outputs=declaration.required_outputs,

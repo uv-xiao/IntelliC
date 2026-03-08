@@ -12,6 +12,6 @@ What it proves:
 
 - WSP schedule directives survive canonicalization and semantic-model
   construction.
-- The typed schedule plan records warp-oriented launch and pipeline directives
-  in staged `schedule.json`.
+- The pass spine emits staged `warp_role_plan.json` and `pipeline_plan.json`
+  analyses before applying them into final `schedule.json`.
 - The final package remains replayable in `sim`.

@@ -4,6 +4,7 @@ import json
 
 from htp.agent_policy import load_agent_policy
 from htp.compiler import compile_program
+from htp.pipeline.defaults import MANDATORY_PASS_IDS
 from htp.tools import (
     bisect_stages,
     explain_diagnostic,
@@ -107,7 +108,7 @@ def test_replay_package_replays_current_stage(tmp_path):
     replay = replay_package(package_dir)
 
     assert replay.ok is True
-    assert replay.stage_id == "s06"
+    assert replay.stage_id == f"s{len(MANDATORY_PASS_IDS):02d}"
     assert replay.result["package"]["emitted"] is True
 
 
@@ -136,7 +137,8 @@ def test_semantic_diff_reports_manifest_and_semantic_changes(tmp_path):
     assert diff["equal"] is False
     assert "manifest.target" in diff["changed_sections"]
     assert "current_stage.kernel_ir" in diff["changed_sections"]
-    assert diff["stage_ids"] == {"left": "s06", "right": "s06"}
+    expected_stage = f"s{len(MANDATORY_PASS_IDS):02d}"
+    assert diff["stage_ids"] == {"left": expected_stage, "right": expected_stage}
     assert "details" in diff
     assert "current_stage.kernel_ir" in diff["details"]
 
@@ -216,7 +218,8 @@ def test_bisect_stages_reports_first_divergent_stage(tmp_path):
     result = bisect_stages(left_dir, right_dir)
 
     assert result["equal"] is False
-    assert result["first_divergent_stage"] == {"left": "s06", "right": "s06"}
+    expected_stage = f"s{len(MANDATORY_PASS_IDS):02d}"
+    assert result["first_divergent_stage"] == {"left": expected_stage, "right": expected_stage}
     assert "current_stage.kernel_ir" in result["reason"]["changed_sections"]
 
 

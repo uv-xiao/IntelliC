@@ -1,0 +1,72 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any
+
+from htp.artifacts.stages import RunnablePySpec
+from htp.passes.contracts import AnalysisOutput, PassContract
+from htp.passes.manager import PassResult
+from htp.passes.program_model import build_warp_role_plan, normalize_target, stage_payloads_from_program
+from htp.passes.replay_program import render_program_state_module
+
+PASS_ID = "htp::analyze_warp_specialization@1"
+ANALYSIS_ID = "htp::WarpRolePlan@1"
+ANALYSIS_SCHEMA = "htp.analysis.warp_role_plan.v1"
+ANALYSIS_PATH = "analysis/warp_role_plan.json"
+
+CONTRACT = PassContract.analysis(
+    pass_id=PASS_ID,
+    owner="htp",
+    requires=("Analysis.SchedulePlan@1",),
+    requires_layout_invariants=("Layout.Typed@1",),
+    requires_effect_invariants=("Effects.Typed@1",),
+    provides=("Analysis.WarpRolePlan@1",),
+    analysis_produces=(
+        AnalysisOutput(
+            analysis_id=ANALYSIS_ID,
+            schema=ANALYSIS_SCHEMA,
+            path_hint=ANALYSIS_PATH,
+        ),
+    ),
+    outputs=("analysis.index", "analysis.result"),
+)
+
+
+def run(
+    program: Mapping[str, Any], *, stage_before: Mapping[str, object]
+) -> tuple[dict[str, Any], PassResult]:
+    del stage_before
+
+    next_program = deepcopy(dict(program))
+    warp_role_plan = build_warp_role_plan(
+        entry=next_program["entry"],
+        kernel_ir=next_program.get("kernel_ir", {}),
+        target=normalize_target(next_program),
+        schedule_directives=next_program.get("schedule_directives", {}),
+    )
+    analysis_state = dict(next_program.get("analysis", {}))
+    analysis_state["warp_role_plan"] = warp_role_plan
+    next_program["analysis"] = analysis_state
+    stage_payloads = stage_payloads_from_program(next_program)
+
+    return next_program, PassResult(
+        runnable_py=RunnablePySpec(
+            status="preserves", modes=("sim",), program_text=render_program_state_module(next_program)
+        ),
+        analyses={ANALYSIS_PATH: warp_role_plan},
+        entities_payload=stage_payloads["entities_payload"],
+        bindings_payload=stage_payloads["bindings_payload"],
+        program_ast_payload=stage_payloads["program_ast_payload"],
+        kernel_ir_payload=stage_payloads["kernel_ir_payload"],
+        workload_ir_payload=stage_payloads["workload_ir_payload"],
+        types_payload=stage_payloads["types_payload"],
+        layout_payload=stage_payloads["layout_payload"],
+        effects_payload=stage_payloads["effects_payload"],
+        schedule_payload=stage_payloads["schedule_payload"],
+        digests={"analysis_hash": "demo-warp-role-plan-v1"},
+        time_ms=0.2,
+    )
+
+
+__all__ = ["ANALYSIS_ID", "ANALYSIS_PATH", "ANALYSIS_SCHEMA", "CONTRACT", "PASS_ID", "run"]

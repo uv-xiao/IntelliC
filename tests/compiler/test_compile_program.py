@@ -1,6 +1,7 @@
 import json
 
 import htp
+from htp.pipeline.defaults import MANDATORY_PASS_IDS
 
 
 def _vector_add_program() -> dict[str, object]:
@@ -59,7 +60,7 @@ def test_compile_program_emits_pto_package_and_keeps_stage_replay(tmp_path):
         "variant": "a2a3sim",
         "hardware_profile": "ascend:a2a3sim",
     }
-    assert compiled.pipeline.current_stage == "s06"
+    assert compiled.pipeline.current_stage == f"s{len(MANDATORY_PASS_IDS):02d}"
 
     session = htp.bind(package_dir).load(mode="sim")
     replay = session.replay(compiled.pipeline.current_stage)
