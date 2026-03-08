@@ -8,6 +8,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/bindings/api.py` — `bind(...)`
 - `htp/runtime/core.py` — replay runtime and kernel dispatch
 - `htp/solver.py` — capability solver and final artifact checks
+- `htp/diagnostics.py` — diagnostic catalog and fix-hint policies
 - `htp/tools.py` / `htp/__main__.py` — replay / verify / semantic diff / explain
 
 ## PTO path

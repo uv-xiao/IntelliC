@@ -8,44 +8,7 @@ from uuid import uuid4
 from htp.bindings import bind
 from htp.bindings.base import ReplayResult
 from htp.bindings.validate import load_manifest
-
-_DIAGNOSTIC_EXPLANATIONS = {
-    "HTP.BINDINGS.MISSING_CONTRACT_FILE": {
-        "title": "Missing contract artifact",
-        "summary": "A required emitted artifact is absent from the package directory.",
-        "docs": (
-            "docs/design/impls/07_binding_interface.md",
-            "docs/design/implementations.md",
-        ),
-        "fix_hints": (
-            "Rebuild the package and check the backend emitter wrote every path recorded in manifest.json.",
-            "If a new artifact was added, update both the emitter and binding validator together.",
-        ),
-    },
-    "HTP.BINDINGS.MISSING_BACKEND": {
-        "title": "Missing backend target",
-        "summary": "Binding selection requires manifest.target.backend.",
-        "docs": (
-            "docs/design/impls/07_binding_interface.md",
-            "docs/design/examples.md",
-        ),
-        "fix_hints": (
-            "Emit target.backend during package emission.",
-            "Keep manifest target fields aligned with the selected backend binding.",
-        ),
-    },
-    "HTP.REPLAY.STUB_HIT": {
-        "title": "Replay hit a stubbed region",
-        "summary": "The stage is runnable in sim, but execution reached an explicitly stubbed region.",
-        "docs": (
-            "docs/design/implementations.md",
-            "docs/design/examples.md",
-        ),
-        "fix_hints": (
-            "Add sim/reference semantics for the intrinsic or keep the stub as an intentional boundary.",
-        ),
-    },
-}
+from htp.diagnostics import explain as explain_diagnostic_code
 
 
 def replay_package(
@@ -142,22 +105,7 @@ def semantic_diff(
 
 
 def explain_diagnostic(code: str) -> dict[str, Any]:
-    payload = _DIAGNOSTIC_EXPLANATIONS.get(
-        code,
-        {
-            "title": "Unknown diagnostic code",
-            "summary": "No explicit explanation is registered for this diagnostic code yet.",
-            "docs": ("docs/design/implementations.md",),
-            "fix_hints": ("Inspect the diagnostic payload and package artifacts directly.",),
-        },
-    )
-    return {
-        "code": code,
-        "title": payload["title"],
-        "summary": payload["summary"],
-        "docs": list(payload["docs"]),
-        "fix_hints": list(payload["fix_hints"]),
-    }
+    return dict(explain_diagnostic_code(code))
 
 
 def _record_agent_provenance(package_dir: Path, *, goal: str, report: dict[str, Any]) -> None:

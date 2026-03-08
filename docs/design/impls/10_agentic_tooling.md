@@ -13,6 +13,7 @@ Implemented commands:
 - `htp verify <package>`
 - `htp diff --semantic <left> <right>`
 - `htp explain <diagnostic-code>`
+- diagnostic explanations are served from `htp/diagnostics.py`
 
 Implemented provenance:
 

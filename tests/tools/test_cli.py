@@ -53,6 +53,8 @@ def test_cli_explain_emits_json(capsys):
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["code"] == "HTP.BINDINGS.MISSING_CONTRACT_FILE"
+    assert payload["known"] is True
+    assert payload["fix_hint_policy"] == "rebuild_or_validate_artifacts"
 
 
 def test_cli_verify_emits_json_report(tmp_path, capsys):

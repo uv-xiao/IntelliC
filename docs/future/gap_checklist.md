@@ -102,7 +102,7 @@ Checklist:
   find the first divergent stage automatically.
 - `[ ]` Extend `htp diff --semantic` from current-stage JSON comparison to
   staged identity-aware semantic diffs.
-- `[ ]` Add a real diagnostic catalog with stable fix-hint policies rather than
+- `[x]` Add a real diagnostic catalog with stable fix-hint policies rather than
   a small hard-coded explanation table.
 - `[ ]` Add agent policy input (for example `agent_policy.toml`) covering:
   allowed edit roots, required gates, promotion mode, and perf thresholds.
