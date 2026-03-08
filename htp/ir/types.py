@@ -16,11 +16,11 @@ class DimExpr:
     symbol: str | None = None
 
     @classmethod
-    def const(cls, value: int) -> "DimExpr":
+    def const(cls, value: int) -> DimExpr:
         return cls(kind="const", value=int(value))
 
     @classmethod
-    def sym(cls, name: str) -> "DimExpr":
+    def sym(cls, name: str) -> DimExpr:
         return cls(kind="symbol", symbol=str(name))
 
 

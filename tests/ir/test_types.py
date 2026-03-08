@@ -29,9 +29,9 @@ def test_type_to_payload_emits_structured_shapes_and_aliases():
         "shape": {
             "kind": "shape",
             "dims": [
-            {"kind": "symbol", "symbol": "M"},
-            {"kind": "symbol", "symbol": "K"},
-        ],
+                {"kind": "symbol", "symbol": "M"},
+                {"kind": "symbol", "symbol": "K"},
+            ],
         },
         "space": "global",
         "alias_of": None,
@@ -53,12 +53,12 @@ def test_shape_from_sequence_accepts_symbolic_and_constant_dims():
 
 def test_view_channel_and_token_types_have_first_class_value_kinds():
     assert type_to_payload(
-            ViewType(
-                dtype=ScalarType("f32"),
-                shape=ShapeExpr((DimExpr.sym("N"),)),
-                source="buffer_A",
-                alias_of="buffer_A",
-            )
+        ViewType(
+            dtype=ScalarType("f32"),
+            shape=ShapeExpr((DimExpr.sym("N"),)),
+            source="buffer_A",
+            alias_of="buffer_A",
+        )
     ) == {
         "kind": "view",
         "dtype": {"kind": "scalar", "name": "f32"},
