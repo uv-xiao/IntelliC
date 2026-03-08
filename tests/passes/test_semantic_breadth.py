@@ -137,3 +137,100 @@ def test_build_type_layout_effects_rejects_nvgpu_unsupported_buffer_dtype():
 
     with pytest.raises(ValueError, match="HTP.TYPECHECK.UNSUPPORTED_BUFFER_DTYPE"):
         build_type_layout_effects(kernel_ir, workload_ir, target={"backend": "nvgpu", "option": "ampere"})
+
+
+def test_build_semantic_model_tracks_intrinsics_views_and_reduction_types():
+    canonical = canonicalize_program(
+        {
+            "entry": "reduce_kernel",
+            "target": {"backend": "generic", "option": "default"},
+            "kernel": {
+                "name": "reduce_kernel",
+                "args": [
+                    {"name": "src", "kind": "buffer", "dtype": "f32", "shape": ["M", "N"], "role": "input"},
+                    {
+                        "name": "row_view",
+                        "kind": "view",
+                        "dtype": "f32",
+                        "shape": ["N"],
+                        "role": "input",
+                        "alias_of": "src",
+                        "source": "src",
+                    },
+                    {"name": "tmp", "kind": "buffer", "dtype": "f32", "shape": ["N"], "role": "temp"},
+                    {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["N"], "role": "output"},
+                ],
+                "ops": [
+                    {"op": "transpose", "source": "src", "out": "tmp", "permutation": [1, 0]},
+                    {"op": "reduction_sum", "source": "tmp", "out": "out", "axis": 0},
+                ],
+            },
+            "workload": {
+                "entry": "reduce_kernel",
+                "tasks": [
+                    {
+                        "task_id": "task0",
+                        "kind": "kernel_call",
+                        "kernel": "reduce_kernel",
+                        "args": ["src", "row_view", "tmp", "out"],
+                    }
+                ],
+                "channels": [],
+                "dependencies": [],
+            },
+        }
+    )
+
+    kernel_ir, workload_ir, _entities, _bindings = build_semantic_model(canonical)
+    types, _layout, effects = build_type_layout_effects(
+        kernel_ir,
+        workload_ir,
+        target={"backend": "generic", "option": "default"},
+    )
+
+    assert [op["intrinsic"] for op in kernel_ir["ops"]] == [
+        "portable.transpose",
+        "portable.reduction_sum",
+    ]
+    assert types["buffers"]["src"]["shape"]["dims"] == [
+        {"kind": "symbol", "symbol": "M"},
+        {"kind": "symbol", "symbol": "N"},
+    ]
+    assert types["values"]["row_view"]["kind"] == "view"
+    assert types["values"]["row_view"]["alias_of"] == "src"
+    assert effects["writes"]["op1"] == ["out"]
+
+
+def test_build_type_layout_effects_rejects_unknown_view_alias():
+    canonical = canonicalize_program(
+        {
+            "entry": "bad_alias",
+            "target": {"backend": "generic", "option": "default"},
+            "kernel": {
+                "name": "bad_alias",
+                "args": [
+                    {
+                        "name": "view_only",
+                        "kind": "view",
+                        "dtype": "f32",
+                        "shape": ["N"],
+                        "role": "input",
+                        "alias_of": "missing_buffer",
+                    }
+                ],
+                "ops": [],
+            },
+            "workload": {
+                "entry": "bad_alias",
+                "tasks": [
+                    {"task_id": "task0", "kind": "kernel_call", "kernel": "bad_alias", "args": ["view_only"]}
+                ],
+                "channels": [],
+                "dependencies": [],
+            },
+        }
+    )
+    kernel_ir, workload_ir, _entities, _bindings = build_semantic_model(canonical)
+
+    with pytest.raises(ValueError, match="HTP.TYPECHECK.UNKNOWN_ALIAS"):
+        build_type_layout_effects(kernel_ir, workload_ir, target={"backend": "generic", "option": "default"})

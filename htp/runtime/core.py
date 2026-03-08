@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
+from htp.intrinsics import get_stub_diagnostic_code
+
 from .errors import raise_missing_kernel, raise_stub
 
 KernelHandler = Callable[..., object]
@@ -60,7 +62,7 @@ class Runtime:
         handler = self.intrinsic_handlers.get(name)
         if handler is None:
             raise_stub(
-                "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+                get_stub_diagnostic_code(name),
                 node_id=f"intrinsic::{name}",
                 entity_id=name,
                 kind="intrinsic",

@@ -11,6 +11,8 @@ class KernelArg:
     dtype: str
     shape: tuple[str, ...] = ()
     role: str | None = None
+    alias_of: str | None = None
+    source: str | None = None
 
 
 @dataclass(frozen=True)
@@ -18,6 +20,7 @@ class KernelOp:
     op_id: str
     entity_id: str
     op: str
+    intrinsic: str
     inputs: tuple[str, ...]
     outputs: tuple[str, ...]
     attrs: dict[str, Any]

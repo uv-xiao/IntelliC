@@ -10,6 +10,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/solver.py` — capability solver and final artifact checks
 - `htp/diagnostics.py` — diagnostic catalog and fix-hint policies
 - `htp/agent_policy.py` — agent policy loading for verify/promote tooling
+- `htp/intrinsics.py` — intrinsic declarations and backend handler availability
 - `htp/tools.py` / `htp/__main__.py` — replay / verify / semantic diff / explain
 
 ## PTO path
@@ -32,6 +33,8 @@ This file is the bridge between `docs/design/` and the current implementation.
 
 ## Semantic substrate
 
+- `htp/ir/types.py` — structured dtype / shape / value-kind payloads
+- `htp/ir/semantics.py` — staged kernel/workload semantic dataclasses
 - `htp/passes/program_model.py` — canonicalization, semantic model, type/layout/effect synthesis
 - `htp/ir/op_specs.py` — centralized op semantics for effects / phase / latency
 - `htp/passes/manager.py` — stage emission, analyses, islands

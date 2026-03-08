@@ -137,27 +137,27 @@ Current code anchors:
 
 Checklist:
 
-- `[~]` The typed substrate exists, but the type system remains mostly stringly
-  (`dtype: str`, shape strings, dict payloads).
-- `[ ]` Introduce a real shared type surface for:
+- `[~]` The typed substrate now includes structured scalar/shape/buffer/view/channel/token
+  payloads, but it still does not cover the full shared user-facing type system.
+- `[~]` Introduce a real shared type surface for:
   `i8/i16/i32/i64/u*/f16/bf16/f32/f64/bool`.
-- `[ ]` Add first-class `Index`, `Dim`, and symbolic shape constructs rather
+- `[~]` Add first-class `Index`, `Dim`, and symbolic shape constructs rather
   than storing symbolic dimensions as bare strings.
-- `[ ]` Add explicit value kinds for:
+- `[x]` Add explicit value kinds for:
   tiles, tensors, buffers, views, async tokens, and channel handles.
-- `[ ]` Add first-class buffer/view alias modeling rather than inferring only
+- `[x]` Add first-class buffer/view alias modeling rather than inferring only
   from names.
-- `[ ]` Move from op-name heuristics to a fuller op registry that covers:
+- `[x]` Move from op-name heuristics to a fuller op registry that covers:
   load, store, cast, broadcast, transpose/view, reduction, async copy, barrier,
   await, mma, and channel ops.
-- `[ ]` Support reduction semantics as first-class kernel IR, not just as a
+- `[x]` Support reduction semantics as first-class kernel IR, not just as a
   future idea.
-- `[ ]` Support view/reshape/transpose semantics explicitly in the semantic
+- `[x]` Support view/reshape/transpose semantics explicitly in the semantic
   model and stage payloads.
-- `[ ]` Support collective/distribution-facing operations in the semantic model.
-- `[ ]` Add legality checks for aliasing and mutation patterns, not only simple
+- `[~]` Support collective/distribution-facing operations in the semantic model.
+- `[x]` Add legality checks for aliasing and mutation patterns, not only simple
   dtype/backend checks.
-- `[ ]` Replace stringly buffer type encodings like `f32[MxK]` with structured
+- `[x]` Replace stringly buffer type encodings like `f32[MxK]` with structured
   shape/dtype payloads in staged types.
 
 ---
@@ -235,19 +235,23 @@ Source intent:
 
 - `docs/future/feats/04_intrinsics.md`
 
-Current code reality:
+Current code anchors:
 
-- Intrinsics are still implicit in op names and backend lowerers.
+- `htp/intrinsics.py`
+- `htp/runtime/core.py`
+- `htp/runtime/intrinsics.py`
+- `htp/backends/nvgpu/lower.py`
+- `htp/backends/pto/lower.py`
 
 Checklist:
 
-- `[ ]` Add an explicit `IntrinsicDecl` contract surface.
-- `[ ]` Split portable intrinsics from backend intrinsics in the registry.
-- `[ ]` Add handler registration for `lower`, `emit`, and `simulate`.
-- `[ ]` Add explicit stub-policy declarations per intrinsic/target.
-- `[ ]` Move backend handler availability checks from op-name tables to
+- `[x]` Add an explicit `IntrinsicDecl` contract surface.
+- `[~]` Split portable intrinsics from backend intrinsics in the registry.
+- `[x]` Add handler registration for `lower`, `emit`, and `simulate`.
+- `[x]` Add explicit stub-policy declarations per intrinsic/target.
+- `[x]` Move backend handler availability checks from op-name tables to
   intrinsic-handler declarations.
-- `[ ]` Add typed effect contracts for async copy, barriers, tokens, and
+- `[~]` Add typed effect contracts for async copy, barriers, tokens, and
   collectives at the intrinsic level.
 - `[ ]` Add extension-owned intrinsic packages under stable registration
   surfaces.

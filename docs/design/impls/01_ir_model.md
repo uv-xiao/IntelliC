@@ -4,6 +4,14 @@
 
 Define the minimal internal representation strategy that preserves Python extensibility.
 
+Current code anchors:
+
+- `htp/ir/semantics.py`
+- `htp/ir/types.py`
+- `htp/ir/op_specs.py`
+- `htp/passes/program_model.py`
+- `htp/intrinsics.py`
+
 This design deliberately exploits a Python-specific advantage: because the IR is Python AST, every intermediate stage can
 also emit a **runnable Python program** (host/orchestration level) for replay, simulation, and debugging.
 

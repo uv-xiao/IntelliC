@@ -60,6 +60,7 @@ def test_default_pipeline_derives_nvgpu_semantics_and_schedule(tmp_path):
             "op_id": "op0",
             "entity_id": "demo_kernel:E6",
             "op": "matmul",
+            "intrinsic": "portable.matmul",
             "inputs": ["A", "B"],
             "outputs": ["C"],
             "attrs": {"dtype": "f32", "m": "M", "n": "N", "k": "K"},

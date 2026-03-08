@@ -99,6 +99,7 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
             "op_id": "op0",
             "entity_id": "gemm_tile:E6",
             "op": "matmul",
+            "intrinsic": "portable.matmul",
             "inputs": ["A", "B"],
             "outputs": ["C"],
             "attrs": {"dtype": "f32", "m": "M", "n": "N", "k": "K"},
@@ -141,6 +142,7 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
                 "tick": 0,
                 "op_id": "op0",
                 "op": "matmul",
+                "intrinsic": "portable.matmul",
                 "phase": "compute",
                 "reads": ["A", "B"],
                 "writes": ["C"],
@@ -152,7 +154,19 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
     assert result.program["canonical_ast"]["target"] == {"backend": "nvgpu", "option": "ampere"}
     assert result.program["kernel_ir"]["entry"] == "gemm_tile"
     assert result.program["workload_ir"]["entry"] == "gemm_tile"
-    assert result.program["types"]["buffers"]["A"] == "f32[MxK]"
+    assert result.program["types"]["buffers"]["A"] == {
+        "kind": "buffer",
+        "dtype": {"kind": "scalar", "name": "f32"},
+        "shape": {
+            "kind": "shape",
+            "dims": [
+                {"kind": "symbol", "symbol": "M"},
+                {"kind": "symbol", "symbol": "K"},
+            ],
+        },
+        "space": "global",
+        "alias_of": None,
+    }
     assert result.program["layout"]["memory_spaces"]["C"] == "global"
     assert result.program["effects"]["reads"] == {"op0": ["A", "B"]}
     assert result.program["analysis"]["schedule"]["ticks"] == schedule_plan["ticks"]

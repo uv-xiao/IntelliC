@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from htp.intrinsics import require_handler
 from htp.passes.program_model import build_semantic_model, canonicalize_program
 
 from .arch import arch_for, normalize_profile
@@ -127,8 +128,8 @@ def _primary_kernel_op(kernel_ir: Mapping[str, Any]) -> Mapping[str, Any]:
     primary = ops[0]
     if not isinstance(primary, Mapping):
         raise ValueError("NV-GPU kernel_ir.ops entries must be mappings")
-    if str(primary.get("op")) not in {"matmul", "elementwise_binary"}:
-        raise ValueError(f"Unsupported NV-GPU kernel op {primary.get('op')!r}")
+    intrinsic = str(primary.get("intrinsic", ""))
+    require_handler("nvgpu", intrinsic, role="lower")
     return primary
 
 
