@@ -12,6 +12,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 
 ## PTO path
 
+- `htp/backends/pto/declarations.py` — solver-visible PTO capability and artifact declarations
 - `htp/backends/pto/lower.py` — PTO codegen plan
 - `htp/backends/pto/emit.py` — PTO artifact emission
 - `htp/bindings/pto.py` — PTO validation / build / run / replay
@@ -21,6 +22,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 
 ## NV-GPU path
 
+- `htp/backends/nvgpu/declarations.py` — solver-visible NV-GPU capability and artifact declarations
 - `htp/backends/nvgpu/lower.py` — NV-GPU codegen plan
 - `htp/backends/nvgpu/emit.py` — `.cu`-first artifact emission
 - `htp/bindings/nvgpu.py` — NV-GPU validation / build / run / replay

@@ -5,6 +5,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from htp.backends.declarations import BackendSolverDeclaration
+from htp.backends.nvgpu.declarations import declaration_for as nvgpu_declaration_for
+from htp.backends.pto.declarations import declaration_for as pto_declaration_for
 from htp.passes import (
     analyze_schedule,
     apply_schedule,
@@ -18,24 +21,6 @@ from htp.passes.program_model import build_semantic_model, canonicalize_program,
 
 SOLVER_FAILURE_SCHEMA_ID = "htp.solver_failure.v1"
 DEFAULT_TEMPLATE_ID = "htp.default.v1"
-
-_BACKEND_SUPPORTED_OPS = {
-    "pto": {"elementwise_binary"},
-    "nvgpu": {"elementwise_binary", "matmul"},
-    "generic": {"elementwise_binary", "matmul"},
-}
-
-_BACKEND_REQUIRED_OUTPUTS = {
-    "pto": (
-        "codegen/pto/kernel_config.py",
-        "codegen/pto/pto_codegen.json",
-        "build/toolchain.json",
-    ),
-    "nvgpu": (
-        "codegen/nvgpu/nvgpu_codegen.json",
-        "build/toolchain.json",
-    ),
-}
 
 
 @dataclass(frozen=True)
@@ -104,7 +89,7 @@ class SolverResult:
 
 
 def default_pipeline_template(*, target: dict[str, str]) -> PipelineTemplate:
-    backend = target["backend"]
+    declaration = _backend_declaration(target)
     return PipelineTemplate(
         template_id=DEFAULT_TEMPLATE_ID,
         passes=(
@@ -115,7 +100,7 @@ def default_pipeline_template(*, target: dict[str, str]) -> PipelineTemplate:
             apply_schedule.CONTRACT,
             emit_package.CONTRACT,
         ),
-        required_outputs=_BACKEND_REQUIRED_OUTPUTS.get(backend, ()),
+        required_outputs=declaration.required_outputs,
     )
 
 
@@ -137,7 +122,13 @@ def solve_pipeline(
         for result in extension_results.values()
         for extension_capability in result["provides"]
     )
+    declaration = _backend_declaration(target)
     state = CapabilityState(capabilities=initial_capabilities, target=target)
+    if declaration.target_capabilities:
+        state = CapabilityState(
+            capabilities=tuple(dict.fromkeys((*declaration.target_capabilities, *initial_capabilities))),
+            target=target,
+        )
 
     handler_failure = _handler_failure(
         program, target=target, template=template, state=state, extension_results=extension_results
@@ -262,7 +253,7 @@ def _handler_failure(
     canonical_ast = canonicalize_program(program)
     kernel_ir, _workload_ir, _entities, _bindings = build_semantic_model(canonical_ast)
     backend = target["backend"]
-    supported_ops = _BACKEND_SUPPORTED_OPS.get(backend, _BACKEND_SUPPORTED_OPS["generic"])
+    supported_ops = set(_backend_declaration(target).supported_ops)
     missing_handlers = tuple(
         {"backend": backend, "op": str(op["op"])}
         for op in kernel_ir.get("ops", ())
@@ -300,6 +291,23 @@ def _collect_extension_results(program: dict[str, Any]) -> dict[str, dict[str, A
             "reasons": list(eligibility["reasons"]),
         }
     return results
+
+
+def _backend_declaration(target: dict[str, str]) -> BackendSolverDeclaration:
+    backend = target["backend"]
+    option = target.get("option")
+    if backend == "pto":
+        return pto_declaration_for(option)
+    if backend == "nvgpu":
+        return nvgpu_declaration_for(option)
+    return BackendSolverDeclaration(
+        backend=backend,
+        variant=option or "default",
+        hardware_profile=f"{backend}:{option or 'default'}",
+        target_capabilities=(),
+        supported_ops=("elementwise_binary", "matmul"),
+        required_outputs=(),
+    )
 
 
 def _write_solver_failure(package_dir: Path, failure: SolverFailure) -> None:

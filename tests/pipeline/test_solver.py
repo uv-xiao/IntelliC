@@ -2,9 +2,17 @@ from __future__ import annotations
 
 import json
 
+from htp.backends.nvgpu.declarations import declaration_for as nvgpu_declaration_for
+from htp.backends.pto.declarations import declaration_for as pto_declaration_for
 from htp.passes.contracts import PassContract
 from htp.pipeline.defaults import MANDATORY_PASS_IDS
-from htp.solver import PipelineTemplate, solve_default_pipeline, solve_pipeline, validate_final_artifacts
+from htp.solver import (
+    PipelineTemplate,
+    default_pipeline_template,
+    solve_default_pipeline,
+    solve_pipeline,
+    validate_final_artifacts,
+)
 
 
 def _vector_add_program() -> dict[str, object]:
@@ -49,6 +57,49 @@ def _vector_add_program() -> dict[str, object]:
     }
 
 
+def _matmul_program() -> dict[str, object]:
+    return {
+        "entry": "matmul_demo",
+        "kernel": {
+            "name": "matmul_demo",
+            "args": [
+                {"name": "A", "kind": "buffer", "dtype": "f32", "shape": ["M", "K"], "role": "input"},
+                {"name": "B", "kind": "buffer", "dtype": "f32", "shape": ["K", "N"], "role": "input"},
+                {"name": "C", "kind": "buffer", "dtype": "f32", "shape": ["M", "N"], "role": "output"},
+                {"name": "M", "kind": "scalar", "dtype": "i32", "role": "shape"},
+                {"name": "N", "kind": "scalar", "dtype": "i32", "role": "shape"},
+                {"name": "K", "kind": "scalar", "dtype": "i32", "role": "shape"},
+            ],
+            "ops": [
+                {
+                    "op": "matmul",
+                    "lhs": "A",
+                    "rhs": "B",
+                    "out": "C",
+                    "dtype": "f32",
+                    "shape": ["M", "N", "K"],
+                }
+            ],
+        },
+        "workload": {
+            "entry": "matmul_demo",
+            "tasks": [
+                {
+                    "task_id": "task0",
+                    "kind": "kernel_call",
+                    "kernel": "matmul_demo",
+                    "args": ["A", "B", "C", "M", "N", "K"],
+                }
+            ],
+            "channels": [],
+            "dependencies": [],
+        },
+        "analysis": {},
+        "package": {"emitted": False},
+        "target": {"backend": "nvgpu", "option": "ampere"},
+    }
+
+
 def test_solver_accepts_default_pipeline_and_tracks_capabilities():
     result = solve_default_pipeline(program=_vector_add_program())
 
@@ -57,6 +108,23 @@ def test_solver_accepts_default_pipeline_and_tracks_capabilities():
     assert result.pass_ids == list(MANDATORY_PASS_IDS)
     assert "Package.Emitted@1" in result.capabilities
     assert result.extension_results == {}
+
+
+def test_default_pipeline_uses_backend_required_outputs():
+    pto_template = default_pipeline_template(target={"backend": "pto", "option": "a2a3sim"})
+    nvgpu_template = default_pipeline_template(target={"backend": "nvgpu", "option": "ampere"})
+
+    assert pto_template.required_outputs == pto_declaration_for("a2a3sim").required_outputs
+    assert nvgpu_template.required_outputs == nvgpu_declaration_for("ampere").required_outputs
+
+
+def test_backend_declarations_define_handler_support_contract():
+    assert "matmul" in nvgpu_declaration_for("ampere").supported_ops
+    assert "matmul" not in pto_declaration_for("a2a3sim").supported_ops
+
+    result = solve_default_pipeline(program=_matmul_program())
+
+    assert result.ok is True
 
 
 def test_solver_reports_missing_capability():

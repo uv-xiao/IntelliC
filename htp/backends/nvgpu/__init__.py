@@ -7,6 +7,7 @@ from .arch import (
     arch_for,
     normalize_profile,
 )
+from .declarations import declaration_for
 from .emit import (
     NVGPU_CODEGEN_SCHEMA_ID,
     NVGPU_PROJECT_DIR,
@@ -30,6 +31,7 @@ __all__ = [
     "NVGPULaunchSpec",
     "SUPPORTED_PROFILES",
     "arch_for",
+    "declaration_for",
     "emit_package",
     "lower_program",
     "normalize_profile",
