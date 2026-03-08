@@ -54,6 +54,7 @@ def test_default_pipeline_derives_nvgpu_semantics_and_schedule(tmp_path):
             "channels": [],
             "dependencies": [],
         },
+        "schedule_directives": {},
     }
     assert result.program["kernel_ir"]["ops"] == [
         {
@@ -73,6 +74,25 @@ def test_default_pipeline_derives_nvgpu_semantics_and_schedule(tmp_path):
         "memory_spaces": {"A": "global", "B": "global", "C": "global"},
         "threading": {"thread_block": [16, 16, 1], "warp_group": 1},
         "tiling": {"block": [16, 16, 16], "pipeline_stages": 1, "backend": "nvgpu"},
+        "facets": {
+            "buffers": {
+                "A": {
+                    "distribution": {"dims": [{"kind": "replicate"}, {"kind": "replicate"}]},
+                    "memory": {"space": "global", "layout": "row_major", "order": [0, 1]},
+                    "hardware": {"scope": "thread_block", "vector_width": 1},
+                },
+                "B": {
+                    "distribution": {"dims": [{"kind": "replicate"}, {"kind": "replicate"}]},
+                    "memory": {"space": "global", "layout": "row_major", "order": [0, 1]},
+                    "hardware": {"scope": "thread_block", "vector_width": 1},
+                },
+                "C": {
+                    "distribution": {"dims": [{"kind": "replicate"}, {"kind": "replicate"}]},
+                    "memory": {"space": "global", "layout": "row_major", "order": [0, 1]},
+                    "hardware": {"scope": "thread_block", "vector_width": 1},
+                },
+            }
+        },
     }
     assert result.program["effects"] == {
         "schema": "htp.effects.v1",
@@ -80,8 +100,12 @@ def test_default_pipeline_derives_nvgpu_semantics_and_schedule(tmp_path):
         "writes": {"op0": ["C"]},
         "barriers": [],
         "channels": [],
+        "protocols": [],
+        "tokens": [],
+        "collectives": [],
     }
     assert result.program["schedule"]["ordered_ops"] == ["op0"]
+    assert result.program["schedule"]["legality"] == {"ok": True, "reasons": []}
     assert result.program["package"] == {
         "emitted": True,
         "entry": "demo_kernel",

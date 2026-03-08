@@ -137,6 +137,17 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
         "entry": "gemm_tile",
         "target": {"backend": "nvgpu", "option": "ampere"},
         "pipeline_depth": 1,
+        "directives": {
+            "tile": {},
+            "bind": {},
+            "pipeline": {},
+            "resources": {},
+            "specialize": {},
+        },
+        "buffering_strategy": "single",
+        "launch": {"grid": "grid", "lane": "thread", "num_warps": 1},
+        "warp_role_plan": {"kind": "single_role", "roles": ["compute"]},
+        "legality": {"ok": True, "reasons": []},
         "ticks": [
             {
                 "tick": 0,
@@ -171,6 +182,7 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
     assert result.program["effects"]["reads"] == {"op0": ["A", "B"]}
     assert result.program["analysis"]["schedule"]["ticks"] == schedule_plan["ticks"]
     assert result.program["schedule"]["ordered_ops"] == ["op0"]
+    assert result.program["schedule"]["legality"] == {"ok": True, "reasons": []}
     assert result.program["scheduled_ops"][0]["op"] == "matmul"
     assert result.program["package"]["emitted"] is True
     assert result.program["package"]["scheduled_tick_count"] == 1

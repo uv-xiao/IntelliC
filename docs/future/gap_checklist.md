@@ -180,23 +180,23 @@ Checklist:
 
 - `[~]` Layout/effects/schedule are emitted today, but they are still simple
   synthesized metadata rather than the full typed contract model.
-- `[ ]` Implement the facet-product layout model:
+- `[~]` Implement the facet-product layout model:
   distribution ⊗ memory ⊗ hardware.
 - `[ ]` Add explicit relayout operations and legality predicates rather than
   backend heuristics only.
 - `[ ]` Add distribution joins / shard / replicate semantics as typed layout
   facts.
-- `[ ]` Add collective-effect obligations and discharge rules.
-- `[ ]` Upgrade channel effects from producer/consumer annotation to typed
+- `[~]` Add collective-effect obligations and discharge rules.
+- `[x]` Upgrade channel effects from producer/consumer annotation to typed
   protocol obligations.
-- `[ ]` Add deadlock-prevention checks for channel/process protocols rather than
+- `[~]` Add deadlock-prevention checks for channel/process protocols rather than
   only local channel metadata.
-- `[ ]` Model async tokens, barrier scopes, and event dependencies explicitly in
+- `[~]` Model async tokens, barrier scopes, and event dependencies explicitly in
   effects.
-- `[ ]` Make schedule state carry real directives:
+- `[x]` Make schedule state carry real directives:
   mapping, specialization, pipelining depth, buffering strategy, warp-role
   plan, launch structure.
-- `[ ]` Add schedule legality checks against hardware/layout constraints rather
+- `[x]` Add schedule legality checks against hardware/layout constraints rather
   than generating a plan opportunistically.
 - `[ ]` Keep structured node/entity references in diagnostics for layout/effect
   violations throughout this richer model.
@@ -216,15 +216,15 @@ Current code reality:
 
 Checklist:
 
-- `[ ]` Add a real WSP dialect package with user-facing authoring surface.
-- `[ ]` Add canonical WSP lowering into the shared semantic substrate.
-- `[ ]` Add explicit schedule directives rather than treating scheduling as a
+- `[x]` Add a real WSP dialect package with user-facing authoring surface.
+- `[x]` Add canonical WSP lowering into the shared semantic substrate.
+- `[x]` Add explicit schedule directives rather than treating scheduling as a
   hidden analysis transform.
-- `[ ]` Add a real CSP dialect package with typed processes and channels.
-- `[ ]` Add canonical CSP lowering into the shared semantic substrate.
-- `[ ]` Add typed channel capacity, element type, and protocol contracts.
+- `[x]` Add a real CSP dialect package with typed processes and channels.
+- `[x]` Add canonical CSP lowering into the shared semantic substrate.
+- `[x]` Add typed channel capacity, element type, and protocol contracts.
 - `[ ]` Add process/channel effect checking integrated with the solver.
-- `[ ]` Add examples and tests that demonstrate WSP and CSP as extension-owned
+- `[~]` Add examples and tests that demonstrate WSP and CSP as extension-owned
   front-end surfaces, not only backend-oriented package construction.
 
 ---

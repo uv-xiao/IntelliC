@@ -33,12 +33,18 @@ This file is the bridge between `docs/design/` and the current implementation.
 
 ## Semantic substrate
 
+- `htp/ir/layout.py` — facet-product layout payload helpers
 - `htp/ir/types.py` — structured dtype / shape / value-kind payloads
 - `htp/ir/semantics.py` — staged kernel/workload semantic dataclasses
 - `htp/passes/program_model.py` — canonicalization, semantic model, type/layout/effect synthesis
 - `htp/ir/op_specs.py` — centralized op semantics for effects / phase / latency
 - `htp/passes/manager.py` — stage emission, analyses, islands
 - `htp/passes/trace.py` — normalized pass-trace events including `requires_satisfied`
+
+## Programming surfaces
+
+- `htp/wsp/__init__.py` — workload/schedule authoring helpers and lowering surface
+- `htp/csp/__init__.py` — process/channel authoring helpers and lowering surface
 
 ## Extensions
 

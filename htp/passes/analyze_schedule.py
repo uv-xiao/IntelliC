@@ -43,6 +43,7 @@ def run(
         kernel_ir=program.get("kernel_ir", {}),
         effects=program.get("effects", {}),
         target=normalize_target(program),
+        schedule_directives=program.get("schedule_directives", {}),
     )
 
     next_program = deepcopy(dict(program))
