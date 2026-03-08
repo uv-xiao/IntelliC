@@ -161,8 +161,6 @@ Check all of the following:
 Do not:
 
 - add MLIR dependencies to the HTP core package
-- add Claude-specific GitHub workflows or Anthropic review automation to this repository; local agent guidance belongs
-  under `.agent/`
 - treat `build/toolchain.json` as a unique backend marker without context
 - validate only the happy path
 - emit unreferenced artifacts
