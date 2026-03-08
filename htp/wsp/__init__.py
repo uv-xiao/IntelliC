@@ -4,7 +4,9 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 
-def workload(*, entry: str, tasks: Sequence[Mapping[str, Any]], channels: Sequence[Mapping[str, Any]] = ()) -> dict[str, Any]:
+def workload(
+    *, entry: str, tasks: Sequence[Mapping[str, Any]], channels: Sequence[Mapping[str, Any]] = ()
+) -> dict[str, Any]:
     return {
         "entry": entry,
         "tasks": [dict(task) for task in tasks],

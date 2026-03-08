@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from htp.csp import channel, process, program as csp_program
+from htp.csp import channel, process
+from htp.csp import program as csp_program
 from htp.wsp import program as wsp_program
 from htp.wsp import schedule as wsp_schedule
 from htp.wsp import workload as wsp_workload
@@ -35,8 +36,12 @@ def test_csp_program_surface_carries_process_and_channel_metadata():
         entry="demo",
         kernel=_kernel(),
         channels=[channel("stream", dtype="f32", capacity=4)],
-        processes=[process("worker", task_id="task0", kernel="demo", puts=[{"channel": "stream", "count": 1}])],
+        processes=[
+            process("worker", task_id="task0", kernel="demo", puts=[{"channel": "stream", "count": 1}])
+        ],
     )
 
-    assert payload["csp"]["channels"] == [{"name": "stream", "dtype": "f32", "capacity": 4, "protocol": "fifo"}]
+    assert payload["csp"]["channels"] == [
+        {"name": "stream", "dtype": "f32", "capacity": 4, "protocol": "fifo"}
+    ]
     assert payload["csp"]["processes"][0]["name"] == "worker"

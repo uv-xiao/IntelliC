@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from htp.csp import channel, process, program as csp_program
+from htp.csp import channel, process
+from htp.csp import program as csp_program
 from htp.passes.program_model import (
     build_schedule_plan,
     build_semantic_model,
@@ -105,8 +106,12 @@ def test_csp_surface_lowers_protocol_obligations_and_rejects_unbalanced_channels
             kernel=_matmul_kernel(),
             channels=[channel("tiles", dtype="f32", capacity=2)],
             processes=[
-                process("producer", task_id="p0", kernel="gemm_tile", puts=[{"channel": "tiles", "count": 1}]),
-                process("consumer", task_id="p1", kernel="gemm_tile", gets=[{"channel": "tiles", "count": 1}]),
+                process(
+                    "producer", task_id="p0", kernel="gemm_tile", puts=[{"channel": "tiles", "count": 1}]
+                ),
+                process(
+                    "consumer", task_id="p1", kernel="gemm_tile", gets=[{"channel": "tiles", "count": 1}]
+                ),
             ],
         )
     )
@@ -135,8 +140,12 @@ def test_csp_surface_lowers_protocol_obligations_and_rejects_unbalanced_channels
             kernel=_matmul_kernel(),
             channels=[channel("tiles", dtype="f32", capacity=1)],
             processes=[
-                process("producer", task_id="p0", kernel="gemm_tile", puts=[{"channel": "tiles", "count": 2}]),
-                process("consumer", task_id="p1", kernel="gemm_tile", gets=[{"channel": "tiles", "count": 1}]),
+                process(
+                    "producer", task_id="p0", kernel="gemm_tile", puts=[{"channel": "tiles", "count": 2}]
+                ),
+                process(
+                    "consumer", task_id="p1", kernel="gemm_tile", gets=[{"channel": "tiles", "count": 1}]
+                ),
             ],
         )
     )
