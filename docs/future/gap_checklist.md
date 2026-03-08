@@ -50,7 +50,7 @@ Current code anchors:
 
 Checklist:
 
-- `[~]` Solver exists, but pipeline templates are still effectively a single
+- `[x]` Solver now uses a small registered template set rather than a single
   hard-coded default template.
 - `[x]` Move backend capability facts out of local solver tables and into
   backend-owned declarations (`ArchModel`-style source of truth).
@@ -276,17 +276,17 @@ Checklist:
 
 - `[~]` Pass contracts and staged analyses exist, but the default pass spine is
   still small and compiler-owned.
-- `[ ]` Add first-class pass package registration beyond the current built-in
+- `[x]` Add first-class pass package registration beyond the current built-in
   modules.
-- `[ ]` Add pipeline template registration beyond the current default template.
-- `[ ]` Add extension-owned passes that consume and produce the same staged
+- `[x]` Add pipeline template registration beyond the current default template.
+- `[x]` Add extension-owned passes that consume and produce the same staged
   contract surfaces as core passes.
 - `[x]` Add richer transform examples such as warp specialization and software
   pipelining as real passes, not only design docs.
 - `[~]` Add staged analysis payloads for warp-role plans, pipeline plans, loop
   dependencies, and async/resource checks.
 - `[ ]` Add preservation/invalidation tracking beyond simple capability removal.
-- `[ ]` Thread solver satisfaction and pass trace together so the trace shows
+- `[~]` Thread solver satisfaction and pass trace together so the trace shows
   why each pass was legal.
 
 ---
@@ -307,13 +307,13 @@ Current code anchors:
 Checklist:
 
 - `[~]` The MLIR CSE extension proves the boundary, but it is still narrow.
-- `[ ]` Convert the MLIR extension from a standalone package emitter into a
+- `[x]` Convert the MLIR extension from a standalone package emitter into a
   proper pass/pipeline participant where appropriate.
-- `[ ]` Add the full v1 island artifact set:
+- `[x]` Add the full v1 island artifact set:
   `input.mlir`, `output.mlir`, `pipeline.txt`, `ledger.json`,
   `eligibility.json`, `import_summary.json`.
-- `[ ]` Record the exact MLIR pass pipeline used, not only the net result.
-- `[ ]` Parse and import real transformed MLIR rather than doing Python-side CSE
+- `[x]` Record the exact MLIR pass pipeline used, not only the net result.
+- `[x]` Parse and import real transformed MLIR rather than doing Python-side CSE
   and treating MLIR as a side artifact.
 - `[ ]` Implement explicit eligible-subset matching over canonical typed program
   structure, not only scalar elementwise kernel normalization.
@@ -321,8 +321,8 @@ Checklist:
   rewrites.
 - `[ ]` Preserve or rebind identities according to the import policy described
   in the future docs.
-- `[ ]` Add malformed-island validation and round-trip correctness tests.
-- `[ ]` Make solver-visible extension composition cover MLIR island entry/exit
+- `[x]` Add malformed-island validation and round-trip correctness tests.
+- `[~]` Make solver-visible extension composition cover MLIR island entry/exit
   requirements, not only a yes/no eligibility bit.
 
 ---

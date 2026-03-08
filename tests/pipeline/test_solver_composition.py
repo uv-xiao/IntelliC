@@ -47,8 +47,16 @@ def _vector_add_program() -> dict[str, object]:
 
 
 def test_solver_exposes_extension_template_candidates_when_requested():
-    program = _vector_add_program()
-    program["extensions"] = {"requested": ["htp_ext.mlir_cse"]}
+    program = {
+        "entry": "demo_kernel",
+        "exprs": [
+            {"target": "sum0", "op": "add", "lhs": "lhs", "rhs": "rhs"},
+            {"target": "out", "op": "mul", "lhs": "sum0", "rhs": "scale"},
+        ],
+        "result": "out",
+        "target": {"backend": "nvgpu", "option": "ampere"},
+        "extensions": {"requested": ["htp_ext.mlir_cse"]},
+    }
 
     templates = available_pipeline_templates(program=program)
 

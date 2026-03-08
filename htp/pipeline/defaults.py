@@ -9,22 +9,10 @@ from typing import Any
 
 from htp.artifacts.manifest import write_manifest
 from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
-from htp.passes import (
-    PassManager,
-    PassResult,
-    analyze_schedule,
-    analyze_software_pipeline,
-    analyze_warp_specialization,
-    apply_schedule,
-    apply_software_pipeline,
-    apply_warp_specialization,
-    ast_canonicalize,
-    emit_package,
-    semantic_model,
-    typecheck_layout_effects,
-)
+from htp.passes import PassManager, PassResult
 from htp.passes.contracts import PassContract
 from htp.passes.program_model import stage_payloads_from_program
+from htp.passes.registry import RegisteredPass, core_passes, resolve_passes
 from htp.solver import (
     apply_contract_to_state,
     build_initial_capability_state,
@@ -48,18 +36,7 @@ class DefaultPipelineResult:
     stages: list[dict[str, object]]
 
 
-MANDATORY_PASSES = (
-    _PipelinePass(contract=ast_canonicalize.CONTRACT, run=ast_canonicalize.run),
-    _PipelinePass(contract=semantic_model.CONTRACT, run=semantic_model.run),
-    _PipelinePass(contract=typecheck_layout_effects.CONTRACT, run=typecheck_layout_effects.run),
-    _PipelinePass(contract=analyze_schedule.CONTRACT, run=analyze_schedule.run),
-    _PipelinePass(contract=apply_schedule.CONTRACT, run=apply_schedule.run),
-    _PipelinePass(contract=analyze_warp_specialization.CONTRACT, run=analyze_warp_specialization.run),
-    _PipelinePass(contract=apply_warp_specialization.CONTRACT, run=apply_warp_specialization.run),
-    _PipelinePass(contract=analyze_software_pipeline.CONTRACT, run=analyze_software_pipeline.run),
-    _PipelinePass(contract=apply_software_pipeline.CONTRACT, run=apply_software_pipeline.run),
-    _PipelinePass(contract=emit_package.CONTRACT, run=emit_package.run),
-)
+MANDATORY_PASSES = tuple(_PipelinePass(contract=item.contract, run=item.run) for item in core_passes())
 MANDATORY_PASS_IDS = tuple(pipeline_pass.contract.pass_id for pipeline_pass in MANDATORY_PASSES)
 
 
@@ -107,8 +84,11 @@ def run_default_pipeline(
         program=program_state,
         extension_results=solver_result.extension_results,
     )
+    selected_passes = tuple(
+        _to_pipeline_pass(item) for item in resolve_passes(solver_result.pass_ids, program=program_state)
+    )
 
-    for pipeline_pass in MANDATORY_PASSES:
+    for pipeline_pass in selected_passes:
         next_program: dict[str, Any] | None = None
         satisfaction = evaluate_contract_satisfaction(
             contract=pipeline_pass.contract,
@@ -142,10 +122,14 @@ def run_default_pipeline(
     return DefaultPipelineResult(
         package_dir=package_path,
         current_stage=manager.current_stage,
-        pass_ids=list(MANDATORY_PASS_IDS),
+        pass_ids=list(solver_result.pass_ids),
         program=program_state,
         stages=list(manager.stages),
     )
+
+
+def _to_pipeline_pass(item: RegisteredPass) -> _PipelinePass:
+    return _PipelinePass(contract=item.contract, run=item.run)
 
 
 def _example_program() -> dict[str, Any]:

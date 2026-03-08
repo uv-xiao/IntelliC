@@ -9,20 +9,9 @@ from htp.backends.declarations import BackendSolverDeclaration
 from htp.backends.nvgpu.declarations import declaration_for as nvgpu_declaration_for
 from htp.backends.pto.declarations import declaration_for as pto_declaration_for
 from htp.bindings.validate import load_manifest
-from htp.passes import (
-    analyze_schedule,
-    analyze_software_pipeline,
-    analyze_warp_specialization,
-    apply_schedule,
-    apply_software_pipeline,
-    apply_warp_specialization,
-    ast_canonicalize,
-    emit_package,
-    semantic_model,
-    typecheck_layout_effects,
-)
 from htp.passes.contracts import PassContract
 from htp.passes.program_model import build_semantic_model, canonicalize_program, normalize_target
+from htp.pipeline.registry import registered_templates
 
 SOLVER_FAILURE_SCHEMA_ID = "htp.solver_failure.v1"
 DEFAULT_TEMPLATE_ID = "htp.default.v1"
@@ -88,6 +77,7 @@ class SolverResult:
     ok: bool
     template_id: str
     pass_ids: list[str]
+    passes: tuple[PassContract, ...]
     capabilities: tuple[str, ...]
     state: CapabilityState
     required_outputs: tuple[str, ...]
@@ -105,38 +95,14 @@ class ContractSatisfaction:
 
 def default_pipeline_template(*, target: dict[str, str]) -> PipelineTemplate:
     declaration = _backend_declaration(target)
-    return PipelineTemplate(
-        template_id=DEFAULT_TEMPLATE_ID,
-        passes=(
-            ast_canonicalize.CONTRACT,
-            semantic_model.CONTRACT,
-            typecheck_layout_effects.CONTRACT,
-            analyze_schedule.CONTRACT,
-            apply_schedule.CONTRACT,
-            analyze_warp_specialization.CONTRACT,
-            apply_warp_specialization.CONTRACT,
-            analyze_software_pipeline.CONTRACT,
-            apply_software_pipeline.CONTRACT,
-            emit_package.CONTRACT,
-        ),
-        required_outputs=declaration.required_outputs,
-    )
+    return registered_templates(program={"target": target}, required_outputs=declaration.required_outputs)[0]
 
 
 def available_pipeline_templates(*, program: dict[str, Any]) -> tuple[PipelineTemplate, ...]:
     target = normalize_target(program)
-    templates = [default_pipeline_template(target=target)]
-    requested = tuple(program.get("extensions", {}).get("requested", ()))
-    if "htp_ext.mlir_cse" in requested:
-        templates.append(
-            PipelineTemplate(
-                template_id="htp.default+htp_ext.mlir_cse.v1",
-                passes=templates[0].passes,
-                required_outputs=templates[0].required_outputs,
-                extension_steps=("htp_ext.mlir_cse",),
-            )
-        )
-    return tuple(templates)
+    return registered_templates(
+        program=program, required_outputs=_backend_declaration(target).required_outputs
+    )
 
 
 def solve_default_pipeline(*, program: dict[str, Any]) -> SolverResult:
@@ -209,6 +175,7 @@ def solve_pipeline(
                 ok=False,
                 template_id=template.template_id,
                 pass_ids=[pass_contract.pass_id for pass_contract in template.passes],
+                passes=template.passes,
                 capabilities=state.capabilities,
                 state=state,
                 required_outputs=template.required_outputs,
@@ -221,6 +188,7 @@ def solve_pipeline(
         ok=True,
         template_id=template.template_id,
         pass_ids=[pass_contract.pass_id for pass_contract in template.passes],
+        passes=template.passes,
         capabilities=state.capabilities,
         state=state,
         required_outputs=template.required_outputs,
@@ -245,6 +213,7 @@ def validate_final_artifacts(package_dir: Path | str, result: SolverResult) -> S
         ok=False,
         template_id=result.template_id,
         pass_ids=result.pass_ids,
+        passes=result.passes,
         capabilities=result.capabilities,
         state=result.state,
         required_outputs=result.required_outputs,
@@ -281,6 +250,7 @@ def _handler_failure(
         ok=False,
         template_id=template.template_id,
         pass_ids=[pass_contract.pass_id for pass_contract in template.passes],
+        passes=template.passes,
         capabilities=state.capabilities,
         state=state,
         required_outputs=template.required_outputs,
@@ -293,15 +263,9 @@ def _collect_extension_results(program: dict[str, Any]) -> dict[str, dict[str, A
     requested = program.get("extensions", {}).get("requested", ())
     results: dict[str, dict[str, Any]] = {}
     if "htp_ext.mlir_cse" in requested:
-        from htp_ext.mlir_cse.export import eligibility_for
+        from htp_ext.mlir_cse.island import extension_solver_result
 
-        eligibility = eligibility_for(program)
-        results["htp_ext.mlir_cse"] = {
-            "eligible": bool(eligibility["ok"]),
-            "provides": ["Extension.MLIRCSEEligible@1"] if eligibility["ok"] else [],
-            "pipeline_templates": ["htp.default+htp_ext.mlir_cse.v1"] if eligibility["ok"] else [],
-            "reasons": list(eligibility["reasons"]),
-        }
+        results["htp_ext.mlir_cse"] = extension_solver_result(program)
     return results
 
 
@@ -444,6 +408,7 @@ def solve_existing_package(package_dir: Path | str) -> SolverResult:
             for stage in manifest.get("stages", {}).get("graph", ())
             if isinstance(stage, dict) and stage.get("pass")
         ],
+        passes=(),
         capabilities=tuple(sorted(capabilities)),
         state=CapabilityState(
             capabilities=tuple(sorted(capabilities)),

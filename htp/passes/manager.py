@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -30,7 +31,15 @@ class PassResult:
     binding_map_payload: dict[str, Any] | None = None
     summary_payload: dict[str, Any] | None = None
     digests: dict[str, str | None] = field(default_factory=dict)
+    stage_files: tuple[StageFile, ...] = ()
     time_ms: float = 0.0
+
+
+@dataclass(frozen=True)
+class StageFile:
+    path: str
+    text: str | None = None
+    payload: dict[str, Any] | None = None
 
 
 class PassManager:
@@ -58,6 +67,9 @@ class PassManager:
         self._validate_runnable_py(contract=contract, result=result)
         self._validate_analysis_results(contract=contract, result=result)
 
+        self._validate_stage_files(result=result)
+        islands = tuple(self._normalize_island(stage_after_id, island) for island in result.islands)
+
         analyses = tuple(
             AnalysisSpec(
                 analysis_id=output.analysis_id,
@@ -74,7 +86,7 @@ class PassManager:
                 pass_id=contract.pass_id,
                 runnable_py=result.runnable_py,
                 analyses=analyses,
-                islands=result.islands,
+                islands=islands,
                 program_ast_payload=result.program_ast_payload,
                 kernel_ir_payload=result.kernel_ir_payload,
                 workload_ir_payload=result.workload_ir_payload,
@@ -91,6 +103,7 @@ class PassManager:
             ),
         )
 
+        self._write_stage_files(stage_after_id=stage_after_id, stage_files=result.stage_files)
         self.stages.append(stage_record)
         self.current_stage = stage_after_id
         write_manifest(self.package_dir, current_stage=self.current_stage, stages=self.stages)
@@ -132,6 +145,24 @@ class PassManager:
     def _analysis_filename(self, path_hint: str) -> str:
         return PurePosixPath(path_hint).name
 
+    def _normalize_island(self, stage_id: str, island: dict[str, str]) -> dict[str, str]:
+        island_id = island.get("island_id")
+        island_dir = island.get("dir")
+        if not island_id or not island_dir:
+            raise ValueError("Island records require island_id and dir")
+        path = PurePosixPath(island_dir)
+        if path.is_absolute() or ".." in path.parts:
+            raise ValueError("Island dir must be stage-relative")
+        if len(path.parts) >= 3 and path.parts[:3] == ("ir", "stages", stage_id):
+            return {
+                "island_id": island_id,
+                "dir": path.as_posix(),
+            }
+        return {
+            "island_id": island_id,
+            "dir": f"ir/stages/{stage_id}/{path.as_posix()}",
+        }
+
     def _validate_analysis_results(self, *, contract: PassContract, result: PassResult) -> None:
         expected = {output.path_hint for output in contract.analysis_produces}
         actual = set(result.analyses)
@@ -154,5 +185,30 @@ class PassManager:
                 f"expected {expected.status}/{expected.modes}, got {actual.status}/{actual.modes}"
             )
 
+    def _validate_stage_files(self, *, result: PassResult) -> None:
+        seen: set[str] = set()
+        for item in result.stage_files:
+            path = PurePosixPath(item.path)
+            if (
+                not item.path
+                or path.is_absolute()
+                or ".." in path.parts
+                or item.path in seen
+                or (item.text is None and item.payload is None)
+                or (item.text is not None and item.payload is not None)
+            ):
+                raise ValueError(f"Invalid stage file declaration: {item.path!r}")
+            seen.add(item.path)
 
-__all__ = ["PassManager", "PassResult", "RunnablePySpec"]
+    def _write_stage_files(self, *, stage_after_id: str, stage_files: tuple[StageFile, ...]) -> None:
+        stage_dir = self.package_dir / "ir" / "stages" / stage_after_id
+        for item in stage_files:
+            destination = stage_dir / item.path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if item.text is not None:
+                destination.write_text(item.text)
+            else:
+                destination.write_text(json.dumps(item.payload, indent=2) + "\n")
+
+
+__all__ = ["PassManager", "PassResult", "RunnablePySpec", "StageFile"]

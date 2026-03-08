@@ -25,7 +25,9 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
     assert manifest == json.loads((package_dir / "manifest.json").read_text())
     assert manifest["stages"]["current"] == "s02"
     assert manifest["extensions"]["mlir_cse"] == {
-        "module": "extensions/mlir_cse/module.mlir",
+        "input": "extensions/mlir_cse/input.mlir",
+        "output": "extensions/mlir_cse/output.mlir",
+        "pipeline": "extensions/mlir_cse/pipeline.txt",
         "ledger": "extensions/mlir_cse/ledger.json",
         "eligibility": "extensions/mlir_cse/eligibility.json",
         "import_summary": "extensions/mlir_cse/import_summary.json",
@@ -37,12 +39,16 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
         {"island_id": "mlir_cse", "dir": "ir/stages/s02/islands/mlir_cse"}
     ]
 
-    assert (package_dir / "extensions" / "mlir_cse" / "module.mlir").is_file()
+    assert (package_dir / "extensions" / "mlir_cse" / "input.mlir").is_file()
+    assert (package_dir / "extensions" / "mlir_cse" / "output.mlir").is_file()
+    assert (package_dir / "extensions" / "mlir_cse" / "pipeline.txt").is_file()
     assert (package_dir / "extensions" / "mlir_cse" / "ledger.json").is_file()
     assert (package_dir / "extensions" / "mlir_cse" / "eligibility.json").is_file()
     assert (package_dir / "extensions" / "mlir_cse" / "import_summary.json").is_file()
-    assert (package_dir / "ir" / "stages" / "s01" / "islands" / "mlir_cse" / "module.mlir").is_file()
+    assert (package_dir / "ir" / "stages" / "s01" / "islands" / "mlir_cse" / "input.mlir").is_file()
+    assert (package_dir / "ir" / "stages" / "s01" / "islands" / "mlir_cse" / "pipeline.txt").is_file()
     assert (package_dir / "ir" / "stages" / "s01" / "islands" / "mlir_cse" / "ledger.json").is_file()
+    assert (package_dir / "ir" / "stages" / "s02" / "islands" / "mlir_cse" / "output.mlir").is_file()
     assert (package_dir / "ir" / "stages" / "s02" / "islands" / "mlir_cse" / "import_summary.json").is_file()
 
     import_summary = json.loads((package_dir / "extensions" / "mlir_cse" / "import_summary.json").read_text())
@@ -54,9 +60,12 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
         }
     ]
     assert import_summary["result"] == "out"
-    module_text = (package_dir / "extensions" / "mlir_cse" / "module.mlir").read_text()
-    assert "func.func @demo_kernel(%lhs: i32, %rhs: i32, %scale: i32) -> i32" in module_text
-    assert "return %v2 : i32" in module_text
+    input_text = (package_dir / "extensions" / "mlir_cse" / "input.mlir").read_text()
+    output_text = (package_dir / "extensions" / "mlir_cse" / "output.mlir").read_text()
+    assert "func.func @demo_kernel(%lhs: i32, %rhs: i32, %scale: i32) -> i32" in input_text
+    assert "return %v2 : i32" in input_text
+    assert output_text.count("arith.addi") == 1
+    assert "return %v2 : i32" in output_text
 
     runtime = Runtime()
     register_replay_handler(runtime=runtime)
