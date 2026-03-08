@@ -11,6 +11,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/diagnostics.py` — diagnostic catalog and fix-hint policies
 - `htp/agent_policy.py` — agent policy loading for verify/promote tooling
 - `htp/intrinsics.py` — intrinsic declarations and backend handler availability
+- `htp/pipeline/defaults.py` — default pipeline execution over solver-validated pass contracts
 - `htp/tools.py` / `htp/__main__.py` — replay / verify / semantic diff / explain
 
 ## PTO path

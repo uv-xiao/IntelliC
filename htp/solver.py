@@ -8,6 +8,7 @@ from typing import Any
 from htp.backends.declarations import BackendSolverDeclaration
 from htp.backends.nvgpu.declarations import declaration_for as nvgpu_declaration_for
 from htp.backends.pto.declarations import declaration_for as pto_declaration_for
+from htp.bindings.validate import load_manifest
 from htp.passes import (
     analyze_schedule,
     apply_schedule,
@@ -21,6 +22,7 @@ from htp.passes.program_model import build_semantic_model, canonicalize_program,
 
 SOLVER_FAILURE_SCHEMA_ID = "htp.solver_failure.v1"
 DEFAULT_TEMPLATE_ID = "htp.default.v1"
+RESUME_TEMPLATE_ID = "htp.resume.v1"
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,7 @@ class PipelineTemplate:
     template_id: str
     passes: tuple[PassContract, ...]
     required_outputs: tuple[str, ...] = ()
+    extension_steps: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -112,10 +115,38 @@ def default_pipeline_template(*, target: dict[str, str]) -> PipelineTemplate:
     )
 
 
-def solve_default_pipeline(*, program: dict[str, Any]) -> SolverResult:
+def available_pipeline_templates(*, program: dict[str, Any]) -> tuple[PipelineTemplate, ...]:
     target = normalize_target(program)
-    template = default_pipeline_template(target=target)
-    return solve_pipeline(program=program, template=template)
+    templates = [default_pipeline_template(target=target)]
+    requested = tuple(program.get("extensions", {}).get("requested", ()))
+    if "htp_ext.mlir_cse" in requested:
+        templates.append(
+            PipelineTemplate(
+                template_id="htp.default+htp_ext.mlir_cse.v1",
+                passes=templates[0].passes,
+                required_outputs=templates[0].required_outputs,
+                extension_steps=("htp_ext.mlir_cse",),
+            )
+        )
+    return tuple(templates)
+
+
+def solve_default_pipeline(*, program: dict[str, Any]) -> SolverResult:
+    extension_results = _collect_extension_results(program)
+    templates = list(available_pipeline_templates(program=program))
+    templates.sort(
+        key=lambda template: 0
+        if template.extension_steps
+        and all(extension_results.get(step, {}).get("eligible", False) for step in template.extension_steps)
+        else 1
+    )
+    attempts: list[SolverResult] = []
+    for template in templates:
+        result = solve_pipeline(program=program, template=template)
+        attempts.append(result)
+        if result.ok:
+            return result
+    return attempts[-1]
 
 
 def solve_pipeline(
@@ -126,6 +157,14 @@ def solve_pipeline(
     target = normalize_target(program)
     extension_results = _collect_extension_results(program)
     state = build_initial_capability_state(program=program, extension_results=extension_results)
+    if template.extension_steps:
+        state = CapabilityState(
+            capabilities=tuple(sorted({*state.capabilities, *template.extension_steps})),
+            layout_invariants=state.layout_invariants,
+            effect_invariants=state.effect_invariants,
+            analyses=state.analyses,
+            target=state.target,
+        )
 
     handler_failure = _handler_failure(
         program, target=target, template=template, state=state, extension_results=extension_results
@@ -134,6 +173,13 @@ def solve_pipeline(
         return handler_failure
 
     providers = {provided: contract.pass_id for contract in template.passes for provided in contract.provides}
+    providers.update(
+        {
+            provided: extension_id
+            for extension_id, result in extension_results.items()
+            for provided in result.get("provides", ())
+        }
+    )
 
     for contract in template.passes:
         satisfaction = evaluate_contract_satisfaction(contract=contract, state=state)
@@ -245,6 +291,7 @@ def _collect_extension_results(program: dict[str, Any]) -> dict[str, dict[str, A
         results["htp_ext.mlir_cse"] = {
             "eligible": bool(eligibility["ok"]),
             "provides": ["Extension.MLIRCSEEligible@1"] if eligibility["ok"] else [],
+            "pipeline_templates": ["htp.default+htp_ext.mlir_cse.v1"] if eligibility["ok"] else [],
             "reasons": list(eligibility["reasons"]),
         }
     return results
@@ -350,18 +397,92 @@ def _write_solver_failure(package_dir: Path, failure: SolverFailure) -> None:
     failure_path.write_text(json.dumps(failure.to_json(), indent=2) + "\n")
 
 
+def solve_existing_package(package_dir: Path | str) -> SolverResult:
+    package_path = Path(package_dir)
+    manifest = load_manifest(package_path)
+    target = _manifest_target(manifest)
+    capabilities = set(_backend_declaration(target).target_capabilities)
+    analyses: set[str] = set()
+    layout_invariants: set[str] = set()
+    effect_invariants: set[str] = set()
+    for event in _read_pass_trace(package_path):
+        capabilities.update(event.get("provides", ()))
+        analyses.update(
+            str(output["analysis_id"])
+            for output in event.get("analysis_produces", ())
+            if isinstance(output, dict) and isinstance(output.get("analysis_id"), str)
+        )
+        layout_invariants.update(
+            invariant
+            for invariant, satisfied in event.get("requires_satisfied", {})
+            .get("layout_invariants", {})
+            .items()
+            if satisfied
+        )
+        effect_invariants.update(
+            invariant
+            for invariant, satisfied in event.get("requires_satisfied", {})
+            .get("effect_invariants", {})
+            .items()
+            if satisfied
+        )
+    capabilities.add("Package.Emitted@1")
+    analyses.add("Analysis.SchedulePlan@1")
+    return SolverResult(
+        ok=True,
+        template_id=RESUME_TEMPLATE_ID,
+        pass_ids=[
+            str(stage.get("pass"))
+            for stage in manifest.get("stages", {}).get("graph", ())
+            if isinstance(stage, dict) and stage.get("pass")
+        ],
+        capabilities=tuple(sorted(capabilities)),
+        state=CapabilityState(
+            capabilities=tuple(sorted(capabilities)),
+            layout_invariants=tuple(sorted(layout_invariants)),
+            effect_invariants=tuple(sorted(effect_invariants)),
+            analyses=tuple(sorted(analyses)),
+            target=target,
+        ),
+        required_outputs=tuple(
+            str(value) for value in manifest.get("outputs", {}).values() if isinstance(value, str)
+        ),
+        extension_results=dict(manifest.get("extensions", {})),
+    )
+
+
+def _manifest_target(manifest: dict[str, Any]) -> dict[str, str]:
+    target = manifest.get("target", {})
+    if not isinstance(target, dict):
+        return {"backend": "generic", "option": "default"}
+    return {
+        "backend": str(target.get("backend", "generic")),
+        "option": str(target.get("variant") or target.get("option") or "default"),
+    }
+
+
+def _read_pass_trace(package_dir: Path) -> list[dict[str, Any]]:
+    trace_path = package_dir / "ir" / "pass_trace.jsonl"
+    if not trace_path.exists():
+        return []
+    return [json.loads(line) for line in trace_path.read_text().splitlines() if line.strip()]
+
+
 __all__ = [
     "CapabilityState",
     "ContractSatisfaction",
     "DEFAULT_TEMPLATE_ID",
     "PipelineTemplate",
+    "RESUME_TEMPLATE_ID",
     "SOLVER_FAILURE_SCHEMA_ID",
     "SolverFailure",
     "SolverResult",
     "apply_contract_to_state",
+    "available_pipeline_templates",
     "build_initial_capability_state",
     "default_pipeline_template",
     "evaluate_contract_satisfaction",
+    "solve_existing_package",
     "solve_default_pipeline",
     "solve_pipeline",
     "validate_final_artifacts",
