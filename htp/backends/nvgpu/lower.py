@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from htp.intrinsics import require_handler
+from htp.intrinsics import lower_intrinsic, require_handler
 from htp.passes.program_model import build_semantic_model, canonicalize_program
 
 from .arch import arch_for, normalize_profile
@@ -130,7 +130,7 @@ def _primary_kernel_op(kernel_ir: Mapping[str, Any]) -> Mapping[str, Any]:
         raise ValueError("NV-GPU kernel_ir.ops entries must be mappings")
     intrinsic = str(primary.get("intrinsic", ""))
     require_handler("nvgpu", intrinsic, role="lower")
-    return primary
+    return lower_intrinsic("nvgpu", primary)
 
 
 def _launch_geometry_for_op(op: Mapping[str, Any]) -> NVGPULaunchGeometry:

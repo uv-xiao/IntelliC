@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -17,9 +19,12 @@ class IntrinsicDecl:
 
 @dataclass(frozen=True)
 class HandlerDecl:
-    lower: bool = False
-    emit: bool = False
-    simulate: bool = False
+    lower: Callable[..., object] | None = None
+    emit: Callable[..., object] | None = None
+    simulate: Callable[..., object] | None = None
+
+    def has(self, role: str) -> bool:
+        return getattr(self, role) is not None
 
 
 _INTRINSICS: dict[str, IntrinsicDecl] = {}
@@ -31,9 +36,18 @@ def register_intrinsic(decl: IntrinsicDecl) -> None:
 
 
 def register_handlers(
-    target: str, intrinsic: str, *, lower: bool = False, emit: bool = False, simulate: bool = False
+    target: str,
+    intrinsic: str,
+    *,
+    lower: Callable[..., object] | bool = False,
+    emit: Callable[..., object] | bool = False,
+    simulate: Callable[..., object] | bool = False,
 ) -> None:
-    _HANDLERS[(target, intrinsic)] = HandlerDecl(lower=lower, emit=emit, simulate=simulate)
+    _HANDLERS[(target, intrinsic)] = HandlerDecl(
+        lower=_normalize_handler(lower),
+        emit=_normalize_handler(emit),
+        simulate=_normalize_handler(simulate),
+    )
 
 
 def get_intrinsic_decl(name: str) -> IntrinsicDecl:
@@ -42,11 +56,18 @@ def get_intrinsic_decl(name: str) -> IntrinsicDecl:
     return _INTRINSICS[name]
 
 
-def has_handler(target: str, intrinsic: str, *, role: str) -> bool:
+def resolve_handler(target: str, intrinsic: str, *, role: str) -> Callable[..., object] | None:
     handler = _HANDLERS.get((target, intrinsic))
-    if handler is None:
-        return False
-    return bool(getattr(handler, role))
+    if handler is not None and handler.has(role):
+        return getattr(handler, role)
+    fallback = _HANDLERS.get(("generic", intrinsic))
+    if fallback is not None and fallback.has(role):
+        return getattr(fallback, role)
+    return None
+
+
+def has_handler(target: str, intrinsic: str, *, role: str) -> bool:
+    return resolve_handler(target, intrinsic, role=role) is not None
 
 
 def require_handler(target: str, intrinsic: str, *, role: str) -> None:
@@ -56,8 +77,44 @@ def require_handler(target: str, intrinsic: str, *, role: str) -> None:
         )
 
 
+def lower_intrinsic(target: str, op: Mapping[str, Any]) -> dict[str, Any]:
+    intrinsic = str(op.get("intrinsic", ""))
+    handler = resolve_handler(target, intrinsic, role="lower")
+    if handler is None:
+        require_handler(target, intrinsic, role="lower")
+        raise AssertionError("unreachable")
+    lowered = handler(op=dict(op), target=target)
+    if not isinstance(lowered, Mapping):
+        raise TypeError(f"Intrinsic lower handler for {intrinsic!r} must return a mapping.")
+    return dict(lowered)
+
+
+def simulate_intrinsic(
+    intrinsic: str,
+    *,
+    args: tuple[object, ...],
+    attrs: Mapping[str, object] | None,
+    mode: str,
+    trace: object | None = None,
+    target: str = "generic",
+) -> object:
+    handler = resolve_handler(target, intrinsic, role="simulate")
+    if handler is None:
+        require_handler(target, intrinsic, role="simulate")
+        raise AssertionError("unreachable")
+    return handler(args=args, attrs=dict(attrs or {}), mode=mode, trace=trace)
+
+
 def get_stub_diagnostic_code(intrinsic: str) -> str:
     return get_intrinsic_decl(intrinsic).stub_diagnostic
+
+
+def _normalize_handler(value: Callable[..., object] | bool) -> Callable[..., object] | None:
+    if callable(value):
+        return value
+    if value:
+        return lambda **kwargs: kwargs
+    return None
 
 
 def _bootstrap() -> None:
@@ -116,8 +173,12 @@ def _bootstrap() -> None:
     for decl in declarations:
         register_intrinsic(decl)
 
-    for intrinsic in (
+    register_handlers(
+        "generic",
         "portable.elementwise_binary",
+        simulate=_simulate_elementwise_binary,
+    )
+    for intrinsic in (
         "portable.load",
         "portable.store",
         "portable.cast",
@@ -133,10 +194,65 @@ def _bootstrap() -> None:
         "portable.channel_recv",
         "portable.allreduce",
     ):
-        register_handlers("generic", intrinsic, simulate=True)
-    register_handlers("nvgpu", "portable.elementwise_binary", lower=True, emit=True, simulate=True)
-    register_handlers("nvgpu", "portable.matmul", lower=True, emit=True, simulate=True)
-    register_handlers("pto", "portable.elementwise_binary", lower=True, emit=True, simulate=True)
+        register_handlers("generic", intrinsic, simulate=_stub_simulate)
+    register_handlers(
+        "nvgpu",
+        "portable.elementwise_binary",
+        lower=_lower_passthrough,
+        emit=_emit_passthrough,
+        simulate=_simulate_elementwise_binary,
+    )
+    register_handlers(
+        "nvgpu",
+        "portable.matmul",
+        lower=_lower_passthrough,
+        emit=_emit_passthrough,
+        simulate=_simulate_matmul_placeholder,
+    )
+    register_handlers(
+        "pto",
+        "portable.elementwise_binary",
+        lower=_lower_passthrough,
+        emit=_emit_passthrough,
+        simulate=_simulate_elementwise_binary,
+    )
+
+
+def _lower_passthrough(*, op: Mapping[str, Any], target: str) -> dict[str, Any]:
+    payload = dict(op)
+    payload.setdefault("target", target)
+    return payload
+
+
+def _emit_passthrough(*, op: Mapping[str, Any], target: str) -> dict[str, Any]:
+    return {"target": target, "intrinsic": op.get("intrinsic")}
+
+
+def _simulate_elementwise_binary(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del mode, trace
+    operator = str(attrs.get("operator", "add"))
+    lhs, rhs = args
+    if operator == "add":
+        return lhs + rhs
+    if operator == "mul":
+        return lhs * rhs
+    raise ValueError(f"Unsupported simulated operator {operator!r}.")
+
+
+def _simulate_matmul_placeholder(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del args, attrs, mode, trace
+    return "matmul-sim"
+
+
+def _stub_simulate(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del args, attrs, mode, trace
+    raise NotImplementedError("stub intrinsic simulation should be handled by runtime fallback")
 
 
 _bootstrap()
@@ -148,7 +264,10 @@ __all__ = [
     "get_intrinsic_decl",
     "get_stub_diagnostic_code",
     "has_handler",
+    "lower_intrinsic",
     "register_handlers",
     "register_intrinsic",
     "require_handler",
+    "resolve_handler",
+    "simulate_intrinsic",
 ]

@@ -251,6 +251,8 @@ Checklist:
 - `[x]` Add explicit stub-policy declarations per intrinsic/target.
 - `[x]` Move backend handler availability checks from op-name tables to
   intrinsic-handler declarations.
+- `[~]` Add callable lower/sim dispatch through the registry rather than using
+  the registry only as a boolean capability table.
 - `[~]` Add typed effect contracts for async copy, barriers, tokens, and
   collectives at the intrinsic level.
 - `[ ]` Add extension-owned intrinsic packages under stable registration

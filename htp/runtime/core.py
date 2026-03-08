@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
-from htp.intrinsics import get_stub_diagnostic_code
+from htp.intrinsics import get_stub_diagnostic_code, simulate_intrinsic
 
 from .errors import raise_missing_kernel, raise_stub
 
@@ -61,13 +61,16 @@ class Runtime:
     ) -> object:
         handler = self.intrinsic_handlers.get(name)
         if handler is None:
-            raise_stub(
-                get_stub_diagnostic_code(name),
-                node_id=f"intrinsic::{name}",
-                entity_id=name,
-                kind="intrinsic",
-                detail=f"No simulator registered for intrinsic '{name}'",
-            )
+            try:
+                return simulate_intrinsic(name, args=args, attrs=attrs, mode=mode, trace=trace)
+            except Exception:
+                raise_stub(
+                    get_stub_diagnostic_code(name),
+                    node_id=f"intrinsic::{name}",
+                    entity_id=name,
+                    kind="intrinsic",
+                    detail=f"No simulator registered for intrinsic '{name}'",
+                )
         return handler(args=args, attrs=dict(attrs or {}), mode=mode, trace=trace)
 
     def invoke_extension(
