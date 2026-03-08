@@ -9,7 +9,6 @@ from htp.pipeline.defaults import run_default_pipeline
 from htp_ext.mlir_cse.import_ import import_program_from_module
 
 
-
 def _eligible_kernel_program() -> dict[str, object]:
     return {
         "entry": "dup_expr_kernel",
@@ -70,13 +69,11 @@ def _eligible_kernel_program() -> dict[str, object]:
     }
 
 
-
 def _stage_by_pass(manifest: dict[str, object], pass_id: str) -> dict[str, object]:
     for stage in manifest["stages"]["graph"]:
         if stage.get("pass") == pass_id:
             return stage
     raise AssertionError(f"missing stage for {pass_id}")
-
 
 
 def test_run_default_pipeline_executes_mlir_extension_passes(tmp_path: Path):
@@ -86,7 +83,6 @@ def test_run_default_pipeline_executes_mlir_extension_passes(tmp_path: Path):
 
     assert "htp_ext.mlir_cse::export@1" in pass_ids
     assert "htp_ext.mlir_cse::import@1" in pass_ids
-
 
 
 def test_mlir_extension_writes_full_roundtrip_artifact_set(tmp_path: Path):
@@ -107,7 +103,6 @@ def test_mlir_extension_writes_full_roundtrip_artifact_set(tmp_path: Path):
     assert (import_dir / "import_summary.json").exists()
 
 
-
 def test_mlir_extension_imports_transformed_output_mlir(tmp_path: Path):
     package_dir = tmp_path / "pkg"
     result = run_default_pipeline(package_dir=package_dir, program=_eligible_kernel_program())
@@ -116,16 +111,13 @@ def test_mlir_extension_imports_transformed_output_mlir(tmp_path: Path):
     import_stage = _stage_by_pass(manifest, "htp_ext.mlir_cse::import@1")
     kernel_ir = json.loads((package_dir / import_stage["semantic"]["kernel_ir"]).read_text())
     import_summary = json.loads(
-        (
-            package_dir / import_stage["islands"][0]["dir"] / "import_summary.json"
-        ).read_text()
+        (package_dir / import_stage["islands"][0]["dir"] / "import_summary.json").read_text()
     )
 
     assert len(kernel_ir["ops"]) == 2
     assert len(import_summary["rewrites"]) == 1
     assert import_summary["rewrites"][0]["reused_target"] == "sum0"
     assert import_stage["id"] in {stage["id"] for stage in result.stages}
-
 
 
 def test_mlir_extension_rejects_malformed_output_module():

@@ -17,7 +17,6 @@ from htp.passes import (
     typecheck_layout_effects,
 )
 from htp.passes.contracts import PassContract
-from htp.passes.manager import PassResult
 
 
 @dataclass(frozen=True)
