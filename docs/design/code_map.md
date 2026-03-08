@@ -9,6 +9,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/runtime/core.py` — replay runtime and kernel dispatch
 - `htp/solver.py` — capability solver and final artifact checks
 - `htp/diagnostics.py` — diagnostic catalog and fix-hint policies
+- `htp/agent_policy.py` — agent policy loading for verify/promote tooling
 - `htp/tools.py` / `htp/__main__.py` — replay / verify / semantic diff / explain
 
 ## PTO path
