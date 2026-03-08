@@ -18,6 +18,7 @@ These are the base rules for HTP development.
   - backend extension surfaces.
 - Return structured diagnostics for contract failures; do not let malformed package state crash validation paths.
 - Keep changes narrow and local; fix the contract boundary rather than patching symptoms downstream.
+- Do not respond to failures by weakening tests or CI unless the repository contract itself has intentionally changed.
 - Use Python 3.10+ idioms and explicit type annotations on public APIs.
 - Avoid hidden global state for compilation or binding behavior.
 
