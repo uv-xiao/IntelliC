@@ -150,6 +150,30 @@ def test_solver_reports_missing_capability():
     assert result.failure.missing_caps == ("Missing.Capability@1",)
 
 
+def test_solver_reports_missing_layout_and_effect_invariants():
+    template = PipelineTemplate(
+        template_id="test.missing_invariants.v1",
+        passes=(
+            PassContract(
+                pass_id="test::requires_invariants@1",
+                owner="test",
+                kind="transform",
+                ast_effect="preserves",
+                requires_layout_invariants=("Layout.Typed@1",),
+                requires_effect_invariants=("Effects.Typed@1",),
+            ),
+        ),
+        required_outputs=(),
+    )
+
+    result = solve_pipeline(program=_vector_add_program(), template=template)
+
+    assert result.ok is False
+    assert result.failure is not None
+    assert result.failure.failed_at_pass == "test::requires_invariants@1"
+    assert result.failure.missing_caps == ("Layout.Typed@1", "Effects.Typed@1")
+
+
 def test_solver_reports_stale_analysis_after_invalidation():
     template = PipelineTemplate(
         template_id="test.analysis_invalidated.v1",

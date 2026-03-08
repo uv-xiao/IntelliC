@@ -13,8 +13,10 @@ Implemented behavior:
 - the default pipeline is validated before pass execution
 - unsupported backend handlers fail early with `ir/solver_failure.json`
 - missing pass capabilities and invalidated analyses fail through the same report
+- layout/effect invariants participate in solver satisfiability through pass contracts
 - final backend artifact requirements are checked after codegen emission
 - MLIR CSE eligibility is solver-visible through extension results
+- `ir/pass_trace.jsonl` records per-pass `requires_satisfied` details for capabilities, analyses, layout invariants, and effect invariants
 
 Current scope:
 

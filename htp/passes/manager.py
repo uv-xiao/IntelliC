@@ -49,6 +49,8 @@ class PassManager:
         self,
         contract: PassContract,
         execute: Callable[[dict[str, object]], PassResult],
+        *,
+        requires_satisfied: dict[str, Any] | None = None,
     ) -> dict[str, object]:
         stage_before = self._current_stage_record()
         stage_after_id = self._next_stage_id()
@@ -107,6 +109,7 @@ class PassManager:
                 for analysis in analyses
             ),
             diagnostics=result.diagnostics,
+            requires_satisfied=requires_satisfied,
         )
         emit_pass_trace_event(self.package_dir, event)
         return stage_record

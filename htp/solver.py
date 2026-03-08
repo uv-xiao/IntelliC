@@ -88,6 +88,14 @@ class SolverResult:
     failure: SolverFailure | None = None
 
 
+@dataclass(frozen=True)
+class ContractSatisfaction:
+    missing_caps: tuple[str, ...]
+    missing_layout: tuple[str, ...]
+    missing_effects: tuple[str, ...]
+    requires_satisfied: dict[str, dict[str, bool]]
+
+
 def default_pipeline_template(*, target: dict[str, str]) -> PipelineTemplate:
     declaration = _backend_declaration(target)
     return PipelineTemplate(
@@ -117,18 +125,7 @@ def solve_pipeline(
 ) -> SolverResult:
     target = normalize_target(program)
     extension_results = _collect_extension_results(program)
-    initial_capabilities = tuple(
-        extension_capability
-        for result in extension_results.values()
-        for extension_capability in result["provides"]
-    )
-    declaration = _backend_declaration(target)
-    state = CapabilityState(capabilities=initial_capabilities, target=target)
-    if declaration.target_capabilities:
-        state = CapabilityState(
-            capabilities=tuple(dict.fromkeys((*declaration.target_capabilities, *initial_capabilities))),
-            target=target,
-        )
+    state = build_initial_capability_state(program=program, extension_results=extension_results)
 
     handler_failure = _handler_failure(
         program, target=target, template=template, state=state, extension_results=extension_results
@@ -136,39 +133,21 @@ def solve_pipeline(
     if handler_failure is not None:
         return handler_failure
 
-    capabilities = set(initial_capabilities)
-    layout_invariants: set[str] = set()
-    effect_invariants: set[str] = set()
-    analyses: set[str] = set()
     providers = {provided: contract.pass_id for contract in template.passes for provided in contract.provides}
 
     for contract in template.passes:
-        missing_caps = tuple(
-            dict.fromkeys(
-                requirement
-                for requirement in (*contract.requires, *contract.analysis_requires)
-                if requirement not in capabilities and requirement not in analyses
-            )
-        )
-        missing_layout = tuple(
-            invariant
-            for invariant in contract.requires_layout_invariants
-            if invariant not in layout_invariants
-        )
-        missing_effects = tuple(
-            invariant
-            for invariant in contract.requires_effect_invariants
-            if invariant not in effect_invariants
-        )
-        if missing_caps or missing_layout or missing_effects:
+        satisfaction = evaluate_contract_satisfaction(contract=contract, state=state)
+        if satisfaction.missing_caps or satisfaction.missing_layout or satisfaction.missing_effects:
             failure = SolverFailure(
                 template_id=template.template_id,
                 failed_at_pass=contract.pass_id,
-                missing_caps=missing_caps + missing_layout + missing_effects,
+                missing_caps=(
+                    satisfaction.missing_caps + satisfaction.missing_layout + satisfaction.missing_effects
+                ),
                 analysis_requirements=tuple(contract.analysis_requires),
                 providers=tuple(
                     {"capability": capability, "pass_id": providers[capability]}
-                    for capability in missing_caps
+                    for capability in satisfaction.missing_caps
                     if capability in providers
                 ),
             )
@@ -176,42 +155,20 @@ def solve_pipeline(
                 ok=False,
                 template_id=template.template_id,
                 pass_ids=[pass_contract.pass_id for pass_contract in template.passes],
-                capabilities=tuple(sorted(capabilities)),
-                state=CapabilityState(
-                    capabilities=tuple(sorted(capabilities)),
-                    layout_invariants=tuple(sorted(layout_invariants)),
-                    effect_invariants=tuple(sorted(effect_invariants)),
-                    analyses=tuple(sorted(analyses)),
-                    target=target,
-                ),
+                capabilities=state.capabilities,
+                state=state,
                 required_outputs=template.required_outputs,
                 extension_results=extension_results,
                 failure=failure,
             )
 
-        capabilities.difference_update(contract.invalidates)
-        analyses.difference_update(contract.invalidates)
-        capabilities.update(contract.provides)
-        capabilities.update(contract.establishes_layout_invariants)
-        capabilities.update(contract.establishes_effect_invariants)
-        analyses.update(contract.provides)
-        analyses.update(output.analysis_id for output in contract.analysis_produces)
-        layout_invariants.update(contract.establishes_layout_invariants)
-        effect_invariants.update(contract.establishes_effect_invariants)
-
-    final_state = CapabilityState(
-        capabilities=tuple(sorted(capabilities)),
-        layout_invariants=tuple(sorted(layout_invariants)),
-        effect_invariants=tuple(sorted(effect_invariants)),
-        analyses=tuple(sorted(analyses)),
-        target=target,
-    )
+        state = apply_contract_to_state(contract=contract, state=state)
     return SolverResult(
         ok=True,
         template_id=template.template_id,
         pass_ids=[pass_contract.pass_id for pass_contract in template.passes],
-        capabilities=final_state.capabilities,
-        state=final_state,
+        capabilities=state.capabilities,
+        state=state,
         required_outputs=template.required_outputs,
         extension_results=extension_results,
     )
@@ -293,6 +250,83 @@ def _collect_extension_results(program: dict[str, Any]) -> dict[str, dict[str, A
     return results
 
 
+def build_initial_capability_state(
+    *,
+    program: dict[str, Any],
+    extension_results: dict[str, dict[str, Any]] | None = None,
+) -> CapabilityState:
+    target = normalize_target(program)
+    results = _collect_extension_results(program) if extension_results is None else extension_results
+    extension_capabilities = tuple(
+        extension_capability for result in results.values() for extension_capability in result["provides"]
+    )
+    declaration = _backend_declaration(target)
+    capabilities = tuple(dict.fromkeys((*declaration.target_capabilities, *extension_capabilities)))
+    return CapabilityState(capabilities=capabilities, target=target)
+
+
+def evaluate_contract_satisfaction(
+    *,
+    contract: PassContract,
+    state: CapabilityState,
+) -> ContractSatisfaction:
+    requires_status = {
+        requirement: requirement in state.capabilities or requirement in state.analyses
+        for requirement in contract.requires
+    }
+    analysis_requires_status = {
+        requirement: requirement in state.analyses for requirement in contract.analysis_requires
+    }
+    layout_status = {
+        invariant: invariant in state.layout_invariants for invariant in contract.requires_layout_invariants
+    }
+    effect_status = {
+        invariant: invariant in state.effect_invariants for invariant in contract.requires_effect_invariants
+    }
+    return ContractSatisfaction(
+        missing_caps=tuple(
+            dict.fromkeys(
+                requirement
+                for requirement, satisfied in (*requires_status.items(), *analysis_requires_status.items())
+                if not satisfied
+            )
+        ),
+        missing_layout=tuple(invariant for invariant, satisfied in layout_status.items() if not satisfied),
+        missing_effects=tuple(invariant for invariant, satisfied in effect_status.items() if not satisfied),
+        requires_satisfied={
+            "requires": requires_status,
+            "analysis_requires": analysis_requires_status,
+            "layout_invariants": layout_status,
+            "effect_invariants": effect_status,
+        },
+    )
+
+
+def apply_contract_to_state(*, contract: PassContract, state: CapabilityState) -> CapabilityState:
+    capabilities = set(state.capabilities)
+    analyses = set(state.analyses)
+    layout_invariants = set(state.layout_invariants)
+    effect_invariants = set(state.effect_invariants)
+
+    capabilities.difference_update(contract.invalidates)
+    analyses.difference_update(contract.invalidates)
+    capabilities.update(contract.provides)
+    capabilities.update(contract.establishes_layout_invariants)
+    capabilities.update(contract.establishes_effect_invariants)
+    analyses.update(contract.provides)
+    analyses.update(output.analysis_id for output in contract.analysis_produces)
+    layout_invariants.update(contract.establishes_layout_invariants)
+    effect_invariants.update(contract.establishes_effect_invariants)
+
+    return CapabilityState(
+        capabilities=tuple(sorted(capabilities)),
+        layout_invariants=tuple(sorted(layout_invariants)),
+        effect_invariants=tuple(sorted(effect_invariants)),
+        analyses=tuple(sorted(analyses)),
+        target=state.target,
+    )
+
+
 def _backend_declaration(target: dict[str, str]) -> BackendSolverDeclaration:
     backend = target["backend"]
     option = target.get("option")
@@ -318,12 +352,16 @@ def _write_solver_failure(package_dir: Path, failure: SolverFailure) -> None:
 
 __all__ = [
     "CapabilityState",
+    "ContractSatisfaction",
     "DEFAULT_TEMPLATE_ID",
     "PipelineTemplate",
     "SOLVER_FAILURE_SCHEMA_ID",
     "SolverFailure",
     "SolverResult",
+    "apply_contract_to_state",
+    "build_initial_capability_state",
     "default_pipeline_template",
+    "evaluate_contract_satisfaction",
     "solve_default_pipeline",
     "solve_pipeline",
     "validate_final_artifacts",
