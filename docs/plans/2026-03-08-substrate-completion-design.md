@@ -37,7 +37,7 @@ What is explicitly **not** required in this phase:
 
 - implementing every future backend,
 - making MLIR the native owner of semantics,
-- pulling all roadmap material from `docs/future/design/` into code.
+- pulling all roadmap material from `docs/future/` into code.
 
 ## Semantic core
 
@@ -136,7 +136,7 @@ Three extension seams are required:
   - use the existing runtime extension hook
   - remain externally owned and do not take over core semantics
 
-This is enough to make the extension substrate real without forcing all of `docs/future/design/` into the core package.
+This is enough to make the extension substrate real without forcing all of `docs/future/` into the core package.
 
 ## Backend consequences
 
@@ -219,7 +219,7 @@ The phase is complete only when all of the following are true:
 - at least one extension-owned path updates semantic state without bypassing replay or artifact contracts,
 - the NV-GPU example performs real numerical work on device,
 - the PTO example performs real numerical work in `a2a3sim`,
-- the design/docs split remains honest: `docs/design/` documents implemented behavior, `docs/future/design/` holds the
+- the design/docs split remains honest: `docs/design/` documents implemented behavior, `docs/future/` holds the
   roadmap and research surface,
 - `pytest` and `pre-commit run --all-files` pass.
 

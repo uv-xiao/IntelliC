@@ -5,6 +5,10 @@
 - Update docs when behavior or contracts change.
 - Keep docs aligned with the current emitted artifact layout and binding behavior.
 - Prefer focused edits to the existing design docs over ad-hoc markdown elsewhere.
+- Keep the tree split explicit:
+  - `docs/design/` documents only implemented behavior with references to real code
+  - `docs/future/` holds unimplemented design, research, and roadmap material
+- Move docs when implementation status changes; do not leave stale duplicates.
 
 ## Artifact Contracts
 

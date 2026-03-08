@@ -14,6 +14,13 @@ Before editing:
    - `.agent/rules/testing-and-verification.md`
 4. If touching a backend, binding, runtime, replay path, artifact layout, or extension seam, read the matching design doc under `docs/design/impls/`.
 
+Before starting feature work, verify the branch:
+
+- `htp/dev` is the stable branch and should stay CI-passed.
+- New feature work must happen on a feature branch named `htp/feat-<topic>`.
+- Merge back into `htp/dev` through a PR-style review flow after tests and hooks pass.
+- Do not land exploratory or half-finished feature work directly on `htp/dev`.
+
 Do not begin with speculative edits.
 
 ## 2. Non-negotiable architecture rules
@@ -102,6 +109,10 @@ Before claiming completion, run:
 - Update docs when artifact layout or contract meaning changes.
 - Keep docs aligned with the actual emitted paths and validation behavior.
 - Prefer focused edits to existing design docs over ad-hoc markdown.
+- Keep the docs split strict:
+  - `docs/design/` = implemented, code-backed behavior only
+  - `docs/future/` = not implemented yet, design/research/roadmap material
+- Do not place unimplemented features under `docs/design/`.
 
 ## 8. Review checklist before commit
 
@@ -124,6 +135,7 @@ Do not:
 - emit unreferenced artifacts
 - make stages non-runnable in `sim` without structured diagnostics
 - leave formatting or verification drift in the branch
+- develop new features directly on `htp/dev`
 
 ## 10. Expected handoff
 

@@ -1,7 +1,7 @@
 # HTP Design — Implemented Surface
 
 `docs/design/` now tracks the design that is backed by code in this branch.
-Unimplemented or research-only material lives under `docs/future/design/`.
+Unimplemented or research-only material lives under `docs/future/`.
 
 ## Read order
 
@@ -30,4 +30,4 @@ Unimplemented or research-only material lives under `docs/future/design/`.
 
 ## Future material
 
-- `docs/future/design/README.md`
+- `docs/future/README.md`

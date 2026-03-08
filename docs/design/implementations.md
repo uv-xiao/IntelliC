@@ -1,7 +1,7 @@
 # HTP Architecture — Current Implementation
 
 This file documents the architecture that exists in code today. It intentionally
-avoids roadmap-only features; those live in `docs/future/design/`.
+avoids roadmap-only features; those live in `docs/future/`.
 
 ## 1. Top-level flow
 

@@ -3,6 +3,10 @@
 This folder holds design and research material that is not fully implemented in
 the current branch.
 
+`docs/future/` is intentionally flat at the top level. There is no
+`docs/future/design/` nesting anymore: if a document is not implemented yet, it
+belongs directly under `docs/future/` or one of its immediate subfolders.
+
 Moved here from `docs/design/`:
 
 - broader methodology and story docs

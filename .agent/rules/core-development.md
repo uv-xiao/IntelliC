@@ -6,6 +6,8 @@ These are the base rules for HTP development.
 
 ## Rules
 
+- Treat `htp/dev` as stable and CI-passed.
+- Start new feature work on `htp/feat-<topic>` branches and merge back through a PR-style review step.
 - Keep the canonical compiler form in Python-space; do not introduce hidden semantic owners outside the staged artifact model.
 - Preserve runnable `sim` replay as the default invariant for stage programs.
 - Prefer explicit contracts over convention:
@@ -22,3 +24,4 @@ These are the base rules for HTP development.
 
 - Do not add broad infrastructure copied from other repos unless HTP actually uses it.
 - Do not add agent-only abstractions that are not tied to replay, artifacts, bindings, or backend contracts.
+- Do not use `htp/dev` as a scratch branch for in-progress feature work.

@@ -40,7 +40,7 @@ Flow:
 
 ## Future examples
 
-Design-only examples and roadmap material were moved to `docs/future/design/`.
+Design-only examples and roadmap material were moved to `docs/future/`.
 
 ## Tooling surface
 

@@ -15,6 +15,8 @@ The intent is narrow:
 - keep Python AST canonical,
 - keep stage artifacts contractual,
 - keep replay in `sim` runnable,
-- keep bindings and backends explicit and testable.
+- keep bindings and backends explicit and testable,
+- keep `htp/dev` stable and do feature work on `htp/feat-*` branches,
+- keep `docs/design/` implemented-only and `docs/future/` future-only.
 
 The repo-wide default guidance now lives in `AGENTS.md`.
