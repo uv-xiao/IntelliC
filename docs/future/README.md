@@ -58,6 +58,7 @@ The remaining future scope is not flat. The current recommended order is:
 
 ## How to read this folder now
 
+- `gap_checklist.md` — code-vs-future implementation checklist
 - `analysis.md` — why the broader design still matters after the current
   implementation milestone
 - `features.md` — the complete target feature surface
