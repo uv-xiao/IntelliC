@@ -154,10 +154,21 @@ def test_csp_example_compiles_and_replays(tmp_path):
             "puts": 1,
             "gets": 1,
             "balanced": True,
-            "participants": ["consumer", "producer"],
+            "participants": ["combine_tiles", "dispatch_tiles"],
             "hazards": [],
             "deadlock_safe": True,
-        }
+        },
+        {
+            "channel": "partials",
+            "protocol": "fifo",
+            "capacity": 1,
+            "puts": 1,
+            "gets": 1,
+            "balanced": True,
+            "participants": ["combine_tiles", "writeback_tiles"],
+            "hazards": [],
+            "deadlock_safe": True,
+        },
     ]
 
 

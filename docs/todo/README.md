@@ -39,7 +39,7 @@ For feature work:
 - `docs/todo/01_compiler_model.md`
   - remaining work: broaden semantic/type/layout/effect breadth beyond the newly landed fused-elementwise semantics and deepen routine semantics
 - `docs/todo/02_programming_surfaces.md`
-  - remaining work: finish the written AST-centric comparison against LittleKernel and use it to drive the next surface pass now that Arknife has been pulled onto native `KernelValue` objects
+  - remaining work: finish the written AST-centric comparison against LittleKernel and use it to drive the next surface pass now that WSP/CSP have decorator-builder surfaces and Arknife is on native `KernelValue` objects
 - `docs/todo/03_pipeline_and_solver.md`
   - remaining work: richer search/composition and broader MLIR island breadth
 - `docs/todo/04_artifacts_replay_debug.md`

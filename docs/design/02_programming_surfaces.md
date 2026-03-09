@@ -98,9 +98,11 @@ The current proof points include:
 - warp-role planning
 - software-pipeline planning
 - shared lowering through the same pass manager and artifact model
-- helper surfaces such as `task(...)`, `tile(...)`, `pipeline(...)`, and
-  `resources(...)` so public WSP examples no longer need to be dominated by
-  nested dict literals
+- decorator/builder authoring through `@wsp.program(...)`
+- fluent schedule helpers such as `.launch(...)`, `.tile(...)`, `.bind(...)`,
+  `.pipeline(...)`, `.resources(...)`, and `.specialize(...)`
+- flagship examples that now show staged copies, barrier handoff, and MMA
+  intent instead of collapsing to a single `store(C, A @ B)` body
 
 ### Arknife-style explicit hardware surface
 
@@ -162,8 +164,10 @@ values and routines instead of inventing parallel semantic roots.
 - protocol obligations
 - deadlock/progress evidence
 - lowering into shared workload/effect state
-- helper surfaces such as `fifo(...)`, `put(...)`, and `get(...)` so the public
-  CSP examples read like process descriptions rather than payload assembly
+- decorator/builder authoring through `@csp.program(...)`
+- fluent process builders such as `.process(...).get(...).put(...)`
+- public examples that now describe named dispatch/combine/writeback stages
+  instead of assembling process dicts by hand
 
 ### Workload-level routines
 
@@ -218,8 +222,8 @@ If you are working in this layer, start here:
 - `htp/compiler.py` — generic program compilation entrypoint
 - `htp/kernel.py` — public kernel authoring helpers
 - `htp/routine.py` — public routine/workload authoring helpers
-- `htp/wsp/__init__.py` — WSP authoring helpers
-- `htp/csp/__init__.py` — CSP authoring helpers
+- `htp/wsp/__init__.py` — WSP builder/decorator surface plus legacy helper functions
+- `htp/csp/__init__.py` — CSP builder/decorator surface plus legacy helper functions
 - `htp/ark/__init__.py` — Arknife-style hardware and instruction authoring surface
 - `examples/` — runnable proof surface
 - `examples/**/README.md` — example-local walkthroughs
@@ -235,9 +239,13 @@ Recent concrete proof points:
 - `examples/nvgpu_arknife_blackwell/demo.py` proves that the same HTP
   programming model can author cluster/TMA/WGMMA plans for the Blackwell
   profile without creating a second compiler path.
+- `examples/wsp_warp_gemm/demo.py` now shows a fluent WSP builder plus an
+  op-rich staged kernel body.
 - `examples/wsp_littlekernel_pipelined_gemm/demo.py` calibrates WSP schedule
   readability against LittleKernel-style pipelined GEMM code without giving up
   HTP's shared artifact model.
+- `examples/csp_channel_pipeline/demo.py` now shows a multi-channel
+  dispatch/combine/writeback protocol authored through the CSP builder surface.
 - `tests/examples/test_examples.py` now defends sequential PTO example
   execution in one process so public examples remain reliable instead of being
   “one-shot” demos.

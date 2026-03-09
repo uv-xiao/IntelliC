@@ -312,6 +312,23 @@ def _bootstrap() -> None:
         simulate=_simulate_matmul_placeholder,
     )
     for intrinsic in (
+        "portable.async_copy",
+        "portable.barrier",
+        "portable.await",
+        "portable.reduction_sum",
+        "portable.broadcast",
+        "portable.channel_send",
+        "portable.channel_recv",
+        "portable.mma",
+    ):
+        register_handlers(
+            "nvgpu",
+            intrinsic,
+            lower=_lower_passthrough,
+            emit=_emit_passthrough,
+            simulate=_stub_simulate,
+        )
+    for intrinsic in (
         "nvgpu.cp_async",
         "nvgpu.ldmatrix",
         "nvgpu.mma_sync",

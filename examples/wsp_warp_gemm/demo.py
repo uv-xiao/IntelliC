@@ -5,19 +5,12 @@ from pathlib import Path
 from typing import Any
 
 from htp import bind, compile_program
-from htp.kernel import buffer, kernel, scalar, store
-from htp.wsp import bind as wsp_bind
-from htp.wsp import pipeline as wsp_pipeline
+from htp.kernel import async_copy, barrier, buffer, kernel, mma, scalar, store
 from htp.wsp import program as wsp_program
-from htp.wsp import resources as wsp_resources
-from htp.wsp import schedule as wsp_schedule
-from htp.wsp import specialize as wsp_specialize
-from htp.wsp import task as wsp_task
-from htp.wsp import tile as wsp_tile
 
 
 @kernel
-def gemm_tile(
+def warp_mainloop_tile(
     A: buffer(dtype="f32", shape=("M", "K"), role="input"),
     B: buffer(dtype="f32", shape=("K", "N"), role="input"),
     C: buffer(dtype="f32", shape=("M", "N"), role="output"),
@@ -25,31 +18,32 @@ def gemm_tile(
     N: scalar(dtype="i32", role="shape"),
     K: scalar(dtype="i32", role="shape"),
 ) -> None:
-    """Warp-scheduled GEMM tile expressed as direct Python math."""
+    """Warp-level GEMM mainloop with staged copies and tensor-core math."""
 
-    store(C, A @ B)
+    async_copy(A, target="a_shared", dtype="f32")
+    async_copy(B, target="b_shared", dtype="f32")
+    barrier()
+    mma("a_shared", "b_shared", out="accum", m=M, n=N, k=K, dtype="f32")
+    store(C, "accum")
 
 
-WSP_GEMM_PROGRAM: dict[str, Any] = wsp_program(
-    entry="gemm_tile",
-    target="nvgpu-ampere",
-    kernel=gemm_tile,
-    tasks=[wsp_task(gemm_tile, "A", "B", "C", "M", "N", "K", task_id="gemm_main")],
-    schedule=wsp_schedule(
-        tile=wsp_tile(block=(32, 64, 16)),
-        bind=wsp_bind(grid="block", lane="warp"),
-        pipeline=wsp_pipeline(depth=2, buffering="double"),
-        resources=wsp_resources(num_warps=4),
-        specialize=wsp_specialize(operator="matmul"),
-    ),
-)
+@wsp_program(target="nvgpu-ampere", kernel=warp_mainloop_tile)
+def warp_gemm(w) -> None:
+    (
+        w.launch(warp_mainloop_tile, "A", "B", "C", "M", "N", "K", task_id="gemm_main")
+        .tile(block=(64, 128, 32))
+        .bind(grid="block", lane="warp")
+        .pipeline(depth=3, buffering="double")
+        .resources(num_warps=4)
+        .specialize(operator="tensor_core_mainloop", stage_plan="async_copy->mma->store")
+    )
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
     package = compile_program(
         package_dir=Path(output_dir),
         target="nvgpu-ampere",
-        program=dict(WSP_GEMM_PROGRAM),
+        program=warp_gemm,
     )
     return {
         "package_dir": package.package_dir.as_posix(),

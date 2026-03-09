@@ -5,19 +5,12 @@ from pathlib import Path
 from typing import Any
 
 from htp import bind, compile_program
-from htp.kernel import buffer, kernel, scalar, store
-from htp.wsp import bind as wsp_bind
-from htp.wsp import pipeline as wsp_pipeline
+from htp.kernel import async_copy, barrier, buffer, kernel, mma, scalar, store
 from htp.wsp import program as wsp_program
-from htp.wsp import resources as wsp_resources
-from htp.wsp import schedule as wsp_schedule
-from htp.wsp import specialize as wsp_specialize
-from htp.wsp import task as wsp_task
-from htp.wsp import tile as wsp_tile
 
 
 @kernel
-def pipelined_gemm(
+def pipelined_mainloop_gemm(
     A: buffer(dtype="f32", shape=("M", "K"), role="input"),
     B: buffer(dtype="f32", shape=("K", "N"), role="input"),
     C: buffer(dtype="f32", shape=("M", "N"), role="output"),
@@ -25,31 +18,37 @@ def pipelined_gemm(
     N: scalar(dtype="i32", role="shape"),
     K: scalar(dtype="i32", role="shape"),
 ) -> None:
-    """LittleKernel-inspired GEMM kernel body expressed as plain Python."""
+    """Pipelined GEMM mainloop with double-buffered shared-memory stages."""
 
-    store(C, A @ B)
+    async_copy(A, target="a_stage0", dtype="f32")
+    async_copy(B, target="b_stage0", dtype="f32")
+    barrier()
+    mma("a_stage0", "b_stage0", out="accum0", m=M, n=N, k=K, dtype="f32")
+
+    async_copy(A, target="a_stage1", dtype="f32")
+    async_copy(B, target="b_stage1", dtype="f32")
+    barrier()
+    mma("a_stage1", "b_stage1", out="accum1", m=M, n=N, k=K, dtype="f32")
+    store(C, "accum1")
 
 
-LITTLEKERNEL_GEMM_PROGRAM: dict[str, Any] = wsp_program(
-    entry="pipelined_gemm",
-    target="nvgpu-ampere",
-    kernel=pipelined_gemm,
-    tasks=[wsp_task(pipelined_gemm, "A", "B", "C", "M", "N", "K", task_id="tile_main")],
-    schedule=wsp_schedule(
-        tile=wsp_tile(block=(128, 256, 64)),
-        bind=wsp_bind(grid="block", lane="warp"),
-        pipeline=wsp_pipeline(depth=3, buffering="double"),
-        resources=wsp_resources(num_warps=8),
-        specialize=wsp_specialize(operator="matmul"),
-    ),
-)
+@wsp_program(target="nvgpu-ampere", kernel=pipelined_mainloop_gemm)
+def littlekernel_pipelined_gemm(w) -> None:
+    (
+        w.launch(pipelined_mainloop_gemm, "A", "B", "C", "M", "N", "K", task_id="tile_main")
+        .tile(block=(128, 256, 64))
+        .bind(grid="block", lane="warp")
+        .pipeline(depth=3, buffering="double")
+        .resources(num_warps=8)
+        .specialize(operator="pipelined_mainloop", stage_plan="load0->mma0->load1->mma1")
+    )
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
     package = compile_program(
         package_dir=Path(output_dir),
         target="nvgpu-ampere",
-        program=dict(LITTLEKERNEL_GEMM_PROGRAM),
+        program=littlekernel_pipelined_gemm,
     )
     return {
         "package_dir": package.package_dir.as_posix(),
