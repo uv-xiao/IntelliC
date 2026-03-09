@@ -150,6 +150,16 @@ def semantic_diff(
     if not identity_diff["equal"]:
         changed_sections.append("current_stage.identity")
         details["current_stage.identity"] = identity_diff
+    replay_stub_diff = _replay_stub_diff(
+        left_root, right_root, left_manifest, right_manifest, resolved_left_stage, resolved_right_stage
+    )
+    if not replay_stub_diff["equal"]:
+        changed_sections.append("current_stage.replay_stubs")
+        details["current_stage.replay_stubs"] = replay_stub_diff
+    pass_trace_diff = _pass_trace_diff(left_root, right_root)
+    if not pass_trace_diff["equal"]:
+        changed_sections.append("pass_trace")
+        details["pass_trace"] = pass_trace_diff
 
     return {
         "equal": not changed_sections,
@@ -447,6 +457,50 @@ def _identity_aware_stage_diff(
     return {"equal": equal, "details": details}
 
 
+def _replay_stub_diff(
+    left_root: Path,
+    right_root: Path,
+    left_manifest: dict[str, Any],
+    right_manifest: dict[str, Any],
+    left_stage_id: str,
+    right_stage_id: str,
+) -> dict[str, Any]:
+    left_stage = next(stage for stage in left_manifest["stages"]["graph"] if stage["id"] == left_stage_id)
+    right_stage = next(stage for stage in right_manifest["stages"]["graph"] if stage["id"] == right_stage_id)
+    left_relpath = _stage_stub_relpath(left_stage)
+    right_relpath = _stage_stub_relpath(right_stage)
+    left_payload = _load_stage_json(left_root, left_relpath)
+    right_payload = _load_stage_json(right_root, right_relpath)
+    details = {
+        "delta": _summarize_difference(left_payload, right_payload),
+        "refs": {
+            "left": left_relpath,
+            "right": right_relpath,
+        },
+    }
+    equal = details["delta"] in (
+        {},
+        {"kind": "mapping", "added_keys": [], "removed_keys": [], "changed_keys": []},
+    )
+    return {"equal": equal, "details": details}
+
+
+def _pass_trace_diff(left_root: Path, right_root: Path) -> dict[str, Any]:
+    left_relpath = "ir/pass_trace.jsonl"
+    right_relpath = "ir/pass_trace.jsonl"
+    left_payload = _load_jsonl(left_root / left_relpath)
+    right_payload = _load_jsonl(right_root / right_relpath)
+    details = {
+        "delta": _summarize_difference(left_payload, right_payload),
+        "refs": {
+            "left": left_relpath,
+            "right": right_relpath,
+        },
+    }
+    equal = left_payload == right_payload
+    return {"equal": equal, "details": details}
+
+
 def _id_delta(left_ids: list[str], right_ids: list[str]) -> dict[str, Any]:
     left_set = set(left_ids)
     right_set = set(right_ids)
@@ -460,6 +514,21 @@ def _load_stage_json(root: Path, relpath: Any) -> dict[str, Any]:
     if isinstance(relpath, str) and (root / relpath).exists():
         return json.loads((root / relpath).read_text())
     return {}
+
+
+def _load_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def _stage_stub_relpath(stage: dict[str, Any]) -> str | None:
+    runnable_py = stage.get("runnable_py", {})
+    if isinstance(runnable_py, dict):
+        stubs = runnable_py.get("stubs")
+        if isinstance(stubs, str):
+            return stubs
+    return None
 
 
 def _equal_prefix_len(left: list[Any], right: list[Any]) -> int:

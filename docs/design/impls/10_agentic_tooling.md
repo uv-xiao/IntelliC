@@ -42,11 +42,18 @@ Current scope:
 - semantic diff now includes identity-aware stage deltas over ids/maps in addition to section-level summaries
 - semantic diff now also reports the compared semantic payload refs and
   identity/map sidecar refs so agents can jump directly to the blamed files
+- semantic diff also reports current-stage replay-stub refs and
+  `ir/pass_trace.jsonl` refs when those surfaces diverge
 - `verify_package(...)` can enforce:
   - backend-specific target-suite gates
   - optional golden semantic-diff gates
   - optional perf gates driven by `agent_policy.toml`
 - promotion planning is policy-driven and stays outside compiler passes
 - `htp explain <diagnostic-code>` now serves both exact-code explanations and
-  family-level explanations (`HTP.BINDINGS.*`, `HTP.TYPECHECK.*`,
-  `HTP.PROTOCOL.*`, `HTP.SOLVER.*`)
+  family-level explanations (`HTP.BINDINGS.*`, `HTP.REPLAY.*`,
+  `HTP.TYPECHECK.*`, `HTP.LAYOUT.*`, `HTP.EFFECT.*`, `HTP.PROTOCOL.*`,
+  `HTP.SOLVER.*`)
+- default agent policy now carries structured edit-corridor templates for:
+  - pass work
+  - intrinsic work
+  - backend contract work

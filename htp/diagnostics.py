@@ -79,6 +79,7 @@ _CATALOG = {
         title="Replay hit a stubbed region",
         summary="The stage is runnable in sim, but execution reached an explicitly stubbed region.",
         docs=(
+            "docs/design/impls/09_debuggability.md",
             "docs/design/impls/01_ir_model.md",
             "docs/design/impls/07_binding_interface.md",
         ),
@@ -97,6 +98,7 @@ _FAMILY_CATALOG = (
             title="PTO package or runtime contract issue",
             summary="The PTO binding found an artifact, metadata, build, or runtime mismatch.",
             docs=(
+                "docs/design/impls/09_debuggability.md",
                 "docs/design/impls/05_backend_pto.md",
                 "docs/design/impls/07_binding_interface.md",
             ),
@@ -114,6 +116,7 @@ _FAMILY_CATALOG = (
             title="NV-GPU package or runtime contract issue",
             summary="The NV-GPU binding found an artifact, metadata, build, or runtime mismatch.",
             docs=(
+                "docs/design/impls/09_debuggability.md",
                 "docs/design/impls/13_backend_nvgpu.md",
                 "docs/design/impls/07_binding_interface.md",
             ),
@@ -131,11 +134,28 @@ _FAMILY_CATALOG = (
             title="AIE package contract issue",
             summary="The AIE binding found a metadata, artifact, or extension-package mismatch.",
             docs=(
+                "docs/design/impls/09_debuggability.md",
                 "docs/design/impls/06_backend_aie.md",
                 "docs/design/impls/07_binding_interface.md",
             ),
             fix_hints=("Check the emitted MLIR-AIE package metadata and declared artifact paths together.",),
             fix_hint_policy="repair_aie_artifact_contract",
+        ),
+    ),
+    (
+        "HTP.REPLAY.",
+        _entry(
+            "HTP.REPLAY.*",
+            title="Replay or simulator contract issue",
+            summary="Stage replay or simulator dispatch hit a stubbed or unsupported execution boundary.",
+            docs=(
+                "docs/design/impls/09_debuggability.md",
+                "docs/design/impls/01_ir_model.md",
+            ),
+            fix_hints=(
+                "Inspect the stage replay log, replay stubs sidecar, and referenced artifact/toolchain boundary together.",
+            ),
+            fix_hint_policy="inspect_replay_stub_and_stage_evidence",
         ),
     ),
     (
@@ -150,6 +170,38 @@ _FAMILY_CATALOG = (
             ),
             fix_hints=("Check manifest.json, staged artifacts, and binding validation together.",),
             fix_hint_policy="repair_binding_contract",
+        ),
+    ),
+    (
+        "HTP.LAYOUT.",
+        _entry(
+            "HTP.LAYOUT.*",
+            title="Layout legality violation",
+            summary="The program’s emitted layout facts conflict with required memory, distribution, or hardware placement rules.",
+            docs=(
+                "docs/design/impls/09_debuggability.md",
+                "docs/design/features.md",
+            ),
+            fix_hints=(
+                "Inspect the staged layout payload and re-check the pass that introduced the conflicting placement or tiling rule.",
+            ),
+            fix_hint_policy="inspect_layout_payload_and_relayout",
+        ),
+    ),
+    (
+        "HTP.EFFECT.",
+        _entry(
+            "HTP.EFFECT.*",
+            title="Effect or synchronization legality violation",
+            summary="The program’s effect model has an undischarged async, barrier, or protocol obligation.",
+            docs=(
+                "docs/design/impls/09_debuggability.md",
+                "docs/design/features.md",
+            ),
+            fix_hints=(
+                "Inspect the staged effects payload, pass trace, and protocol checks to find the undischarged obligation.",
+            ),
+            fix_hint_policy="inspect_effect_payload_and_protocol_checks",
         ),
     ),
     (
@@ -187,6 +239,7 @@ _FAMILY_CATALOG = (
             title="Solver satisfiability failure",
             summary="Pipeline or capability solving could not find a legal composition.",
             docs=(
+                "docs/design/impls/09_debuggability.md",
                 "docs/design/impls/03_capability_solver.md",
                 "docs/design/implementations.md",
             ),

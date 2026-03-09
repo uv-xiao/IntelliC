@@ -18,6 +18,36 @@ DEFAULT_POLICY = {
             "intrinsics": ["htp/intrinsics.py", "htp/runtime/intrinsics.py", "tests/ir"],
             "backends": ["htp/backends", "htp/bindings", "tests/backends", "docs/design/impls"],
         },
+        "edit_corridor_templates": {
+            "passes": {
+                "allowed_roots": ["htp/passes", "tests/passes", "docs/design/impls/02_pass_manager.md"],
+                "required_tests": ["tests/passes", "tests/pipeline"],
+                "required_docs": ["docs/design/impls/02_pass_manager.md", "docs/future/gap_checklist.md"],
+                "contract_surfaces": ["pass contracts", "analysis payloads", "ir/pass_trace.jsonl"],
+            },
+            "intrinsics": {
+                "allowed_roots": ["htp/intrinsics.py", "htp/runtime/intrinsics.py", "tests/ir"],
+                "required_tests": ["tests/ir", "tests/runtime"],
+                "required_docs": ["docs/design/features.md", "docs/future/gap_checklist.md"],
+                "contract_surfaces": ["intrinsic registry", "simulate/lower handlers", "stub diagnostics"],
+            },
+            "backend_contracts": {
+                "allowed_roots": [
+                    "htp/backends",
+                    "htp/bindings",
+                    "tests/backends",
+                    "docs/design/impls",
+                ],
+                "required_tests": ["tests/backends", "tests/bindings", "tests/examples"],
+                "required_docs": [
+                    "docs/design/impls/05_backend_pto.md",
+                    "docs/design/impls/07_binding_interface.md",
+                    "docs/design/impls/13_backend_nvgpu.md",
+                    "docs/future/gap_checklist.md",
+                ],
+                "contract_surfaces": ["manifest.outputs", "backend codegen index", "adapter traces"],
+            },
+        },
     },
     "perf": {
         "enabled": False,
@@ -44,14 +74,28 @@ def load_agent_policy(path: Path | str | None = None) -> dict[str, Any]:
         value = payload.get(section)
         if isinstance(value, dict):
             merged_section = dict(merged[section])
-            merged_section.update(value)
+            for key, item in value.items():
+                if isinstance(item, dict) and isinstance(merged_section.get(key), dict):
+                    nested = dict(merged_section[key])
+                    nested.update(item)
+                    merged_section[key] = nested
+                else:
+                    merged_section[key] = item
             merged[section] = merged_section
     return merged
 
 
 def _clone_default_policy() -> dict[str, Any]:
     return {
-        "agent": dict(DEFAULT_POLICY["agent"]),
+        "agent": {
+            **dict(DEFAULT_POLICY["agent"]),
+            "edit_corridors": {
+                key: list(value) for key, value in DEFAULT_POLICY["agent"]["edit_corridors"].items()
+            },
+            "edit_corridor_templates": {
+                key: dict(value) for key, value in DEFAULT_POLICY["agent"]["edit_corridor_templates"].items()
+            },
+        },
         "perf": dict(DEFAULT_POLICY["perf"]),
     }
 

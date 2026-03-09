@@ -28,12 +28,12 @@ consume:
 - backend artifact validation
 - real end-to-end examples on PTO and NV-GPU
 
-What is still missing is the **product layer**:
+What is still missing is the **remaining product layer**:
 
-- explicit CLI/tool surfaces for diff/minimize/verify/explain
-- a provenance schema for autonomous runs
-- policy-controlled bounded edit corridors
-- automation around stage bisect and semantic diff
+- bounded autonomous patch loops over those existing tools
+- stricter diagnostic completeness across every compiler/backend surface
+- richer node-aware semantic diffs beyond the current section/ref-oriented view
+- promotion automation beyond policy emission and repo-side PR checks
 
 ## Core idea: agents consume and produce artifact packages
 
