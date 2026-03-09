@@ -1,1 +1,0 @@
-"""PyPTO-calibrated GELU example."""

@@ -20,6 +20,8 @@ Replace the remaining payload-shaped WSP/CSP public authoring with traced, human
 
 - [x] add traced WSP/CSP program surfaces that record tasks/channels/processes from ordinary Python
 - [x] rewrite the flagship WSP/CSP examples onto those traced surfaces with stronger pattern content
+- [x] reorganize `examples/` into grouped subtrees and remove stale top-level example duplicates
+- [x] rework WSP/CSP flagship example semantics around reference-backed tile/channel stories instead of fake phase names
 - [x] strengthen tests around the new traced authoring rules and malformed usage
 - [x] rewrite `docs/design/layers/02_programming_surfaces.md` with detailed surface design and extension guidance
 - [x] update `docs/todo/` to narrow the programming-surface gap
@@ -29,7 +31,7 @@ Replace the remaining payload-shaped WSP/CSP public authoring with traced, human
 
 - producer: `htp/wsp/__init__.py`, `htp/csp/__init__.py`, possibly `htp/kernel.py` / `htp/routine.py`
 - compiler integration: `htp/compiler.py`, `htp/passes/program_model.py`
-- tests/examples: `tests/test_public_surfaces.py`, `tests/examples/test_examples.py`, `examples/wsp_*`, `examples/csp_*`
+- tests/examples: `tests/test_public_surfaces.py`, `tests/examples/test_examples.py`, `examples/patterns/wsp/*`, `examples/patterns/csp/*`
 - docs: `docs/design/layers/02_programming_surfaces.md`, `docs/design/examples/`, `docs/todo/`, `AGENTS.md`
 
 ## Test and Verification Plan
@@ -54,7 +56,7 @@ Do not add low-signal tests. Each added test must defend a concrete contract, fa
 1. create task file
 2. land traced WSP/CSP surface changes
 3. land tests and example rewrites
-4. rewrite programming-surface docs
+4. rewrite programming-surface docs and example READMEs
 5. rebase, review, and merge
 
 ## Review Notes

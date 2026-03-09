@@ -2,9 +2,9 @@
 
 Code:
 
-- `examples/pto_pypto_vector_add/demo.py`
-- `examples/pto_pypto_vector_add/README.md`
-- `examples/pto_pypto_vector_add/notebook.ipynb`
+- `examples/pto/beginner/vector_add/demo.py`
+- `examples/pto/beginner/vector_add/README.md`
+- `examples/pto/beginner/vector_add/notebook.ipynb`
 
 This example mirrors the shape of the `references/pypto` / `references/pto-runtime`
 vector-add flow, but uses HTP’s artifact-first pipeline:

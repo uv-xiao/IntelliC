@@ -237,102 +237,127 @@ def test_compile_program_accepts_traced_routine_surface(tmp_path):
 
 def test_public_wsp_surface_supports_traced_program_authoring():
     @kernel
-    def gemm_tile(
-        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
-        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
-        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
-        M: scalar(dtype="i32", role="shape"),
-        N: scalar(dtype="i32", role="shape"),
-        K: scalar(dtype="i32", role="shape"),
+    def gemm_microtile(
+        A: buffer(dtype="f32", shape=("TM", "TK"), role="input"),
+        B: buffer(dtype="f32", shape=("TK", "TN"), role="input"),
+        C: buffer(dtype="f32", shape=("TM", "TN"), role="output"),
+        TM: scalar(dtype="i32", role="shape"),
+        TN: scalar(dtype="i32", role="shape"),
+        TK: scalar(dtype="i32", role="shape"),
     ) -> None:
         store(C, A @ B)
 
     @wsp_program(
         target="nvgpu-ampere",
-        tile=wsp_tile(block=(128, 128, 32)),
+        tile=wsp_tile(block=(32, 64, 16)),
         bind=wsp_bind(grid="block", lane="warp"),
-        pipeline=wsp_pipeline(depth=3, buffering="double"),
-        resources=wsp_resources(num_warps=8),
+        pipeline=wsp_pipeline(depth=2, buffering="double"),
+        resources=wsp_resources(num_warps=4),
         specialize=wsp_specialize(operator="matmul"),
     )
-    def pipelined_gemm(
-        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
-        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
-        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
-        C_stage: buffer(dtype="f32", shape=("M", "N"), role="output"),
-        M: scalar(dtype="i32", role="shape"),
-        N: scalar(dtype="i32", role="shape"),
-        K: scalar(dtype="i32", role="shape"),
+    def warp_tiled_gemm(
+        A_row0: buffer(dtype="f32", shape=("TM", "TK"), role="input"),
+        A_row1: buffer(dtype="f32", shape=("TM", "TK"), role="input"),
+        B_col0: buffer(dtype="f32", shape=("TK", "TN"), role="input"),
+        B_col1: buffer(dtype="f32", shape=("TK", "TN"), role="input"),
+        C_00: buffer(dtype="f32", shape=("TM", "TN"), role="output"),
+        C_01: buffer(dtype="f32", shape=("TM", "TN"), role="output"),
+        C_10: buffer(dtype="f32", shape=("TM", "TN"), role="output"),
+        C_11: buffer(dtype="f32", shape=("TM", "TN"), role="output"),
+        TM: scalar(dtype="i32", role="shape"),
+        TN: scalar(dtype="i32", role="shape"),
+        TK: scalar(dtype="i32", role="shape"),
     ) -> None:
-        prologue = wsp_task(gemm_tile, A, B, C_stage, M, N, K, task_id="prologue")
-        steady = wsp_task(gemm_tile, A, B, C_stage, M, N, K, after=prologue, task_id="steady")
-        wsp_task(gemm_tile, A, B, C, M, N, K, after=steady, task_id="epilogue")
+        wsp_task(gemm_microtile, A_row0, B_col0, C_00, TM, TN, TK, task_id="tile_00")
+        wsp_task(gemm_microtile, A_row0, B_col1, C_01, TM, TN, TK, task_id="tile_01")
+        wsp_task(gemm_microtile, A_row1, B_col0, C_10, TM, TN, TK, task_id="tile_10")
+        wsp_task(gemm_microtile, A_row1, B_col1, C_11, TM, TN, TK, task_id="tile_11")
 
-    payload = pipelined_gemm.to_program()
+    payload = warp_tiled_gemm.to_program()
 
     assert [task["task_id"] for task in payload["wsp"]["workload"]["tasks"]] == [
-        "prologue",
-        "steady",
-        "epilogue",
+        "tile_00",
+        "tile_01",
+        "tile_10",
+        "tile_11",
     ]
-    assert payload["wsp"]["workload"]["dependencies"] == [
-        {"src": "prologue", "dst": "steady"},
-        {"src": "steady", "dst": "epilogue"},
-    ]
-    assert payload["wsp"]["schedule"]["pipeline"]["depth"] == 3
-    assert payload["wsp"]["schedule"]["resources"]["num_warps"] == 8
+    assert payload["wsp"]["workload"]["dependencies"] == []
+    assert payload["wsp"]["schedule"]["pipeline"]["depth"] == 2
+    assert payload["wsp"]["schedule"]["resources"]["num_warps"] == 4
 
 
 def test_public_csp_surface_supports_traced_program_authoring():
     @kernel
-    def stage_kernel(
-        src: buffer(dtype="f32", shape=("M", "N"), role="input"),
-        weights: buffer(dtype="f32", shape=("N", "K"), role="input"),
-        dst: buffer(dtype="f32", shape=("M", "K"), role="output"),
-        M: scalar(dtype="i32", role="shape"),
-        N: scalar(dtype="i32", role="shape"),
-        K: scalar(dtype="i32", role="shape"),
+    def affine_stage(
+        src: buffer(dtype="f32", shape=("size",), role="input"),
+        scale: buffer(dtype="f32", shape=("size",), role="input"),
+        bias: buffer(dtype="f32", shape=("size",), role="input"),
+        dst: buffer(dtype="f32", shape=("size",), role="output"),
+        size: scalar(dtype="i32", role="shape"),
     ) -> None:
-        store(dst, src @ weights)
+        store(dst, src * scale + bias)
 
     @csp_program(target="nvgpu-ampere")
-    def staged_pipeline(
-        activations: buffer(dtype="f32", shape=("M", "N"), role="input"),
-        weights0: buffer(dtype="f32", shape=("N", "K"), role="input"),
-        weights1: buffer(dtype="f32", shape=("K", "P"), role="input"),
-        hidden: buffer(dtype="f32", shape=("M", "K"), role="output"),
-        out: buffer(dtype="f32", shape=("M", "P"), role="output"),
-        M: scalar(dtype="i32", role="shape"),
-        N: scalar(dtype="i32", role="shape"),
-        K: scalar(dtype="i32", role="shape"),
-        P: scalar(dtype="i32", role="shape"),
+    def channel_pipeline(
+        activations: buffer(dtype="f32", shape=("size",), role="input"),
+        norm_scale: buffer(dtype="f32", shape=("size",), role="input"),
+        norm_bias: buffer(dtype="f32", shape=("size",), role="input"),
+        proj_scale: buffer(dtype="f32", shape=("size",), role="input"),
+        proj_bias: buffer(dtype="f32", shape=("size",), role="input"),
+        out_scale: buffer(dtype="f32", shape=("size",), role="input"),
+        out_bias: buffer(dtype="f32", shape=("size",), role="input"),
+        hidden: buffer(dtype="f32", shape=("size",), role="output"),
+        projected: buffer(dtype="f32", shape=("size",), role="output"),
+        output: buffer(dtype="f32", shape=("size",), role="output"),
+        size: scalar(dtype="i32", role="shape"),
     ) -> None:
-        tiles = fifo("tiles", dtype="f32", capacity=2)
-        partials = fifo("partials", dtype="f32", capacity=1)
+        input_tiles = fifo("input_tiles", dtype="f32", capacity=2)
+        hidden_tiles = fifo("hidden_tiles", dtype="f32", capacity=1)
+        completions = fifo("completions", dtype="f32", capacity=1)
         process(
-            "prefetch",
-            kernel=stage_kernel,
-            args=(activations, weights0, hidden, M, N, K),
-            steps=[put(tiles), put(partials)],
+            "load_norm",
+            kernel=affine_stage,
+            args=(activations, norm_scale, norm_bias, hidden, size),
+            steps=[put(input_tiles), put(hidden_tiles)],
         )
         process(
-            "consumer",
-            kernel=stage_kernel,
-            args=(hidden, weights1, out, M, K, P),
-            steps=[get(tiles), get(partials)],
+            "project",
+            kernel=affine_stage,
+            args=(hidden, proj_scale, proj_bias, projected, size),
+            steps=[get(input_tiles), get(hidden_tiles), put(completions)],
+        )
+        process(
+            "writeback",
+            kernel=affine_stage,
+            args=(projected, out_scale, out_bias, output, size),
+            steps=[get(completions)],
         )
 
-    payload = staged_pipeline.to_program()
+    payload = channel_pipeline.to_program()
 
-    assert [channel["name"] for channel in payload["csp"]["channels"]] == ["tiles", "partials"]
-    assert [process["task_id"] for process in payload["csp"]["processes"]] == ["prefetch", "consumer"]
+    assert [channel["name"] for channel in payload["csp"]["channels"]] == [
+        "input_tiles",
+        "hidden_tiles",
+        "completions",
+    ]
+    assert [process["task_id"] for process in payload["csp"]["processes"]] == [
+        "load_norm",
+        "project",
+        "writeback",
+    ]
     assert payload["csp"]["processes"][0]["puts"] == [
-        {"kind": "put", "channel": "tiles", "count": 1},
-        {"kind": "put", "channel": "partials", "count": 1},
+        {"kind": "put", "channel": "input_tiles", "count": 1},
+        {"kind": "put", "channel": "hidden_tiles", "count": 1},
     ]
     assert payload["csp"]["processes"][1]["gets"] == [
-        {"kind": "get", "channel": "tiles", "count": 1},
-        {"kind": "get", "channel": "partials", "count": 1},
+        {"kind": "get", "channel": "input_tiles", "count": 1},
+        {"kind": "get", "channel": "hidden_tiles", "count": 1},
+    ]
+    assert payload["csp"]["processes"][1]["puts"] == [
+        {"kind": "put", "channel": "completions", "count": 1},
+    ]
+    assert payload["csp"]["processes"][2]["gets"] == [
+        {"kind": "get", "channel": "completions", "count": 1},
     ]
 
 

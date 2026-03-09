@@ -2,9 +2,9 @@
 
 Code:
 
-- `examples/nvgpu_arknife_gemm/demo.py`
-- `examples/nvgpu_arknife_gemm/README.md`
-- `examples/nvgpu_arknife_gemm/notebook.ipynb`
+- `examples/nvgpu/arknife_gemm/demo.py`
+- `examples/nvgpu/arknife_gemm/README.md`
+- `examples/nvgpu/arknife_gemm/notebook.ipynb`
 
 This example turns the Arknife hardware-model story into concrete HTP code:
 

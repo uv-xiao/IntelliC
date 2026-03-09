@@ -2,8 +2,8 @@
 
 Code:
 
-- `examples/pto_pypto_vector_dag/demo.py`
-- `examples/pto_pypto_vector_dag/README.md`
+- `examples/pto/intermediate/vector_dag/demo.py`
+- `examples/pto/intermediate/vector_dag/README.md`
 
 This example raises the public PTO story from a compact fused activation to a
 larger arithmetic DAG inspired by `references/pypto/examples/language/intermediate/vector_dag.py`:

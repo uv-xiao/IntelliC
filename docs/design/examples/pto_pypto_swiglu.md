@@ -2,8 +2,8 @@
 
 Code:
 
-- `examples/pto_pypto_swiglu/demo.py`
-- `examples/pto_pypto_swiglu/README.md`
+- `examples/pto/intermediate/swiglu/demo.py`
+- `examples/pto/intermediate/swiglu/README.md`
 
 This example raises the PTO flagship bar above vector add while keeping the
 authoring surface Python-native. The user writes a traced `@kernel`

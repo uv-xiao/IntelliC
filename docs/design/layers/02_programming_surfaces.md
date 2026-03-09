@@ -126,9 +126,9 @@ Code anchors:
 
 - `htp/kernel.py`
 - `tests/test_public_surfaces.py`
-- `examples/pto_pypto_swiglu/demo.py`
-- `examples/pto_pypto_gelu/demo.py`
-- `examples/nvgpu_arknife_gemm/demo.py`
+- `examples/pto/intermediate/swiglu/demo.py`
+- `examples/pto/intermediate/gelu/demo.py`
+- `examples/nvgpu/arknife_gemm/demo.py`
 
 ### 2.2 Routine / workload surface
 
@@ -160,7 +160,7 @@ state.
 Code anchors:
 
 - `htp/routine.py`
-- `examples/serving_routine/demo.py`
+- `examples/workloads/serving_routine/demo.py`
 - `docs/design/examples/serving_routine.md`
 
 ### 2.3 WSP surface
@@ -177,17 +177,17 @@ The traced form is the intended surface:
 ```python
 @wsp.program(
     target="nvgpu-ampere",
-    tile=wsp.tile(block=(128, 256, 64)),
+    tile=wsp.tile(block=(32, 64, 16)),
     bind=wsp.bind(grid="block", lane="warp"),
-    pipeline=wsp.pipeline(depth=3, buffering="double"),
-    resources=wsp.resources(num_warps=8),
+    pipeline=wsp.pipeline(depth=2, buffering="double"),
+    resources=wsp.resources(num_warps=4),
     specialize=wsp.specialize(operator="matmul"),
 )
-def pipelined_mainloop(...):
-    prologue = wsp.task(gemm_tile, A, B, C_stage0, M, N, K, task_id="prologue")
-    stage0 = wsp.task(gemm_tile, A, B, C_stage1, M, N, K, after=prologue, task_id="stage0")
-    stage1 = wsp.task(gemm_tile, A, B, C_stage0, M, N, K, after=stage0, task_id="stage1")
-    wsp.task(gemm_tile, A, B, C, M, N, K, after=stage1, task_id="epilogue")
+def warp_tiled_gemm(...):
+    wsp.task(gemm_microtile, A_row0, B_col0, C_00, TM, TN, TK, task_id="tile_00")
+    wsp.task(gemm_microtile, A_row0, B_col1, C_01, TM, TN, TK, task_id="tile_01")
+    wsp.task(gemm_microtile, A_row1, B_col0, C_10, TM, TN, TK, task_id="tile_10")
+    wsp.task(gemm_microtile, A_row1, B_col1, C_11, TM, TN, TK, task_id="tile_11")
 ```
 
 Implemented WSP properties:
@@ -195,6 +195,8 @@ Implemented WSP properties:
 - decorator-form schedule ownership
 - named WSP tasks
 - explicit dependency edges through handles
+- block-level task decomposition that reads like a tiled program, not like a
+  pass hint list
 - schedule directives as readable helper values:
   - `tile(...)`
   - `bind(...)`
@@ -203,20 +205,39 @@ Implemented WSP properties:
   - `specialize(...)`
 - lowering into shared workload state plus staged schedule artifacts
 
+Semantically, the current WSP examples are calibrated against two reference
+stories:
+
+- `references/arknife/tests/python/codegen_cuda_ampere.py`
+  - one CTA owns a block tile
+  - warps own subtiles
+  - schedule metadata explains how the CTA is launched and pipelined
+- `references/triton-distributed-knowingnothing/python/little_kernel/`
+  - the interesting content is the mainloop structure: tile decomposition,
+    software-pipeline depth, warp allocation, and ownership of output tiles
+
+HTP deliberately mirrors those ideas in simpler traced Python:
+
+- `warp_tiled_gemm` models one CTA computing a `2 x 2` output-tile grid, with
+  one task per warp-owned microtile
+- `littlekernel_mainloop_gemm` models one CTA computing a `4 x 2` output-tile
+  lattice under a deeper software-pipeline schedule
+
+That keeps the public program semantically meaningful even though the current
+surface still limits one WSP program to one kernel shape.
+
 Important current constraint:
 
 - the public WSP surface currently supports exactly one kernel per WSP program
 
-That is an intentional simplification of the public API, not a statement about
-the long-term framework. The current implementation prefers a readable,
-testable surface over prematurely generalizing task graphs with heterogeneous
-kernels.
+That is an intentional API simplification. It constrains heterogenous task
+graphs, but it still allows meaningful tiled ownership and schedule structure.
 
 Code anchors:
 
 - `htp/wsp/__init__.py`
-- `examples/wsp_warp_gemm/demo.py`
-- `examples/wsp_littlekernel_pipelined_gemm/demo.py`
+- `examples/patterns/wsp/warp_tiled_gemm/demo.py`
+- `examples/patterns/wsp/littlekernel_mainloop_gemm/demo.py`
 - `tests/test_public_surfaces.py`
 - `tests/examples/test_examples.py`
 
@@ -234,12 +255,12 @@ The traced form is now the preferred way to express process/channel structure:
 ```python
 @csp.program(target="nvgpu-ampere")
 def channel_pipeline(...):
-    tiles = fifo("tiles", dtype="f32", capacity=2)
-    partials = fifo("partials", dtype="f32", capacity=1)
+    input_tiles = fifo("input_tiles", dtype="f32", capacity=2)
+    hidden_tiles = fifo("hidden_tiles", dtype="f32", capacity=1)
     completions = fifo("completions", dtype="f32", capacity=1)
-    process("prefetch", kernel=gemm_tile, args=(...), steps=[put(tiles), put(partials)])
-    process("compute", kernel=gemm_tile, args=(...), steps=[get(tiles), get(partials), put(completions)])
-    process("epilogue", kernel=gemm_tile, args=(...), steps=[get(completions)])
+    process("load_norm", kernel=affine_stage, args=(...), steps=[put(input_tiles), put(hidden_tiles)])
+    process("project", kernel=affine_stage, args=(...), steps=[get(input_tiles), get(hidden_tiles), put(completions)])
+    process("writeback", kernel=affine_stage, args=(...), steps=[get(completions)])
 ```
 
 Implemented CSP properties:
@@ -257,13 +278,21 @@ Important current constraint:
 - the traced CSP surface currently supports exactly one kernel per CSP program
 
 That mirrors the current WSP simplification and keeps the public API smaller
-than the eventual framework envelope.
+than the eventual framework envelope, while still allowing meaningful protocol
+stories:
+
+- `load_norm` produces normalized tiles
+- `project` consumes them and forwards projected tiles
+- `writeback` drains completions into the final output
+
+That is a real staged dataflow narrative, not a synthetic “three names in a
+list” example.
 
 Code anchors:
 
 - `htp/csp/__init__.py`
-- `examples/csp_channel_pipeline/demo.py`
-- `examples/aie_channel_pipeline/demo.py`
+- `examples/patterns/csp/channel_pipeline/demo.py`
+- `examples/extensions/aie_channel_pipeline/demo.py`
 - `tests/test_public_surfaces.py`
 - `tests/examples/test_examples.py`
 
@@ -361,6 +390,23 @@ htp_ext/<surface>/
     tests/             focused public-surface tests
 ```
 
+There are two good extension styles today.
+
+1. **Thin traced frontend over core kernel/routine values**
+   - best when the surface is mostly syntax sugar
+   - example: a future `htp_ext.collectives` surface could trace calls that
+     eventually lower into ordinary workload tasks plus collective analysis
+
+2. **Pattern frontend with its own typed spec object**
+   - best when the surface needs pattern-local invariants before lowering
+   - example: a future grouped-GEMM or attention frontend could build a
+     dedicated public spec, validate its shape, then emit one canonical
+     program payload
+
+In both cases, the extension should make the authored Python shorter and more
+readable than manual payload construction. If it adds ceremony without semantic
+benefit, it is the wrong abstraction.
+
 ### Minimum extension contract
 
 An extension surface should specify:
@@ -370,6 +416,10 @@ An extension surface should specify:
 - what canonical payload it emits
 - which parts are frontend sugar versus normative payload
 - how malformed usage fails
+- which parts of the authored Python are normative compiler input versus
+  frontend sugar
+- how examples remain readable without forcing users to learn internal payload
+  keys
 
 ### Review bar for new surfaces
 
@@ -381,27 +431,30 @@ the public-language bar:
 - is the number of explicit helper objects justified?
 - does the code feel at least as readable as the relevant `references/`
   examples?
+- does the surface preserve semantic meaning, not just syntactic compactness?
+  A short program that no longer communicates ownership, schedule, or protocol
+  intent is still a bad public surface.
 
 ## Implemented example inventory
 
 Programming-surface proof cases currently include:
 
 - PTO:
-  - `examples/pto_pypto_vector_add/demo.py`
-  - `examples/pto_pypto_swiglu/demo.py`
-  - `examples/pto_pypto_gelu/demo.py`
-  - `examples/pto_pypto_vector_dag/demo.py`
+  - `examples/pto/beginner/vector_add/demo.py`
+  - `examples/pto/intermediate/swiglu/demo.py`
+  - `examples/pto/intermediate/gelu/demo.py`
+  - `examples/pto/intermediate/vector_dag/demo.py`
 - NV-GPU:
-  - `examples/nvgpu_arknife_gemm/demo.py`
+  - `examples/nvgpu/arknife_gemm/demo.py`
 - WSP:
-  - `examples/wsp_warp_gemm/demo.py`
-  - `examples/wsp_littlekernel_pipelined_gemm/demo.py`
+  - `examples/patterns/wsp/warp_tiled_gemm/demo.py`
+  - `examples/patterns/wsp/littlekernel_mainloop_gemm/demo.py`
 - CSP / channel workloads:
-  - `examples/csp_channel_pipeline/demo.py`
-  - `examples/aie_channel_pipeline/demo.py`
+  - `examples/patterns/csp/channel_pipeline/demo.py`
+  - `examples/extensions/aie_channel_pipeline/demo.py`
 - higher-level workload and extension composition:
-  - `examples/serving_routine/demo.py`
-  - `examples/mlir_cse_extension/demo.py`
+  - `examples/workloads/serving_routine/demo.py`
+  - `examples/extensions/mlir_cse/demo.py`
 
 These examples matter because they are the public proof that the programming
 surface is real, not merely documented.
@@ -438,6 +491,10 @@ Current limits that still remain outside `docs/design/`:
   in `docs/todo/reports/littlekernel_ast_comparison.md`
 - WSP and CSP still intentionally constrain traced public programs to one kernel
   each
+- WSP public surfaces currently encode tile ownership and launch structure, but
+  not explicit producer/consumer warp roles inside one program body
+- CSP public surfaces currently encode channel/process protocols, but not
+  richer topology builders such as fan-out, join, or collective route helpers
 - the public surfaces are still proof-oriented compared with the full framework
   story in `docs/story.md`
 

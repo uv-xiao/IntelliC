@@ -38,8 +38,10 @@ The public surface and examples are now materially stronger:
   instead of top-level payload assembly
 - CSP examples now use traced `@csp.program(...)` plus typed channels and named
   processes instead of raw process payload lists
-- a LittleKernel-calibrated WSP pipelined GEMM example now shows a visible
-  prologue / steady-state / epilogue structure
+- the WSP examples now model CTA tile ownership explicitly:
+  - `warp_tiled_gemm` uses a `2 x 2` warp-owned tile grid
+  - `littlekernel_mainloop_gemm` uses a `4 x 2` output-tile lattice with a
+    deeper software-pipeline schedule
 
 The remaining gap in this layer is no longer “make the surface readable at
 all”. It is the written comparative analysis tracked in

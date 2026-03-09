@@ -6,33 +6,37 @@ from pathlib import Path
 
 import pytest
 
-from examples.aie_channel_pipeline.demo import compile_example as compile_aie_example
-from examples.aie_channel_pipeline.demo import replay_latest_stage as replay_aie_stage
-from examples.csp_channel_pipeline.demo import compile_example as compile_csp_example
-from examples.csp_channel_pipeline.demo import replay_latest_stage as replay_csp_stage
-from examples.mlir_cse_extension.demo import compile_example as compile_mlir_cse_example
-from examples.mlir_cse_extension.demo import replay_latest_stage as replay_mlir_cse_stage
-from examples.nvgpu_arknife_gemm.demo import compile_example as compile_nvgpu_example
-from examples.nvgpu_arknife_gemm.demo import replay_latest_stage as replay_nvgpu_stage
-from examples.nvgpu_arknife_gemm.demo import run_demo as run_nvgpu_demo
-from examples.pto_pypto_gelu.demo import compile_example as compile_pto_gelu_example
-from examples.pto_pypto_gelu.demo import replay_latest_stage as replay_pto_gelu_stage
-from examples.pto_pypto_gelu.demo import run_demo as run_pto_gelu_demo
-from examples.pto_pypto_swiglu.demo import compile_example as compile_pto_swiglu_example
-from examples.pto_pypto_swiglu.demo import replay_latest_stage as replay_pto_swiglu_stage
-from examples.pto_pypto_swiglu.demo import run_demo as run_pto_swiglu_demo
-from examples.pto_pypto_vector_add.demo import compile_example as compile_pto_example
-from examples.pto_pypto_vector_add.demo import replay_latest_stage as replay_pto_stage
-from examples.pto_pypto_vector_add.demo import run_demo as run_pto_demo
-from examples.pto_pypto_vector_dag.demo import compile_example as compile_pto_vector_dag_example
-from examples.pto_pypto_vector_dag.demo import replay_latest_stage as replay_pto_vector_dag_stage
-from examples.pto_pypto_vector_dag.demo import run_demo as run_pto_vector_dag_demo
-from examples.serving_routine.demo import compile_example as compile_serving_example
-from examples.serving_routine.demo import replay_latest_stage as replay_serving_stage
-from examples.wsp_littlekernel_pipelined_gemm.demo import compile_example as compile_littlekernel_example
-from examples.wsp_littlekernel_pipelined_gemm.demo import replay_latest_stage as replay_littlekernel_stage
-from examples.wsp_warp_gemm.demo import compile_example as compile_wsp_example
-from examples.wsp_warp_gemm.demo import replay_latest_stage as replay_wsp_stage
+from examples.extensions.aie_channel_pipeline.demo import compile_example as compile_aie_example
+from examples.extensions.aie_channel_pipeline.demo import replay_latest_stage as replay_aie_stage
+from examples.extensions.mlir_cse.demo import compile_example as compile_mlir_cse_example
+from examples.extensions.mlir_cse.demo import replay_latest_stage as replay_mlir_cse_stage
+from examples.nvgpu.arknife_gemm.demo import compile_example as compile_nvgpu_example
+from examples.nvgpu.arknife_gemm.demo import replay_latest_stage as replay_nvgpu_stage
+from examples.nvgpu.arknife_gemm.demo import run_demo as run_nvgpu_demo
+from examples.patterns.csp.channel_pipeline.demo import compile_example as compile_csp_example
+from examples.patterns.csp.channel_pipeline.demo import replay_latest_stage as replay_csp_stage
+from examples.patterns.wsp.littlekernel_mainloop_gemm.demo import (
+    compile_example as compile_littlekernel_example,
+)
+from examples.patterns.wsp.littlekernel_mainloop_gemm.demo import (
+    replay_latest_stage as replay_littlekernel_stage,
+)
+from examples.patterns.wsp.warp_tiled_gemm.demo import compile_example as compile_wsp_example
+from examples.patterns.wsp.warp_tiled_gemm.demo import replay_latest_stage as replay_wsp_stage
+from examples.pto.beginner.vector_add.demo import compile_example as compile_pto_example
+from examples.pto.beginner.vector_add.demo import replay_latest_stage as replay_pto_stage
+from examples.pto.beginner.vector_add.demo import run_demo as run_pto_demo
+from examples.pto.intermediate.gelu.demo import compile_example as compile_pto_gelu_example
+from examples.pto.intermediate.gelu.demo import replay_latest_stage as replay_pto_gelu_stage
+from examples.pto.intermediate.gelu.demo import run_demo as run_pto_gelu_demo
+from examples.pto.intermediate.swiglu.demo import compile_example as compile_pto_swiglu_example
+from examples.pto.intermediate.swiglu.demo import replay_latest_stage as replay_pto_swiglu_stage
+from examples.pto.intermediate.swiglu.demo import run_demo as run_pto_swiglu_demo
+from examples.pto.intermediate.vector_dag.demo import compile_example as compile_pto_vector_dag_example
+from examples.pto.intermediate.vector_dag.demo import replay_latest_stage as replay_pto_vector_dag_stage
+from examples.pto.intermediate.vector_dag.demo import run_demo as run_pto_vector_dag_demo
+from examples.workloads.serving_routine.demo import compile_example as compile_serving_example
+from examples.workloads.serving_routine.demo import replay_latest_stage as replay_serving_stage
 
 
 def test_pto_example_compiles_and_replays(tmp_path):
@@ -100,10 +104,12 @@ def test_wsp_example_compiles_and_replays(tmp_path):
     assert replay_summary["schedule"]["pipeline_depth"] >= 1
     assert replay_summary["schedule"]["launch"]["num_warps"] == 4
     assert [task["task_id"] for task in replay_summary["workload_ir"]["tasks"]] == [
-        "load_warp",
-        "compute_warp",
-        "store_warp",
+        "tile_00",
+        "tile_01",
+        "tile_10",
+        "tile_11",
     ]
+    assert replay_summary["workload_ir"]["dependencies"] == []
 
 
 def test_littlekernel_example_compiles_and_replays(tmp_path):
@@ -116,11 +122,16 @@ def test_littlekernel_example_compiles_and_replays(tmp_path):
     assert replay_summary["schedule"]["pipeline_depth"] >= 3
     assert replay_summary["schedule"]["launch"]["num_warps"] == 8
     assert [task["task_id"] for task in replay_summary["workload_ir"]["tasks"]] == [
-        "prologue",
-        "stage0",
-        "stage1",
-        "epilogue",
+        "tile_m0n0",
+        "tile_m0n1",
+        "tile_m1n0",
+        "tile_m1n1",
+        "tile_m2n0",
+        "tile_m2n1",
+        "tile_m3n0",
+        "tile_m3n1",
     ]
+    assert replay_summary["workload_ir"]["dependencies"] == []
 
 
 def test_csp_example_compiles_and_replays(tmp_path):
@@ -132,24 +143,24 @@ def test_csp_example_compiles_and_replays(tmp_path):
     assert replay_summary["ok"] is True
     assert replay_summary["effects"]["protocols"] == [
         {
-            "channel": "tiles",
+            "channel": "input_tiles",
             "protocol": "fifo",
             "capacity": 2,
             "puts": 1,
             "gets": 1,
             "balanced": True,
-            "participants": ["compute", "prefetch"],
+            "participants": ["load_norm", "project"],
             "hazards": [],
             "deadlock_safe": True,
         },
         {
-            "channel": "partials",
+            "channel": "hidden_tiles",
             "protocol": "fifo",
             "capacity": 1,
             "puts": 1,
             "gets": 1,
             "balanced": True,
-            "participants": ["compute", "prefetch"],
+            "participants": ["load_norm", "project"],
             "hazards": [],
             "deadlock_safe": True,
         },
@@ -160,15 +171,15 @@ def test_csp_example_compiles_and_replays(tmp_path):
             "puts": 1,
             "gets": 1,
             "balanced": True,
-            "participants": ["compute", "epilogue"],
+            "participants": ["project", "writeback"],
             "hazards": [],
             "deadlock_safe": True,
         },
     ]
     assert [process["name"] for process in replay_summary["workload_ir"]["processes"]] == [
-        "prefetch",
-        "compute",
-        "epilogue",
+        "load_norm",
+        "project",
+        "writeback",
     ]
 
 

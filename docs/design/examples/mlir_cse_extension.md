@@ -1,6 +1,6 @@
 # MLIR CSE Extension Example
 
-Code anchor: `examples/mlir_cse_extension/demo.py`
+Code anchor: `examples/extensions/mlir_cse/demo.py`
 
 This example demonstrates:
 

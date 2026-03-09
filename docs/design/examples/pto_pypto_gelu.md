@@ -2,8 +2,8 @@
 
 Code:
 
-- `examples/pto_pypto_gelu/demo.py`
-- `examples/pto_pypto_gelu/README.md`
+- `examples/pto/intermediate/gelu/demo.py`
+- `examples/pto/intermediate/gelu/README.md`
 
 This example extends the PTO public surface beyond vector add and SwiGLU with a
 reference-calibrated fast GELU:

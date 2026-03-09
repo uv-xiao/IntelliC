@@ -1,6 +1,6 @@
 # Serving Routine Example
 
-Code anchor: `examples/serving_routine/demo.py`
+Code anchor: `examples/workloads/serving_routine/demo.py`
 
 This example demonstrates a workload-level routine above the current kernel
 examples:

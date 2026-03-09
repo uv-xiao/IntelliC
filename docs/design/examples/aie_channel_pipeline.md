@@ -1,6 +1,6 @@
 # AIE Channel Pipeline Example
 
-Code anchor: `examples/aie_channel_pipeline/demo.py`
+Code anchor: `examples/extensions/aie_channel_pipeline/demo.py`
 
 This example exercises the current AIE extension path with:
 

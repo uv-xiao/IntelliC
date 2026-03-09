@@ -124,7 +124,7 @@ If you are working in this layer, start here:
 - `htp/intrinsics.py` — intrinsic declarations and handler registration
 - `htp/passes/program_model.py` — semantic synthesis from the current frontend/program surface
 - `htp/passes/typecheck_layout_effects.py` — legality and typing checks
-- `examples/pto_pypto_swiglu/demo.py` — a concrete fused unary/binary semantic proof case
+- `examples/pto/intermediate/swiglu/demo.py` — a concrete fused unary/binary semantic proof case
 
 Then inspect stage artifacts under `ir/stages/<id>/` from a compiled example to see what this layer actually emits.
 
