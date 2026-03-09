@@ -12,6 +12,8 @@ from examples.csp_channel_pipeline.demo import compile_example as compile_csp_ex
 from examples.csp_channel_pipeline.demo import replay_latest_stage as replay_csp_stage
 from examples.mlir_cse_extension.demo import compile_example as compile_mlir_cse_example
 from examples.mlir_cse_extension.demo import replay_latest_stage as replay_mlir_cse_stage
+from examples.nvgpu_arknife_blackwell.demo import compile_example as compile_nvgpu_blackwell_example
+from examples.nvgpu_arknife_blackwell.demo import replay_latest_stage as replay_nvgpu_blackwell_stage
 from examples.nvgpu_arknife_gemm.demo import compile_example as compile_nvgpu_example
 from examples.nvgpu_arknife_gemm.demo import replay_latest_stage as replay_nvgpu_stage
 from examples.nvgpu_arknife_gemm.demo import run_demo as run_nvgpu_demo
@@ -53,6 +55,31 @@ def test_nvgpu_example_compiles_and_replays(tmp_path):
 
     assert compile_summary["target"] == {"backend": "nvgpu", "option": "ampere"}
     assert (Path(compile_summary["manifest_path"])).is_file()
+    assert [item["instruction"] for item in compile_summary["instruction_plan"]] == [
+        "cp_async",
+        "cp_async",
+        "ldmatrix",
+        "ldmatrix",
+        "mma_sync",
+        "commit",
+    ]
+    assert replay_summary["ok"] is True
+    assert replay_summary["stage_id"].startswith("s")
+
+
+def test_nvgpu_blackwell_example_compiles_and_replays(tmp_path):
+    package_dir = tmp_path / "nvgpu_blackwell_example"
+    compile_summary = compile_nvgpu_blackwell_example(package_dir)
+    replay_summary = replay_nvgpu_blackwell_stage(package_dir)
+
+    assert compile_summary["target"] == {"backend": "nvgpu", "option": "blackwell"}
+    assert compile_summary["hardware"]["profile"] == "blackwell"
+    assert [item["instruction"] for item in compile_summary["instruction_plan"]] == [
+        "tma_load",
+        "tma_load",
+        "wgmma",
+        "tma_store",
+    ]
     assert replay_summary["ok"] is True
     assert replay_summary["stage_id"].startswith("s")
 
