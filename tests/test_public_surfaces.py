@@ -7,6 +7,7 @@ from htp import ark
 from htp.csp import fifo, get, process, put
 from htp.csp import program as csp_program
 from htp.kernel import (
+    KernelValue,
     async_copy,
     barrier,
     broadcast,
@@ -22,6 +23,7 @@ from htp.kernel import (
     sigmoid,
     store,
     transpose,
+    value,
 )
 from htp.routine import call, fifo_channel, program
 from htp.wsp import bind as wsp_bind
@@ -383,6 +385,10 @@ def test_ark_surface_builds_ampere_program_payload():
                     ark.ldmatrix(BR, BS)
                     ark.mma_sync(CR, AR, BR, accum=CR, shape=(16, 8, 16))
             ark.commit(C, CR)
+        assert isinstance(A, KernelValue)
+        assert A.memory_space == "global"
+        assert A.axis_layout == ("M", "K")
+        assert AS.axis_layout == ("BM", "BK")
         return A, B, C
 
     payload = ampere_mainloop.to_program()
@@ -390,6 +396,8 @@ def test_ark_surface_builds_ampere_program_payload():
     assert payload["target"] == {"backend": "nvgpu", "option": "ampere"}
     assert payload["ark"]["hardware"]["profile"] == "ampere"
     assert payload["ark"]["hardware"]["memory_spaces"] == ["global", "shared", "register"]
+    assert payload["kernel"]["args"][0]["memory_space"] == "global"
+    assert payload["kernel"]["args"][0]["axis_layout"] == ["M", "K"]
     assert [op["op"] for op in payload["kernel"]["ops"]] == [
         "cp_async",
         "cp_async",
@@ -421,3 +429,30 @@ def test_ark_surface_rejects_blackwell_only_instruction_on_ampere(tmp_path):
             target="nvgpu-ampere",
             program=bad_blackwell_program,
         )
+
+
+def test_ark_surface_reuses_native_kernel_value_objects():
+    @ark.build(target="nvgpu-ampere", hardware=ark.ampere())
+    def native_value_program():
+        A = ark.attach(
+            value("A", dtype="f16", shape=("M", "K"), role="input"),
+            memory="global",
+        )
+        B = ark.attach(
+            value("B", dtype="f16", shape=("K", "N"), role="input"),
+            memory="global",
+        )
+        C = ark.attach(
+            value("C", dtype="f32", shape=("M", "N"), role="output"),
+            memory="global",
+            axis_layout=("row", "col"),
+            attrs={"tile_hint": "accumulator"},
+        )
+        ark.commit(C, C)
+        return A, B, C
+
+    payload = native_value_program.to_program()
+    c_arg = next(item for item in payload["kernel"]["args"] if item["name"] == "C")
+
+    assert c_arg["axis_layout"] == ["row", "col"]
+    assert c_arg["attrs"] == {"tile_hint": "accumulator"}

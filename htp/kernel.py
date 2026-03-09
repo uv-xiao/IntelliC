@@ -28,6 +28,9 @@ class KernelArgSpec:
     dtype: str
     shape: tuple[str, ...]
     role: str | None = None
+    memory_space: str | None = None
+    axis_layout: tuple[str, ...] = ()
+    attrs: dict[str, Any] | None = None
     name: str | None = None
 
     def named(self, name: str) -> KernelArgSpec:
@@ -37,6 +40,9 @@ class KernelArgSpec:
             dtype=self.dtype,
             shape=self.shape,
             role=self.role,
+            memory_space=self.memory_space,
+            axis_layout=self.axis_layout,
+            attrs=None if self.attrs is None else dict(self.attrs),
         )
 
     def to_payload(self) -> dict[str, Any]:
@@ -50,6 +56,12 @@ class KernelArgSpec:
         }
         if self.role is not None:
             payload["role"] = self.role
+        if self.memory_space is not None:
+            payload["memory_space"] = self.memory_space
+        if self.axis_layout:
+            payload["axis_layout"] = list(self.axis_layout)
+        if self.attrs:
+            payload["attrs"] = dict(self.attrs)
         return payload
 
 
@@ -62,6 +74,26 @@ class KernelValue:
     shape: tuple[str, ...] = ()
     kind: str = "value"
     role: str | None = None
+    memory_space: str | None = None
+    axis_layout: tuple[str, ...] = ()
+    attrs: dict[str, Any] | None = None
+
+    def to_arg_payload(self) -> dict[str, Any]:
+        payload = {
+            "name": self.name,
+            "kind": self.kind,
+            "dtype": self.dtype,
+            "shape": list(self.shape),
+        }
+        if self.role is not None:
+            payload["role"] = self.role
+        if self.memory_space is not None:
+            payload["memory_space"] = self.memory_space
+        if self.axis_layout:
+            payload["axis_layout"] = list(self.axis_layout)
+        if self.attrs:
+            payload["attrs"] = dict(self.attrs)
+        return payload
 
     def __add__(self, other: Operand) -> KernelValue:
         return _binary_expr("add", self, other)
@@ -154,12 +186,60 @@ def buffer(
     dtype: str,
     shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
     role: str,
+    memory_space: str | None = None,
+    axis_layout: tuple[str, ...] | list[str] = (),
+    attrs: dict[str, Any] | None = None,
 ) -> KernelArgSpec:
-    return KernelArgSpec(name=name, kind="buffer", dtype=dtype, shape=_normalize_dims(shape), role=role)
+    return KernelArgSpec(
+        name=name,
+        kind="buffer",
+        dtype=dtype,
+        shape=_normalize_dims(shape),
+        role=role,
+        memory_space=memory_space,
+        axis_layout=tuple(str(item) for item in axis_layout),
+        attrs=None if attrs is None else dict(attrs),
+    )
 
 
-def scalar(name: str | None = None, *, dtype: str, role: str) -> KernelArgSpec:
-    return KernelArgSpec(name=name, kind="scalar", dtype=dtype, shape=(), role=role)
+def scalar(
+    name: str | None = None,
+    *,
+    dtype: str,
+    role: str,
+    attrs: dict[str, Any] | None = None,
+) -> KernelArgSpec:
+    return KernelArgSpec(
+        name=name,
+        kind="scalar",
+        dtype=dtype,
+        shape=(),
+        role=role,
+        attrs=None if attrs is None else dict(attrs),
+    )
+
+
+def value(
+    name: str,
+    *,
+    kind: str = "buffer",
+    dtype: str,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue] = (),
+    role: str | None = None,
+    memory_space: str | None = None,
+    axis_layout: tuple[str, ...] | list[str] = (),
+    attrs: dict[str, Any] | None = None,
+) -> KernelValue:
+    return KernelValue(
+        name=name,
+        dtype=dtype,
+        shape=_normalize_dims(shape),
+        kind=kind,
+        role=role,
+        memory_space=memory_space,
+        axis_layout=tuple(str(item) for item in axis_layout),
+        attrs=None if attrs is None else dict(attrs),
+    )
 
 
 def kernel(
@@ -195,6 +275,9 @@ def _trace_kernel(function: Callable[..., Any]) -> KernelSpec:
                 shape=annotation.shape,
                 kind=annotation.kind,
                 role=annotation.role,
+                memory_space=annotation.memory_space,
+                axis_layout=annotation.axis_layout,
+                attrs=None if annotation.attrs is None else dict(annotation.attrs),
             )
         )
     token = _TRACE_RECORDER.set(_KernelTrace(ops=[]))
@@ -659,6 +742,9 @@ def _resolve_result_value(
             shape=resolved_shape if not out.shape else out.shape,
             kind=out.kind,
             role=out.role,
+            memory_space=out.memory_space,
+            axis_layout=out.axis_layout,
+            attrs=None if out.attrs is None else dict(out.attrs),
         )
     return KernelValue(name=out, dtype=resolved_dtype, shape=resolved_shape)
 
@@ -680,7 +766,16 @@ def _as_named_value(value: str | KernelValue, *, fallback: KernelValue | None = 
     if isinstance(value, KernelValue):
         return value
     if fallback is not None:
-        return KernelValue(name=value, dtype=fallback.dtype, shape=fallback.shape)
+        return KernelValue(
+            name=value,
+            dtype=fallback.dtype,
+            shape=fallback.shape,
+            kind=fallback.kind,
+            role=fallback.role,
+            memory_space=fallback.memory_space,
+            axis_layout=fallback.axis_layout,
+            attrs=None if fallback.attrs is None else dict(fallback.attrs),
+        )
     raise ValueError("String-only kernel references require a typed fallback.")
 
 
@@ -755,4 +850,5 @@ __all__ = [
     "sigmoid",
     "store",
     "transpose",
+    "value",
 ]
