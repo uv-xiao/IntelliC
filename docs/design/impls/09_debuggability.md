@@ -32,6 +32,12 @@ Implemented behavior:
   - node-aware blame for added/removed entities and bindings
 - replay, build, and run paths emit stable refs to logs or adapter traces where
   available
+- effect/protocol diagnostics now have concrete staged evidence in
+  `effects.json` and `analysis/async_resources.json`, including:
+  - async token ids and discharge sites
+  - barrier scopes and event dependencies
+  - collective pending/discharged state
+  - protocol participants, hazards, and `deadlock_safe` summaries
 
 Current debug guidance:
 
@@ -53,6 +59,10 @@ Current debug guidance:
   - `ir/compiler_failure.json`
   - the `stage_before` directory referenced by that failure
   - the payload ref recorded on the diagnostic
+  - for effect/protocol failures specifically, inspect:
+    - `effects.json`
+    - `analysis/async_resources.json`
+    - `ir/pass_trace.jsonl`
 
 ## Extension-island debugging
 

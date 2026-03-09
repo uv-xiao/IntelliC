@@ -98,6 +98,15 @@ def test_default_pipeline_derives_nvgpu_semantics_and_schedule(tmp_path):
         "schema": "htp.effects.v1",
         "reads": {"op0": ["A", "B"]},
         "writes": {"op0": ["C"]},
+        "intrinsics": [
+            {
+                "op_id": "op0",
+                "intrinsic": "portable.matmul",
+                "requires_effects": [],
+                "produces_effects": [],
+                "discharges_effects": [],
+            }
+        ],
         "barriers": [],
         "channels": [],
         "protocols": [],

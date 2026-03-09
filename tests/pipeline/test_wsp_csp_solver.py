@@ -103,5 +103,8 @@ def test_csp_example_pipeline_emits_protocol_effects(tmp_path):
             "puts": 1,
             "gets": 1,
             "balanced": True,
+            "participants": ["consumer", "producer"],
+            "hazards": [],
+            "deadlock_safe": True,
         }
     ]

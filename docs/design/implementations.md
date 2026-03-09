@@ -78,7 +78,9 @@ Within that pass spine, the current semantic substrate now includes:
 - alias validation for view-style arguments
 - staged reduction / transpose / reshape / broadcast / channel semantics in the op registry
 - facet-product buffer layout payloads (`distribution ⊗ memory ⊗ hardware`) in `layout.json`
-- typed protocol obligations, token effects, and collective placeholders in `effects.json`
+- typed protocol obligations, hazard evidence, async-token discharge state,
+  barrier scopes, event dependencies, and collective discharge records in
+  `effects.json`
 - schedule directives, legality, launch structure, and warp-role plan in `analysis/schedule_plan.json` and `schedule.json`
 - staged warp-role plans in `analysis/warp_role_plan.json`
 - staged software-pipeline plans in `analysis/pipeline_plan.json`

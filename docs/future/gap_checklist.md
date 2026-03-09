@@ -189,12 +189,12 @@ Checklist:
   backend heuristics only.
 - `[ ]` Add distribution joins / shard / replicate semantics as typed layout
   facts.
-- `[~]` Add collective-effect obligations and discharge rules.
+- `[x]` Add collective-effect obligations and discharge rules.
 - `[x]` Upgrade channel effects from producer/consumer annotation to typed
   protocol obligations.
 - `[~]` Add deadlock-prevention checks for channel/process protocols rather than
   only local channel metadata.
-- `[~]` Model async tokens, barrier scopes, and event dependencies explicitly in
+- `[x]` Model async tokens, barrier scopes, and event dependencies explicitly in
   effects.
 - `[x]` Make schedule state carry real directives:
   mapping, specialization, pipelining depth, buffering strategy, warp-role
@@ -259,7 +259,7 @@ Checklist:
   intrinsic-handler declarations.
 - `[x]` Add callable lower/sim dispatch through the registry rather than using
   the registry only as a boolean capability table.
-- `[~]` Add typed effect contracts for async copy, barriers, tokens, and
+- `[x]` Add typed effect contracts for async copy, barriers, tokens, and
   collectives at the intrinsic level.
 - `[x]` Add extension-owned intrinsic packages under stable registration
   surfaces.
