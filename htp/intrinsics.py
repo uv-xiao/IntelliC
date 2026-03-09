@@ -335,11 +335,22 @@ def _simulate_elementwise_binary(
 ) -> object:
     del mode, trace
     operator = str(attrs.get("operator", "add"))
-    lhs, rhs = args
+    lhs = args[0] if args else attrs.get("lhs_const")
+    rhs = args[1] if len(args) > 1 else attrs.get("rhs_const")
+    if lhs is None:
+        lhs = attrs.get("lhs_const")
+    if rhs is None:
+        rhs = attrs.get("rhs_const")
+    if lhs is None or rhs is None:
+        raise ValueError("Simulated elementwise_binary requires two operands.")
     if operator == "add":
         return lhs + rhs
+    if operator == "sub":
+        return lhs - rhs
     if operator == "mul":
         return lhs * rhs
+    if operator == "div":
+        return lhs / rhs
     raise ValueError(f"Unsupported simulated operator {operator!r}.")
 
 

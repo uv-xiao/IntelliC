@@ -894,13 +894,14 @@ def _layout_joins(kernel_ir: Mapping[str, Any], layout: Mapping[str, Any]) -> li
         op_name = str(op.get("op"))
         if op_name not in {"elementwise_binary", "matmul"}:
             continue
-        lhs_name = str(op.get("inputs", [None])[0] or "")
-        rhs_name = str(op.get("inputs", [None, None])[1] or "")
+        inputs = list(op.get("inputs", ()))
+        lhs_name = str(inputs[0]) if inputs else ""
+        rhs_name = str(inputs[1]) if len(inputs) > 1 else ""
         out_name = str(op.get("outputs", [None])[0] or "")
-        if not lhs_name or not rhs_name or not out_name:
+        if not lhs_name or not out_name:
             continue
         lhs = _distribution_for_buffer(layout, lhs_name)
-        rhs = _distribution_for_buffer(layout, rhs_name)
+        rhs = _distribution_for_buffer(layout, rhs_name) if rhs_name else lhs
         if op_name == "matmul":
             joined = _matmul_output_distribution(lhs, rhs)
         else:
