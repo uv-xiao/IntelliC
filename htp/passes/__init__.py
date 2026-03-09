@@ -1,6 +1,8 @@
 """Passes package."""
 
 from . import (
+    analyze_async_resources,
+    analyze_loop_dependencies,
     analyze_schedule,
     analyze_software_pipeline,
     analyze_warp_specialization,
@@ -25,6 +27,8 @@ __all__ = [
     "PassResult",
     "PassTraceEvent",
     "RunnablePyContract",
+    "analyze_async_resources",
+    "analyze_loop_dependencies",
     "analyze_software_pipeline",
     "analyze_schedule",
     "analyze_warp_specialization",

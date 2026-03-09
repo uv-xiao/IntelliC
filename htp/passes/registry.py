@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from htp.passes import (
+    analyze_async_resources,
+    analyze_loop_dependencies,
     analyze_schedule,
     analyze_software_pipeline,
     analyze_warp_specialization,
@@ -31,6 +33,8 @@ def core_passes() -> tuple[RegisteredPass, ...]:
         RegisteredPass(contract=ast_canonicalize.CONTRACT, run=ast_canonicalize.run),
         RegisteredPass(contract=semantic_model.CONTRACT, run=semantic_model.run),
         RegisteredPass(contract=typecheck_layout_effects.CONTRACT, run=typecheck_layout_effects.run),
+        RegisteredPass(contract=analyze_loop_dependencies.CONTRACT, run=analyze_loop_dependencies.run),
+        RegisteredPass(contract=analyze_async_resources.CONTRACT, run=analyze_async_resources.run),
         RegisteredPass(contract=analyze_schedule.CONTRACT, run=analyze_schedule.run),
         RegisteredPass(contract=apply_schedule.CONTRACT, run=apply_schedule.run),
         RegisteredPass(contract=analyze_warp_specialization.CONTRACT, run=analyze_warp_specialization.run),

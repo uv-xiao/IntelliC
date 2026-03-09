@@ -7,22 +7,21 @@ from typing import Any
 from htp.artifacts.stages import RunnablePySpec
 from htp.passes.contracts import AnalysisOutput, PassContract
 from htp.passes.manager import PassResult
-from htp.passes.program_model import build_schedule_plan, normalize_target, stage_payloads_from_program
+from htp.passes.program_model import build_async_resource_checks, stage_payloads_from_program
 from htp.passes.replay_program import render_program_state_module
 
-PASS_ID = "htp::analyze_schedule@1"
-ANALYSIS_ID = "htp::SchedulePlan@1"
-ANALYSIS_SCHEMA = "htp.analysis.schedule_plan.v1"
-ANALYSIS_PATH = "analysis/schedule_plan.json"
+PASS_ID = "htp::analyze_async_resources@1"
+ANALYSIS_ID = "htp::AsyncResourceChecks@1"
+ANALYSIS_SCHEMA = "htp.analysis.async_resources.v1"
+ANALYSIS_PATH = "analysis/async_resources.json"
 
 CONTRACT = PassContract.analysis(
     pass_id=PASS_ID,
     owner="htp",
-    requires=("Type.LayoutChecked@1", "Type.EffectsChecked@1"),
-    analysis_requires=("Analysis.LoopDeps@1", "Analysis.AsyncResourceChecks@1"),
-    requires_layout_invariants=("Layout.Typed@1",),
-    requires_effect_invariants=("Effects.Typed@1", "Effects.ProtocolBalanced@1"),
-    provides=("Analysis.SchedulePlan@1",),
+    requires=("Type.EffectsChecked@1", "Analysis.LoopDeps@1"),
+    requires_effect_invariants=("Effects.Typed@1",),
+    provides=("Analysis.AsyncResourceChecks@1",),
+    analysis_requires=("Analysis.LoopDeps@1",),
     analysis_produces=(
         AnalysisOutput(
             analysis_id=ANALYSIS_ID,
@@ -39,27 +38,22 @@ def run(
 ) -> tuple[dict[str, Any], PassResult]:
     del stage_before
 
-    schedule_plan = build_schedule_plan(
-        entry=program["entry"],
-        kernel_ir=program.get("kernel_ir", {}),
-        effects=program.get("effects", {}),
-        target=normalize_target(program),
-        schedule_directives=program.get("schedule_directives", {}),
-    )
-
     next_program = deepcopy(dict(program))
+    async_checks = build_async_resource_checks(
+        entry=next_program["entry"],
+        kernel_ir=next_program.get("kernel_ir", {}),
+        effects=next_program.get("effects", {}),
+        workload_ir=next_program.get("workload_ir", {}),
+    )
     analysis_state = dict(next_program.get("analysis", {}))
-    analysis_state["schedule"] = schedule_plan
+    analysis_state["async_resources"] = async_checks
     next_program["analysis"] = analysis_state
     stage_payloads = stage_payloads_from_program(next_program)
-
     return next_program, PassResult(
         runnable_py=RunnablePySpec(
-            status="preserves",
-            modes=("sim",),
-            program_text=render_program_state_module(next_program),
+            status="preserves", modes=("sim",), program_text=render_program_state_module(next_program)
         ),
-        analyses={ANALYSIS_PATH: schedule_plan},
+        analyses={ANALYSIS_PATH: async_checks},
         entities_payload=stage_payloads["entities_payload"],
         bindings_payload=stage_payloads["bindings_payload"],
         program_ast_payload=stage_payloads["program_ast_payload"],
@@ -69,8 +63,8 @@ def run(
         layout_payload=stage_payloads["layout_payload"],
         effects_payload=stage_payloads["effects_payload"],
         schedule_payload=stage_payloads["schedule_payload"],
-        digests={"analysis_hash": "demo-schedule-plan-v1"},
-        time_ms=0.4,
+        digests={"analysis_hash": "demo-async-resources-v1"},
+        time_ms=0.2,
     )
 
 

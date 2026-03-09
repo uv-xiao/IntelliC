@@ -255,6 +255,68 @@ def build_schedule_plan(
     }
 
 
+def build_loop_dependencies(
+    *,
+    entry: str,
+    kernel_ir: Mapping[str, Any],
+) -> dict[str, Any]:
+    last_writer: dict[str, str] = {}
+    edges: list[dict[str, Any]] = []
+    for op in kernel_ir.get("ops", ()):
+        op_id = str(op["op_id"])
+        for read_name in op.get("effects", {}).get("reads", ()):
+            writer = last_writer.get(str(read_name))
+            if writer is not None:
+                edges.append(
+                    {
+                        "src": writer,
+                        "dst": op_id,
+                        "kind": "flow",
+                        "buffer": str(read_name),
+                    }
+                )
+        for write_name in op.get("effects", {}).get("writes", ()):
+            last_writer[str(write_name)] = op_id
+    return {
+        "schema": "htp.analysis.loop_deps.v1",
+        "entry": entry,
+        "op_ids": [str(op["op_id"]) for op in kernel_ir.get("ops", ())],
+        "edges": edges,
+    }
+
+
+def build_async_resource_checks(
+    *,
+    entry: str,
+    kernel_ir: Mapping[str, Any],
+    effects: Mapping[str, Any],
+    workload_ir: Mapping[str, Any],
+) -> dict[str, Any]:
+    channel_protocols = [
+        {
+            "name": str(item.get("name", "")),
+            "protocol": str(item.get("protocol", "fifo")),
+            "capacity": int(item.get("capacity", 1) or 1),
+        }
+        for item in workload_ir.get("channels", ())
+        if isinstance(item, Mapping)
+    ]
+    return {
+        "schema": "htp.analysis.async_resources.v1",
+        "entry": entry,
+        "tokens": list(effects.get("tokens", ())),
+        "barriers": list(effects.get("barriers", ())),
+        "channel_protocols": channel_protocols,
+        "collectives": list(effects.get("collectives", ())),
+        "resource_summary": {
+            "token_count": len(list(effects.get("tokens", ()))),
+            "barrier_count": len(list(effects.get("barriers", ()))),
+            "collective_count": len(list(effects.get("collectives", ()))),
+            "op_count": len(list(kernel_ir.get("ops", ()))),
+        },
+    }
+
+
 def build_warp_role_plan(
     *,
     entry: str,
