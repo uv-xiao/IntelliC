@@ -4,6 +4,7 @@ import json
 
 from htp.__main__ import main
 from htp.compiler import compile_program
+from htp.pipeline.defaults import MANDATORY_PASS_IDS
 
 
 def _vector_add_program() -> dict[str, object]:
@@ -91,7 +92,8 @@ def test_cli_bisect_emits_json(tmp_path, capsys):
     assert exit_code == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["equal"] is False
-    assert payload["first_divergent_stage"] == {"left": "s06", "right": "s06"}
+    expected_stage = f"s{len(MANDATORY_PASS_IDS):02d}"
+    assert payload["first_divergent_stage"] == {"left": expected_stage, "right": expected_stage}
 
 
 def test_cli_minimize_emits_json(tmp_path, capsys):
