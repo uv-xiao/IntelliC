@@ -6,6 +6,7 @@ from htp.backends.nvgpu.declarations import declaration_for as nvgpu_declaration
 from htp.backends.pto.declarations import declaration_for as pto_declaration_for
 from htp.passes.contracts import PassContract
 from htp.pipeline.defaults import MANDATORY_PASS_IDS
+from htp.schemas import MANIFEST_SCHEMA_ID
 from htp.solver import (
     PipelineTemplate,
     available_pipeline_templates,
@@ -266,6 +267,26 @@ def test_solver_writes_failure_report_for_missing_final_artifact(tmp_path):
     ]
 
 
+def test_validate_final_artifacts_prefers_manifest_outputs_contract(tmp_path):
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema": MANIFEST_SCHEMA_ID,
+                "stages": {"current": "s00", "graph": []},
+                "outputs": {"authoritative": "build/authoritative.txt"},
+            }
+        )
+        + "\n"
+    )
+    result = solve_default_pipeline(program=_vector_add_program())
+
+    artifact_check = validate_final_artifacts(tmp_path, result)
+
+    assert artifact_check.ok is False
+    assert artifact_check.failure is not None
+    assert artifact_check.failure.artifact_contract_violations == ("build/authoritative.txt",)
+
+
 def test_available_pipeline_templates_expand_bounded_choices():
     template = PipelineTemplate(
         template_id="test.or.v1",
@@ -361,3 +382,50 @@ def test_solver_exposes_mlir_cse_extension_eligibility():
     assert result.ok is True
     assert result.extension_results["htp_ext.mlir_cse"]["eligible"] is True
     assert result.extension_results["htp_ext.mlir_cse"]["provides"] == ["Extension.MLIRCSEEligible@1"]
+
+
+def test_solver_prefers_lower_cost_satisfiable_template(monkeypatch):
+    low_cost = PipelineTemplate(
+        template_id="test.low_cost.v1",
+        passes=(),
+        required_outputs=(),
+        selection_cost=5,
+    )
+    high_cost = PipelineTemplate(
+        template_id="test.high_cost.v1",
+        passes=(),
+        required_outputs=(),
+        selection_cost=50,
+    )
+
+    monkeypatch.setattr("htp.solver.available_pipeline_templates", lambda *, program: (high_cost, low_cost))
+
+    result = solve_default_pipeline(program=_vector_add_program())
+
+    assert result.ok is True
+    assert result.template_id == "test.low_cost.v1"
+    assert result.selection_cost == 5
+
+
+def test_solver_fails_when_requested_mlir_extension_is_ineligible():
+    program = _vector_add_program()
+    program["target"] = {"backend": "nvgpu", "option": "ampere"}
+    program["extensions"] = {"requested": ["htp_ext.mlir_cse"]}
+
+    result = solve_default_pipeline(program=program)
+
+    assert result.ok is False
+    assert result.failure is not None
+    assert result.failure.failed_at_pass == "extensions.requested"
+    assert result.failure.requested_extensions == ("htp_ext.mlir_cse",)
+    requirement = result.failure.extension_requirements[0]
+    assert requirement["extension_id"] == "htp_ext.mlir_cse"
+    assert requirement["eligible"] is False
+    assert {"typed.result_symbol", "typed.scalar_i32_only", "typed.expr_program"} <= set(
+        requirement["failed_rules"]
+    )
+    assert {
+        "program requires a non-empty string result symbol",
+        "eligible subset requires scalar i32 arguments only",
+        "program requires a canonical scalar elementwise kernel when exprs are not provided directly",
+    } <= set(requirement["reasons"])

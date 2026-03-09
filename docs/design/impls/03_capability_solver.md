@@ -15,12 +15,19 @@ Implemented behavior:
 - the default pipeline is validated before pass execution
 - template selection now comes from a registered template set and can choose
   between the plain default template and eligible extension-backed templates
+- when multiple templates are satisfiable, the solver selects the lowest-cost
+  result using a deterministic cost key (`selection_cost`, then pass / output
+  footprint, then template id)
 - extension passes and extension-backed templates are discovered through
   `htp_ext/registry.py`, not hard-coded checks in the solver
 - unsupported backend handlers fail early with `ir/solver_failure.json`
 - missing pass capabilities and invalidated analyses fail through the same report
 - layout/effect invariants participate in solver satisfiability through pass contracts
-- final backend artifact requirements are checked after codegen emission
+- requested extensions are treated as hard requirements; requested-but-ineligible
+  MLIR island composition fails solver selection with structured eligibility
+  reasons instead of silently falling back to the plain default template
+- final backend artifact requirements are checked from emitted `manifest.outputs`
+  rather than a second hard-coded solver-only file list
 - MLIR CSE eligibility and template ids are solver-visible through extension
   results
 - package resumption can rebuild solver-visible state from an emitted artifact package
@@ -31,7 +38,8 @@ Implemented behavior:
 Current scope:
 
 - deterministic forward checking only
-- a small registered template set with bounded OR-style template expansion
+- a small registered template set with bounded OR-style template expansion and
+  deterministic cost-based final choice
 - extension-owned pass/template registration exists, but the registered set is
   still intentionally small
 - backend-required outputs, supported-op facts, target capability tags, and manifest output paths come from backend-owned artifact declarations

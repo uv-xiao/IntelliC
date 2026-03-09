@@ -25,8 +25,16 @@ class AIEBinding(ManifestBinding):
         diagnostics = [
             diagnostic
             for diagnostic in base_report.diagnostics
-            if diagnostic.get("code") != "HTP.BINDINGS.MISSING_BACKEND"
+            if diagnostic.get("code")
+            not in {"HTP.BINDINGS.MISSING_BACKEND", "HTP.BINDINGS.MISSING_CONTRACT_FILE"}
         ]
+        diagnostics.extend(
+            {
+                "code": "HTP.BINDINGS.AIE_MISSING_CONTRACT_FILE",
+                "detail": f"Missing required AIE artifact path: {missing_path}",
+            }
+            for missing_path in missing_files
+        )
         for required_path in _REQUIRED_PATHS:
             if required_path in missing_files:
                 continue

@@ -13,6 +13,7 @@ from htp.passes.contracts import PassContract
 from htp.passes.program_model import build_semantic_model, canonicalize_program, normalize_target
 from htp.pipeline.registry import registered_templates
 from htp_ext.registry import extension_results as registered_extension_results
+from htp_ext.registry import requested_extension_ids
 
 SOLVER_FAILURE_SCHEMA_ID = "htp.solver_failure.v1"
 DEFAULT_TEMPLATE_ID = "htp.default.v1"
@@ -45,6 +46,7 @@ class PipelineTemplate:
     template_id: str
     passes: tuple[PassContract, ...]
     required_outputs: tuple[str, ...] = ()
+    selection_cost: int = 0
     extension_steps: tuple[str, ...] = ()
     pass_choices: tuple[tuple[PassContract, ...], ...] = ()
 
@@ -57,6 +59,8 @@ class SolverFailure:
     missing_handlers: tuple[dict[str, str], ...] = ()
     analysis_requirements: tuple[str, ...] = ()
     artifact_contract_violations: tuple[str, ...] = ()
+    requested_extensions: tuple[str, ...] = ()
+    extension_requirements: tuple[dict[str, Any], ...] = ()
     providers: tuple[dict[str, Any], ...] = ()
     hints: tuple[str, ...] = ()
 
@@ -69,6 +73,8 @@ class SolverFailure:
             "missing_handlers": [dict(item) for item in self.missing_handlers],
             "analysis_requirements": list(self.analysis_requirements),
             "artifact_contract_violations": list(self.artifact_contract_violations),
+            "requested_extensions": list(self.requested_extensions),
+            "extension_requirements": [dict(item) for item in self.extension_requirements],
             "providers": [dict(item) for item in self.providers],
             "hints": list(self.hints),
         }
@@ -80,6 +86,7 @@ class SolverResult:
     template_id: str
     pass_ids: list[str]
     passes: tuple[PassContract, ...]
+    selection_cost: int
     capabilities: tuple[str, ...]
     state: CapabilityState
     required_outputs: tuple[str, ...]
@@ -113,19 +120,29 @@ def available_pipeline_templates(*, program: dict[str, Any]) -> tuple[PipelineTe
 
 def solve_default_pipeline(*, program: dict[str, Any]) -> SolverResult:
     extension_results = _collect_extension_results(program)
+    requested_extensions = tuple(requested_extension_ids(program))
     templates = list(available_pipeline_templates(program=program))
-    templates.sort(
-        key=lambda template: 0
-        if template.extension_steps
-        and all(extension_results.get(step, {}).get("eligible", False) for step in template.extension_steps)
-        else 1
-    )
     attempts: list[SolverResult] = []
     for template in templates:
         result = solve_pipeline(program=program, template=template)
         attempts.append(result)
-        if result.ok:
-            return result
+    matching_attempts = [
+        result
+        for result in attempts
+        if _template_satisfies_requested_extensions(result, requested_extensions=requested_extensions)
+    ]
+    successful = [result for result in matching_attempts if result.ok]
+    if successful:
+        return min(successful, key=_result_selection_key)
+    if matching_attempts:
+        return min(matching_attempts, key=_result_selection_key)
+    requested_failure = _requested_extension_failure(
+        requested_extensions=requested_extensions,
+        extension_results=extension_results,
+        attempts=attempts,
+    )
+    if requested_failure is not None:
+        return requested_failure
     return attempts[-1]
 
 
@@ -182,6 +199,7 @@ def solve_pipeline(
                 template_id=template.template_id,
                 pass_ids=[pass_contract.pass_id for pass_contract in template.passes],
                 passes=template.passes,
+                selection_cost=template.selection_cost,
                 capabilities=state.capabilities,
                 state=state,
                 required_outputs=template.required_outputs,
@@ -199,6 +217,7 @@ def solve_pipeline(
         template_id=template.template_id,
         pass_ids=[pass_contract.pass_id for pass_contract in template.passes],
         passes=template.passes,
+        selection_cost=template.selection_cost,
         capabilities=state.capabilities,
         state=state,
         required_outputs=required_outputs,
@@ -208,9 +227,9 @@ def solve_pipeline(
 
 def validate_final_artifacts(package_dir: Path | str, result: SolverResult) -> SolverResult:
     package_path = Path(package_dir)
-    missing_outputs = tuple(
-        output for output in result.required_outputs if not (package_path / output).exists()
-    )
+    manifest_outputs = _manifest_outputs(package_path)
+    expected_outputs = manifest_outputs or result.required_outputs
+    missing_outputs = tuple(output for output in expected_outputs if not (package_path / output).exists())
     if not missing_outputs:
         return result
     failure = SolverFailure(
@@ -224,6 +243,7 @@ def validate_final_artifacts(package_dir: Path | str, result: SolverResult) -> S
         template_id=result.template_id,
         pass_ids=result.pass_ids,
         passes=result.passes,
+        selection_cost=result.selection_cost,
         capabilities=result.capabilities,
         state=result.state,
         required_outputs=result.required_outputs,
@@ -261,6 +281,7 @@ def _handler_failure(
         template_id=template.template_id,
         pass_ids=[pass_contract.pass_id for pass_contract in template.passes],
         passes=template.passes,
+        selection_cost=template.selection_cost,
         capabilities=state.capabilities,
         state=state,
         required_outputs=template.required_outputs,
@@ -384,6 +405,7 @@ def _expand_template_choices(template: PipelineTemplate) -> tuple[PipelineTempla
                         template_id=f"{candidate.template_id}+choice{choice_index}:{alternative.pass_id}",
                         passes=candidate.passes + (alternative,),
                         required_outputs=candidate.required_outputs,
+                        selection_cost=candidate.selection_cost,
                         extension_steps=candidate.extension_steps,
                     )
                 )
@@ -403,6 +425,95 @@ def _resolve_required_outputs(
             if isinstance(output, str):
                 outputs.append(output)
     return tuple(dict.fromkeys(outputs))
+
+
+def _result_selection_key(result: SolverResult) -> tuple[int, int, int, str]:
+    return (
+        result.selection_cost,
+        sum(contract.deterministic is False for contract in result.passes) * 1000
+        + sum(getattr(contract, "owner", "") != "htp" for contract in result.passes) * 100
+        + len(result.passes) * 10
+        + len(_template_extensions(result.template_id, result.extension_results)) * 5
+        + len(result.required_outputs),
+        len(result.passes),
+        len(result.required_outputs),
+        result.template_id,
+    )
+
+
+def _template_satisfies_requested_extensions(
+    result: SolverResult,
+    *,
+    requested_extensions: tuple[str, ...],
+) -> bool:
+    if not requested_extensions:
+        return True
+    return set(requested_extensions).issubset(
+        set(_template_extensions(result.template_id, result.extension_results))
+    )
+
+
+def _template_extensions(template_id: str, extension_results: dict[str, dict[str, Any]]) -> tuple[str, ...]:
+    extensions: list[str] = []
+    for extension_id, payload in extension_results.items():
+        templates = payload.get("pipeline_templates", ())
+        if isinstance(templates, list | tuple) and template_id in templates:
+            extensions.append(str(extension_id))
+    return tuple(extensions)
+
+
+def _requested_extension_failure(
+    *,
+    requested_extensions: tuple[str, ...],
+    extension_results: dict[str, dict[str, Any]],
+    attempts: list[SolverResult],
+) -> SolverResult | None:
+    if not requested_extensions:
+        return None
+    extension_requirements = []
+    hints: list[str] = []
+    for extension_id in requested_extensions:
+        payload = extension_results.get(extension_id, {})
+        requirement = {
+            "extension_id": extension_id,
+            "eligible": bool(payload.get("eligible", False)),
+            "failed_rules": list(payload.get("failed_rules", ())),
+            "reasons": list(payload.get("reasons", ())),
+        }
+        extension_requirements.append(requirement)
+        if requirement["reasons"]:
+            hints.extend(f"{extension_id}: {reason}" for reason in requirement["reasons"])
+    failure = SolverFailure(
+        template_id=DEFAULT_TEMPLATE_ID,
+        failed_at_pass="extensions.requested",
+        requested_extensions=requested_extensions,
+        extension_requirements=tuple(extension_requirements),
+        hints=tuple(hints),
+    )
+    state = attempts[-1].state if attempts else CapabilityState()
+    return SolverResult(
+        ok=False,
+        template_id=DEFAULT_TEMPLATE_ID,
+        pass_ids=[],
+        passes=(),
+        selection_cost=0,
+        capabilities=state.capabilities,
+        state=state,
+        required_outputs=(),
+        extension_results=extension_results,
+        failure=failure,
+    )
+
+
+def _manifest_outputs(package_dir: Path) -> tuple[str, ...]:
+    manifest_path = package_dir / "manifest.json"
+    if not manifest_path.exists():
+        return ()
+    manifest = load_manifest(package_dir)
+    outputs = manifest.get("outputs", {})
+    if not isinstance(outputs, dict):
+        return ()
+    return tuple(str(value) for value in outputs.values() if isinstance(value, str))
 
 
 def _write_solver_failure(package_dir: Path, failure: SolverFailure) -> None:
@@ -451,6 +562,7 @@ def solve_existing_package(package_dir: Path | str) -> SolverResult:
             if isinstance(stage, dict) and stage.get("pass")
         ],
         passes=(),
+        selection_cost=0,
         capabilities=tuple(sorted(capabilities)),
         state=CapabilityState(
             capabilities=tuple(sorted(capabilities)),

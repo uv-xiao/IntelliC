@@ -20,6 +20,7 @@ def declaration_for(profile: str | None = None) -> BackendSolverDeclaration:
             "Target.aie.MemorySpace.stream@1",
         ),
         supported_ops=("elementwise_binary", "channel_send", "channel_recv"),
+        selection_cost=50,
         artifact_contract=ArtifactContract(
             outputs=(
                 ("aie_codegen_index", (AIE_PROJECT_DIR / "aie_codegen.json").as_posix()),

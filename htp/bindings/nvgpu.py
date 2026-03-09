@@ -228,8 +228,17 @@ class NVGPUBinding(ManifestBinding):
         diagnostics = [
             diagnostic
             for diagnostic in base_report.diagnostics
-            if diagnostic.get("code") != "HTP.BINDINGS.MISSING_BACKEND"
+            if diagnostic.get("code")
+            not in {"HTP.BINDINGS.MISSING_BACKEND", "HTP.BINDINGS.MISSING_CONTRACT_FILE"}
         ]
+        if self._should_enforce_nvgpu_contract():
+            diagnostics.extend(
+                {
+                    "code": "HTP.BINDINGS.NVGPU_MISSING_CONTRACT_FILE",
+                    "detail": f"Missing required NV-GPU artifact path: {missing_path}",
+                }
+                for missing_path in missing_files
+            )
 
         diagnostics.extend(self._validate_metadata())
         required_paths = self._required_paths()

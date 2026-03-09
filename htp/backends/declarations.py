@@ -29,6 +29,7 @@ class BackendSolverDeclaration:
     target_capabilities: tuple[str, ...]
     supported_ops: tuple[str, ...]
     artifact_contract: ArtifactContract
+    selection_cost: int = 0
 
     @property
     def required_outputs(self) -> tuple[str, ...]:

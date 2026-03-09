@@ -70,8 +70,8 @@ Checklist:
   extensions rather than best-effort local hints.
 - `[x]` Add bounded alternative choice support (OR nodes) for pipeline
   selection.
-- `[ ]` Add cost-model-based selection only after satisfiability is complete.
-- `[~]` Unify final artifact requirements with backend/extension contracts so
+- `[x]` Add cost-model-based selection only after satisfiability is complete.
+- `[x]` Unify final artifact requirements with backend/extension contracts so
   the solver does not maintain a second independent list.
 - `[x]` Make solver-visible resumption work from existing artifact packages, not
   only from fresh in-memory compilation inputs.
@@ -333,7 +333,9 @@ Checklist:
   in the future docs.
 - `[x]` Add malformed-island validation and round-trip correctness tests.
 - `[~]` Make solver-visible extension composition cover MLIR island entry/exit
-  requirements, not only a yes/no eligibility bit.
+  requirements, not only a yes/no eligibility bit. Entry requirements are now
+  solver-visible and requested-but-ineligible extension use fails explicitly;
+  exit/re-import requirements are still narrower than the future contract.
 
 ---
 
@@ -436,7 +438,9 @@ Checklist:
 - `[x]` Validate more than stage graph paths at the generic validation layer
   where appropriate.
 - `[~]` Make artifact ownership and validation rules fully shared between
-  emitters, solver, and bindings.
+  emitters, solver, and bindings. `manifest.outputs` is now the authoritative
+  final-artifact source for both solver checks and binding validation, but some
+  richer extension-owned ownership rules are still future work.
 - `[x]` Add structured schema/version validation for more emitted sidecars.
 - `[~]` Strengthen staged semantic diff support around identities and maps.
 - `[~]` Make replay/stub metadata richer and easier to diff automatically.

@@ -78,10 +78,19 @@ class PTOBinding(ManifestBinding):
         diagnostics = [
             diagnostic
             for diagnostic in base_report.diagnostics
-            if diagnostic.get("code") != "HTP.BINDINGS.MISSING_BACKEND"
+            if diagnostic.get("code")
+            not in {"HTP.BINDINGS.MISSING_BACKEND", "HTP.BINDINGS.MISSING_CONTRACT_FILE"}
         ]
         required_paths = self._required_paths()
         diagnostics.extend(self._validate_required_metadata(required_paths=required_paths))
+        if self._should_enforce_pto_contract():
+            diagnostics.extend(
+                {
+                    "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",
+                    "detail": f"Missing required PTO artifact path: {missing_path}",
+                }
+                for missing_path in missing_files
+            )
 
         if self._should_enforce_pto_contract():
             for required_path in required_paths:

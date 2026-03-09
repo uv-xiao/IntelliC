@@ -43,6 +43,11 @@ def collect_missing_files(package_dir: Path | str, manifest: Mapping[str, Any]) 
 
 
 def iter_contract_paths(manifest: Mapping[str, Any]) -> Iterable[str]:
+    outputs = manifest.get("outputs")
+    if isinstance(outputs, Mapping):
+        for value in outputs.values():
+            if isinstance(value, str):
+                yield value
     for stage in _stage_graph(manifest):
         yield from _stage_contract_paths(stage)
 

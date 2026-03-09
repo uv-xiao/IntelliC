@@ -20,6 +20,10 @@ Implemented behavior:
 - the solver can select the registered
   `htp.default+htp_ext.mlir_cse.v1` template when the extension is requested
   and the program is eligible
+- requested-but-ineligible MLIR CSE composition now fails solver selection
+  explicitly through `failed_at_pass = "extensions.requested"` with structured
+  `failed_rules` / `reasons`, rather than silently falling back to the plain
+  default pipeline
 - pipeline execution resolves selected pass ids through the registered pass
   surface, so extension passes run through the same pass manager and pass trace
   as core passes
@@ -43,6 +47,9 @@ Implemented import/export model:
   module
 - eligibility is checked against canonical typed program structure, including
   scalar-only args and the absence of channels/process graphs
+- the export pass contract now explicitly requires `Extension.MLIRCSEEligible@1`
+  so island entry legality is visible in the same contract language as core
+  passes
 - the island runs a deterministic built-in CSE pipeline over that MLIR module
 - import parses the transformed `output.mlir` and reconstructs the reduced
   expression program from MLIR SSA plus the export ledger
