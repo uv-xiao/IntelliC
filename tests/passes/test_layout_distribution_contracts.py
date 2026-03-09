@@ -149,7 +149,9 @@ def test_distribution_join_rejects_incompatible_shards():
                         "distribution": [{"kind": "shard", "axis": "x"}],
                     },
                 ],
-                "ops": [{"op": "elementwise_binary", "operator": "add", "lhs": "lhs", "rhs": "rhs", "out": "out"}],
+                "ops": [
+                    {"op": "elementwise_binary", "operator": "add", "lhs": "lhs", "rhs": "rhs", "out": "out"}
+                ],
             },
             "workload": _workload("bad_join", ["lhs", "rhs", "out"]),
         }
