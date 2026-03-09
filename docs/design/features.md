@@ -129,6 +129,8 @@ Implemented today:
 - NV-GPU `.cu`-first package emission and real CUDA execution
 - AIE extension-owned artifact path plus `compile_program(...)` target support
 - AIE planning analyses (`mapping` / `fifo`) staged before MLIR-AIE emission
+- AIE reference toolchain build outputs and host-runtime launch through the
+  binding-owned adapter path
 - normalized binding lifecycle:
   - `validate`
   - `build`

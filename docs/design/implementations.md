@@ -148,10 +148,14 @@ running on CUDA with explicit tensor/scalar arguments.
 ### AIE extension backend
 
 - emitter: `htp_ext/aie/emit.py`
+- toolchain shim: `htp_ext/aie/toolchain.py`
 - binding: `htp/bindings/aie.py`
+- adapter: `htp/bindings/aie_toolchain_adapter.py`
 
 HTP now has an extension-owned MLIR-AIE artifact path. It emits `codegen/aie/`
-artifacts plus `extensions.aie.*` metadata and keeps replay in Python `sim`.
+artifacts plus `extensions.aie.*` metadata, builds reference toolchain sidecars
+under `build/aie/`, and runs through emitted `codegen/aie/host.py` while
+keeping replay in Python `sim`.
 
 ## 6. Replay versus backend execution
 
@@ -180,6 +184,7 @@ Implemented extension-owned seams now include:
 
 - MLIR CSE round-trip package emission plus registered export/import pipeline
   passes
-- AIE artifact emission with binding validation
+- AIE planning/emission plus reference toolchain execution and host-runtime
+  binding integration
 
 Anything not backed by code in `htp/` or `htp_ext/` remains future work.

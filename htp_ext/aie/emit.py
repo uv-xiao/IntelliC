@@ -23,6 +23,7 @@ from htp_ext.aie.plan import (
     build_fifo_plan,
     build_mapping_plan,
 )
+from htp_ext.aie.toolchain import AIE_BUILD_PRODUCT_SCHEMA_ID, AIE_HOST_RUNTIME_SCHEMA_ID
 
 AIE_CODEGEN_SCHEMA_ID = "htp.aie.codegen.v1"
 AIE_TOOLCHAIN_SCHEMA_ID = "htp.aie.toolchain.v1"
@@ -162,10 +163,33 @@ def _write_codegen_tree(package_dir: Path, *, state: Mapping[str, Any], profile:
     fifos["schema"] = "htp.aie.fifos.v1"
     host = "\n".join(
         (
+            "from __future__ import annotations",
+            "",
+            "import json",
+            "from pathlib import Path",
+            "",
             f"ENTRY = {state['entry']!r}",
-            "def launch(*args, **kwargs):",
+            "",
+            "def launch(*args, package_dir, build_dir, entry, mode='sim', **kwargs):",
             "    del args, kwargs",
-            f"    return {{'status': 'sim-only', 'mapping_plan': {mapping['tiles']!r}, 'fifo_plan': {fifos['channels']!r}}}",
+            "    if entry != ENTRY:",
+            "        raise ValueError(f'unknown AIE entrypoint: {entry!r}')",
+            "    build_path = Path(build_dir) / 'host_runtime.json'",
+            "    runtime = None",
+            "    if build_path.exists():",
+            "        runtime = json.loads(build_path.read_text())",
+            "    elif mode == 'device':",
+            "        raise ValueError('missing build/aie/host_runtime.json for device launch')",
+            "    return {",
+            "        'status': 'ok',",
+            "        'entry': ENTRY,",
+            "        'mode': mode,",
+            "        'package_dir': package_dir,",
+            f"        'mapping_plan': {mapping['tiles']!r},",
+            f"        'fifo_plan': {fifos['channels']!r},",
+            "        'runtime': runtime,",
+            "    }",
+            "",
             "",
         )
     )
@@ -184,6 +208,17 @@ def _write_codegen_tree(package_dir: Path, *, state: Mapping[str, Any], profile:
         "schema": AIE_TOOLCHAIN_SCHEMA_ID,
         "toolchain_contract": "mlir-aie:dev",
         "profile": profile,
+        "build_driver": {
+            "kind": "python_module",
+            "module": "htp_ext.aie.toolchain",
+            "callable": "build_package",
+        },
+        "build_product_schema": AIE_BUILD_PRODUCT_SCHEMA_ID,
+        "host_runtime_schema": AIE_HOST_RUNTIME_SCHEMA_ID,
+        "derived_outputs": [
+            "build/aie/build_product.json",
+            "build/aie/host_runtime.json",
+        ],
         "build_flags": [],
     }
 

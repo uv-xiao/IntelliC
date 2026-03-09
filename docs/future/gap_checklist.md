@@ -398,13 +398,13 @@ Current code anchors:
 
 Checklist:
 
-- `[~]` AIE artifact emission exists, but it is still a contract skeleton.
+- `[x]` AIE artifact emission exists with host/runtime and toolchain closure.
 - `[x]` Split AIE into planning analyses and emission transforms.
 - `[x]` Add solver-visible AIE capabilities.
 - `[x]` Emit richer MLIR-AIE content derived from real mapping/FIFO plans rather
   than placeholder MLIR comments.
-- `[ ]` Add host/runtime integration beyond replay-only validation.
-- `[ ]` Add toolchain execution and validation for the emitted AIE package.
+- `[x]` Add host/runtime integration beyond replay-only validation.
+- `[x]` Add toolchain execution and validation for the emitted AIE package.
 - `[x]` Add end-to-end examples that exercise mapping and FIFO semantics.
 
 ### 9.4 Additional extension backends
