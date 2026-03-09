@@ -35,14 +35,14 @@ Large external checkouts (Triton, papers, experimental repos) are local-only and
 ## Deliverables (what should exist in git)
 
 ### Redo design docs (primary)
-- `docs/design/analysis.md` — positioning + methodology (“why”)
+- `docs/future/analysis.md` — positioning + methodology (“why”)
 - `docs/design/features.md` — feature catalog (“what”)
 - `docs/design/implementations.md` — architecture/contracts (“how”)
-- `docs/design/feats/*` — deep dives per feature area
+- `docs/future/feats/*` — deep dives per feature area
 - `docs/design/impls/*` — deep dives per implementation component
 
 ### Research reports (evidence)
-- `docs/design/reports/retargetable_extensibility_report.md` — Triton/JAX/TileLang/MLIR comparative report
+- `docs/future/reports/retargetable_extensibility_report.md` — Triton/JAX/TileLang/MLIR comparative report
 
 ### Reference notes (context only)
 - `docs/reference/*` — curated notes about related systems and hardware
@@ -62,4 +62,4 @@ The redo is “done enough to implement” when:
 - Every “must-have” semantic contract is explicit and testable in the spec.
 - The extension points are enumerated with concrete interfaces and composition rules.
 - At least 2–3 cross-target case studies (e.g., async pipeline + barriers, matmul accel, communication/scheduling) are
-  analyzed end-to-end in `docs/design/reports/`.
+  analyzed end-to-end in `docs/future/reports/`.

@@ -250,10 +250,10 @@ engineer the implicit invariants that live in pass ordering and dialect conventi
 
 ## Next doc links
 
-- Capability typing: `docs/design/feats/01_extensibility.md`
+- Capability typing: `docs/future/feats/01_extensibility.md`
 - Pass tracing: `docs/design/impls/02_pass_manager.md`
 - Manifest schema: `docs/design/impls/04_artifact_manifest.md`
-- Debug requirements: `docs/design/feats/09_debuggability.md`
+- Debug requirements: `docs/future/feats/09_debuggability.md`
 
 ## Recommended acceptance criteria for the first landing
 
