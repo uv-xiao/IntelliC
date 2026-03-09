@@ -1,23 +1,38 @@
 # TODO Layer 6 — Agent Product and Workflow
 
-This layer tracks what remains for long-term agent-native development.
+This layer tracks the remaining gap between today’s disciplined workflow/tooling and the final agent-native framework product.
 
-## Remaining gaps
+## Completion snapshot
 
-- broaden autonomous patch / verify / promote loops beyond the current tooling surface
-- strengthen bounded edit corridors and policy-driven promotion decisions
-- deepen machine-consumable diagnostics, fix-hint strategies, and review support
-- continue turning remaining roadmap items into controlled feature-branch workflow under `docs/in_progress/`
-- keep examples, tests, and docs calibrated for human readability and agent reliability together
+- total checklist items: 8
+- complete: 5
+- partial: 2
+- open: 1
 
-## Visual target
+## Detailed checklist
 
-```text
-todo -> in_progress -> PR -> CI/review -> design
-  ^                                 |
-  +------ agent tooling loops ------+
-```
+### Tooling surface
+- [x] Provide replay, verify, semantic diff, explain, bisect, minimize, and promote-plan tools.
+- [x] Keep diagnostics and fix-hint policies machine-consumable.
+- [~] Broaden autonomous patch / verify / promote loops beyond the current tool surface.
 
-## Why it still matters
+### Repository workflow
+- [x] Enforce `htp/dev` as stable and `htp/feat-*` for feature work.
+- [x] Enforce `docs/in_progress/` task files as part of feature PR workflow.
+- [x] Keep `docs/design/`, `docs/todo/`, and `docs/in_progress/` as explicit repository state surfaces.
+- [~] Continue refining example/test/doc quality rules so human readability and agent reliability improve together.
+- [ ] Build fuller agent-native development controls beyond the current workflow and policy scaffolding.
 
-The repo workflow is now much closer to the intended model, but the full agent-native product still includes richer automation and stronger machine-guided development loops than the current implementation provides.
+## Why these tasks remain
+
+This layer improved substantially with the docs/process work, but the full target still includes stronger autonomous loops and richer machine-guided development behavior than the repository currently provides.
+
+## Coding pointers
+
+Relevant anchors:
+- `htp/agent_policy.py`
+- `htp/tools.py`
+- `htp/diagnostics.py`
+- `AGENTS.md`
+- `.agent/rules/`
+- `.github/scripts/check_pr_policy.py`

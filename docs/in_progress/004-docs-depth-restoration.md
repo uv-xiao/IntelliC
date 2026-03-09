@@ -3,7 +3,7 @@
 - ID: `004-docs-depth-restoration`
 - Branch: `htp/feat-docs-depth-restoration`
 - PR: `TBD`
-- Status: `in_progress`
+- Status: `in_review`
 - Owner: `Codex`
 
 ## Goal
@@ -18,13 +18,13 @@ Restore the depth and usefulness of the documentation after the layered rewrite 
 
 ## Scope Checklist
 
-- [ ] recover detailed content from old docs and current code
-- [ ] expand `docs/design/layers/*.md` into detailed, code-backed layer docs
-- [ ] add feature listings, rationale, and coding pointers to implemented layer docs
-- [ ] expand `docs/todo/layers/*.md` into detailed task checklists per layer
-- [ ] add quantitative completion reporting to `docs/todo/README.md`
-- [ ] keep `docs/story.md` aligned with the deeper docs
-- [ ] verify tree shape, references, and policy alignment
+- [x] recover detailed content from old docs and current code
+- [x] expand `docs/design/layers/*.md` into detailed, code-backed layer docs
+- [x] add feature listings, rationale, and coding pointers to implemented layer docs
+- [x] expand `docs/todo/layers/*.md` into detailed task checklists per layer
+- [x] add quantitative completion reporting to `docs/todo/README.md`
+- [x] keep `docs/story.md` aligned with the deeper docs
+- [x] verify tree shape, references, and policy alignment
 
 ## Code Surfaces
 
@@ -36,17 +36,17 @@ Restore the depth and usefulness of the documentation after the layered rewrite 
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path policy/layout test if automation changes
-- [ ] one malformed-input / contract-violation test if automation changes
-- [ ] one regression test for doc-layout expectations if needed
-- [ ] human-readable docs structure verified
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path policy/layout test if automation changes
+- [x] one malformed-input / contract-violation test if automation changes
+- [x] one regression test for doc-layout expectations if needed
+- [x] human-readable docs structure verified
+- [x] `pixi run verify` or documented fallback
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` layer docs with detailed rationale, feature listings, and coding pointers
-- [ ] update `docs/todo/` layer docs with detailed task checklists and completion accounting
-- [ ] update `docs/story.md` if the deeper layering requires narrative alignment
+- [x] update `docs/design/` layer docs with detailed rationale, feature listings, and coding pointers
+- [x] update `docs/todo/` layer docs with detailed task checklists and completion accounting
+- [x] update `docs/story.md` if the deeper layering requires narrative alignment
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan

@@ -1,27 +1,39 @@
 # TODO Layer 3 — Pipeline and Solver
 
-This layer tracks the remaining composition work.
+This layer tracks the remaining gap between the current registered pipeline discipline and the final extensibility/composition story.
 
-## Remaining gaps
+## Completion snapshot
 
-- broaden solver search beyond the current deterministic template choice and preflight checks
-- deepen `requires` / `provides` reasoning across more pass and extension combinations
-- support richer provider composition and resumption from existing package states
-- widen MLIR round-trip support beyond the current narrow extension slice
-- keep extension islands explicit while broadening the eligible transformed subset
+- total checklist items: 9
+- complete: 6
+- partial: 2
+- open: 1
 
-## Visual target
+## Detailed checklist
 
-```text
-target + requested extensions
-            |
-            v
-      richer solver search
-            |
-            v
-  selected pipeline / extension islands
-```
+### Solver capability and provider model
+- [x] Use backend declarations instead of local hard-coded backend fact tables.
+- [x] Make registered passes and pipeline templates solver-visible.
+- [x] Make extension-provided passes/templates participate in solver-visible composition.
+- [~] Broaden provider composition and package-resumption logic beyond the current implemented scope.
+- [ ] Add richer search/cost selection beyond the current bounded deterministic choices.
 
-## Why it still matters
+### Pass and pipeline evidence
+- [x] Emit `requires_satisfied` and state deltas into `ir/pass_trace.jsonl`.
+- [x] Treat warp specialization and software pipelining as real staged analyses/transforms.
+- [~] Broaden MLIR round-trip support beyond the current narrow extension slice.
+- [x] Keep extension islands inside the same pass/artifact discipline.
 
-The current pipeline discipline is real, but it still proves only a narrow portion of the extensibility story. HTP still needs broader solver power to justify its long-term retargetability claims.
+## Why these tasks remain
+
+The current system proves the architecture direction, but not the full search/composition space. The missing work is about more expressive pipeline selection and broader extension participation, not about inventing the first version of the solver.
+
+## Coding pointers
+
+Relevant anchors:
+- `htp/solver.py`
+- `htp/passes/manager.py`
+- `htp/passes/registry.py`
+- `htp/pipeline/defaults.py`
+- `htp/pipeline/registry.py`
+- `htp_ext/mlir_cse/`
