@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `docs/in_progress/007-frontend-surface-redesign.md`
+- `docs/in_progress/008-reference-calibrated-examples.md`
