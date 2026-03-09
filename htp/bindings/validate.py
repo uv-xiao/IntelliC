@@ -49,6 +49,7 @@ def validation_diagnostics(
                 "detail": "Manifest target.backend is required for binding selection.",
             }
         )
+    diagnostics.extend(_manifest_shape_diagnostics(manifest))
     for missing_path in missing_files:
         diagnostics.append(
             {
@@ -116,6 +117,47 @@ def _as_optional_str(value: object) -> str | None:
     if isinstance(value, str):
         return value
     return None
+
+
+def _manifest_shape_diagnostics(manifest: Mapping[str, Any]) -> list[dict[str, str]]:
+    diagnostics: list[dict[str, str]] = []
+    inputs = manifest.get("inputs")
+    if inputs is not None and not isinstance(inputs, Mapping):
+        diagnostics.append(
+            {
+                "code": "HTP.BINDINGS.MALFORMED_MANIFEST_SECTION",
+                "detail": "manifest.json inputs must be a mapping when present.",
+            }
+        )
+    pipeline = manifest.get("pipeline")
+    if pipeline is not None:
+        if not isinstance(pipeline, Mapping):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.MALFORMED_MANIFEST_SECTION",
+                    "detail": "manifest.json pipeline must be a mapping when present.",
+                }
+            )
+        else:
+            pass_ids = pipeline.get("pass_ids")
+            if pass_ids is not None and (
+                isinstance(pass_ids, (str, bytes)) or not isinstance(pass_ids, Iterable)
+            ):
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.MALFORMED_MANIFEST_SECTION",
+                        "detail": "manifest.json pipeline.pass_ids must be a list of strings when present.",
+                    }
+                )
+    capabilities = manifest.get("capabilities")
+    if capabilities is not None and not isinstance(capabilities, Mapping):
+        diagnostics.append(
+            {
+                "code": "HTP.BINDINGS.MALFORMED_MANIFEST_SECTION",
+                "detail": "manifest.json capabilities must be a mapping when present.",
+            }
+        )
+    return diagnostics
 
 
 __all__ = [

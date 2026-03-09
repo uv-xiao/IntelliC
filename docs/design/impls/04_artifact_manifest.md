@@ -9,18 +9,23 @@
 
 ---
 
-## Core fields (normative v1)
+## Core fields (implemented v1)
 
 - `htp_version`, `git_hash`, `build_env`
 - `inputs`:
-  - entrypoints
-  - enabled dialects
-  - intrinsic sets
+  - entry
+  - kernel name
+  - workload entry
+  - requested extensions
 - `target`:
   - backend name
   - hardware profile
 - `pipeline`:
-  - pass list with versions and parameters
+  - selected template id
+  - selected pass ids
+  - current stage id
+- `capabilities`:
+  - solver-visible target/capability state serialized from `CapabilityState`
 - `outputs`:
   - emitted files with semantic roles
   - entry symbols and callable signatures
@@ -33,6 +38,16 @@
 ## Extensibility
 
 - `extensions` namespace for backend/dialect-specific structured fields.
+- current implementation records backend/tooling and agent provenance there.
+
+## Current implementation notes
+
+- `compile_program(...)` enriches the emitted manifest with `inputs`,
+  `pipeline`, and `capabilities` after solver selection and backend emission.
+- generic validation accepts older minimal manifests, but validates these
+  sections when they are present.
+- backend bindings continue to own backend-specific `outputs` and `extensions`
+  fields.
 
 ---
 

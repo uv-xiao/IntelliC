@@ -59,7 +59,11 @@ def test_compile_program_emits_pto_package_and_keeps_stage_replay(tmp_path):
         "backend": "pto",
         "variant": "a2a3sim",
         "hardware_profile": "ascend:a2a3sim",
+        "option": "a2a3sim",
     }
+    assert compiled.manifest["inputs"]["entry"] == "vector_add"
+    assert compiled.manifest["pipeline"]["pass_ids"] == list(MANDATORY_PASS_IDS)
+    assert compiled.manifest["capabilities"]["target"]["backend"] == "pto"
     assert compiled.pipeline.current_stage == f"s{len(MANDATORY_PASS_IDS):02d}"
 
     session = htp.bind(package_dir).load(mode="sim")
@@ -124,7 +128,10 @@ def test_compile_program_emits_nvgpu_package_and_keeps_stage_replay(tmp_path):
         "backend": "nvgpu",
         "variant": "cuda",
         "hardware_profile": "nvidia:ampere:sm80",
+        "option": "ampere",
     }
+    assert compiled.manifest["pipeline"]["template_id"] == "htp.default.v1"
+    assert compiled.manifest["capabilities"]["target"]["backend"] == "nvgpu"
     assert json.loads((package_dir / "manifest.json").read_text()) == compiled.manifest
 
     session = htp.bind(package_dir).load(mode="sim")

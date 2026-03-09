@@ -4,6 +4,7 @@ from pathlib import Path
 import htp
 import htp.bindings
 from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
+from htp.schemas import BINDING_LOG_SCHEMA_ID
 
 
 def _write_manifest(package_dir, *, current_stage="s01", stage_records=None):
@@ -67,6 +68,19 @@ def run(*args, **kwargs):
     assert result.result == {"args": [1, 2], "kwargs": {"flag": True}}
     assert result.log_path is not None
     assert Path(package_dir / result.log_path).is_file()
+    assert json.loads((package_dir / result.log_path).read_text()) == {
+        "schema": BINDING_LOG_SCHEMA_ID,
+        "kind": "replay",
+        "fields": {
+            "backend": "pto",
+            "mode": "sim",
+            "stage_id": "s01",
+            "entry": "run",
+            "trace": "basic",
+            "ok": "True",
+            "diagnostic_codes": "",
+        },
+    }
 
 
 def test_replay_returns_structured_diagnostic_for_missing_stage(tmp_path):
@@ -186,6 +200,37 @@ def run(*args, **kwargs):
     second = session.replay("s01")
 
     assert first.log_path != second.log_path
+
+
+def test_binding_validate_reports_malformed_manifest_sections(tmp_path):
+    package_dir = tmp_path / "package"
+    package_dir.mkdir()
+    stage_record = _write_stage(
+        package_dir,
+        program_text="""
+def run(*args, **kwargs):
+    return "ok"
+""".lstrip(),
+    )
+    (package_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema": "htp.manifest.v1",
+                "target": {"backend": "pto", "variant": "a2a3sim"},
+                "inputs": "bad",
+                "pipeline": {"pass_ids": "bad"},
+                "capabilities": [],
+                "stages": {"current": "s01", "graph": [stage_record]},
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+    result = htp.bind(package_dir).validate()
+
+    assert result.ok is False
+    assert [item["code"] for item in result.diagnostics].count("HTP.BINDINGS.MALFORMED_MANIFEST_SECTION") == 3
 
 
 def test_replay_returns_structured_diagnostic_for_malformed_stages_shape(tmp_path):

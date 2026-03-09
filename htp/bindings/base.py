@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -9,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from htp.runtime.errors import ReplayDiagnosticError
+from htp.schemas import BINDING_LOG_SCHEMA_ID
 
 from .validate import CONTRACT_REFS, collect_missing_files, manifest_target, validation_diagnostics
 
@@ -168,8 +170,15 @@ class LoadResult:
         relative_path = Path("logs") / f"{stem}_{timestamp}_{uuid4().hex[:8]}.log"
         log_path = self.package_dir / relative_path
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = "\n".join((f"kind={kind}", *lines)) + "\n"
-        log_path.write_text(payload)
+        payload: dict[str, Any] = {
+            "schema": BINDING_LOG_SCHEMA_ID,
+            "kind": kind,
+            "fields": {},
+        }
+        for line in lines:
+            key, _, value = line.partition("=")
+            payload["fields"][key] = value
+        log_path.write_text(json.dumps(payload, indent=2) + "\n")
         return relative_path.as_posix()
 
     def _resolve_current_stage_id(self) -> str:
