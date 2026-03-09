@@ -292,8 +292,10 @@ Current status: **partial**.
 - Optional execution tracing hooks in bindings.
 
 Current status: **partial**.
-- implemented: pass traces, staged artifacts, structured diagnostics, replay, semantic diff, minimize, bisect, and explain
-- missing: identity-aware semantic diff and richer backend/extension debug traces
+- implemented: pass traces, staged artifacts, structured diagnostics, replay,
+  semantic diff, minimize, bisect, and explain
+- missing: node-aware semantic diff, fully uniform diagnostic payloads, and
+  broader future backend/extension debug guidance
 
 ---
 

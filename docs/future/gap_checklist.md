@@ -118,7 +118,7 @@ Checklist:
 - `[x]` Add target-specific correctness suites into `verify_package(...)` rather
   than leaving them as external test selection.
 - `[x]` Add optional performance gates and threshold policy to the tool surface.
-- `[~]` Add bounded edit-corridor templates for passes, intrinsic handlers, and
+- `[x]` Add bounded edit-corridor templates for passes, intrinsic handlers, and
   backend contracts to support healthy autonomous changes.
 
 ---
@@ -443,7 +443,7 @@ Checklist:
   richer extension-owned ownership rules are still future work.
 - `[x]` Add structured schema/version validation for more emitted sidecars.
 - `[~]` Strengthen staged semantic diff support around identities and maps.
-- `[~]` Make replay/stub metadata richer and easier to diff automatically.
+- `[x]` Make replay/stub metadata richer and easier to diff automatically.
 
 ---
 
@@ -464,12 +464,14 @@ Checklist:
   complete.
 - `[~]` Make diagnostics consistently include `node_id`, payload refs, and fix
   hint refs across compiler, bindings, and extensions.
-- `[~]` Add richer diagnostic families for layout conflicts, protocol
+- `[x]` Add richer diagnostic families for layout conflicts, protocol
   violations, and solver unsat cores.
 - `[~]` Add first-class semantic diff tooling across stages and packages using
-  identities and maps, not only JSON inequality.
+  identities and maps, not only JSON inequality. Semantic diffs now include
+  identity maps, replay stubs, and pass-trace refs; node-aware blame remains
+  future work.
 - `[x]` Add standardized trace/log schemas for backend build/run adapters.
-- `[ ]` Add explicit debug guidance for extension-owned islands and backend
+- `[x]` Add explicit debug guidance for extension-owned islands and backend
   toolchains.
 
 ---
@@ -507,8 +509,9 @@ work healthy.
 - `[x]` Enforce that branch policy in contributor workflow and automation, not
   only prose guidance.
 - `[x]` Keep this checklist current whenever a future item lands in code.
-- `[ ]` When an item is implemented, move the normative doc from `docs/future/`
-  to `docs/design/` and add code references there.
+- `[~]` When an item is implemented, move the normative doc from `docs/future/`
+  to `docs/design/` and add code references there. Debuggability is now moved;
+  more future docs still need the same treatment.
 
 ---
 

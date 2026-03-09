@@ -155,6 +155,39 @@ def test_semantic_diff_reports_manifest_and_semantic_changes(tmp_path):
     )
 
 
+def test_semantic_diff_reports_pass_trace_refs(tmp_path):
+    left_dir = tmp_path / "left_pkg"
+    right_dir = tmp_path / "right_pkg"
+    compile_program(package_dir=left_dir, target="pto-a2a3sim", program=_vector_add_program())
+    compile_program(package_dir=right_dir, target="pto-a2a3sim", program=_vector_add_program())
+    trace_path = right_dir / "ir" / "pass_trace.jsonl"
+    trace_path.write_text(trace_path.read_text() + json.dumps({"schema": "htp.pass_trace_event.v1"}) + "\n")
+
+    diff = semantic_diff(left_dir, right_dir)
+
+    assert "pass_trace" in diff["changed_sections"]
+    assert diff["details"]["pass_trace"]["details"]["refs"] == {
+        "left": "ir/pass_trace.jsonl",
+        "right": "ir/pass_trace.jsonl",
+    }
+
+
+def test_semantic_diff_reports_replay_stub_refs(tmp_path):
+    left_dir = copy_golden_fixture("nvgpu_demo", tmp_path / "left")
+    right_dir = copy_golden_fixture("nvgpu_demo", tmp_path / "right")
+    stubs_path = right_dir / "ir" / "stages" / "s02" / "replay" / "stubs.json"
+    stubs = json.loads(stubs_path.read_text())
+    stubs["stubs"][0]["reason"] = "intentionally_unimplemented"
+    stubs_path.write_text(json.dumps(stubs, indent=2) + "\n")
+
+    diff = semantic_diff(left_dir, right_dir, left_stage_id="s02", right_stage_id="s02")
+
+    assert "current_stage.replay_stubs" in diff["changed_sections"]
+    assert diff["details"]["current_stage.replay_stubs"]["details"]["refs"]["right"].endswith(
+        "/replay/stubs.json"
+    )
+
+
 def test_explain_diagnostic_returns_contract_reference():
     explanation = explain_diagnostic("HTP.BINDINGS.MISSING_CONTRACT_FILE")
 
@@ -173,6 +206,16 @@ def test_explain_diagnostic_uses_family_catalog_for_protocol_codes():
     assert explanation["matched_by"] == "family"
     assert explanation["fix_hint_policy"] == "repair_protocol_obligations"
     assert "docs/examples/csp_channel_pipeline.md" in explanation["docs"]
+
+
+def test_explain_diagnostic_uses_replay_family_catalog():
+    explanation = explain_diagnostic("HTP.REPLAY.STUB_EXTERNAL_TOOLCHAIN_ONLY")
+
+    assert explanation["code"] == "HTP.REPLAY.STUB_EXTERNAL_TOOLCHAIN_ONLY"
+    assert explanation["known"] is True
+    assert explanation["matched_by"] == "family"
+    assert explanation["fix_hint_policy"] == "inspect_replay_stub_and_stage_evidence"
+    assert "docs/design/impls/09_debuggability.md" in explanation["docs"]
 
 
 def test_explain_diagnostic_returns_generic_fallback_for_unknown_code():
@@ -205,6 +248,7 @@ def test_load_agent_policy_reads_toml_file(tmp_path):
 
     assert policy["agent"]["allowed_edit_roots"] == ["htp", "docs"]
     assert policy["agent"]["required_gates"] == ["validate", "replay", "golden_diff"]
+    assert "passes" in policy["agent"]["edit_corridor_templates"]
     assert policy["perf"]["enabled"] is True
     assert policy["perf"]["max_regression_pct"] == 3.5
 

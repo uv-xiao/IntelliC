@@ -21,6 +21,7 @@ Unimplemented or research-only material lives under `docs/future/`.
 - `docs/design/impls/06_backend_aie.md` — AIE extension backend artifact contract
 - `docs/design/impls/07_binding_interface.md` — validate/build/load/run/replay lifecycle
 - `docs/design/impls/08_testing.md` — verification expectations
+- `docs/design/impls/09_debuggability.md` — diagnostics, semantic diff, and debug guidance
 - `docs/design/impls/10_agentic_tooling.md` — replay/verify/diff/explain tooling
 - `docs/design/impls/11_warp_specialization_pipelining.md` — staged warp/pipeline pass sequence
 - `docs/design/impls/12_mlir_roundtrip_island.md` — implemented MLIR round-trip extension path

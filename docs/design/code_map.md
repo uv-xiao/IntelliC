@@ -9,6 +9,8 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/runtime/core.py` — replay runtime and kernel/intrinsic dispatch
 - `htp/runtime/errors.py` — structured replay/stub diagnostics with payload and
   fix-hint refs
+- `docs/design/impls/09_debuggability.md` — implemented debug guidance for
+  stages, extension islands, and backend toolchains
 - `htp/solver.py` — capability solver, deterministic cost-based template
   selection, requested-extension enforcement, and manifest-owned final artifact
   checks

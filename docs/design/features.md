@@ -159,9 +159,13 @@ Implemented today:
 - agent policy loading
 - promotion recommendation from `agent_policy.toml`
 - optional perf threshold checks with package-local metrics
+- structured edit-corridor templates for passes, intrinsics, and backend
+  contracts in `agent_policy.toml`
 - structured diagnostic catalog with exact-code and family-based explanations
 - semantic diff evidence that includes compared semantic sidecar refs and
   identity/map refs for staged comparisons
+- semantic diff evidence that includes replay-stub refs and `ir/pass_trace.jsonl`
+  refs for package-level blame
 - agent provenance under `extensions.agent.*`
 
 Main anchors:
