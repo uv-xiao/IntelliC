@@ -18,10 +18,10 @@ For feature work:
 ### Overall
 
 - total tracked TODO checklist items: 56
-- complete: 40
-- partial: 10
-- open: 6
-- completion ratio: about 71%
+- complete: 42
+- partial: 9
+- open: 5
+- completion ratio: about 75%
 
 ### By area
 
@@ -30,7 +30,7 @@ For feature work:
 | Compiler model, semantics, typing | 6 | 2 | 2 | 10 |
 | Programming surfaces | 10 | 0 | 0 | 10 |
 | Pipeline and solver | 6 | 2 | 1 | 9 |
-| Artifacts, replay, debug | 5 | 2 | 1 | 8 |
+| Artifacts, replay, debug | 7 | 1 | 0 | 8 |
 | Backends and extensions | 8 | 2 | 1 | 11 |
 | Agent product and workflow | 5 | 2 | 1 | 8 |
 
@@ -43,7 +43,7 @@ For feature work:
 - `docs/todo/03_pipeline_and_solver.md`
   - remaining work: richer search/composition and broader MLIR island breadth
 - `docs/todo/04_artifacts_replay_debug.md`
-  - remaining work: broader consistency checks and deeper replay/reference coverage
+  - remaining work: deeper replay/reference coverage; the package/debug contract itself is now broadly uniform
 - `docs/todo/05_backends_and_extensions.md`
   - remaining work: deepen PTO, NV-GPU, and AIE rather than changing the architecture; the remaining gap is backend depth, not the Arknife reuse boundary
 - `docs/todo/06_agent_product_and_workflow.md`

@@ -258,6 +258,7 @@ def run(*args, **kwargs):
     assert {
         "code": "HTP.BINDINGS.INVALID_SCHEMA",
         "detail": f"{stage_record['program_pyast']} must declare schema 'htp.program_ast.v1'.",
+        "artifact_ref": stage_record["program_pyast"],
     } in result.diagnostics
 
 

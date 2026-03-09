@@ -253,6 +253,31 @@ def test_aie_binding_reports_invalid_toolchain_manifest(tmp_path):
     ]
 
 
+def test_aie_validate_reports_artifact_ref_for_invalid_codegen_schema(tmp_path):
+    package_dir = tmp_path / "aie_pkg"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "stream_add",
+            "kernel": {"name": "stream_add", "args": [], "ops": []},
+            "workload": {"entry": "stream_add", "tasks": [], "channels": [], "dependencies": []},
+        },
+    )
+    codegen_path = package_dir / "codegen" / "aie" / "aie_codegen.json"
+    payload = json.loads(codegen_path.read_text())
+    payload["schema"] = "broken.schema"
+    codegen_path.write_text(json.dumps(payload, indent=2) + "\n")
+
+    report = htp.bind(package_dir).validate()
+
+    assert any(
+        diagnostic.get("code") == "HTP.BINDINGS.INVALID_SCHEMA"
+        and diagnostic.get("artifact_ref") == "codegen/aie/aie_codegen.json"
+        for diagnostic in report.diagnostics
+    )
+
+
 def test_aie_device_run_requires_built_runtime(tmp_path):
     package_dir = tmp_path / "aie_pkg"
     package_dir.mkdir()

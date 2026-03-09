@@ -446,7 +446,12 @@ class NVGPUBinding(ManifestBinding):
         try:
             codegen_index = json.loads((self.package_dir / codegen_index_path).read_text())
         except Exception as exc:
-            return [{"code": "HTP.BINDINGS.NVGPU_INVALID_CODEGEN_INDEX", "detail": str(exc)}]
+            return [
+                {
+                    "code": "HTP.BINDINGS.NVGPU_INVALID_CODEGEN_INDEX",
+                    "detail": str(exc),
+                }
+            ]
         if not isinstance(codegen_index, Mapping):
             return [
                 {
@@ -465,7 +470,12 @@ class NVGPUBinding(ManifestBinding):
         try:
             toolchain_manifest = json.loads((self.package_dir / toolchain_manifest_path).read_text())
         except Exception as exc:
-            return [{"code": "HTP.BINDINGS.NVGPU_INVALID_TOOLCHAIN_MANIFEST", "detail": str(exc)}]
+            return [
+                {
+                    "code": "HTP.BINDINGS.NVGPU_INVALID_TOOLCHAIN_MANIFEST",
+                    "detail": str(exc),
+                }
+            ]
         if not isinstance(toolchain_manifest, Mapping):
             return [
                 {

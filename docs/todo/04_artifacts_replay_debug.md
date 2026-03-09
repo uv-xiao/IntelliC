@@ -5,17 +5,17 @@ This layer tracks the remaining gap between the current package/debug surface an
 ## Completion snapshot
 
 - total checklist items: 8
-- complete: 5
-- partial: 2
-- open: 1
+- complete: 7
+- partial: 1
+- open: 0
 
 ## Detailed checklist
 
 ### Package and validation surface
 - [x] Emit normalized package artifacts, manifests, stage graphs, logs, and sidecars.
 - [x] Validate malformed package state through structured diagnostics.
-- [~] Broaden generic validation across more backend/extension sidecars and stronger consistency checks.
-- [ ] Finish the remaining contract/debug uniformity work so every backend and extension path feels equally inspectable.
+- [x] Broaden generic validation across more backend/extension sidecars and stronger consistency checks.
+- [x] Finish the remaining contract/debug uniformity work so every backend and extension path feels equally inspectable.
 
 ### Replay and debug surface
 - [x] Keep replay distinct from backend package execution.
@@ -25,7 +25,11 @@ This layer tracks the remaining gap between the current package/debug surface an
 
 ## Why these tasks remain
 
-This layer is already one of the strongest parts of the repository. The remaining work is mostly consistency and breadth: making all backend and extension paths live up to the same artifact/debug standard.
+This layer is now mostly closed on the package/debug-contract side. PTO,
+NV-GPU, and AIE all participate in the same generic sidecar-schema checks, and
+invalid sidecars now point back to explicit `artifact_ref` evidence. The only
+meaningful remaining gap is replay/reference breadth: reducing how often
+backend/extension boundaries still need explicit stubs.
 
 ## Coding pointers
 

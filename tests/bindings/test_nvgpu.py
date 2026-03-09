@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 
 import htp.runtime as runtime_api
@@ -188,3 +190,22 @@ def test_nvgpu_device_run_uses_cuda_adapter(tmp_path, monkeypatch):
     }
     assert result.trace_ref == "logs/adapter_nvgpu_run.json"
     assert result.diagnostics == []
+
+
+def test_nvgpu_validate_reports_artifact_ref_for_invalid_codegen_schema(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(package_dir, program=_gemm_program(), profile="ampere")
+
+    codegen_path = package_dir / "codegen" / "nvgpu" / "nvgpu_codegen.json"
+    payload = json.loads(codegen_path.read_text())
+    payload["schema"] = "broken.schema"
+    codegen_path.write_text(json.dumps(payload, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert any(
+        diagnostic.get("code") == "HTP.BINDINGS.INVALID_SCHEMA"
+        and diagnostic.get("artifact_ref") == "codegen/nvgpu/nvgpu_codegen.json"
+        for diagnostic in report.diagnostics
+    )

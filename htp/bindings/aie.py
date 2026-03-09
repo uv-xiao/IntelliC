@@ -285,7 +285,12 @@ def _validate_codegen_contract(package_dir: Path, manifest: Mapping[str, Any]) -
     try:
         codegen_index = json.loads((package_dir / _AIE_OUTPUTS["aie_codegen_index"]).read_text())
     except Exception as exc:
-        return [{"code": "HTP.BINDINGS.AIE_INVALID_CODEGEN_INDEX", "detail": str(exc)}]
+        return [
+            {
+                "code": "HTP.BINDINGS.AIE_INVALID_CODEGEN_INDEX",
+                "detail": str(exc),
+            }
+        ]
     if not isinstance(codegen_index, Mapping) or codegen_index.get("schema") != AIE_CODEGEN_SCHEMA_ID:
         diagnostics.append(
             {
@@ -298,7 +303,12 @@ def _validate_codegen_contract(package_dir: Path, manifest: Mapping[str, Any]) -
     try:
         toolchain_manifest = json.loads((package_dir / _AIE_OUTPUTS["toolchain_manifest"]).read_text())
     except Exception as exc:
-        return [{"code": "HTP.BINDINGS.AIE_INVALID_TOOLCHAIN_MANIFEST", "detail": str(exc)}]
+        return [
+            {
+                "code": "HTP.BINDINGS.AIE_INVALID_TOOLCHAIN_MANIFEST",
+                "detail": str(exc),
+            }
+        ]
     if (
         not isinstance(toolchain_manifest, Mapping)
         or toolchain_manifest.get("schema") != AIE_TOOLCHAIN_SCHEMA_ID
