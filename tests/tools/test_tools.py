@@ -147,7 +147,12 @@ def test_semantic_diff_reports_manifest_and_semantic_changes(tmp_path):
     assert diff["stage_ids"] == {"left": expected_stage, "right": expected_stage}
     assert "details" in diff
     assert "current_stage.kernel_ir" in diff["details"]
+    assert diff["details"]["current_stage.kernel_ir"]["refs"]["left"].endswith("/kernel_ir.json")
+    assert diff["details"]["current_stage.kernel_ir"]["refs"]["right"].endswith("/kernel_ir.json")
     assert "current_stage.identity" in diff["details"]
+    assert diff["details"]["current_stage.identity"]["details"]["refs"]["left"]["entities"].endswith(
+        "/ids/entities.json"
+    )
 
 
 def test_explain_diagnostic_returns_contract_reference():
@@ -158,6 +163,16 @@ def test_explain_diagnostic_returns_contract_reference():
     assert explanation["title"] == "Missing contract artifact"
     assert explanation["fix_hint_policy"] == "rebuild_or_validate_artifacts"
     assert "docs/design/impls/07_binding_interface.md" in explanation["docs"]
+
+
+def test_explain_diagnostic_uses_family_catalog_for_protocol_codes():
+    explanation = explain_diagnostic("HTP.PROTOCOL.UNBALANCED_CHANNEL")
+
+    assert explanation["code"] == "HTP.PROTOCOL.UNBALANCED_CHANNEL"
+    assert explanation["known"] is True
+    assert explanation["matched_by"] == "family"
+    assert explanation["fix_hint_policy"] == "repair_protocol_obligations"
+    assert "docs/examples/csp_channel_pipeline.md" in explanation["docs"]
 
 
 def test_explain_diagnostic_returns_generic_fallback_for_unknown_code():

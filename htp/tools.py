@@ -137,7 +137,13 @@ def semantic_diff(
         if left_payload != right_payload:
             section = f"current_stage.{semantic_name}"
             changed_sections.append(section)
-            details[section] = _summarize_difference(left_payload, right_payload)
+            details[section] = {
+                **_summarize_difference(left_payload, right_payload),
+                "refs": {
+                    "left": _stage_semantic_relpath(left_manifest, resolved_left_stage, relpath_key),
+                    "right": _stage_semantic_relpath(right_manifest, resolved_right_stage, relpath_key),
+                },
+            }
     identity_diff = _identity_aware_stage_diff(
         left_root, right_root, left_manifest, right_manifest, resolved_left_stage, resolved_right_stage
     )
@@ -317,6 +323,16 @@ def _load_stage_semantic(
     return {}
 
 
+def _stage_semantic_relpath(manifest: dict[str, Any], stage_id: str, semantic_key: str) -> str:
+    stage = next(stage for stage in manifest["stages"]["graph"] if stage["id"] == stage_id)
+    semantic = stage.get("semantic", {})
+    if isinstance(semantic, dict):
+        relpath = semantic.get(semantic_key)
+        if isinstance(relpath, str):
+            return relpath
+    return f"ir/stages/{stage_id}/{semantic_key}.json"
+
+
 def _summarize_difference(left: Any, right: Any) -> dict[str, Any]:
     if isinstance(left, dict) and isinstance(right, dict):
         left_keys = set(left)
@@ -403,6 +419,20 @@ def _identity_aware_stage_diff(
         ),
         "entity_map": _summarize_difference(left_entity_map, right_entity_map),
         "binding_map": _summarize_difference(left_binding_map, right_binding_map),
+        "refs": {
+            "left": {
+                "entities": left_stage.get("ids", {}).get("entities"),
+                "bindings": left_stage.get("ids", {}).get("bindings"),
+                "entity_map": left_stage.get("maps", {}).get("entity_map"),
+                "binding_map": left_stage.get("maps", {}).get("binding_map"),
+            },
+            "right": {
+                "entities": right_stage.get("ids", {}).get("entities"),
+                "bindings": right_stage.get("ids", {}).get("bindings"),
+                "entity_map": right_stage.get("maps", {}).get("entity_map"),
+                "binding_map": right_stage.get("maps", {}).get("binding_map"),
+            },
+        },
     }
     equal = all(
         item
@@ -411,7 +441,8 @@ def _identity_aware_stage_diff(
             {"kind": "mapping", "added_keys": [], "removed_keys": [], "changed_keys": []},
             {"added": [], "removed": []},
         )
-        for item in details.values()
+        for key, item in details.items()
+        if key != "refs"
     )
     return {"equal": equal, "details": details}
 
