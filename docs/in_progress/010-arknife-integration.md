@@ -2,8 +2,8 @@
 
 - ID: `010-arknife-integration`
 - Branch: `htp/feat-arknife-integration`
-- PR: `TBD`
-- Status: `in_progress`
+- PR: `https://github.com/uv-xiao/htp/pull/45`
+- Status: `in_review`
 - Owner: `Codex`
 
 ## Goal
@@ -18,13 +18,13 @@ Integrate the core Arknife technique classes into HTP’s native programming and
 
 ## Scope Checklist
 
-- [ ] add a core hardware-model substrate for hierarchical parallel levels and memory spaces
-- [ ] add instruction and channel declarations that integrate with HTP intrinsics and semantic state
-- [ ] add an Arknife-style Python authoring surface that lowers into canonical HTP programs
-- [ ] thread hardware/instruction/channel facts through semantic analysis and stage artifacts
-- [ ] deepen NV-GPU lowering and emitted metadata for Ampere and Blackwell profile-specific Arknife-style programs
-- [ ] add reference-backed Ampere and Blackwell examples with local README docs
-- [ ] update design and todo docs to reflect implemented Arknife support
+- [x] add a core hardware-model substrate for hierarchical parallel levels and memory spaces
+- [x] add instruction and channel declarations that integrate with HTP intrinsics and semantic state
+- [x] add an Arknife-style Python authoring surface that lowers into canonical HTP programs
+- [x] thread hardware/instruction/channel facts through semantic analysis and stage artifacts
+- [x] deepen NV-GPU lowering and emitted metadata for Ampere and Blackwell profile-specific Arknife-style programs
+- [x] add reference-backed Ampere and Blackwell examples with local README docs
+- [x] update design and todo docs to reflect implemented Arknife support
 
 ## Code Surfaces
 
@@ -36,18 +36,18 @@ Integrate the core Arknife technique classes into HTP’s native programming and
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for the motivating bug or gap
-- [ ] human-friendly example updated or added
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating bug or gap
+- [x] human-friendly example updated or added
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for implemented behavior
-- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] update `docs/design/` for implemented behavior
+- [x] update `docs/todo/` to remove or narrow the gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan
