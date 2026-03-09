@@ -264,4 +264,4 @@ code examples and the example-local docs.
 
 ## Current limits
 
-The user-facing surfaces are still narrower and more mechanical than the final intended framework. The missing work now lives in `docs/todo/layers/02_programming_surfaces.md`.
+The user-facing surfaces are still narrower and more mechanical than the final intended framework. The missing work now lives in `docs/todo/02_programming_surfaces.md`.

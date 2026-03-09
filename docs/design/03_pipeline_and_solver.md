@@ -86,4 +86,4 @@ When working here, inspect `ir/pass_trace.jsonl` together with `ir/stages/*/anal
 
 ## Current limits
 
-The solver and pipeline system is real, but still narrower than the long-term target. The missing breadth and search power live in `docs/todo/layers/03_pipeline_and_solver.md`.
+The solver and pipeline system is real, but still narrower than the long-term target. The missing breadth and search power live in `docs/todo/03_pipeline_and_solver.md`.

@@ -91,4 +91,4 @@ Tests worth reading together with this layer:
 
 ## Current limits
 
-The artifact and debugging layer is strong, but it is not the final surface. Broader validation/debug depth still lives in `docs/todo/layers/04_artifacts_replay_debug.md`.
+The artifact and debugging layer is strong, but it is not the final surface. Broader validation/debug depth still lives in `docs/todo/04_artifacts_replay_debug.md`.

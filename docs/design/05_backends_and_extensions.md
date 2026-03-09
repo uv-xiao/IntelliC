@@ -125,4 +125,4 @@ remains. The main remaining work is no longer “does HTP support Arknife-style
 backend planning at all?” That part is now implemented. The remaining gap is
 deeper profile-specialized lowering, wider runtime breadth, and additional
 extension backends. Those tasks now live in
-`docs/todo/layers/05_backends_and_extensions.md`.
+`docs/todo/05_backends_and_extensions.md`.

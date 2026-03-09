@@ -16,9 +16,9 @@ from htp.schemas import (
 )
 
 CONTRACT_REFS = (
-    "docs/design/layers/04_artifacts_replay_debug.md",
-    "docs/design/layers/05_backends_and_extensions.md",
-    "docs/design/layers/04_artifacts_replay_debug.md",
+    "docs/design/04_artifacts_replay_debug.md",
+    "docs/design/05_backends_and_extensions.md",
+    "docs/design/04_artifacts_replay_debug.md",
 )
 
 

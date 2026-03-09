@@ -66,4 +66,4 @@ Relevant code and policy files:
 
 ## Current limits
 
-The repository workflow is now much cleaner, but the full autonomous-development target still extends beyond the current implementation. The remaining work lives in `docs/todo/layers/06_agent_product_and_workflow.md`.
+The repository workflow is now much cleaner, but the full autonomous-development target still extends beyond the current implementation. The remaining work lives in `docs/todo/06_agent_product_and_workflow.md`.

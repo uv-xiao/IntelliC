@@ -130,4 +130,4 @@ Then inspect stage artifacts under `ir/stages/<id>/` from a compiled example to 
 
 ## Current limits
 
-What is implemented here is already meaningful, but it is not the final semantic envelope. The missing breadth now lives in `docs/todo/layers/01_compiler_model.md`.
+What is implemented here is already meaningful, but it is not the final semantic envelope. The missing breadth now lives in `docs/todo/01_compiler_model.md`.

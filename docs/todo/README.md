@@ -2,13 +2,13 @@
 
 `docs/todo/` tracks the part of HTP that is not finished yet.
 
-This tree is organized by layers. `README.md` gives the summary and completion statistics; the detailed remaining work lives in `docs/todo/layers/` and the research-backed report under `docs/todo/reports/`.
+This tree is organized as direct TODO feature documents. `README.md` gives the summary and completion statistics; the detailed remaining work lives in `docs/todo/` and the research-backed report under `docs/todo/reports/`.
 
 ## How to use this tree
 
 For feature work:
-1. choose one feature-sized gap from the layer summaries below
-2. read the relevant detailed layer file under `docs/todo/layers/`
+1. choose one feature-sized gap from the summaries below
+2. read the relevant detailed TODO file under `docs/todo/`
 3. create a task file under `docs/in_progress/`
 4. open a feature PR from `htp/feat-*`
 5. move landed behavior into `docs/design/` before merge
@@ -23,7 +23,7 @@ For feature work:
 - open: 7
 - completion ratio: about 70%
 
-### By layer
+### By area
 
 | Layer | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
@@ -34,28 +34,28 @@ For feature work:
 | Backends and extensions | 8 | 2 | 1 | 11 |
 | Agent product and workflow | 5 | 2 | 1 | 8 |
 
-## Layer summaries
+## Feature summaries
 
-- `docs/todo/layers/01_compiler_model.md`
+- `docs/todo/01_compiler_model.md`
   - remaining work: broaden semantic/type/layout/effect breadth beyond the newly landed fused-elementwise semantics and deepen routine semantics
-- `docs/todo/layers/02_programming_surfaces.md`
+- `docs/todo/02_programming_surfaces.md`
   - remaining work: finish the written AST-centric comparison against LittleKernel and use it to drive the next surface pass now that Arknife has been pulled onto native `KernelValue` objects
-- `docs/todo/layers/03_pipeline_and_solver.md`
+- `docs/todo/03_pipeline_and_solver.md`
   - remaining work: richer search/composition and broader MLIR island breadth
-- `docs/todo/layers/04_artifacts_replay_debug.md`
+- `docs/todo/04_artifacts_replay_debug.md`
   - remaining work: broader consistency checks and deeper replay/reference coverage
-- `docs/todo/layers/05_backends_and_extensions.md`
+- `docs/todo/05_backends_and_extensions.md`
   - remaining work: deepen PTO, NV-GPU, and AIE rather than changing the architecture; the remaining gap is backend depth, not the Arknife reuse boundary
-- `docs/todo/layers/06_agent_product_and_workflow.md`
+- `docs/todo/06_agent_product_and_workflow.md`
   - remaining work: stronger autonomous loops and continued quality-discipline tightening
 
-## Detailed remaining layers
+## Detailed remaining TODO files
 
-- `docs/todo/layers/01_compiler_model.md`
-- `docs/todo/layers/02_programming_surfaces.md`
-- `docs/todo/layers/03_pipeline_and_solver.md`
-- `docs/todo/layers/04_artifacts_replay_debug.md`
-- `docs/todo/layers/05_backends_and_extensions.md`
-- `docs/todo/layers/06_agent_product_and_workflow.md`
+- `docs/todo/01_compiler_model.md`
+- `docs/todo/02_programming_surfaces.md`
+- `docs/todo/03_pipeline_and_solver.md`
+- `docs/todo/04_artifacts_replay_debug.md`
+- `docs/todo/05_backends_and_extensions.md`
+- `docs/todo/06_agent_product_and_workflow.md`
 - `docs/todo/reports/retargetable_extensibility_report.md`
 - `docs/todo/reports/littlekernel_ast_comparison.md`

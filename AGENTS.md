@@ -9,7 +9,7 @@ This file is the operating contract for agents and contributors working in this 
 For every feature-sized change:
 
 1. start from `htp/dev`
-2. choose a feature-sized gap from `docs/todo/README.md` and the detailed layer docs under `docs/todo/layers/`
+2. choose a feature-sized gap from `docs/todo/README.md` and the detailed layer docs under `docs/todo/`
 3. create a branch named `htp/feat-<topic>`
 4. create a task file under `docs/in_progress/` using `docs/in_progress/TEMPLATE.md`
 5. make that task-file creation its own first commit
@@ -17,7 +17,7 @@ For every feature-sized change:
 7. land implementation as additional commits on that PR
 8. before merge:
    - update `docs/design/` for what is now implemented
-   - update `docs/todo/README.md` and the affected `docs/todo/layers/*.md`
+   - update `docs/todo/README.md` and the affected `docs/todo/*.md`
    - remove the corresponding file from `docs/in_progress/`
    - rebase on current `htp/dev`
    - verify locally and wait for green CI
@@ -34,7 +34,7 @@ Before editing:
    - `.agent/rules/core-development.md`
    - `.agent/rules/docs-and-artifacts.md`
    - `.agent/rules/testing-and-verification.md`
-4. if touching a backend, binding, runtime, replay path, artifact layout, or extension seam, read the corresponding doc in `docs/design/layers/` and the relevant example-local `examples/**/README.md`
+4. if touching a backend, binding, runtime, replay path, artifact layout, or extension seam, read the corresponding doc in `docs/design/` and the relevant example-local `examples/**/README.md`
 
 Do not begin with speculative edits.
 
@@ -46,11 +46,11 @@ The `docs/` tree is strict.
   - implemented behavior only
   - must reference real code paths
   - `README.md` is the index and architecture entrypoint
-  - layer documents live under `docs/design/layers/`
+  - layer documents live under `docs/design/`
 - `docs/todo/`
   - unimplemented or partial features only
   - `README.md` is the summary checklist for remaining feature work
-  - future layer documents live under `docs/todo/layers/`
+  - future layer documents live under `docs/todo/`
 - `docs/in_progress/`
   - active feature-branch task files only
   - one file per feature PR
