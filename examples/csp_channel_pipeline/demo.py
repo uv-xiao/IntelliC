@@ -5,30 +5,45 @@ from pathlib import Path
 from typing import Any
 
 from htp import bind, compile_program
-from htp.csp import channel, process
+from htp.csp import fifo, get, process, put
 from htp.csp import program as csp_program
+from htp.kernel import buffer, kernel, scalar, store
+
+
+@kernel
+def gemm_tile(
+    A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+    B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+    C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+    M: scalar(dtype="i32", role="shape"),
+    N: scalar(dtype="i32", role="shape"),
+    K: scalar(dtype="i32", role="shape"),
+) -> None:
+    """Pipeline kernel used by the producer and consumer processes."""
+
+    store(C, A @ B)
+
 
 CSP_PIPELINE_PROGRAM: dict[str, Any] = csp_program(
     entry="pipeline_demo",
-    target={"backend": "nvgpu", "option": "ampere"},
-    kernel={
-        "name": "gemm_tile",
-        "args": [
-            {"name": "A", "kind": "buffer", "dtype": "f32", "shape": ["M", "K"], "role": "input"},
-            {"name": "B", "kind": "buffer", "dtype": "f32", "shape": ["K", "N"], "role": "input"},
-            {"name": "C", "kind": "buffer", "dtype": "f32", "shape": ["M", "N"], "role": "output"},
-            {"name": "M", "kind": "scalar", "dtype": "i32", "shape": [], "role": "shape"},
-            {"name": "N", "kind": "scalar", "dtype": "i32", "shape": [], "role": "shape"},
-            {"name": "K", "kind": "scalar", "dtype": "i32", "shape": [], "role": "shape"},
-        ],
-        "ops": [
-            {"op": "matmul", "lhs": "A", "rhs": "B", "out": "C", "m": "M", "n": "N", "k": "K", "dtype": "f32"}
-        ],
-    },
-    channels=[channel("tiles", dtype="f32", capacity=2)],
+    target="nvgpu-ampere",
+    kernel=gemm_tile,
+    channels=[fifo("tiles", dtype="f32", capacity=2)],
     processes=[
-        process("producer", task_id="p0", kernel="gemm_tile", puts=[{"channel": "tiles", "count": 1}]),
-        process("consumer", task_id="p1", kernel="gemm_tile", gets=[{"channel": "tiles", "count": 1}]),
+        process(
+            "producer",
+            task_id="p0",
+            kernel=gemm_tile,
+            args=("A", "B", "C", "M", "N", "K"),
+            steps=[put("tiles")],
+        ),
+        process(
+            "consumer",
+            task_id="p1",
+            kernel=gemm_tile,
+            args=("A", "B", "C", "M", "N", "K"),
+            steps=[get("tiles")],
+        ),
     ],
 )
 
