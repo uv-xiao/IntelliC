@@ -24,35 +24,49 @@ def gemm_tile(
     store(C, A @ B)
 
 
-CSP_PIPELINE_PROGRAM: dict[str, Any] = csp_program(
-    entry="pipeline_demo",
+@csp_program(
     target="nvgpu-ampere",
-    kernel=gemm_tile,
-    channels=[fifo("tiles", dtype="f32", capacity=2)],
-    processes=[
-        process(
-            "producer",
-            task_id="p0",
-            kernel=gemm_tile,
-            args=("A", "B", "C", "M", "N", "K"),
-            steps=[put("tiles")],
-        ),
-        process(
-            "consumer",
-            task_id="p1",
-            kernel=gemm_tile,
-            args=("A", "B", "C", "M", "N", "K"),
-            steps=[get("tiles")],
-        ),
-    ],
 )
+def channel_pipeline(
+    activations: buffer(dtype="f32", shape=("M", "K"), role="input"),
+    weights0: buffer(dtype="f32", shape=("K", "N"), role="input"),
+    weights1: buffer(dtype="f32", shape=("N", "P"), role="input"),
+    stage0: buffer(dtype="f32", shape=("M", "N"), role="output"),
+    stage1: buffer(dtype="f32", shape=("M", "P"), role="output"),
+    output: buffer(dtype="f32", shape=("M", "P"), role="output"),
+    M: scalar(dtype="i32", role="shape"),
+    N: scalar(dtype="i32", role="shape"),
+    K: scalar(dtype="i32", role="shape"),
+    P: scalar(dtype="i32", role="shape"),
+) -> None:
+    tiles = fifo("tiles", dtype="f32", capacity=2)
+    partials = fifo("partials", dtype="f32", capacity=1)
+    completions = fifo("completions", dtype="f32", capacity=1)
+    process(
+        "prefetch",
+        kernel=gemm_tile,
+        args=(activations, weights0, stage0, M, N, K),
+        steps=[put(tiles), put(partials)],
+    )
+    process(
+        "compute",
+        kernel=gemm_tile,
+        args=(stage0, weights1, stage1, M, P, N),
+        steps=[get(tiles), get(partials), put(completions)],
+    )
+    process(
+        "epilogue",
+        kernel=gemm_tile,
+        args=(stage1, weights1, output, M, P, P),
+        steps=[get(completions)],
+    )
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
     package = compile_program(
         package_dir=Path(output_dir),
         target="nvgpu-ampere",
-        program=dict(CSP_PIPELINE_PROGRAM),
+        program=channel_pipeline,
     )
     return {
         "package_dir": package.package_dir.as_posix(),
@@ -67,12 +81,14 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
     stage_id = session.manifest["stages"]["current"]
     result = session.replay(stage_id, trace="basic")
     effects = json.loads((package_dir / "ir" / "stages" / stage_id / "effects.json").read_text())
+    workload_ir = json.loads((package_dir / "ir" / "stages" / stage_id / "workload_ir.json").read_text())
     return {
         "ok": result.ok,
         "stage_id": stage_id,
         "entry": result.entry,
         "diagnostics": result.diagnostics,
         "effects": effects,
+        "workload_ir": workload_ir,
     }
 
 

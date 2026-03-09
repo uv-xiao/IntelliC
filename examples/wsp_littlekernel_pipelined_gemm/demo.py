@@ -10,7 +10,6 @@ from htp.wsp import bind as wsp_bind
 from htp.wsp import pipeline as wsp_pipeline
 from htp.wsp import program as wsp_program
 from htp.wsp import resources as wsp_resources
-from htp.wsp import schedule as wsp_schedule
 from htp.wsp import specialize as wsp_specialize
 from htp.wsp import task as wsp_task
 from htp.wsp import tile as wsp_tile
@@ -30,26 +29,35 @@ def pipelined_gemm(
     store(C, A @ B)
 
 
-LITTLEKERNEL_GEMM_PROGRAM: dict[str, Any] = wsp_program(
-    entry="pipelined_gemm",
+@wsp_program(
     target="nvgpu-ampere",
-    kernel=pipelined_gemm,
-    tasks=[wsp_task(pipelined_gemm, "A", "B", "C", "M", "N", "K", task_id="tile_main")],
-    schedule=wsp_schedule(
-        tile=wsp_tile(block=(128, 256, 64)),
-        bind=wsp_bind(grid="block", lane="warp"),
-        pipeline=wsp_pipeline(depth=3, buffering="double"),
-        resources=wsp_resources(num_warps=8),
-        specialize=wsp_specialize(operator="matmul"),
-    ),
+    tile=wsp_tile(block=(128, 256, 64)),
+    bind=wsp_bind(grid="block", lane="warp"),
+    pipeline=wsp_pipeline(depth=3, buffering="double"),
+    resources=wsp_resources(num_warps=8),
+    specialize=wsp_specialize(operator="matmul"),
 )
+def pipelined_mainloop(
+    A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+    B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+    C_stage0: buffer(dtype="f32", shape=("M", "N"), role="output"),
+    C_stage1: buffer(dtype="f32", shape=("M", "N"), role="output"),
+    C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+    M: scalar(dtype="i32", role="shape"),
+    N: scalar(dtype="i32", role="shape"),
+    K: scalar(dtype="i32", role="shape"),
+) -> None:
+    prologue = wsp_task(pipelined_gemm, A, B, C_stage0, M, N, K, task_id="prologue")
+    stage0 = wsp_task(pipelined_gemm, A, B, C_stage1, M, N, K, after=prologue, task_id="stage0")
+    stage1 = wsp_task(pipelined_gemm, A, B, C_stage0, M, N, K, after=stage0, task_id="stage1")
+    wsp_task(pipelined_gemm, A, B, C, M, N, K, after=stage1, task_id="epilogue")
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
     package = compile_program(
         package_dir=Path(output_dir),
         target="nvgpu-ampere",
-        program=dict(LITTLEKERNEL_GEMM_PROGRAM),
+        program=pipelined_mainloop,
     )
     return {
         "package_dir": package.package_dir.as_posix(),
@@ -64,12 +72,14 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
     stage_id = session.manifest["stages"]["current"]
     result = session.replay(stage_id, trace="basic")
     schedule = json.loads((package_dir / "ir" / "stages" / stage_id / "schedule.json").read_text())
+    workload_ir = json.loads((package_dir / "ir" / "stages" / stage_id / "workload_ir.json").read_text())
     return {
         "ok": result.ok,
         "stage_id": stage_id,
         "entry": result.entry,
         "diagnostics": result.diagnostics,
         "schedule": schedule,
+        "workload_ir": workload_ir,
     }
 
 

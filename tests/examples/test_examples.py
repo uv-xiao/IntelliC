@@ -99,6 +99,11 @@ def test_wsp_example_compiles_and_replays(tmp_path):
     assert replay_summary["ok"] is True
     assert replay_summary["schedule"]["pipeline_depth"] >= 1
     assert replay_summary["schedule"]["launch"]["num_warps"] == 4
+    assert [task["task_id"] for task in replay_summary["workload_ir"]["tasks"]] == [
+        "load_warp",
+        "compute_warp",
+        "store_warp",
+    ]
 
 
 def test_littlekernel_example_compiles_and_replays(tmp_path):
@@ -110,6 +115,12 @@ def test_littlekernel_example_compiles_and_replays(tmp_path):
     assert replay_summary["ok"] is True
     assert replay_summary["schedule"]["pipeline_depth"] >= 3
     assert replay_summary["schedule"]["launch"]["num_warps"] == 8
+    assert [task["task_id"] for task in replay_summary["workload_ir"]["tasks"]] == [
+        "prologue",
+        "stage0",
+        "stage1",
+        "epilogue",
+    ]
 
 
 def test_csp_example_compiles_and_replays(tmp_path):
@@ -127,10 +138,37 @@ def test_csp_example_compiles_and_replays(tmp_path):
             "puts": 1,
             "gets": 1,
             "balanced": True,
-            "participants": ["consumer", "producer"],
+            "participants": ["compute", "prefetch"],
             "hazards": [],
             "deadlock_safe": True,
-        }
+        },
+        {
+            "channel": "partials",
+            "protocol": "fifo",
+            "capacity": 1,
+            "puts": 1,
+            "gets": 1,
+            "balanced": True,
+            "participants": ["compute", "prefetch"],
+            "hazards": [],
+            "deadlock_safe": True,
+        },
+        {
+            "channel": "completions",
+            "protocol": "fifo",
+            "capacity": 1,
+            "puts": 1,
+            "gets": 1,
+            "balanced": True,
+            "participants": ["compute", "epilogue"],
+            "hazards": [],
+            "deadlock_safe": True,
+        },
+    ]
+    assert [process["name"] for process in replay_summary["workload_ir"]["processes"]] == [
+        "prefetch",
+        "compute",
+        "epilogue",
     ]
 
 

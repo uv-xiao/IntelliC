@@ -2,7 +2,7 @@
 
 - ID: `009-traced-wsp-csp-surfaces`
 - Branch: `htp/feat-traced-wsp-csp-surfaces`
-- PR: `TBD`
+- PR: `#44`
 - Status: `in_progress`
 - Owner: `Codex`
 
@@ -18,11 +18,11 @@ Replace the remaining payload-shaped WSP/CSP public authoring with traced, human
 
 ## Scope Checklist
 
-- [ ] add traced WSP/CSP program surfaces that record tasks/channels/processes from ordinary Python
-- [ ] rewrite the flagship WSP/CSP examples onto those traced surfaces with stronger pattern content
-- [ ] strengthen tests around the new traced authoring rules and malformed usage
-- [ ] rewrite `docs/design/layers/02_programming_surfaces.md` with detailed surface design and extension guidance
-- [ ] update `docs/todo/` to narrow the programming-surface gap
+- [x] add traced WSP/CSP program surfaces that record tasks/channels/processes from ordinary Python
+- [x] rewrite the flagship WSP/CSP examples onto those traced surfaces with stronger pattern content
+- [x] strengthen tests around the new traced authoring rules and malformed usage
+- [x] rewrite `docs/design/layers/02_programming_surfaces.md` with detailed surface design and extension guidance
+- [x] update `docs/todo/` to narrow the programming-surface gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Code Surfaces
@@ -35,18 +35,18 @@ Replace the remaining payload-shaped WSP/CSP public authoring with traced, human
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test for traced WSP/CSP authoring
-- [ ] one malformed-input / contract-violation test for the new surface
-- [ ] one regression test showing the new surface removes an old awkward pattern
-- [ ] human-friendly flagship examples updated or added
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test for traced WSP/CSP authoring
+- [x] one malformed-input / contract-violation test for the new surface
+- [x] one regression test showing the new surface removes an old awkward pattern
+- [x] human-friendly flagship examples updated or added
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for implemented behavior
-- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] update `docs/design/` for implemented behavior
+- [x] update `docs/todo/` to remove or narrow the gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan

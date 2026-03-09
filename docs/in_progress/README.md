@@ -11,5 +11,4 @@ Rules:
 
 ## Active tasks
 
-- none
 - `docs/in_progress/009-traced-wsp-csp-surfaces.md`

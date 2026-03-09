@@ -31,13 +31,21 @@ This layer tracks the remaining gap between today’s authoring surfaces and the
 
 ## Why these tasks remain
 
-The public surface and examples are now materially stronger: PTO examples cover
-vector add, SwiGLU, GELU, and a broader arithmetic DAG; WSP/CSP public examples
-no longer depend on nested top-level payload dicts; and a LittleKernel-inspired
-WSP example now exists. The remaining gap in this layer is no longer “make the
-surface readable at all”. It is the written comparative analysis tracked in
+The public surface and examples are now materially stronger:
+
+- PTO examples cover vector add, SwiGLU, GELU, and a broader arithmetic DAG
+- WSP examples now use traced `@wsp.program(...)` plus named task handles
+  instead of top-level payload assembly
+- CSP examples now use traced `@csp.program(...)` plus typed channels and named
+  processes instead of raw process payload lists
+- a LittleKernel-calibrated WSP pipelined GEMM example now shows a visible
+  prologue / steady-state / epilogue structure
+
+The remaining gap in this layer is no longer “make the surface readable at
+all”. It is the written comparative analysis tracked in
 `docs/todo/reports/littlekernel_ast_comparison.md`, which should drive the next
-front-end pass.
+frontend pass and decide what additional syntax simplifications HTP should
+adopt.
 
 ## Coding pointers
 

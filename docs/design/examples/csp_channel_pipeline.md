@@ -6,7 +6,7 @@ Files:
 - `examples/csp_channel_pipeline/README.md`
 
 This example uses the implemented `htp.csp` authoring surface to compile a
-two-process pipeline with a typed FIFO channel.
+three-process channel pipeline with typed FIFO channels.
 
 What it proves:
 
@@ -14,5 +14,8 @@ What it proves:
 - The type/layout/effect pass emits balanced protocol obligations into staged
   `effects.json`.
 - The final package remains replayable in `sim`.
-- The public example can now be written through a traced `@kernel`, `fifo(...)`,
-  `put(...)`, and `get(...)` helpers instead of inline nested dict payloads.
+- The public example can now be written through traced `@kernel` and
+  `@csp.program(...)` surfaces plus `fifo(...)`, `put(...)`, `get(...)`, and
+  `process(...)` helpers instead of inline nested dict payloads.
+- The authored Python now exposes `prefetch`, `compute`, and `epilogue`
+  processes plus the `tiles`, `partials`, and `completions` channels directly.

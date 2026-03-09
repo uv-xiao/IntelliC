@@ -10,7 +10,6 @@ from htp.wsp import bind as wsp_bind
 from htp.wsp import pipeline as wsp_pipeline
 from htp.wsp import program as wsp_program
 from htp.wsp import resources as wsp_resources
-from htp.wsp import schedule as wsp_schedule
 from htp.wsp import specialize as wsp_specialize
 from htp.wsp import task as wsp_task
 from htp.wsp import tile as wsp_tile
@@ -30,26 +29,33 @@ def gemm_tile(
     store(C, A @ B)
 
 
-WSP_GEMM_PROGRAM: dict[str, Any] = wsp_program(
-    entry="gemm_tile",
+@wsp_program(
     target="nvgpu-ampere",
-    kernel=gemm_tile,
-    tasks=[wsp_task(gemm_tile, "A", "B", "C", "M", "N", "K", task_id="gemm_main")],
-    schedule=wsp_schedule(
-        tile=wsp_tile(block=(32, 64, 16)),
-        bind=wsp_bind(grid="block", lane="warp"),
-        pipeline=wsp_pipeline(depth=2, buffering="double"),
-        resources=wsp_resources(num_warps=4),
-        specialize=wsp_specialize(operator="matmul"),
-    ),
+    tile=wsp_tile(block=(32, 64, 16)),
+    bind=wsp_bind(grid="block", lane="warp"),
+    pipeline=wsp_pipeline(depth=2, buffering="double"),
+    resources=wsp_resources(num_warps=4),
+    specialize=wsp_specialize(operator="matmul"),
 )
+def warp_specialized_gemm(
+    A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+    B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+    C_partial: buffer(dtype="f32", shape=("M", "N"), role="output"),
+    C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+    M: scalar(dtype="i32", role="shape"),
+    N: scalar(dtype="i32", role="shape"),
+    K: scalar(dtype="i32", role="shape"),
+) -> None:
+    load_warp = wsp_task(gemm_tile, A, B, C_partial, M, N, K, task_id="load_warp")
+    compute_warp = wsp_task(gemm_tile, A, B, C_partial, M, N, K, after=load_warp, task_id="compute_warp")
+    wsp_task(gemm_tile, A, B, C, M, N, K, after=compute_warp, task_id="store_warp")
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
     package = compile_program(
         package_dir=Path(output_dir),
         target="nvgpu-ampere",
-        program=dict(WSP_GEMM_PROGRAM),
+        program=warp_specialized_gemm,
     )
     return {
         "package_dir": package.package_dir.as_posix(),
@@ -64,12 +70,14 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
     stage_id = session.manifest["stages"]["current"]
     result = session.replay(stage_id, trace="basic")
     schedule = json.loads((package_dir / "ir" / "stages" / stage_id / "schedule.json").read_text())
+    workload_ir = json.loads((package_dir / "ir" / "stages" / stage_id / "workload_ir.json").read_text())
     return {
         "ok": result.ok,
         "stage_id": stage_id,
         "entry": result.entry,
         "diagnostics": result.diagnostics,
         "schedule": schedule,
+        "workload_ir": workload_ir,
     }
 
 

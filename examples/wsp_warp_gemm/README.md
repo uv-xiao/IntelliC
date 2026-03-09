@@ -1,7 +1,7 @@
 # WSP Warp GEMM Example
 
-This example exercises the WSP authoring surface on top of the shared HTP
-pipeline.
+This example exercises the traced WSP authoring surface on top of the shared
+HTP pipeline.
 
 It proves three implemented contracts:
 
@@ -9,6 +9,8 @@ It proves three implemented contracts:
 - The default pipeline preserves those directives into staged
   `schedule.json`.
 - The final package remains replayable in `sim`.
+- The authored Python shows named `load_warp`, `compute_warp`, and `store_warp`
+  tasks instead of one anonymous metadata-wrapped call.
 
 Run:
 

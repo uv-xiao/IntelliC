@@ -235,6 +235,120 @@ def test_compile_program_accepts_traced_routine_surface(tmp_path):
     assert compiled.manifest["target"]["backend"] == "nvgpu"
 
 
+def test_public_wsp_surface_supports_traced_program_authoring():
+    @kernel
+    def gemm_tile(
+        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(C, A @ B)
+
+    @wsp_program(
+        target="nvgpu-ampere",
+        tile=wsp_tile(block=(128, 128, 32)),
+        bind=wsp_bind(grid="block", lane="warp"),
+        pipeline=wsp_pipeline(depth=3, buffering="double"),
+        resources=wsp_resources(num_warps=8),
+        specialize=wsp_specialize(operator="matmul"),
+    )
+    def pipelined_gemm(
+        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        C_stage: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        prologue = wsp_task(gemm_tile, A, B, C_stage, M, N, K, task_id="prologue")
+        steady = wsp_task(gemm_tile, A, B, C_stage, M, N, K, after=prologue, task_id="steady")
+        wsp_task(gemm_tile, A, B, C, M, N, K, after=steady, task_id="epilogue")
+
+    payload = pipelined_gemm.to_program()
+
+    assert [task["task_id"] for task in payload["wsp"]["workload"]["tasks"]] == [
+        "prologue",
+        "steady",
+        "epilogue",
+    ]
+    assert payload["wsp"]["workload"]["dependencies"] == [
+        {"src": "prologue", "dst": "steady"},
+        {"src": "steady", "dst": "epilogue"},
+    ]
+    assert payload["wsp"]["schedule"]["pipeline"]["depth"] == 3
+    assert payload["wsp"]["schedule"]["resources"]["num_warps"] == 8
+
+
+def test_public_csp_surface_supports_traced_program_authoring():
+    @kernel
+    def stage_kernel(
+        src: buffer(dtype="f32", shape=("M", "N"), role="input"),
+        weights: buffer(dtype="f32", shape=("N", "K"), role="input"),
+        dst: buffer(dtype="f32", shape=("M", "K"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(dst, src @ weights)
+
+    @csp_program(target="nvgpu-ampere")
+    def staged_pipeline(
+        activations: buffer(dtype="f32", shape=("M", "N"), role="input"),
+        weights0: buffer(dtype="f32", shape=("N", "K"), role="input"),
+        weights1: buffer(dtype="f32", shape=("K", "P"), role="input"),
+        hidden: buffer(dtype="f32", shape=("M", "K"), role="output"),
+        out: buffer(dtype="f32", shape=("M", "P"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+        P: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        tiles = fifo("tiles", dtype="f32", capacity=2)
+        partials = fifo("partials", dtype="f32", capacity=1)
+        process(
+            "prefetch",
+            kernel=stage_kernel,
+            args=(activations, weights0, hidden, M, N, K),
+            steps=[put(tiles), put(partials)],
+        )
+        process(
+            "consumer",
+            kernel=stage_kernel,
+            args=(hidden, weights1, out, M, K, P),
+            steps=[get(tiles), get(partials)],
+        )
+
+    payload = staged_pipeline.to_program()
+
+    assert [channel["name"] for channel in payload["csp"]["channels"]] == ["tiles", "partials"]
+    assert [process["task_id"] for process in payload["csp"]["processes"]] == ["prefetch", "consumer"]
+    assert payload["csp"]["processes"][0]["puts"] == [
+        {"kind": "put", "channel": "tiles", "count": 1},
+        {"kind": "put", "channel": "partials", "count": 1},
+    ]
+    assert payload["csp"]["processes"][1]["gets"] == [
+        {"kind": "get", "channel": "tiles", "count": 1},
+        {"kind": "get", "channel": "partials", "count": 1},
+    ]
+
+
+def test_public_csp_surface_rejects_non_kernel_process_in_traced_program():
+    with pytest.raises(TypeError, match="KernelSpec"):
+
+        @csp_program(target="nvgpu-ampere")
+        def invalid_pipeline(
+            src: buffer(dtype="f32", shape=("M",), role="input"),
+            dst: buffer(dtype="f32", shape=("M",), role="output"),
+            M: scalar(dtype="i32", role="shape"),
+        ) -> None:
+            tiles = fifo("tiles", dtype="f32", capacity=1)
+            process("bad", kernel="vector_add", args=(src, dst, M), steps=[put(tiles)])
+
+
 def test_public_kernel_surface_covers_broader_operation_helpers():
     payload = kernel(
         "rich_kernel",

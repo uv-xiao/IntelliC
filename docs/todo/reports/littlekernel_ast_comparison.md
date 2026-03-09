@@ -6,8 +6,14 @@ compiler and `references/triton-distributed-knowingnothing/python/little_kernel`
 ## Why it remains
 
 HTP now has code-backed programming surfaces that are materially closer to the
-LittleKernel bar, but the repository still does not contain a full written
-comparison of:
+LittleKernel bar:
+
+- traced `@kernel` authoring with expression-form arithmetic
+- traced `@wsp.program(...)` for named WSP tasks and schedule directives
+- traced `@csp.program(...)` for typed channels and named processes
+- LittleKernel-calibrated WSP pipelined GEMM examples under `examples/`
+
+But the repository still does not contain a full written comparison of:
 
 - how both systems use Python as the authoring medium
 - where HTP keeps Python AST canonical while LittleKernel transitions into its
