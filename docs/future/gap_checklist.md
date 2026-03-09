@@ -433,11 +433,11 @@ Checklist:
   richer closure than current code implements.
 - `[x]` Add manifest-level inputs/pipeline/capabilities recording beyond the
   current minimal shape.
-- `[~]` Validate more than stage graph paths at the generic validation layer
+- `[x]` Validate more than stage graph paths at the generic validation layer
   where appropriate.
 - `[ ]` Make artifact ownership and validation rules fully shared between
   emitters, solver, and bindings.
-- `[ ]` Add structured schema/version validation for more emitted sidecars.
+- `[x]` Add structured schema/version validation for more emitted sidecars.
 - `[ ]` Strengthen staged semantic diff support around identities and maps.
 - `[ ]` Make replay/stub metadata richer and easier to diff automatically.
 

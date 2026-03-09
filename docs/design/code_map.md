@@ -12,7 +12,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/diagnostics.py` — diagnostic catalog and fix-hint policies
 - `htp/agent_policy.py` — agent policy loading for verify/promote tooling
 - `htp/perf.py` — perf metric loading and baseline-threshold comparison
-- `htp/bindings/validate.py` — generic manifest/artifact validation, including optional manifest section shape checks
+- `htp/bindings/validate.py` — generic manifest/artifact validation, including optional manifest sections and sidecar schema checks
 - `htp/intrinsics.py` — intrinsic declarations plus lower/emit/sim handler registration
 - `htp_ext/aie/intrinsics.py` — extension-owned backend intrinsic package example
 - `htp/pipeline/defaults.py` — default pipeline execution over solver-validated pass contracts

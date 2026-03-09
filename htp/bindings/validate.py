@@ -5,6 +5,16 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+from htp.artifacts.stages import ANALYSIS_INDEX_SCHEMA_ID
+from htp.schemas import (
+    BINDING_MAP_SCHEMA_ID,
+    ENTITY_MAP_SCHEMA_ID,
+    IDS_BINDINGS_SCHEMA_ID,
+    IDS_ENTITIES_SCHEMA_ID,
+    MANIFEST_SCHEMA_ID,
+    REPLAY_STUBS_SCHEMA_ID,
+)
+
 CONTRACT_REFS = (
     "docs/design/impls/07_binding_interface.md",
     "docs/design/feats/08_binding_runtime.md",
@@ -38,9 +48,16 @@ def iter_contract_paths(manifest: Mapping[str, Any]) -> Iterable[str]:
 
 
 def validation_diagnostics(
-    manifest: Mapping[str, Any], missing_files: tuple[str, ...]
+    manifest: Mapping[str, Any], missing_files: tuple[str, ...], package_dir: Path | str | None = None
 ) -> tuple[dict[str, str], ...]:
     diagnostics: list[dict[str, str]] = []
+    if manifest.get("schema") != MANIFEST_SCHEMA_ID:
+        diagnostics.append(
+            {
+                "code": "HTP.BINDINGS.INVALID_SCHEMA",
+                "detail": f"manifest.json must declare schema {MANIFEST_SCHEMA_ID!r}.",
+            }
+        )
     backend, _variant = manifest_target(manifest)
     if backend is None:
         diagnostics.append(
@@ -50,6 +67,8 @@ def validation_diagnostics(
             }
         )
     diagnostics.extend(_manifest_shape_diagnostics(manifest))
+    if package_dir is not None:
+        diagnostics.extend(_sidecar_schema_diagnostics(package_dir, manifest, missing_files))
     for missing_path in missing_files:
         diagnostics.append(
             {
@@ -158,6 +177,88 @@ def _manifest_shape_diagnostics(manifest: Mapping[str, Any]) -> list[dict[str, s
             }
         )
     return diagnostics
+
+
+def _sidecar_schema_diagnostics(
+    package_dir: Path | str, manifest: Mapping[str, Any], missing_files: tuple[str, ...]
+) -> list[dict[str, str]]:
+    root = Path(package_dir)
+    missing = set(missing_files)
+    diagnostics: list[dict[str, str]] = []
+    for relpath, expected_schema in _iter_schema_paths(manifest):
+        if relpath in missing or expected_schema is None:
+            continue
+        path = root / relpath
+        try:
+            payload = json.loads(path.read_text())
+        except Exception as exc:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.MALFORMED_JSON",
+                    "detail": f"{relpath} could not be decoded as JSON: {exc}",
+                }
+            )
+            continue
+        if not isinstance(payload, Mapping):
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.INVALID_SCHEMA",
+                    "detail": f"{relpath} must decode to a mapping with schema {expected_schema!r}.",
+                }
+            )
+            continue
+        if payload.get("schema") != expected_schema:
+            diagnostics.append(
+                {
+                    "code": "HTP.BINDINGS.INVALID_SCHEMA",
+                    "detail": f"{relpath} must declare schema {expected_schema!r}.",
+                }
+            )
+    return diagnostics
+
+
+def _iter_schema_paths(manifest: Mapping[str, Any]) -> Iterable[tuple[str, str | None]]:
+    for stage in _stage_graph(manifest):
+        analysis_index = stage.get("analysis_index")
+        if isinstance(analysis_index, str):
+            yield analysis_index, ANALYSIS_INDEX_SCHEMA_ID
+        program_pyast = stage.get("program_pyast")
+        if isinstance(program_pyast, str):
+            yield program_pyast, "htp.program_ast.v1"
+        semantic = stage.get("semantic")
+        if isinstance(semantic, Mapping):
+            for key, schema in (
+                ("kernel_ir", "htp.kernel_ir.v1"),
+                ("workload_ir", "htp.workload_ir.v1"),
+                ("types", "htp.types.v1"),
+                ("layout", "htp.layout.v1"),
+                ("effects", "htp.effects.v1"),
+                ("schedule", "htp.schedule.v1"),
+            ):
+                relpath = semantic.get(key)
+                if isinstance(relpath, str):
+                    yield relpath, schema
+        ids = stage.get("ids")
+        if isinstance(ids, Mapping):
+            entities = ids.get("entities")
+            bindings = ids.get("bindings")
+            if isinstance(entities, str):
+                yield entities, IDS_ENTITIES_SCHEMA_ID
+            if isinstance(bindings, str):
+                yield bindings, IDS_BINDINGS_SCHEMA_ID
+        maps = stage.get("maps")
+        if isinstance(maps, Mapping):
+            entity_map = maps.get("entity_map")
+            binding_map = maps.get("binding_map")
+            if isinstance(entity_map, str):
+                yield entity_map, ENTITY_MAP_SCHEMA_ID
+            if isinstance(binding_map, str):
+                yield binding_map, BINDING_MAP_SCHEMA_ID
+        runnable_py = stage.get("runnable_py")
+        if isinstance(runnable_py, Mapping):
+            stubs = runnable_py.get("stubs")
+            if isinstance(stubs, str):
+                yield stubs, REPLAY_STUBS_SCHEMA_ID
 
 
 __all__ = [
