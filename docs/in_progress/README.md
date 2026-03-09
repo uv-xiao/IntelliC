@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `docs/in_progress/006-fused-activation-examples.md`
+- none
