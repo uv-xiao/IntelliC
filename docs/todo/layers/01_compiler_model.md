@@ -14,7 +14,7 @@ This layer tracks the remaining gap between the current semantic substrate and t
 ### Shared semantic breadth
 - [x] Stage explicit `kernel_ir`, `workload_ir`, `types`, `layout`, `effects`, and `schedule` sidecars.
 - [x] Use explicit identity and mapping artifacts instead of relying on Python object identity.
-- [~] Broaden the shared operation set beyond the current implemented mix of elementwise, view, reduction, async, protocol, and matrix-like operations.
+- [~] Broaden the shared operation set beyond the current implemented mix of unary/binary elementwise, view, reduction, async, protocol, and matrix-like operations.
 - [ ] Make the user-facing type surface as rich and stable as the internal staged payload model.
 
 ### Type/layout/effect maturity
@@ -29,7 +29,11 @@ This layer tracks the remaining gap between the current semantic substrate and t
 
 ## Why these tasks remain
 
-The implemented substrate is already strong enough to drive real backends and meaningful tools. What remains is not foundational cleanup; it is breadth. HTP still needs a wider semantic envelope before the top-level story in `docs/story.md` is fully realized.
+The implemented substrate is already strong enough to drive real backends and
+meaningful tools. Recent progress includes fused unary+binary elementwise
+semantics exercised by the PTO SwiGLU example. What remains is not foundational
+cleanup; it is breadth. HTP still needs a wider semantic envelope before the
+top-level story in `docs/story.md` is fully realized.
 
 ## Coding pointers
 

@@ -102,6 +102,7 @@ HTP semantic substrate.
 
 Code-backed example families currently include:
 - PTO vector add
+- PTO fused SwiGLU
 - NV-GPU GEMM
 - WSP warp GEMM
 - CSP channel pipeline
@@ -130,6 +131,13 @@ If you are working in this layer, start here:
 - `htp/csp/__init__.py` — CSP authoring helpers
 - `examples/` — runnable proof surface
 - `docs/design/examples/` — narrative walkthroughs tied to those examples
+
+Recent concrete proof points:
+- `examples/pto_pypto_swiglu/demo.py` shows a harder PyPTO-calibrated flagship
+  example authored entirely as a traced Python kernel.
+- `tests/examples/test_examples.py` now defends sequential PTO example
+  execution in one process so public examples remain reliable instead of being
+  “one-shot” demos.
 
 If the work changes what “good” public authoring looks like, update both the code examples and the example docs.
 

@@ -18,11 +18,11 @@ Broaden the semantic and backend surface enough to support harder, pypto-calibra
 
 ## Scope Checklist
 
-- [ ] add richer unary/elementwise semantic ops needed for fused activation examples
-- [ ] broaden NV-GPU and PTO lowering/emission for the supported fused-elementwise subset
-- [ ] add at least one harder pypto-calibrated public example
-- [ ] add focused contract and numerical tests
-- [ ] update `docs/design/` and `docs/todo/`
+- [x] add richer unary/elementwise semantic ops needed for fused activation examples
+- [x] broaden NV-GPU and PTO lowering/emission for the supported fused-elementwise subset
+- [x] add at least one harder pypto-calibrated public example
+- [x] add focused contract and numerical tests
+- [x] update `docs/design/` and `docs/todo/`
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Code Surfaces
@@ -34,8 +34,8 @@ Broaden the semantic and backend surface enough to support harder, pypto-calibra
 
 ## Test and Verification Plan
 
-- [ ] one happy-path compile/replay test for the new fused example
-- [ ] one malformed/unsupported-case test for the broadened lowering contract
-- [ ] one numerical backend-path regression where feasible
-- [ ] `pytest -q`
-- [ ] `pre-commit run --all-files`
+- [x] one happy-path compile/replay test for the new fused example
+- [x] one malformed/unsupported-case test for the broadened lowering contract
+- [x] one numerical backend-path regression where feasible
+- [x] `pytest -q`
+- [x] `pre-commit run --all-files`
