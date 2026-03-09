@@ -38,7 +38,6 @@ Agent Product + Workflow
 - `docs/design/layers/04_artifacts_replay_debug.md`
 - `docs/design/layers/05_backends_and_extensions.md`
 - `docs/design/layers/06_agent_product_and_workflow.md`
-- `docs/design/examples/README.md`
 
 ## Implemented layers
 
@@ -46,12 +45,14 @@ Agent Product + Workflow
 - `docs/design/layers/02_programming_surfaces.md` — kernel, WSP, CSP, and workload authoring surfaces
 - `docs/design/layers/03_pipeline_and_solver.md` — pass spine, capability solver, staged transformations, MLIR round-trip participation
 - `docs/design/layers/04_artifacts_replay_debug.md` — manifest, staged artifacts, replay, diagnostics, and verification surface
-- `docs/design/layers/05_backends_and_extensions.md` — PTO, NV-GPU, AIE, and extension integration
+- `docs/design/layers/05_backends_and_extensions.md` — PTO, NV-GPU, AIE, extension integration, and Arknife-style NV-GPU support
 - `docs/design/layers/06_agent_product_and_workflow.md` — agent-facing tooling and repository workflow
 
 ## Examples
 
-Runnable example walkthroughs live in `docs/design/examples/` and are backed by code under `examples/`.
+Runnable example walkthroughs live with the examples themselves under
+`examples/**/README.md`. This is intentional: public example documentation stays
+co-located with the code it explains.
 
 ## Out of scope for this tree
 

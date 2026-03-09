@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 import htp
+from htp import ark
 from htp.csp import fifo, get, process, put
 from htp.csp import program as csp_program
 from htp.kernel import (
@@ -353,3 +354,70 @@ def test_compile_program_rejects_broken_program_surface(tmp_path):
         assert "to_program()" in str(exc)
     else:
         raise AssertionError("compile_program should reject broken public program surfaces")
+
+
+def test_ark_surface_builds_ampere_program_payload():
+    @ark.build(target="nvgpu-ampere", hardware=ark.ampere())
+    def ampere_mainloop():
+        A = ark.tensor("A", dtype="f16", shape=("M", "K"), role="input", memory="global")
+        B = ark.tensor("B", dtype="f16", shape=("K", "N"), role="input", memory="global")
+        C = ark.tensor("C", dtype="f32", shape=("M", "N"), role="output", memory="global")
+        AS = ark.tensor("AS", dtype="f16", shape=("BM", "BK"), memory="shared")
+        BS = ark.tensor("BS", dtype="f16", shape=("BK", "BN"), memory="shared")
+        AR = ark.tensor("AR", dtype="f16", shape=("WM", "WK"), memory="register")
+        BR = ark.tensor("BR", dtype="f16", shape=("WK", "WN"), memory="register")
+        CR = ark.tensor("CR", dtype="f32", shape=("WM", "WN"), memory="register")
+
+        m_block = ark.axis("m_block", 2)
+        n_block = ark.axis("n_block", 2)
+        k_outer = ark.axis("k_outer", 4)
+        warp_m = ark.axis("warp_m", 2)
+        warp_n = ark.axis("warp_n", 2)
+
+        with ark.spatial("block", m_block, n_block, swizzle=[8, None]):
+            with ark.pipeline(k_outer, stages=3):
+                ark.cp_async(AS, A, channel="shared_pipe")
+                ark.cp_async(BS, B, channel="shared_pipe")
+                with ark.spatial("warp", warp_m, warp_n):
+                    ark.ldmatrix(AR, AS)
+                    ark.ldmatrix(BR, BS)
+                    ark.mma_sync(CR, AR, BR, accum=CR, shape=(16, 8, 16))
+            ark.commit(C, CR)
+        return A, B, C
+
+    payload = ampere_mainloop.to_program()
+
+    assert payload["target"] == {"backend": "nvgpu", "option": "ampere"}
+    assert payload["ark"]["hardware"]["profile"] == "ampere"
+    assert payload["ark"]["hardware"]["memory_spaces"] == ["global", "shared", "register"]
+    assert [op["op"] for op in payload["kernel"]["ops"]] == [
+        "cp_async",
+        "cp_async",
+        "ldmatrix",
+        "ldmatrix",
+        "mma_sync",
+        "commit",
+    ]
+
+
+def test_ark_surface_rejects_blackwell_only_instruction_on_ampere(tmp_path):
+    @ark.build(target="nvgpu-ampere", hardware=ark.ampere())
+    def bad_blackwell_program():
+        A = ark.tensor("A", dtype="bf16", shape=("M", "K"), role="input", memory="global")
+        B = ark.tensor("B", dtype="bf16", shape=("K", "N"), role="input", memory="global")
+        C = ark.tensor("C", dtype="f32", shape=("M", "N"), role="output", memory="global")
+        TS = ark.tensor("TS", dtype="bf16", shape=("BM", "BK"), memory="shared")
+        TC = ark.tensor("TC", dtype="f32", shape=("BM", "BN"), memory="tensor")
+
+        with ark.spatial("cluster", ark.axis("cluster_m", 2), ark.axis("cluster_n", 2)):
+            ark.tma_load(TS, A, channel="cluster_pipe")
+            ark.wgmma(TC, TS, B, accum=TC, shape=(64, 128, 16), channel="cluster_pipe")
+            ark.tma_store(C, TC, channel="store_pipe")
+        return A, B, C
+
+    with pytest.raises(RuntimeError, match="wgmma|tma_load|tma_store"):
+        htp.compile_program(
+            package_dir=tmp_path / "bad_ark_ampere",
+            target="nvgpu-ampere",
+            program=bad_blackwell_program,
+        )

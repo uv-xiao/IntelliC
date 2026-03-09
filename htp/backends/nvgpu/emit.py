@@ -91,6 +91,7 @@ def _codegen_index(plan: NVGPUCodegenPlan) -> dict[str, Any]:
         "backend": plan.backend,
         "variant": plan.variant,
         "hardware_profile": plan.hardware_profile,
+        **({"arknife": dict(plan.arknife)} if plan.arknife is not None else {}),
         "entrypoint": plan.entrypoint,
         "launch": {
             "source": plan.launch.source,
@@ -120,6 +121,11 @@ def _codegen_index(plan: NVGPUCodegenPlan) -> dict[str, Any]:
                 },
                 "op": kernel.op,
                 "attrs": dict(kernel.attrs),
+                **(
+                    {"instruction_plan": [dict(item) for item in kernel.attrs.get("instruction_plan", ())]}
+                    if isinstance(kernel.attrs.get("instruction_plan"), list)
+                    else {}
+                ),
             }
             for kernel in plan.kernels
         ],
@@ -172,6 +178,8 @@ def _launch_source(plan: NVGPUCodegenPlan) -> str:
 
 
 def _kernel_source(kernel: NVGPUKernelSpec) -> str:
+    if kernel.op == "arknife_mainloop":
+        return _arknife_kernel_source(kernel)
     if kernel.op == "matmul":
         return _matmul_kernel_source(kernel)
     return _fused_elementwise_source(kernel)
@@ -191,6 +199,49 @@ def _matmul_kernel_source(kernel: NVGPUKernelSpec) -> str:
             "  float accum = 0.0f;",
             "  for (int k = 0; k < K; ++k) {",
             "    accum += A[row * K + k] * B[k * N + col];",
+            "  }",
+            "  C[row * N + col] = accum;",
+            "}",
+            "",
+        )
+    )
+
+
+def _arknife_kernel_source(kernel: NVGPUKernelSpec) -> str:
+    attrs = kernel.attrs
+    instruction_plan = [dict(item) for item in attrs.get("instruction_plan", ())]
+    hardware = dict(attrs.get("hardware", {}))
+    channels = [dict(item) for item in attrs.get("channels", ())]
+    comment_lines = [
+        f"// Arknife hardware profile: {hardware.get('hardware_profile', '')}",
+        f"// Capabilities: {', '.join(str(item) for item in hardware.get('capabilities', ()))}",
+    ]
+    for channel in channels:
+        comment_lines.append(
+            f"// Channel {channel.get('name')}: scope={channel.get('scope')} memory={channel.get('memory')} kind={channel.get('kind')}"
+        )
+    for item in instruction_plan:
+        comment_lines.append(f"// instruction: {item.get('instruction')}")
+    return "\n".join(
+        (
+            "#include <cuda_runtime.h>",
+            "#include <math.h>",
+            "",
+            *comment_lines,
+            "",
+            f'extern "C" __global__ void {kernel.func_id}({_param_signature(kernel)}) {{',
+            "  const int row = blockIdx.y * blockDim.y + threadIdx.y;",
+            "  const int col = blockIdx.x * blockDim.x + threadIdx.x;",
+            "  if (row >= M || col >= N) {",
+            "    return;",
+            "  }",
+            "  // HTP keeps the Arknife-style instruction plan as emitted metadata and",
+            "  // annotated source. The numerical fallback below preserves semantics on",
+            "  // available hardware even when the exact low-level instruction sequence is",
+            "  // profile-specific.",
+            "  float accum = 0.0f;",
+            "  for (int k = 0; k < K; ++k) {",
+            "    accum += static_cast<float>(A[row * K + k]) * static_cast<float>(B[k * N + col]);",
             "  }",
             "  C[row * N + col] = accum;",
             "}",

@@ -11,10 +11,13 @@ The implemented repository proves that convergence at a limited but real scale.
 ## Visual model
 
 ```text
-Python authoring
-   |-- compile_program(...)
-   |-- htp.wsp
-   `-- htp.csp
+human-written Python
+   |-- htp.kernel / htp.routine
+   |-- htp.wsp / htp.csp
+   `-- htp.ark
+             |
+             v
+    canonical HTP program payload
              |
              v
     shared kernel/workload semantics
@@ -99,6 +102,47 @@ The current proof points include:
   `resources(...)` so public WSP examples no longer need to be dominated by
   nested dict literals
 
+### Arknife-style explicit hardware surface
+
+`htp.ark` is now the explicit-hierarchy frontend for NV-GPU programs. It is the
+implemented answer to “how does HTP absorb Arknife organically instead of
+copying it as a sidecar DSL?”
+
+The surface is intentionally close to the reference classes in
+`references/arknife/python/arknife/language.py` and the CUDA reference tests:
+
+- `@ark.build(target=..., hardware=...)`
+- `ark.tensor(...)`
+- `ark.axis(...)`
+- `ark.spatial(...)`
+- `ark.temporal(...)`
+- `ark.pipeline(...)`
+- instruction-level steps such as:
+  - `ark.cp_async(...)`
+  - `ark.ldmatrix(...)`
+  - `ark.mma_sync(...)`
+  - `ark.tma_load(...)`
+  - `ark.wgmma(...)`
+  - `ark.tma_store(...)`
+
+The important design decision is that this does **not** bypass HTP’s canonical
+program model. `htp.ark` lowers into the same `to_program()` payload shape as
+the rest of the compiler, while adding an `ark` sidecar with:
+
+- hardware profile metadata,
+- channel declarations,
+- instruction catalog metadata.
+
+That means:
+
+- solver selection still works through the standard target path,
+- the same pass spine still stages the program,
+- replay still happens through the standard stage program,
+- and the NV-GPU backend still consumes the normal HTP package boundary.
+
+In other words, Arknife’s *technique* is integrated; Arknife itself does not
+become a second compiler inside the repository.
+
 ### CSP
 
 `htp.csp` now proves that process/channel authoring can live inside the same compiler architecture. Current CSP examples and tests show:
@@ -124,9 +168,9 @@ surface now covers:
 That means public examples no longer need to express routine structure as
 anonymous nested dicts just to reach the workload semantic model.
 
-This is intentionally closer to the public feel of the `references/pypto/` and
-`references/arknife/` authoring examples, while still lowering into the shared
-HTP semantic substrate.
+This is intentionally closer to the public feel of the `references/pypto/`,
+`references/arknife/`, and LittleKernel authoring examples, while still
+lowering into the shared HTP semantic substrate.
 
 ## Implemented feature inventory
 
@@ -136,6 +180,8 @@ Code-backed example families currently include:
 - PTO GELU
 - PTO vector DAG
 - NV-GPU GEMM
+- NV-GPU Arknife-style Ampere GEMM mainloop
+- NV-GPU Arknife-style Blackwell cluster/TMA/WGMMA GEMM
 - WSP warp GEMM
 - LittleKernel-calibrated WSP pipelined GEMM
 - CSP channel pipeline
@@ -162,8 +208,9 @@ If you are working in this layer, start here:
 - `htp/routine.py` — public routine/workload authoring helpers
 - `htp/wsp/__init__.py` — WSP authoring helpers
 - `htp/csp/__init__.py` — CSP authoring helpers
+- `htp/ark/__init__.py` — Arknife-style hardware and instruction authoring surface
 - `examples/` — runnable proof surface
-- `docs/design/examples/` — narrative walkthroughs tied to those examples
+- `examples/**/README.md` — example-local walkthroughs
 
 Recent concrete proof points:
 - `examples/pto_pypto_swiglu/demo.py` shows a harder PyPTO-calibrated flagship
@@ -172,7 +219,11 @@ Recent concrete proof points:
   `examples/pto_pypto_vector_dag/demo.py` show that literal-bearing arithmetic
   DAGs now survive replay and PTO `a2a3sim`.
 - `examples/nvgpu_arknife_gemm/demo.py` now uses expression-form `A @ B` plus
-  `store(C, ...)` instead of explicit low-level output plumbing.
+  an explicit Arknife-style mainloop surface for block/warp/pipeline structure
+  and instruction steps.
+- `examples/nvgpu_arknife_blackwell/demo.py` proves that the same HTP
+  programming model can author cluster/TMA/WGMMA plans for the Blackwell
+  profile without creating a second compiler path.
 - `examples/wsp_littlekernel_pipelined_gemm/demo.py` calibrates WSP schedule
   readability against LittleKernel-style pipelined GEMM code without giving up
   HTP's shared artifact model.
@@ -180,7 +231,24 @@ Recent concrete proof points:
   execution in one process so public examples remain reliable instead of being
   “one-shot” demos.
 
-If the work changes what “good” public authoring looks like, update both the code examples and the example docs.
+## Extension rules for programming surfaces
+
+New public surfaces must follow the same discipline:
+
+1. authoring stays Python-native,
+2. the surface lowers into `to_program()` rather than inventing a separate
+   compiler entry,
+3. backend- or extension-specific metadata lives in a namespaced sidecar
+   (`ark`, `wsp`, `csp`, extension package payload), and
+4. the result still flows through the normal HTP pass, replay, artifact, and
+   binding contracts.
+
+That rule is now concrete because the repository has four distinct frontend
+families (`kernel`, `routine`, `wsp/csp`, and `ark`) all converging on the same
+compiler core.
+
+If the work changes what “good” public authoring looks like, update both the
+code examples and the example-local docs.
 
 ## Current limits
 

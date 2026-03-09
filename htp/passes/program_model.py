@@ -70,13 +70,20 @@ def canonicalize_program(program: Mapping[str, Any]) -> dict[str, Any]:
         normalized_workload = _normalize_workload_surface(entry, workload, normalized_kernel)
     else:
         normalized_workload = _default_workload(entry, normalized_kernel)
-    return {
+    canonical = {
         "entry": entry,
         "target": target,
         "kernel": normalized_kernel,
         "workload": normalized_workload,
         "schedule_directives": schedule_directives,
     }
+    if isinstance(program.get("ark"), Mapping):
+        canonical["ark"] = {
+            "hardware": dict(program["ark"].get("hardware", {})),
+            "channels": [dict(item) for item in program["ark"].get("channels", ())],
+            "instructions": [dict(item) for item in program["ark"].get("instructions", ())],
+        }
+    return canonical
 
 
 def build_semantic_model(
@@ -91,6 +98,9 @@ def build_semantic_model(
             kind=str(argument["kind"]),
             dtype=str(argument["dtype"]),
             shape=tuple(str(dim) for dim in argument.get("shape", ())),
+            memory_space=(
+                str(argument["memory_space"]) if argument.get("memory_space") is not None else None
+            ),
             role=str(argument["role"]) if argument.get("role") is not None else None,
             alias_of=str(argument["alias_of"]) if argument.get("alias_of") is not None else None,
             source=str(argument["source"]) if argument.get("source") is not None else None,
@@ -537,6 +547,9 @@ def _normalize_kernel_surface(entry: str, kernel: Mapping[str, Any]) -> dict[str
                 "role": str(argument["role"]) if argument.get("role") is not None else None,
                 "alias_of": str(argument["alias_of"]) if argument.get("alias_of") is not None else None,
                 "source": str(argument["source"]) if argument.get("source") is not None else None,
+                "memory_space": (
+                    str(argument["memory_space"]) if argument.get("memory_space") is not None else None
+                ),
                 **(
                     {
                         "distribution": [
@@ -550,7 +563,13 @@ def _normalize_kernel_surface(entry: str, kernel: Mapping[str, Any]) -> dict[str
             }
             for argument in kernel.get("args", ())
         ],
-        "ops": [dict(op) for op in kernel.get("ops", ())],
+        "ops": [
+            {
+                **dict(op),
+                **({"attrs": dict(op.get("attrs", {}))} if isinstance(op.get("attrs"), Mapping) else {}),
+            }
+            for op in kernel.get("ops", ())
+        ],
     }
 
 
@@ -749,7 +768,11 @@ def _op_attrs(op: Mapping[str, Any]) -> dict[str, Any]:
         "outputs",
         "value",
     }
-    return {str(key): value for key, value in op.items() if key not in reserved}
+    payload = {str(key): value for key, value in op.items() if key not in reserved and key != "attrs"}
+    nested = op.get("attrs")
+    if isinstance(nested, Mapping):
+        payload = {**dict(nested), **payload}
+    return payload
 
 
 def _buffer_type_payload(argument: Mapping[str, Any], memory_spaces: Mapping[str, str]) -> dict[str, Any]:
@@ -805,7 +828,10 @@ def _memory_spaces_for_backend(backend: str, kernel_ir: Mapping[str, Any]) -> di
         if argument.get("kind") != "buffer":
             continue
         name = str(argument["name"])
-        if backend == "pto":
+        explicit = argument.get("memory_space")
+        if isinstance(explicit, str) and explicit:
+            spaces[name] = explicit
+        elif backend == "pto":
             spaces[name] = "gm"
         elif backend == "nvgpu":
             spaces[name] = "global"
@@ -858,11 +884,20 @@ def _layout_facets(memory_spaces: Mapping[str, str], kernel_ir: Mapping[str, Any
             distribution = _matmul_output_distribution(lhs, rhs) or lhs
         else:
             distribution = join_distribution_facets(lhs, rhs) or lhs
+        attrs = op.get("attrs", {})
+        output_space = "register"
+        if isinstance(attrs, Mapping):
+            output_space = str(
+                attrs.get("out_memory")
+                or attrs.get("target_memory")
+                or attrs.get("value_memory")
+                or output_space
+            )
         buffer_layouts[out_name] = layout_to_payload(
             LayoutFacetProduct(
                 distribution=distribution,
                 memory=MemoryFacet(
-                    space="register",
+                    space=output_space,
                     layout="row_major",
                     order=tuple(range(len(shape))),
                 ),
@@ -947,10 +982,14 @@ def _matmul_output_distribution(lhs: DistributionFacet, rhs: DistributionFacet) 
 
 def _threading_for_backend(backend: str, kernel_ir: Mapping[str, Any]) -> dict[str, Any]:
     has_matmul = any(str(op.get("op")) == "matmul" for op in kernel_ir.get("ops", ()))
+    has_warpgroup = any(str(op.get("op")) == "wgmma" for op in kernel_ir.get("ops", ()))
     if backend == "pto":
         return {"core": "aiv", "block_dim": 1}
     if backend == "nvgpu":
-        return {"thread_block": [16, 16, 1] if has_matmul else [128, 1, 1], "warp_group": 1}
+        return {
+            "thread_block": [16, 16, 1] if has_matmul or has_warpgroup else [128, 1, 1],
+            "warp_group": 2 if has_warpgroup else 1,
+        }
     return {"mode": "generic"}
 
 
@@ -1369,15 +1408,18 @@ def _intrinsic_effect_contracts(kernel_ir: Mapping[str, Any]) -> list[dict[str, 
 def _validate_dtype_contracts(kernel_ir: Mapping[str, Any], *, target: Mapping[str, str]) -> None:
     backend = target["backend"]
     entry = str(kernel_ir.get("entry", ""))
+    arknife_ops = {"cp_async", "ldmatrix", "mma_sync", "tma_load", "wgmma", "tma_store", "commit"}
+    has_arknife_nvgpu_ops = any(str(op.get("op")) in arknife_ops for op in kernel_ir.get("ops", ()))
+    allowed_nvgpu_dtypes = {"f32"} if not has_arknife_nvgpu_ops else {"f32", "f16", "bf16"}
     for index, argument in enumerate(kernel_ir.get("args", ())):
         if argument.get("kind") != "buffer":
             continue
         dtype = str(argument["dtype"])
         name = str(argument["name"])
-        if backend == "nvgpu" and dtype != "f32":
+        if backend == "nvgpu" and dtype not in allowed_nvgpu_dtypes:
             raise compiler_error(
                 "HTP.TYPECHECK.UNSUPPORTED_BUFFER_DTYPE",
-                f"nvgpu buffer {name!r} requires 'f32', got {dtype!r}.",
+                f"nvgpu buffer {name!r} requires one of {sorted(allowed_nvgpu_dtypes)!r}, got {dtype!r}.",
                 node_id=f"{entry}:Arg:{index}" if entry else None,
                 entity_id=f"{entry}:E{index}" if entry else None,
                 payload_ref_hint="semantic.kernel_ir",

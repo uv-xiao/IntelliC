@@ -305,7 +305,7 @@ def test_compile_program_writes_compiler_failure_for_layout_typecheck(tmp_path):
         "stage_before": "s02",
         "diagnostic": {
             "code": "HTP.TYPECHECK.UNSUPPORTED_BUFFER_DTYPE",
-            "detail": "nvgpu buffer 'A' requires 'f32', got 'bf16'.",
+            "detail": "nvgpu buffer 'A' requires one of ['f32'], got 'bf16'.",
             "node_id": "bad_kernel:Arg:0",
             "entity_id": "bad_kernel:E0",
             "stage_id": "s02",

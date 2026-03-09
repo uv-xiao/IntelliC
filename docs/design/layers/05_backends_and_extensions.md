@@ -42,8 +42,32 @@ Implemented today:
 - NV-GPU lowerer and emitter
 - CUDA adapter with real build/launch path
 - GEMM example with real CUDA execution
+- explicit Arknife-style hardware/profile metadata in codegen artifacts
+- explicit Arknife-style instruction-plan metadata for Ampere and Blackwell
 
 This is the current proof that HTP can own the source artifact while delegating execution policy to the binding/adapter layer.
+
+#### Arknife integration inside NV-GPU
+
+The important new point is that Arknife-style targeting is now implemented as a
+native HTP path, not a disconnected example convention.
+
+What is real today:
+
+- Ampere and Blackwell remain profiles of the same `nvgpu` backend.
+- `htp.ark` programs lower into the standard HTP program model.
+- the NV-GPU lowerer inspects the `ark` sidecar and validates profile /
+  capability compatibility.
+- the emitted `nvgpu_codegen.json` now carries:
+  - the hardware profile summary,
+  - the channel plan,
+  - and the per-kernel instruction plan.
+- the emitted `.cu` source keeps those instruction decisions visible as
+  annotated comments while preserving a numerically-correct fallback kernel body.
+
+That is an important architectural step. It means explicit hardware and
+instruction planning now exist as first-class compiler facts inside HTP’s
+backend contracts instead of living only in reference notes.
 
 ### AIE extension backend
 
@@ -83,6 +107,7 @@ Main code paths:
 - `htp/bindings/pto.py`
 - `htp/bindings/pto_runtime_adapter.py`
 - `htp/backends/nvgpu/`
+- `htp/ark/__init__.py`
 - `htp/bindings/nvgpu.py`
 - `htp/bindings/nvgpu_cuda_adapter.py`
 - `htp_ext/aie/`
@@ -92,4 +117,9 @@ Main code paths:
 
 ## Current limits
 
-Backend and extension participation are real, but broader target depth still remains. Those missing tasks now live in `docs/todo/layers/05_backends_and_extensions.md`.
+Backend and extension participation are real, but broader target depth still
+remains. The main remaining work is no longer “does HTP support Arknife-style
+backend planning at all?” That part is now implemented. The remaining gap is
+deeper profile-specialized lowering, wider runtime breadth, and additional
+extension backends. Those tasks now live in
+`docs/todo/layers/05_backends_and_extensions.md`.

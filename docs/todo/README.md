@@ -17,21 +17,21 @@ For feature work:
 
 ### Overall
 
-- total tracked TODO checklist items: 54
-- complete: 36
-- partial: 11
+- total tracked TODO checklist items: 56
+- complete: 39
+- partial: 10
 - open: 7
-- completion ratio: about 67%
+- completion ratio: about 70%
 
 ### By layer
 
 | Layer | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Compiler model, semantics, typing | 6 | 2 | 2 | 10 |
-| Programming surfaces | 8 | 0 | 1 | 9 |
+| Programming surfaces | 9 | 0 | 1 | 10 |
 | Pipeline and solver | 6 | 2 | 1 | 9 |
 | Artifacts, replay, debug | 5 | 2 | 1 | 8 |
-| Backends and extensions | 6 | 3 | 1 | 10 |
+| Backends and extensions | 8 | 2 | 1 | 11 |
 | Agent product and workflow | 5 | 2 | 1 | 8 |
 
 ## Layer summaries

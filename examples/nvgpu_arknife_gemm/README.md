@@ -1,14 +1,14 @@
-# Arknife-Inspired NV-GPU GEMM Tile
+# Arknife-Inspired Ampere GEMM Mainloop
 
-This example is the concrete HTP counterpart of the Arknife-style explicit
-hardware abstraction story:
+This example is the concrete HTP counterpart of the Arknife Ampere CUDA
+mainloop story:
 
-- compile a block-level GEMM tile to the `nvgpu` backend,
-- replay the final Python stage in `sim`,
-- run the package in `sim` with a registered kernel handler,
-- optionally materialize `.ptx` / `.cubin` and launch the GEMM kernel with real
-  tensor and shape arguments
-  on a CUDA device.
+- author the kernel with explicit block / warp / pipeline structure,
+- express `cp_async`, `ldmatrix`, and `mma_sync` as first-class HTP operations,
+- emit the instruction plan and hardware profile into the normal NV-GPU package,
+- replay the final stage in `sim`,
+- run the package in `sim`,
+- optionally build and launch the generated CUDA package on Ampere-class GPUs.
 
 Run it from the repo root:
 
@@ -21,6 +21,8 @@ The example writes outputs under `artifacts/nvgpu_arknife_gemm/`.
 Notes:
 
 - the `sim` path is deterministic and does not need CUDA;
+- the emitted `.cu` source preserves the Arknife instruction plan as annotated
+  metadata and comments, while using a numerically-correct fallback kernel body;
 - the device path needs `nvcc`, a CUDA driver, and a GPU visible to the
   process;
 - on A100-class machines with the required CUDA stack, the current example is
