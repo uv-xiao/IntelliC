@@ -18,11 +18,11 @@ Remove the `layers/` nesting under `docs/design/` and `docs/todo/` so those tree
 
 ## Scope Checklist
 
-- [ ] move `docs/design/layers/*.md` to `docs/design/*.md`
-- [ ] move `docs/todo/layers/*.md` to `docs/todo/*.md`
-- [ ] update repo guidance, policy scripts, diagnostics, tests, and code references to the flattened paths
-- [ ] keep `docs/reference/`, `docs/research/`, `docs/in_progress/`, and `docs/story.md` unchanged except for path references
-- [ ] verify docs layout and policy tests against the new structure
+- [x] move `docs/design/layers/*.md` to `docs/design/*.md`
+- [x] move `docs/todo/layers/*.md` to `docs/todo/*.md`
+- [x] update repo guidance, policy scripts, diagnostics, tests, and code references to the flattened paths
+- [x] keep `docs/reference/`, `docs/research/`, `docs/in_progress/`, and `docs/story.md` unchanged except for path references
+- [x] verify docs layout and policy tests against the new structure
 
 ## Code Surfaces
 
@@ -34,18 +34,18 @@ Remove the `layers/` nesting under `docs/design/` and `docs/todo/` so those tree
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for the motivating bug or gap
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating bug or gap
 - [ ] human-friendly example updated or added
-- [ ] `pixi run verify` or documented fallback
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for implemented behavior
-- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] update `docs/design/` for implemented behavior
+- [x] update `docs/todo/` to remove or narrow the gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan

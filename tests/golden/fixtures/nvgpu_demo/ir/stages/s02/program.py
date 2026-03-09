@@ -13,7 +13,7 @@ def run(*args, **kwargs):
             "kind": "kernel",
             "artifact_ref": "ir/stages/s02/replay/stubs.json",
             "payload_ref": "ir/stages/s02/replay/stubs.json",
-            "fix_hints_ref": "docs/design/layers/01_compiler_model.md",
+            "fix_hints_ref": "docs/design/01_compiler_model.md",
         },
         fix_hints=(
             "Replay through the owning extension or binding.",

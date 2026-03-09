@@ -25,8 +25,8 @@ Not finished yet:
 ## Documentation layout
 
 - `docs/story.md` — final intended framework story
-- `docs/design/` — implemented layers, examples, and code-backed architecture
-- `docs/todo/` — remaining layers and future work
+- `docs/design/` — implemented feature documents, examples, and code-backed architecture
+- `docs/todo/` — remaining feature documents and future work
 - `docs/in_progress/` — active feature-sized PR tasks
 - `docs/reference/` — references
 - `docs/research/` — research notes
@@ -35,17 +35,17 @@ Not finished yet:
 
 Implemented architecture:
 - `docs/design/README.md`
-- `docs/design/layers/01_compiler_model.md`
-- `docs/design/layers/02_programming_surfaces.md`
-- `docs/design/layers/03_pipeline_and_solver.md`
-- `docs/design/layers/04_artifacts_replay_debug.md`
-- `docs/design/layers/05_backends_and_extensions.md`
-- `docs/design/layers/06_agent_product_and_workflow.md`
+- `docs/design/01_compiler_model.md`
+- `docs/design/02_programming_surfaces.md`
+- `docs/design/03_pipeline_and_solver.md`
+- `docs/design/04_artifacts_replay_debug.md`
+- `docs/design/05_backends_and_extensions.md`
+- `docs/design/06_agent_product_and_workflow.md`
 - example-local walkthroughs under `examples/**/README.md`
 
 Remaining work:
 - `docs/todo/README.md`
-- `docs/todo/layers/`
+- `docs/todo/`
 - `docs/todo/reports/retargetable_extensibility_report.md`
 
 ## Usage

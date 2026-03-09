@@ -29,10 +29,27 @@ def test_docs_root_does_not_contain_legacy_layout_dirs():
 def test_design_tree_has_only_supported_top_level_entries():
     design_root = Path("docs/design")
     entries = {path.name for path in design_root.iterdir()}
-    assert entries == {"README.md", "layers"}
+    assert entries == {
+        "README.md",
+        "01_compiler_model.md",
+        "02_programming_surfaces.md",
+        "03_pipeline_and_solver.md",
+        "04_artifacts_replay_debug.md",
+        "05_backends_and_extensions.md",
+        "06_agent_product_and_workflow.md",
+    }
 
 
 def test_todo_tree_has_only_supported_top_level_entries():
     todo_root = Path("docs/todo")
     entries = {path.name for path in todo_root.iterdir()}
-    assert entries == {"README.md", "layers", "reports"}
+    assert entries == {
+        "README.md",
+        "01_compiler_model.md",
+        "02_programming_surfaces.md",
+        "03_pipeline_and_solver.md",
+        "04_artifacts_replay_debug.md",
+        "05_backends_and_extensions.md",
+        "06_agent_product_and_workflow.md",
+        "reports",
+    }

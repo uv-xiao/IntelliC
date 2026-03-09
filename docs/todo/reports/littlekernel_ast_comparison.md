@@ -29,4 +29,4 @@ comparison of:
 - `references/triton-distributed-knowingnothing/python/little_kernel/language/`
 - `references/triton-distributed-knowingnothing/python/little_kernel/design/sm90_bf16_gemm.py`
 - `docs/story.md`
-- `docs/design/layers/02_programming_surfaces.md`
+- `docs/design/02_programming_surfaces.md`
