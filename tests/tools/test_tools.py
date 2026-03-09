@@ -2,8 +2,17 @@ from __future__ import annotations
 
 import json
 
+from htp.agent_policy import load_agent_policy
 from htp.compiler import compile_program
-from htp.tools import explain_diagnostic, replay_package, semantic_diff, verify_package
+from htp.tools import (
+    bisect_stages,
+    explain_diagnostic,
+    minimize_package,
+    replay_package,
+    semantic_diff,
+    verify_package,
+)
+from tests.conftest import copy_golden_fixture
 
 
 def _vector_add_program() -> dict[str, object]:
@@ -128,11 +137,98 @@ def test_semantic_diff_reports_manifest_and_semantic_changes(tmp_path):
     assert "manifest.target" in diff["changed_sections"]
     assert "current_stage.kernel_ir" in diff["changed_sections"]
     assert diff["stage_ids"] == {"left": "s06", "right": "s06"}
+    assert "details" in diff
+    assert "current_stage.kernel_ir" in diff["details"]
 
 
 def test_explain_diagnostic_returns_contract_reference():
     explanation = explain_diagnostic("HTP.BINDINGS.MISSING_CONTRACT_FILE")
 
     assert explanation["code"] == "HTP.BINDINGS.MISSING_CONTRACT_FILE"
+    assert explanation["known"] is True
     assert explanation["title"] == "Missing contract artifact"
+    assert explanation["fix_hint_policy"] == "rebuild_or_validate_artifacts"
     assert "docs/design/impls/07_binding_interface.md" in explanation["docs"]
+
+
+def test_explain_diagnostic_returns_generic_fallback_for_unknown_code():
+    explanation = explain_diagnostic("HTP.UNKNOWN.CODE")
+
+    assert explanation["code"] == "HTP.UNKNOWN.CODE"
+    assert explanation["known"] is False
+    assert explanation["fix_hint_policy"] == "inspect_diagnostic_payload"
+
+
+def test_load_agent_policy_reads_toml_file(tmp_path):
+    policy_path = tmp_path / "agent_policy.toml"
+    policy_path.write_text(
+        "\n".join(
+            (
+                "[agent]",
+                'allowed_edit_roots = ["htp", "docs"]',
+                'required_gates = ["validate", "replay", "golden_diff"]',
+                'promotion_mode = "pr"',
+                "",
+                "[perf]",
+                "enabled = true",
+                "max_regression_pct = 3.5",
+                "",
+            )
+        )
+    )
+
+    policy = load_agent_policy(policy_path)
+
+    assert policy["agent"]["allowed_edit_roots"] == ["htp", "docs"]
+    assert policy["agent"]["required_gates"] == ["validate", "replay", "golden_diff"]
+    assert policy["perf"]["enabled"] is True
+    assert policy["perf"]["max_regression_pct"] == 3.5
+
+
+def test_verify_package_can_enforce_golden_diff_gate(tmp_path):
+    package_dir = copy_golden_fixture("pto_demo", tmp_path)
+    golden_dir = copy_golden_fixture("pto_demo", tmp_path / "golden")
+
+    report = verify_package(package_dir, goal="golden-check", golden_package_dir=golden_dir)
+
+    assert report["ok"] is True
+    assert report["gates"]["golden_diff"] is True
+    assert report["evidence"]["golden_diff"]["equal"] is True
+
+
+def test_bisect_stages_reports_first_divergent_stage(tmp_path):
+    left_dir = tmp_path / "left_pkg"
+    right_dir = tmp_path / "right_pkg"
+    compile_program(package_dir=left_dir, target="nvgpu-ampere", program=_vector_add_program())
+    compile_program(package_dir=right_dir, target="nvgpu-ampere", program=_vector_add_program())
+    manifest = json.loads((right_dir / "manifest.json").read_text())
+    current_stage = manifest["stages"]["current"]
+    kernel_ir_path = (
+        right_dir
+        / next(stage for stage in manifest["stages"]["graph"] if stage["id"] == current_stage)["semantic"][
+            "kernel_ir"
+        ]
+    )
+    kernel_ir = json.loads(kernel_ir_path.read_text())
+    kernel_ir["ops"][0]["attrs"]["operator"] = "mul"
+    kernel_ir_path.write_text(json.dumps(kernel_ir, indent=2) + "\n")
+
+    result = bisect_stages(left_dir, right_dir)
+
+    assert result["equal"] is False
+    assert result["first_divergent_stage"] == {"left": "s06", "right": "s06"}
+    assert "current_stage.kernel_ir" in result["reason"]["changed_sections"]
+
+
+def test_minimize_package_keeps_prefix_through_selected_stage(tmp_path):
+    package_dir = tmp_path / "nvgpu_pkg"
+    compile_program(package_dir=package_dir, target="nvgpu-ampere", program=_matmul_program())
+
+    minimized_dir = tmp_path / "minimized"
+    result = minimize_package(package_dir, minimized_dir, stage_id="s03")
+
+    assert result["stage_id"] == "s03"
+    assert result["output_dir"] == str(minimized_dir)
+    manifest = json.loads((minimized_dir / "manifest.json").read_text())
+    assert manifest["stages"]["current"] == "s03"
+    assert [stage["id"] for stage in manifest["stages"]["graph"]] == ["s00", "s01", "s02", "s03"]

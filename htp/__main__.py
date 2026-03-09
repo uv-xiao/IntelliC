@@ -4,7 +4,14 @@ import argparse
 import json
 from collections.abc import Sequence
 
-from htp.tools import explain_diagnostic, replay_package, semantic_diff, verify_package
+from htp.tools import (
+    bisect_stages,
+    explain_diagnostic,
+    minimize_package,
+    replay_package,
+    semantic_diff,
+    verify_package,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -21,6 +28,8 @@ def build_parser() -> argparse.ArgumentParser:
     verify_parser.add_argument("package_dir")
     verify_parser.add_argument("--goal", default="verify")
     verify_parser.add_argument("--mode", default="sim")
+    verify_parser.add_argument("--golden")
+    verify_parser.add_argument("--policy")
 
     diff_parser = subparsers.add_parser("diff")
     diff_parser.add_argument("left_package_dir")
@@ -31,6 +40,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     explain_parser = subparsers.add_parser("explain")
     explain_parser.add_argument("code")
+
+    bisect_parser = subparsers.add_parser("bisect")
+    bisect_parser.add_argument("left_package_dir")
+    bisect_parser.add_argument("right_package_dir")
+
+    minimize_parser = subparsers.add_parser("minimize")
+    minimize_parser.add_argument("package_dir")
+    minimize_parser.add_argument("output_dir")
+    minimize_parser.add_argument("--stage")
     return parser
 
 
@@ -48,7 +66,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(_serialize_dataclass_like(result), indent=2))
         return 0 if result.ok else 1
     if args.command == "verify":
-        result = verify_package(args.package_dir, goal=args.goal, mode=args.mode)
+        result = verify_package(
+            args.package_dir,
+            goal=args.goal,
+            mode=args.mode,
+            golden_package_dir=args.golden,
+            policy_path=args.policy,
+        )
         print(json.dumps(result, indent=2))
         return 0 if result["ok"] else 1
     if args.command == "diff":
@@ -66,6 +90,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = explain_diagnostic(args.code)
         print(json.dumps(result, indent=2))
         return 0
+    if args.command == "bisect":
+        result = bisect_stages(args.left_package_dir, args.right_package_dir)
+        print(json.dumps(result, indent=2))
+        return 0 if result["equal"] else 1
+    if args.command == "minimize":
+        result = minimize_package(args.package_dir, args.output_dir, stage_id=args.stage)
+        print(json.dumps(result, indent=2))
+        return 0 if result["ok"] else 1
     parser.error(f"Unhandled command: {args.command}")
     return 2
 

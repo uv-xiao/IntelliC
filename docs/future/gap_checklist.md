@@ -96,22 +96,22 @@ Checklist:
 - `[~]` `htp replay`, `htp verify`, `htp diff --semantic`, and `htp explain`
   exist, but they are still thin utilities rather than a full agent-product
   surface.
-- `[ ]` Add `htp minimize <package>` to reduce failing packages to smaller
+- `[x]` Add `htp minimize <package>` to reduce failing packages to smaller
   reproducers.
-- `[ ]` Add stage bisect/localization tooling on top of replay so agents can
+- `[x]` Add stage bisect/localization tooling on top of replay so agents can
   find the first divergent stage automatically.
-- `[ ]` Extend `htp diff --semantic` from current-stage JSON comparison to
+- `[~]` Extend `htp diff --semantic` from current-stage JSON comparison to
   staged identity-aware semantic diffs.
-- `[ ]` Add a real diagnostic catalog with stable fix-hint policies rather than
+- `[x]` Add a real diagnostic catalog with stable fix-hint policies rather than
   a small hard-coded explanation table.
-- `[ ]` Add agent policy input (for example `agent_policy.toml`) covering:
+- `[x]` Add agent policy input (for example `agent_policy.toml`) covering:
   allowed edit roots, required gates, promotion mode, and perf thresholds.
-- `[ ]` Extend provenance under `extensions.agent.*` to include:
+- `[x]` Extend provenance under `extensions.agent.*` to include:
   decision trace, attempted candidates, rejected candidates, patch summary, and
   timing.
 - `[ ]` Add promotion workflow support (patch-only / PR / auto-land) without
   placing git policy inside core compiler passes.
-- `[ ]` Add artifact-based golden diff gates into `verify_package(...)`, not
+- `[x]` Add artifact-based golden diff gates into `verify_package(...)`, not
   just validate + replay.
 - `[ ]` Add target-specific correctness suites into `verify_package(...)` rather
   than leaving them as external test selection.

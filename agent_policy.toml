@@ -1,0 +1,8 @@
+[agent]
+allowed_edit_roots = ["htp", "htp_ext", "tests", "docs", ".github"]
+required_gates = ["validate", "replay"]
+promotion_mode = "pr"
+
+[perf]
+enabled = false
+max_regression_pct = 5.0
