@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- none
+- `docs/in_progress/007-frontend-surface-redesign.md`
