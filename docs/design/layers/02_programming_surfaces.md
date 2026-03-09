@@ -47,11 +47,24 @@ from ordinary Python functions. A flagship example can therefore read like:
 ```text
 @kernel
 def gemm_tile(A: buffer(...), B: buffer(...), C: buffer(...), ...):
-    matmul(A, B, out=C, ...)
+    store(C, A @ B)
 ```
 
 rather than forcing public examples to assemble a nested `{"kernel": ...,
 "workload": ...}` payload by hand.
+
+Recent frontend work also makes elementwise programs read like ordinary Python
+expressions instead of builder calls. Public kernels can now use symbolic
+temporaries and operator-style composition such as:
+
+```text
+gate_sigmoid = sigmoid(gate)
+store(out, gate * gate_sigmoid * up)
+```
+
+This is materially closer to the readability bar set by
+`references/pypto/python/pypto/language` and
+`references/triton-distributed-knowingnothing/python/little_kernel/language`.
 
 ### `htp.compile_program(...)`
 
@@ -90,6 +103,7 @@ surface now covers:
 - explicit dependency edges
 - typed FIFO channels
 - target selection on the routine object itself
+- readable auto-generated task ids when explicit names are omitted
 
 That means public examples no longer need to express routine structure as
 anonymous nested dicts just to reach the workload semantic model.
@@ -135,6 +149,8 @@ If you are working in this layer, start here:
 Recent concrete proof points:
 - `examples/pto_pypto_swiglu/demo.py` shows a harder PyPTO-calibrated flagship
   example authored entirely as a traced Python kernel.
+- `examples/nvgpu_arknife_gemm/demo.py` now uses expression-form `A @ B` plus
+  `store(C, ...)` instead of explicit low-level output plumbing.
 - `tests/examples/test_examples.py` now defends sequential PTO example
   execution in one process so public examples remain reliable instead of being
   “one-shot” demos.

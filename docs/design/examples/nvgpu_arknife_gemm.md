@@ -22,4 +22,5 @@ machines with `nvcc` and a working CUDA driver it runs the real-device path
 end-to-end.
 
 The authoring goal here is human-first: the example now starts from a traced
-Python `@kernel` definition rather than a hand-built nested payload.
+Python `@kernel` definition and uses expression-form GEMM authoring
+(`store(C, A @ B)`) rather than a hand-built nested payload.

@@ -24,5 +24,5 @@ when the local PTO reference runtime is available under `3rdparty/pto-runtime/`
 `out = lhs + rhs` result.
 
 Compared to the earlier dict-style example, the user now writes the kernel as a
-plain Python function with argument annotations and a single `elementwise_add`
-call.
+plain Python function with argument annotations and an expression-form sink:
+`store(out, lhs + rhs)`.

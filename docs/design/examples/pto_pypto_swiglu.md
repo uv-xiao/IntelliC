@@ -7,14 +7,13 @@ Code:
 
 This example raises the PTO flagship bar above vector add while keeping the
 authoring surface Python-native. The user writes a traced `@kernel`
- definition:
+definition:
 
 ```python
 @kernel
 def swiglu(gate: buffer(...), up: buffer(...), out: buffer(...), size: scalar(...)):
-    sigmoid(gate, out="gate_sigmoid", shape=(size,), dtype="f32")
-    elementwise_mul(gate, "gate_sigmoid", out="swish_gate", shape=(size,), dtype="f32")
-    elementwise_mul("swish_gate", up, out=out, shape=(size,), dtype="f32")
+    gate_sigmoid = sigmoid(gate)
+    store(out, gate * gate_sigmoid * up)
 ```
 
 What it proves:
