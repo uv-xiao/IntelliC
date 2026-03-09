@@ -104,6 +104,7 @@ def test_mlir_extension_writes_full_roundtrip_artifact_set(tmp_path: Path):
     assert (package_dir / "ir" / "stages" / import_stage["id"] / "maps" / "entity_map.json").exists()
     assert (package_dir / "ir" / "stages" / import_stage["id"] / "maps" / "binding_map.json").exists()
 
+
 def test_mlir_extension_imports_transformed_output_mlir(tmp_path: Path):
     package_dir = tmp_path / "pkg"
     result = run_default_pipeline(package_dir=package_dir, program=_eligible_kernel_program())
