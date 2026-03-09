@@ -83,12 +83,17 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `examples/csp_channel_pipeline/demo.py` — CSP frontend example with typed protocol effects
 - `examples/aie_channel_pipeline/demo.py` — AIE extension example with mapping
   and FIFO plan sidecars
+- `examples/mlir_cse_extension/demo.py` — extension-composition example with
+  solver-visible MLIR CSE template selection
+- `examples/serving_routine/demo.py` — workload-level serving routine example
 - `tests/extensions/test_aie_backend.py` — AIE extension validation example
 - `docs/examples/pto_pypto_vector_add.md` — PTO example walkthrough
 - `docs/examples/nvgpu_arknife_gemm.md` — NV-GPU example walkthrough
 - `docs/examples/wsp_warp_gemm.md` — WSP example walkthrough
 - `docs/examples/csp_channel_pipeline.md` — CSP example walkthrough
 - `docs/examples/aie_channel_pipeline.md` — AIE example walkthrough
+- `docs/examples/mlir_cse_extension.md` — MLIR CSE extension walkthrough
+- `docs/examples/serving_routine.md` — serving routine walkthrough
 
 ## Contract tests
 

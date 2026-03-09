@@ -90,6 +90,39 @@ Flow:
 This example proves that the AIE extension now splits planning from emission,
 and that the emitted MLIR/sidecars derive from explicit mapping/FIFO plans.
 
+## MLIR CSE extension example
+
+Files:
+
+- `examples/mlir_cse_extension/demo.py`
+- `docs/examples/mlir_cse_extension.md`
+
+Flow:
+
+1. solve a program with `extensions.requested = ["htp_ext.mlir_cse"]`
+2. show that the solver selects `htp.default+htp_ext.mlir_cse.v1`
+3. emit the MLIR CSE extension package and replay the latest stage in `sim`
+
+This example proves the extension-composition story is implemented as a
+solver-visible template choice, not only a design claim.
+
+## Serving routine example
+
+Files:
+
+- `examples/serving_routine/demo.py`
+- `docs/examples/serving_routine.md`
+
+Flow:
+
+1. compile a workload-level serving routine with multiple tasks and
+   dependencies
+2. replay the latest staged Python program in `sim`
+3. inspect `workload_ir.json` as the routine-level contract
+
+This example proves the repo now includes a workload-level routine example
+above the kernel-only examples.
+
 ## Future examples
 
 Design-only examples and roadmap material were moved to `docs/future/`.

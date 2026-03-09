@@ -10,12 +10,16 @@ from examples.aie_channel_pipeline.demo import compile_example as compile_aie_ex
 from examples.aie_channel_pipeline.demo import replay_latest_stage as replay_aie_stage
 from examples.csp_channel_pipeline.demo import compile_example as compile_csp_example
 from examples.csp_channel_pipeline.demo import replay_latest_stage as replay_csp_stage
+from examples.mlir_cse_extension.demo import compile_example as compile_mlir_cse_example
+from examples.mlir_cse_extension.demo import replay_latest_stage as replay_mlir_cse_stage
 from examples.nvgpu_arknife_gemm.demo import compile_example as compile_nvgpu_example
 from examples.nvgpu_arknife_gemm.demo import replay_latest_stage as replay_nvgpu_stage
 from examples.nvgpu_arknife_gemm.demo import run_demo as run_nvgpu_demo
 from examples.pto_pypto_vector_add.demo import compile_example as compile_pto_example
 from examples.pto_pypto_vector_add.demo import replay_latest_stage as replay_pto_stage
 from examples.pto_pypto_vector_add.demo import run_demo as run_pto_demo
+from examples.serving_routine.demo import compile_example as compile_serving_example
+from examples.serving_routine.demo import replay_latest_stage as replay_serving_stage
 from examples.wsp_warp_gemm.demo import compile_example as compile_wsp_example
 from examples.wsp_warp_gemm.demo import replay_latest_stage as replay_wsp_stage
 
@@ -93,6 +97,37 @@ def test_aie_example_compiles_and_replays(tmp_path):
     ]
     assert [tile["task_id"] for tile in replay_summary["mapping"]["tiles"]] == ["p0", "p1"]
     assert replay_summary["fifos"]["channels"][0]["name"] == "tiles"
+
+
+def test_mlir_cse_extension_example_compiles_and_replays(tmp_path):
+    package_dir = tmp_path / "mlir_cse_example"
+    compile_summary = compile_mlir_cse_example(package_dir)
+    replay_summary = replay_mlir_cse_stage(package_dir)
+
+    assert compile_summary["solver"]["ok"] is True
+    assert compile_summary["solver"]["template_id"] == "htp.default+htp_ext.mlir_cse.v1"
+    assert compile_summary["solver"]["extension_results"]["htp_ext.mlir_cse"]["eligible"] is True
+    assert replay_summary["ok"] is True
+    assert replay_summary["result"] == {"entry": "expr_demo", "result": 7, "rewrites": []}
+    assert "mlir_cse" in replay_summary["extensions"]
+
+
+def test_serving_routine_example_compiles_and_replays(tmp_path):
+    package_dir = tmp_path / "serving_example"
+    compile_summary = compile_serving_example(package_dir)
+    replay_summary = replay_serving_stage(package_dir)
+
+    assert compile_summary["target"] == {"backend": "nvgpu", "option": "ampere"}
+    assert replay_summary["ok"] is True
+    assert [task["task_id"] for task in replay_summary["workload_ir"]["tasks"]] == [
+        "prefill",
+        "decode",
+        "writeback",
+    ]
+    assert replay_summary["workload_ir"]["dependencies"] == [
+        {"src": "prefill", "dst": "decode"},
+        {"src": "decode", "dst": "writeback"},
+    ]
 
 
 @pytest.mark.skipif(

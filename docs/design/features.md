@@ -61,6 +61,9 @@ Implemented today:
   - NV-GPU GEMM
   - WSP warp GEMM
   - CSP channel pipeline
+  - AIE channel pipeline
+  - MLIR CSE extension composition
+  - serving routine workload
 
 Main anchors:
 

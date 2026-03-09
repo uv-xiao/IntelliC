@@ -485,8 +485,8 @@ Checklist:
 - `[x]` Turn software pipelining into a real staged pass sequence with tests and
   artifact examples.
 - `[x]` Add CSP/process/channel example programs that exercise protocol typing.
-- `[ ]` Add serving-routine examples above the current kernel-level examples.
-- `[ ]` Add extension-composition examples showing solver-visible pipeline
+- `[x]` Add serving-routine examples above the current kernel-level examples.
+- `[x]` Add extension-composition examples showing solver-visible pipeline
   choice.
 - `[~]` Keep `docs/design/` and `docs/future/` synchronized as features land so
   the narrative stays honest.
