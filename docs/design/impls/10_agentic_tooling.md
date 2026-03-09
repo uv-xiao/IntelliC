@@ -13,6 +13,7 @@ Implemented commands:
 
 - `htp replay <package>`
 - `htp verify <package>`
+- `htp promote-plan <package>`
 - `htp diff --semantic <left> <right>`
 - `htp explain <diagnostic-code>`
 - `htp bisect <left> <right>`
@@ -27,6 +28,7 @@ Implemented provenance:
   - `extensions.agent.gates`
   - `extensions.agent.evidence`
   - `extensions.agent.policy`
+  - `extensions.agent.promotion`
   - `extensions.agent.patch_summary`
   - `extensions.agent.decision_trace`
   - `extensions.agent.attempted_candidates`
@@ -37,5 +39,9 @@ Current scope:
 - artifact-driven tooling only
 - no autonomous patch loop in core
 - reducer/minimizer is stage-prefix package pruning, not semantic delta minimization
-- semantic diff now includes section-level difference summaries, but not identity-aware diffs yet
-- `verify_package(...)` can enforce an optional golden semantic-diff gate
+- semantic diff now includes identity-aware stage deltas over ids/maps in addition to section-level summaries
+- `verify_package(...)` can enforce:
+  - backend-specific target-suite gates
+  - optional golden semantic-diff gates
+  - optional perf gates driven by `agent_policy.toml`
+- promotion planning is policy-driven and stays outside compiler passes

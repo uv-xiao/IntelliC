@@ -13,6 +13,11 @@ DEFAULT_POLICY = {
         "allowed_edit_roots": ["htp", "htp_ext", "tests", "docs", ".github"],
         "required_gates": ["validate", "replay"],
         "promotion_mode": "pr",
+        "edit_corridors": {
+            "passes": ["htp/passes", "tests/passes", "docs/design/impls/02_pass_manager.md"],
+            "intrinsics": ["htp/intrinsics.py", "htp/runtime/intrinsics.py", "tests/ir"],
+            "backends": ["htp/backends", "htp/bindings", "tests/backends", "docs/design/impls"],
+        },
     },
     "perf": {
         "enabled": False,

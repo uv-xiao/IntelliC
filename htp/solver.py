@@ -12,6 +12,7 @@ from htp.bindings.validate import load_manifest
 from htp.passes.contracts import PassContract
 from htp.passes.program_model import build_semantic_model, canonicalize_program, normalize_target
 from htp.pipeline.registry import registered_templates
+from htp_ext.registry import extension_results as registered_extension_results
 
 SOLVER_FAILURE_SCHEMA_ID = "htp.solver_failure.v1"
 DEFAULT_TEMPLATE_ID = "htp.default.v1"
@@ -45,6 +46,7 @@ class PipelineTemplate:
     passes: tuple[PassContract, ...]
     required_outputs: tuple[str, ...] = ()
     extension_steps: tuple[str, ...] = ()
+    pass_choices: tuple[tuple[PassContract, ...], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -100,9 +102,13 @@ def default_pipeline_template(*, target: dict[str, str]) -> PipelineTemplate:
 
 def available_pipeline_templates(*, program: dict[str, Any]) -> tuple[PipelineTemplate, ...]:
     target = normalize_target(program)
-    return registered_templates(
+    templates = registered_templates(
         program=program, required_outputs=_backend_declaration(target).required_outputs
     )
+    expanded: list[PipelineTemplate] = []
+    for template in templates:
+        expanded.extend(_expand_template_choices(template))
+    return tuple(expanded)
 
 
 def solve_default_pipeline(*, program: dict[str, Any]) -> SolverResult:
@@ -184,6 +190,10 @@ def solve_pipeline(
             )
 
         state = apply_contract_to_state(contract=contract, state=state)
+    required_outputs = _resolve_required_outputs(
+        template=template,
+        extension_results=extension_results,
+    )
     return SolverResult(
         ok=True,
         template_id=template.template_id,
@@ -191,7 +201,7 @@ def solve_pipeline(
         passes=template.passes,
         capabilities=state.capabilities,
         state=state,
-        required_outputs=template.required_outputs,
+        required_outputs=required_outputs,
         extension_results=extension_results,
     )
 
@@ -260,13 +270,7 @@ def _handler_failure(
 
 
 def _collect_extension_results(program: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    requested = program.get("extensions", {}).get("requested", ())
-    results: dict[str, dict[str, Any]] = {}
-    if "htp_ext.mlir_cse" in requested:
-        from htp_ext.mlir_cse.island import extension_solver_result
-
-        results["htp_ext.mlir_cse"] = extension_solver_result(program)
-    return results
+    return registered_extension_results(program)
 
 
 def build_initial_capability_state(
@@ -361,6 +365,40 @@ def _backend_declaration(target: dict[str, str]) -> BackendSolverDeclaration:
         supported_ops=("elementwise_binary", "matmul"),
         required_outputs=(),
     )
+
+
+def _expand_template_choices(template: PipelineTemplate) -> tuple[PipelineTemplate, ...]:
+    if not template.pass_choices:
+        return (template,)
+    templates = [template]
+    for choice_index, alternatives in enumerate(template.pass_choices):
+        next_templates: list[PipelineTemplate] = []
+        for candidate in templates:
+            for alternative in alternatives:
+                next_templates.append(
+                    PipelineTemplate(
+                        template_id=f"{candidate.template_id}+choice{choice_index}:{alternative.pass_id}",
+                        passes=candidate.passes + (alternative,),
+                        required_outputs=candidate.required_outputs,
+                        extension_steps=candidate.extension_steps,
+                    )
+                )
+        templates = next_templates
+    return tuple(templates)
+
+
+def _resolve_required_outputs(
+    *,
+    template: PipelineTemplate,
+    extension_results: dict[str, dict[str, Any]],
+) -> tuple[str, ...]:
+    outputs = list(template.required_outputs)
+    for extension_id in template.extension_steps:
+        extension_output_paths = extension_results.get(extension_id, {}).get("required_outputs", ())
+        for output in extension_output_paths:
+            if isinstance(output, str):
+                outputs.append(output)
+    return tuple(dict.fromkeys(outputs))
 
 
 def _write_solver_failure(package_dir: Path, failure: SolverFailure) -> None:

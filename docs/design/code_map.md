@@ -8,11 +8,13 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/bindings/api.py` — `bind(...)`
 - `htp/runtime/core.py` — replay runtime and kernel/intrinsic dispatch
 - `htp/solver.py` — capability solver and final artifact checks
+- `htp_ext/registry.py` — extension registration for solver / pass / template discovery
 - `htp/diagnostics.py` — diagnostic catalog and fix-hint policies
 - `htp/agent_policy.py` — agent policy loading for verify/promote tooling
+- `htp/perf.py` — perf metric loading and baseline-threshold comparison
 - `htp/intrinsics.py` — intrinsic declarations plus lower/emit/sim handler registration
 - `htp/pipeline/defaults.py` — default pipeline execution over solver-validated pass contracts
-- `htp/tools.py` / `htp/__main__.py` — replay / verify / semantic diff / explain
+- `htp/tools.py` / `htp/__main__.py` — replay / verify / promote-plan / semantic diff / explain
 
 ## PTO path
 
