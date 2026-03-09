@@ -97,6 +97,7 @@ class _ProgramTrace:
     dependencies: list[DependencySpec]
     channels: list[ChannelSpec]
     seen_kernel: KernelSpec | None = None
+    task_counts: dict[str, int] | None = None
 
 
 _PROGRAM_TRACE: ContextVar[_ProgramTrace | None] = ContextVar("htp_program_trace", default=None)
@@ -125,7 +126,7 @@ def fifo_channel(name: str, *, dtype: str, capacity: int) -> ChannelSpec:
 def call(
     kernel_spec: KernelSpec,
     *args: str | KernelValue,
-    task: str,
+    task: str | None = None,
     after: TaskHandle | None = None,
 ) -> TaskHandle:
     trace = _PROGRAM_TRACE.get()
@@ -135,11 +136,14 @@ def call(
         trace.seen_kernel = kernel_spec
     elif trace.seen_kernel.name != kernel_spec.name:
         raise ValueError("The current public routine surface supports exactly one kernel per program")
-    task_spec = KernelCallSpec(task_id=task, kernel=kernel_spec.name, args=tuple(_ref(arg) for arg in args))
+    task_id = task if task is not None else _auto_task_id(trace, kernel_spec.name)
+    task_spec = KernelCallSpec(
+        task_id=task_id, kernel=kernel_spec.name, args=tuple(_ref(arg) for arg in args)
+    )
     trace.tasks.append(task_spec)
     if after is not None:
-        trace.dependencies.append(DependencySpec(src=after.task_id, dst=task))
-    return TaskHandle(task_id=task)
+        trace.dependencies.append(DependencySpec(src=after.task_id, dst=task_id))
+    return TaskHandle(task_id=task_id)
 
 
 def program(
@@ -178,7 +182,7 @@ def _trace_program(function: Callable[..., Any], *, target: dict[str, Any] | str
                 f"Traced program parameter {parameter_name!r} must use htp.kernel.buffer(...) or htp.kernel.scalar(...) annotation"
             )
         values.append(KernelValue(parameter_name))
-    trace = _ProgramTrace(tasks=[], dependencies=[], channels=[])
+    trace = _ProgramTrace(tasks=[], dependencies=[], channels=[], task_counts={})
     token = _PROGRAM_TRACE.set(trace)
     try:
         function(*values)
@@ -214,6 +218,14 @@ def _ref(value: str | KernelValue) -> str:
     if isinstance(value, KernelValue):
         return value.name
     return value
+
+
+def _auto_task_id(trace: _ProgramTrace, kernel_name: str) -> str:
+    counts = {} if trace.task_counts is None else trace.task_counts
+    index = counts.get(kernel_name, 0)
+    counts[kernel_name] = index + 1
+    trace.task_counts = counts
+    return f"{kernel_name}_{index}"
 
 
 def _resolve_annotation(annotation: Any, *, function: Callable[..., Any]) -> Any:

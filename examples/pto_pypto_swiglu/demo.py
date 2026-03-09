@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 from htp import bind, compile_program
-from htp.kernel import buffer, elementwise_mul, kernel, scalar, sigmoid
+from htp.kernel import buffer, kernel, scalar, sigmoid, store
 
 
 @kernel
@@ -19,9 +19,8 @@ def swiglu(
 ) -> None:
     """PyPTO-calibrated fused activation: Swish(gate) * up."""
 
-    sigmoid(gate, out="gate_sigmoid", shape=(size,), dtype="f32")
-    elementwise_mul(gate, "gate_sigmoid", out="swish_gate", shape=(size,), dtype="f32")
-    elementwise_mul("swish_gate", up, out=out, shape=(size,), dtype="f32")
+    gate_sigmoid = sigmoid(gate)
+    store(out, gate * gate_sigmoid * up)
 
 
 def make_inputs(size: int = 32 * 128) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:

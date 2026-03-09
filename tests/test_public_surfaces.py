@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 import htp
 from htp.kernel import (
     async_copy,
@@ -14,6 +16,8 @@ from htp.kernel import (
     matmul,
     reduction_sum,
     scalar,
+    sigmoid,
+    store,
     transpose,
 )
 from htp.routine import call, fifo_channel, program
@@ -34,6 +38,45 @@ def test_compile_program_accepts_public_program_surface(tmp_path):
     compiled = htp.compile_program(package_dir=package_dir, target="pto-a2a3sim", program=vector_add)
 
     assert compiled.manifest["inputs"]["entry"] == "vector_add"
+    assert compiled.manifest["target"]["backend"] == "pto"
+
+
+def test_compile_program_accepts_expression_first_kernel_surface(tmp_path):
+    package_dir = tmp_path / "expression_surface_pkg"
+
+    @kernel
+    def vector_add(
+        lhs: buffer(dtype="f32", shape=("size",), role="input"),
+        rhs: buffer(dtype="f32", shape=("size",), role="input"),
+        out: buffer(dtype="f32", shape=("size",), role="output"),
+        size: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(out, lhs + rhs)
+
+    compiled = htp.compile_program(package_dir=package_dir, target="pto-a2a3sim", program=vector_add)
+
+    assert compiled.manifest["inputs"]["entry"] == "vector_add"
+    assert compiled.manifest["target"]["backend"] == "pto"
+
+
+def test_expression_first_kernel_surface_supports_fused_temporaries(tmp_path):
+    @kernel
+    def swiglu(
+        gate: buffer(dtype="f32", shape=("size",), role="input"),
+        up: buffer(dtype="f32", shape=("size",), role="input"),
+        out: buffer(dtype="f32", shape=("size",), role="output"),
+        size: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        gate_sigmoid = sigmoid(gate)
+        store(out, gate * gate_sigmoid * up)
+
+    compiled = htp.compile_program(
+        package_dir=tmp_path / "expression_swiglu_pkg",
+        target="pto-a2a3sim",
+        program=swiglu,
+    )
+
+    assert compiled.manifest["inputs"]["entry"] == "swiglu"
     assert compiled.manifest["target"]["backend"] == "pto"
 
 
@@ -65,6 +108,50 @@ def test_public_routine_surface_emits_human_readable_workload_shape():
     assert payload["workload"]["tasks"][0]["task_id"] == "prefill"
     assert payload["workload"]["dependencies"] == [{"src": "prefill", "dst": "decode"}]
     assert payload["workload"]["channels"][0]["name"] == "token_batches"
+
+
+def test_public_routine_surface_assigns_readable_task_ids_when_omitted():
+    @kernel
+    def decode_step(
+        hidden: buffer(dtype="f32", shape=("B", "H"), role="input"),
+        weights: buffer(dtype="f32", shape=("H", "H"), role="input"),
+        next_hidden: buffer(dtype="f32", shape=("B", "H"), role="output"),
+        B: scalar(dtype="i32", role="shape"),
+        H: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(next_hidden, hidden @ weights)
+
+    @program(target="nvgpu-ampere")
+    def serving_routine(
+        hidden: buffer(dtype="f32", shape=("B", "H"), role="input"),
+        weights: buffer(dtype="f32", shape=("H", "H"), role="input"),
+        next_hidden: buffer(dtype="f32", shape=("B", "H"), role="output"),
+        B: scalar(dtype="i32", role="shape"),
+        H: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        fifo_channel("token_batches", dtype="f32", capacity=2)
+        prefill = call(decode_step, hidden, weights, next_hidden, B, H)
+        call(decode_step, next_hidden, weights, next_hidden, B, H, after=prefill)
+
+    payload = serving_routine.to_program()
+
+    assert [task["task_id"] for task in payload["workload"]["tasks"]] == [
+        "decode_step_0",
+        "decode_step_1",
+    ]
+    assert payload["workload"]["dependencies"] == [{"src": "decode_step_0", "dst": "decode_step_1"}]
+
+
+def test_expression_first_matmul_requires_rank_two_operands():
+    with pytest.raises(ValueError, match="rank-2"):
+
+        @kernel
+        def bad_matmul(
+            lhs: buffer(dtype="f32", shape=("M",), role="input"),
+            rhs: buffer(dtype="f32", shape=("M",), role="input"),
+            out: buffer(dtype="f32", shape=("M",), role="output"),
+        ) -> None:
+            store(out, lhs @ rhs)
 
 
 def test_compile_program_accepts_traced_routine_surface(tmp_path):

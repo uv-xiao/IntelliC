@@ -8,7 +8,7 @@ import numpy as np
 
 import htp.runtime as runtime_api
 from htp import bind, compile_program
-from htp.kernel import buffer, kernel, matmul, scalar
+from htp.kernel import buffer, kernel, scalar, store
 
 
 @kernel
@@ -22,7 +22,7 @@ def gemm_tile(
 ) -> None:
     """Arknife-inspired GEMM tile expressed as ordinary Python."""
 
-    matmul(A, B, out=C, m=M, n=N, k=K, dtype="f32")
+    store(C, A @ B)
 
 
 def make_inputs(
