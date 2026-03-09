@@ -18,7 +18,7 @@ def test_requires_todo_sync_for_code_and_design_changes():
     module = _load_module()
 
     assert module._requires_todo_sync(["htp/tools.py"]) is True
-    assert module._requires_todo_sync(["docs/design/features.md"]) is True
+    assert module._requires_todo_sync(["docs/design/layers/01_compiler_model.md"]) is True
     assert module._requires_todo_sync(["examples/serving_routine/demo.py"]) is True
 
 
@@ -27,4 +27,4 @@ def test_does_not_require_todo_sync_for_unrelated_changes():
 
     assert module._requires_todo_sync(["README.md"]) is False
     assert module._requires_todo_sync(["docs/todo/README.md"]) is False
-    assert module._requires_todo_sync(["docs/todo/gap_checklist.md"]) is False
+    assert module._requires_todo_sync(["docs/todo/layers/01_compiler_model.md"]) is False

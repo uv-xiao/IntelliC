@@ -1,51 +1,59 @@
 # HTP Story
 
-HTP aims to be a Python-AST-centric compiler framework for heterogeneous tile programs, kernel programs, and structured workload/dataflow programs.
+HTP aims to be a Python-AST-centric compiler framework for heterogeneous tile programs, structured kernel programs, and workload/dataflow programs that span multiple hardware backends without fragmenting into backend-local compiler stacks.
 
-The final intended framework has four defining properties.
+## Final intended shape
 
-## 1. Python remains the semantic home
+The intended framework has six layers.
 
-Programs are authored as native Python programs, not as opaque data blobs. Compilation may attach staged semantic payloads, analyses, backend artifacts, and extension-owned side paths, but the canonical form remains runnable Python-space IR. Every stage should remain runnable in `sim` or fail through a structured replay diagnostic.
+### 1. Compiler model
 
-## 2. Compiler state is explicit and inspectable
+Python remains the semantic home. Every compilation stage should still correspond to runnable Python in `sim`, while semantic state, identity, layout, effects, schedules, and backend discharge facts are emitted as explicit artifacts.
 
-HTP should never hide the real state of compilation inside transient pass-local caches alone. Identity maps, semantic payloads, layout/effect facts, schedule state, pass traces, solver decisions, backend codegen indices, and runtime/build traces are all intended to be explicit artifacts. This is a design choice for retargetability, debuggability, and agent-friendliness.
+### 2. Programming surfaces
 
-## 3. Retargetability comes from contracts, not pass soup
+Users should author kernels, schedules, channels, and serving routines as native Python programs. WSP and CSP are not special side compilers; they are frontend surfaces over the same shared substrate.
 
-HTP is intended to support multiple hardware targets and extension pathways without letting each backend own a separate compiler architecture. Core semantics, layout/effect typing, and schedule intent should stay shared. Backends and extensions should consume explicit contracts and discharge them into target mechanisms.
+### 3. Pipeline and solver
 
-## 4. Agent development is a first-class target
+Passes, pipelines, and optional extension islands should be selected through explicit contracts rather than folklore about pass order. Retargetability comes from shared semantics plus typed composition, not from cloning a new compiler stack for each backend.
 
-The framework is intended to support long-lived agent-driven compiler development. That requires:
-- replayable intermediate programs,
-- stable emitted schemas,
-- explicit diagnostics and fix-hint surfaces,
-- narrow edit corridors,
-- and a disciplined repo workflow that exposes TODO, in-progress, and implemented states separately.
+### 4. Artifacts and debug
 
-## Intended feature envelope
+Compiler state must stay inspectable. Replay, staged sidecars, diagnostics, maps, traces, and codegen indices are not debugging accidents; they are part of the framework contract.
 
-The full intended framework spans:
-- kernel semantics and workload/dataflow semantics,
-- WSP and CSP authoring surfaces,
-- solver-driven pass/pipeline composition,
-- explicit intrinsics and discharge contracts,
-- MLIR round-trip extensions,
-- multiple backend/runtime integrations,
-- and a full agent-product loop for replay, diff, minimization, bisect, verification, and controlled promotion.
+### 5. Backends and extensions
 
-## Docs split
+PTO, NV-GPU, AIE, and future targets should consume the same semantic model and discharge it through explicit backend contracts. MLIR and vendor toolchains are extension mechanisms or artifact boundaries, not the native semantic owner of HTP.
 
-- `docs/design/` documents the implemented subset.
-- `docs/todo/` documents the remaining feature set and research-backed direction.
-- `docs/in_progress/` tracks feature branches currently being built.
+### 6. Agent-native development
 
-## Source material for this story
+HTP is also intended to be a healthy long-term environment for autonomous and semi-autonomous compiler development. That requires stable schemas, replayable intermediate artifacts, strong diagnostics, narrow edit corridors, controlled PR workflow, and examples/tests that are readable enough for humans and reliable enough for agents.
 
-This top-level story is the repository-level synthesis of:
-- `docs/todo/analysis.md`
-- `docs/todo/features.md`
-- `docs/todo/story.md`
-- `docs/todo/reports/retargetable_extensibility_report.md`
+## Visual overview
+
+```text
+Python authoring
+    |
+    v
+shared compiler model
+    |
+    v
+passes + solver + extension islands
+    |
+    v
+artifacts + replay + diagnostics
+    |
+    v
+backends / runtimes / toolchains
+    |
+    v
+human + agent development loop
+```
+
+## Repository split
+
+- `docs/design/` documents the implemented subset
+- `docs/todo/` documents the remaining layers and gaps
+- `docs/in_progress/` tracks feature-branch work currently being built
+- `docs/reference/` and `docs/research/` remain supporting corpora

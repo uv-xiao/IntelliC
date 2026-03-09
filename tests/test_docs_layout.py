@@ -24,3 +24,15 @@ def test_docs_root_does_not_contain_legacy_layout_dirs():
     assert not (docs_root / "future").exists()
     assert not (docs_root / "examples").exists()
     assert not (docs_root / "plans").exists()
+
+
+def test_design_tree_has_only_supported_top_level_entries():
+    design_root = Path("docs/design")
+    entries = {path.name for path in design_root.iterdir()}
+    assert entries == {"README.md", "examples", "layers"}
+
+
+def test_todo_tree_has_only_supported_top_level_entries():
+    todo_root = Path("docs/todo")
+    entries = {path.name for path in todo_root.iterdir()}
+    assert entries == {"README.md", "layers", "reports"}
