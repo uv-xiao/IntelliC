@@ -41,7 +41,7 @@ Implemented architecture:
 - `docs/design/layers/04_artifacts_replay_debug.md`
 - `docs/design/layers/05_backends_and_extensions.md`
 - `docs/design/layers/06_agent_product_and_workflow.md`
-- `docs/design/examples/README.md`
+- example-local walkthroughs under `examples/**/README.md`
 
 Remaining work:
 - `docs/todo/README.md`

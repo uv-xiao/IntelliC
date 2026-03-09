@@ -29,7 +29,7 @@ def test_docs_root_does_not_contain_legacy_layout_dirs():
 def test_design_tree_has_only_supported_top_level_entries():
     design_root = Path("docs/design")
     entries = {path.name for path in design_root.iterdir()}
-    assert entries == {"README.md", "examples", "layers"}
+    assert entries == {"README.md", "layers"}
 
 
 def test_todo_tree_has_only_supported_top_level_entries():

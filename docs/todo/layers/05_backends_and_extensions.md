@@ -4,9 +4,9 @@ This layer tracks the remaining backend depth and extension breadth.
 
 ## Completion snapshot
 
-- total checklist items: 10
-- complete: 6
-- partial: 3
+- total checklist items: 11
+- complete: 8
+- partial: 2
 - open: 1
 
 ## Detailed checklist
@@ -19,7 +19,8 @@ This layer tracks the remaining backend depth and extension breadth.
 ### NV-GPU
 - [x] Emit `.cu`-first NV-GPU packages.
 - [x] Run real CUDA execution from the emitted package.
-- [~] Broaden NV-GPU lowering/runtime breadth, profiling, and Blackwell-specialized behavior.
+- [x] Integrate Arknife-style hardware, channel, and instruction plans into the native NV-GPU path.
+- [~] Broaden NV-GPU lowering/runtime breadth, profiling, and deeper Blackwell-specialized behavior beyond the current Arknife-backed profile plan.
 
 ### AIE and extensions
 - [x] Support AIE planning, MLIR emission, build outputs, and host-runtime launch.
@@ -37,6 +38,7 @@ Relevant anchors:
 - `htp/backends/pto/`
 - `htp/bindings/pto_runtime_adapter.py`
 - `htp/backends/nvgpu/`
+- `htp/ark/__init__.py`
 - `htp/bindings/nvgpu_cuda_adapter.py`
 - `htp_ext/aie/`
 - `htp/bindings/aie_toolchain_adapter.py`

@@ -4,8 +4,8 @@ This layer tracks the remaining gap between today’s authoring surfaces and the
 
 ## Completion snapshot
 
-- total checklist items: 9
-- complete: 8
+- total checklist items: 10
+- complete: 9
 - partial: 0
 - open: 1
 
@@ -16,6 +16,7 @@ This layer tracks the remaining gap between today’s authoring surfaces and the
 - [x] Provide code-backed CSP authoring.
 - [x] Make flagship authoring patterns look like human-written Python instead of low-level data descriptions where that is still leaking into public examples/tests.
 - [x] Broaden the public kernel authoring surface beyond the current proof-oriented entrypoints.
+- [x] Integrate an Arknife-style explicit hardware/instruction surface without creating a sidecar compiler path.
 
 ### Example quality
 - [x] Ship runnable examples across PTO, NV-GPU, WSP, CSP, AIE, MLIR extension composition, and serving routines.
@@ -47,8 +48,9 @@ Relevant anchors:
 - `htp/routine.py`
 - `htp/wsp/__init__.py`
 - `htp/csp/__init__.py`
+- `htp/ark/__init__.py`
 - `examples/`
-- `docs/design/examples/`
+- `examples/**/README.md`
 - `references/pypto/examples/language/`
 - `references/arknife/tests/python/`
 - `references/triton-distributed-knowingnothing/python/little_kernel/`
