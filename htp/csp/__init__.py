@@ -21,14 +21,23 @@ def process(
     args: Sequence[str] = (),
     puts: Sequence[Mapping[str, Any]] = (),
     gets: Sequence[Mapping[str, Any]] = (),
+    steps: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    normalized_steps = [dict(item) for item in steps]
+    if normalized_steps:
+        derived_puts = [dict(item) for item in normalized_steps if str(item.get("kind")) == "put"]
+        derived_gets = [dict(item) for item in normalized_steps if str(item.get("kind")) == "get"]
+    else:
+        derived_puts = [dict(item) for item in puts]
+        derived_gets = [dict(item) for item in gets]
     return {
         "name": str(name),
         "task_id": str(task_id),
         "kernel": str(kernel),
         "args": [str(arg) for arg in args],
-        "puts": [dict(item) for item in puts],
-        "gets": [dict(item) for item in gets],
+        "puts": derived_puts,
+        "gets": derived_gets,
+        **({"steps": normalized_steps} if normalized_steps else {}),
     }
 
 

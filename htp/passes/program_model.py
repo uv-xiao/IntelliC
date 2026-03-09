@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from htp.compiler_errors import compiler_error
+from htp.intrinsics import get_intrinsic_decl
 from htp.ir.layout import (
     DistributionFacet,
     DistributionPlacement,
@@ -164,6 +165,10 @@ def build_type_layout_effects(
         "tiling": _tiling_for_kernel(kernel_ir, backend),
         "facets": _layout_facets(memory_spaces, kernel_ir),
     }
+    protocols = _protocol_effects(workload_ir)
+    tokens = _token_effects(kernel_ir)
+    barriers = _barriers_for_kernel(kernel_ir, tokens=tokens)
+    collectives = _collective_effects(kernel_ir, layout=layout)
     effects = {
         "schema": EFFECTS_SCHEMA_ID,
         "reads": {
@@ -174,12 +179,19 @@ def build_type_layout_effects(
             str(op["op_id"]): [str(name) for name in op.get("effects", {}).get("writes", ())]
             for op in kernel_ir.get("ops", ())
         },
-        "barriers": _barriers_for_kernel(kernel_ir),
+        "intrinsics": _intrinsic_effect_contracts(kernel_ir),
+        "barriers": barriers,
         "channels": _channel_effects(workload_ir, kernel_ir),
-        "protocols": _protocol_effects(workload_ir),
-        "tokens": _token_effects(kernel_ir),
-        "collectives": _collective_effects(kernel_ir),
+        "protocols": protocols,
+        "tokens": tokens,
+        "collectives": collectives,
     }
+    _validate_effect_contracts(
+        effects,
+        entry=entry,
+        kernel_ir=kernel_ir,
+        workload_ir=workload_ir,
+    )
     return types, layout, effects
 
 
@@ -297,8 +309,31 @@ def build_async_resource_checks(
             "name": str(item.get("name", "")),
             "protocol": str(item.get("protocol", "fifo")),
             "capacity": int(item.get("capacity", 1) or 1),
+            "participants": list(item.get("participants", ())),
+            "deadlock_safe": bool(item.get("deadlock_safe", True)),
+            "hazards": [dict(hazard) for hazard in item.get("hazards", ())],
         }
-        for item in workload_ir.get("channels", ())
+        for item in effects.get("protocols", ())
+        if isinstance(item, Mapping)
+    ]
+    unresolved_tokens = [
+        dict(item)
+        for item in effects.get("tokens", ())
+        if isinstance(item, Mapping) and str(item.get("status", "")) != "discharged"
+    ]
+    pending_collectives = [
+        dict(item)
+        for item in effects.get("collectives", ())
+        if isinstance(item, Mapping) and str(item.get("status", "")) != "discharged"
+    ]
+    barrier_scopes = [
+        {
+            "barrier_id": str(item.get("barrier_id", "")),
+            "scope": str(item.get("scope", "thread_block")),
+            "kind": str(item.get("kind", "implicit")),
+            "event_dependencies": list(item.get("event_dependencies", ())),
+        }
+        for item in effects.get("barriers", ())
         if isinstance(item, Mapping)
     ]
     return {
@@ -308,10 +343,16 @@ def build_async_resource_checks(
         "barriers": list(effects.get("barriers", ())),
         "channel_protocols": channel_protocols,
         "collectives": list(effects.get("collectives", ())),
+        "unresolved_tokens": unresolved_tokens,
+        "pending_collectives": pending_collectives,
+        "barrier_scopes": barrier_scopes,
         "resource_summary": {
             "token_count": len(list(effects.get("tokens", ()))),
             "barrier_count": len(list(effects.get("barriers", ()))),
             "collective_count": len(list(effects.get("collectives", ()))),
+            "pending_token_count": len(unresolved_tokens),
+            "pending_collective_count": len(pending_collectives),
+            "protocol_hazard_count": sum(len(item["hazards"]) for item in channel_protocols),
             "op_count": len(list(kernel_ir.get("ops", ()))),
         },
     }
@@ -533,7 +574,19 @@ def _normalize_workload_surface(
         "dependencies": normalized_dependencies,
         "kernel": str(kernel.get("name", entry)),
         **(
-            {"processes": [dict(item) for item in workload.get("processes", ())]}
+            {
+                "processes": [
+                    {
+                        **dict(item),
+                        **(
+                            {"steps": [dict(step) for step in item.get("steps", ())]}
+                            if item.get("steps")
+                            else {}
+                        ),
+                    }
+                    for item in workload.get("processes", ())
+                ]
+            }
             if workload.get("processes")
             else {}
         ),
@@ -558,7 +611,13 @@ def _lower_csp_surface(entry: str, csp: Mapping[str, Any], kernel: object) -> di
         "channels": [dict(item) for item in csp.get("channels", ())],
         "dependencies": [],
         "kernel": kernel_name,
-        "processes": processes,
+        "processes": [
+            {
+                **dict(item),
+                **({"steps": [dict(step) for step in item.get("steps", ())]} if item.get("steps") else {}),
+            }
+            for item in processes
+        ],
     }
 
 
@@ -664,11 +723,7 @@ def _op_attrs(op: Mapping[str, Any]) -> dict[str, Any]:
         "out",
         "inputs",
         "outputs",
-        "source",
-        "target",
         "value",
-        "token",
-        "channel",
     }
     return {str(key): value for key, value in op.items() if key not in reserved}
 
@@ -770,12 +825,54 @@ def _tiling_for_kernel(kernel_ir: Mapping[str, Any], backend: str) -> dict[str, 
     return {"block": [128], "pipeline_stages": 1, "backend": backend}
 
 
-def _barriers_for_kernel(kernel_ir: Mapping[str, Any]) -> list[dict[str, str]]:
-    barriers: list[dict[str, str]] = []
+def _barriers_for_kernel(
+    kernel_ir: Mapping[str, Any], *, tokens: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    pending_tokens_by_scope: dict[str, list[str]] = {}
+    for token in tokens:
+        if str(token.get("status", "")) == "pending":
+            pending_tokens_by_scope.setdefault(str(token.get("required_scope", "thread_block")), []).append(
+                str(token.get("token_id", ""))
+            )
+    barriers: list[dict[str, Any]] = []
     for op in kernel_ir.get("ops", ()):
-        if get_op_spec(str(op.get("op"))).barrier_after:
-            barriers.append({"after": str(op["op_id"]), "reason": "pipeline_ready"})
+        op_id = str(op["op_id"])
+        if str(op.get("intrinsic", "")) == "portable.barrier":
+            scope = str(op.get("attrs", {}).get("scope", "thread_block"))
+            event_dependencies = list(pending_tokens_by_scope.get(scope, ()))
+            barriers.append(
+                {
+                    "barrier_id": f"{op_id}.barrier",
+                    "after": op_id,
+                    "reason": "explicit_barrier",
+                    "scope": scope,
+                    "kind": "explicit",
+                    "discharges": ["memory.pending_copy", "token.async_copy"],
+                    "event_dependencies": event_dependencies,
+                }
+            )
+        elif get_op_spec(str(op.get("op"))).barrier_after:
+            barriers.append(
+                {
+                    "barrier_id": f"{op_id}.barrier",
+                    "after": op_id,
+                    "reason": "pipeline_ready",
+                    "scope": "thread_block",
+                    "kind": "implicit",
+                    "discharges": ["sync.barrier"],
+                    "event_dependencies": [],
+                }
+            )
     return barriers
+
+
+def _is_sharded_layout(payload: Mapping[str, Any]) -> bool:
+    distribution = payload.get("distribution", {})
+    dims = distribution.get("dims", ()) if isinstance(distribution, Mapping) else ()
+    return any(
+        isinstance(dim, Mapping) and str(dim.get("kind", "replicate")) not in {"replicate", "R"}
+        for dim in dims
+    )
 
 
 def _phase_for_op(kind: str) -> str:
@@ -819,6 +916,12 @@ def _protocol_effects(workload_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
     entry = str(workload_ir.get("entry", ""))
     for index, channel in enumerate(workload_ir.get("channels", ())):
         channel_name = str(channel["name"])
+        participants = sorted(
+            str(process.get("name", process.get("task_id", "")))
+            for process in processes
+            if any(str(item.get("channel")) == channel_name for item in process.get("puts", ()))
+            or any(str(item.get("channel")) == channel_name for item in process.get("gets", ()))
+        )
         puts = sum(
             int(item.get("count", 1))
             for process in processes
@@ -839,6 +942,7 @@ def _protocol_effects(workload_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
             "puts": puts,
             "gets": gets,
             "balanced": balanced,
+            "participants": participants,
         }
         if not balanced:
             raise compiler_error(
@@ -851,27 +955,241 @@ def _protocol_effects(workload_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
                 puts=puts,
                 gets=gets,
             )
+        hazards = _protocol_hazards(channel_name, channel, processes)
+        obligation["hazards"] = hazards
+        obligation["deadlock_safe"] = not hazards
+        if hazards:
+            first_hazard = hazards[0]
+            raise compiler_error(
+                "HTP.PROTOCOL.DEADLOCK_RISK",
+                f"channel {channel_name!r} has a potential deadlock hazard: {first_hazard['detail']}",
+                node_id=f"{entry}:Channel:{index}" if entry else None,
+                payload_ref_hint="semantic.workload_ir",
+                fix_hints_ref="docs/design/impls/09_debuggability.md",
+                channel=channel_name,
+                hazard=first_hazard,
+            )
         obligations.append(obligation)
     return obligations
 
 
+def _process_steps(process: Mapping[str, Any]) -> list[dict[str, Any]]:
+    explicit = [dict(item) for item in process.get("steps", ()) if isinstance(item, Mapping)]
+    if explicit:
+        return explicit
+    return [
+        *({"kind": "get", **dict(item)} for item in process.get("gets", ()) if isinstance(item, Mapping)),
+        *({"kind": "put", **dict(item)} for item in process.get("puts", ()) if isinstance(item, Mapping)),
+    ]
+
+
+def _protocol_hazards(
+    channel_name: str, channel: Mapping[str, Any], processes: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    hazards: list[dict[str, Any]] = []
+    channel_processes = [
+        process
+        for process in processes
+        if any(str(item.get("channel")) == channel_name for item in process.get("puts", ()))
+        or any(str(item.get("channel")) == channel_name for item in process.get("gets", ()))
+    ]
+    first_steps = []
+    for process in channel_processes:
+        steps = _process_steps(process)
+        if steps:
+            first_steps.append(
+                {
+                    "process": str(process.get("name", process.get("task_id", ""))),
+                    "step": dict(steps[0]),
+                }
+            )
+    initial_puts = [
+        item
+        for item in first_steps
+        if str(item["step"].get("kind")) == "put" and str(item["step"].get("channel")) == channel_name
+    ]
+    initial_gets = [
+        item
+        for item in first_steps
+        if str(item["step"].get("kind")) == "get" and str(item["step"].get("channel")) == channel_name
+    ]
+    capacity = int(channel.get("capacity", 0) or 0)
+    if initial_gets and not initial_puts and capacity <= 0:
+        hazards.append(
+            {
+                "kind": "all_processes_block_on_empty_channel",
+                "channel": channel_name,
+                "participants": [item["process"] for item in initial_gets],
+                "detail": "every participating process performs an initial get on an empty zero-capacity channel",
+            }
+        )
+    wait_edges: list[dict[str, str]] = []
+    process_by_name = {
+        str(process.get("name", process.get("task_id", ""))): process for process in channel_processes
+    }
+    initial_producers_by_channel: dict[str, list[str]] = {}
+    for item in first_steps:
+        if str(item["step"].get("kind")) == "put":
+            initial_producers_by_channel.setdefault(str(item["step"].get("channel", "")), []).append(
+                item["process"]
+            )
+    for item in first_steps:
+        if str(item["step"].get("kind")) != "get":
+            continue
+        src = item["process"]
+        awaited_channel = str(item["step"].get("channel", ""))
+        producers = initial_producers_by_channel.get(awaited_channel, ())
+        for producer in producers:
+            wait_edges.append({"src": src, "dst": producer})
+    if wait_edges and _has_wait_cycle(wait_edges):
+        hazards.append(
+            {
+                "kind": "initial_wait_cycle",
+                "channel": channel_name,
+                "participants": sorted(process_by_name),
+                "detail": "initial blocking channel operations form a wait cycle across processes",
+                "edges": wait_edges,
+            }
+        )
+    return hazards
+
+
+def _has_wait_cycle(edges: Sequence[Mapping[str, str]]) -> bool:
+    graph: dict[str, set[str]] = {}
+    for edge in edges:
+        src = str(edge.get("src", ""))
+        dst = str(edge.get("dst", ""))
+        if src and dst:
+            graph.setdefault(src, set()).add(dst)
+    seen: set[str] = set()
+    stack: set[str] = set()
+
+    def visit(node: str) -> bool:
+        if node in stack:
+            return True
+        if node in seen:
+            return False
+        seen.add(node)
+        stack.add(node)
+        for nxt in graph.get(node, ()):
+            if visit(nxt):
+                return True
+        stack.remove(node)
+        return False
+
+    return any(visit(node) for node in graph)
+
+
 def _token_effects(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
-    tokens = []
+    records: dict[str, dict[str, Any]] = {}
+    pending_order: list[str] = []
+    for op in kernel_ir.get("ops", ()):
+        op_id = str(op["op_id"])
+        intrinsic = str(op.get("intrinsic", ""))
+        attrs = op.get("attrs", {})
+        if intrinsic == "portable.async_copy":
+            token_name = str(attrs.get("token", f"{op_id}.token"))
+            event_id = f"{op_id}.event"
+            records[token_name] = {
+                "token_id": token_name,
+                "token_kind": "async_copy",
+                "produced_by": op_id,
+                "required_scope": str(attrs.get("scope", "thread_block")),
+                "source": attrs.get("source"),
+                "target": attrs.get("target"),
+                "event_id": event_id,
+                "status": "pending",
+                "discharged_by": None,
+                "discharge_kind": None,
+            }
+            pending_order.append(token_name)
+        elif intrinsic == "portable.await":
+            token_name = str(attrs.get("token", pending_order[-1] if pending_order else ""))
+            if token_name and token_name in records:
+                records[token_name]["status"] = "discharged"
+                records[token_name]["discharged_by"] = op_id
+                records[token_name]["discharge_kind"] = "await"
+                if token_name in pending_order:
+                    pending_order.remove(token_name)
+        elif intrinsic == "portable.barrier":
+            scope = str(attrs.get("scope", "thread_block"))
+            discharged = [
+                token_name
+                for token_name in list(pending_order)
+                if str(records[token_name].get("required_scope", "thread_block")) == scope
+            ]
+            for token_name in discharged:
+                records[token_name]["status"] = "discharged"
+                records[token_name]["discharged_by"] = op_id
+                records[token_name]["discharge_kind"] = "barrier"
+                pending_order.remove(token_name)
+    return list(records.values())
+
+
+def _collective_effects(kernel_ir: Mapping[str, Any], *, layout: Mapping[str, Any]) -> list[dict[str, Any]]:
+    output_buffers = {
+        str(argument["name"])
+        for argument in kernel_ir.get("args", ())
+        if str(argument.get("kind")) == "buffer" and str(argument.get("role")) == "output"
+    }
+    shard_outputs = {
+        buffer_name
+        for buffer_name, payload in layout.get("facets", {}).get("buffers", {}).items()
+        if _is_sharded_layout(payload) and buffer_name in output_buffers
+    }
+    records: list[dict[str, Any]] = []
+    for op in kernel_ir.get("ops", ()):
+        if str(op.get("intrinsic", "")) != "portable.allreduce":
+            continue
+        op_id = str(op["op_id"])
+        outputs = [str(name) for name in op.get("outputs", ())]
+        collective_id = f"{op_id}.collective"
+        discharged = any(name in shard_outputs for name in outputs)
+        records.append(
+            {
+                "collective_id": collective_id,
+                "op_id": op_id,
+                "kind": "allreduce",
+                "outputs": outputs,
+                "status": "discharged" if discharged else "redundant",
+                "discharged_by": op_id if discharged else None,
+                "required_by": sorted(name for name in outputs if name in shard_outputs),
+                "discharge_rule": "allreduce_over_sharded_output" if discharged else "no_pending_obligation",
+            }
+        )
+    for buffer_name in sorted(shard_outputs):
+        if any(buffer_name in record["required_by"] for record in records):
+            continue
+        records.append(
+            {
+                "collective_id": f"{buffer_name}.collective",
+                "op_id": None,
+                "kind": "allreduce",
+                "outputs": [buffer_name],
+                "status": "pending",
+                "discharged_by": None,
+                "required_by": [buffer_name],
+                "discharge_rule": "allreduce_over_sharded_output",
+            }
+        )
+    return records
+
+
+def _intrinsic_effect_contracts(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
+    payloads: list[dict[str, Any]] = []
     for op in kernel_ir.get("ops", ()):
         intrinsic = str(op.get("intrinsic", ""))
-        if intrinsic == "portable.async_copy":
-            tokens.append({"op_id": str(op["op_id"]), "token_kind": "async_copy", "status": "produced"})
-        if intrinsic == "portable.await":
-            tokens.append({"op_id": str(op["op_id"]), "token_kind": "async_copy", "status": "awaited"})
-    return tokens
-
-
-def _collective_effects(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
-    collectives = []
-    for op in kernel_ir.get("ops", ()):
-        if str(op.get("intrinsic", "")) == "portable.allreduce":
-            collectives.append({"op_id": str(op["op_id"]), "kind": "allreduce", "status": "pending"})
-    return collectives
+        decl = get_intrinsic_decl(intrinsic)
+        payloads.append(
+            {
+                "op_id": str(op["op_id"]),
+                "intrinsic": intrinsic,
+                "requires_effects": list(decl.requires_effects),
+                "produces_effects": list(decl.produces_effects),
+                "discharges_effects": list(decl.discharges_effects),
+            }
+        )
+    return payloads
 
 
 def _validate_dtype_contracts(kernel_ir: Mapping[str, Any], *, target: Mapping[str, str]) -> None:
@@ -938,6 +1256,46 @@ def _validate_alias_contracts(kernel_ir: Mapping[str, Any]) -> None:
                 alias_of=alias_name,
                 mutable_aliases=users,
             )
+
+
+def _validate_effect_contracts(
+    effects: Mapping[str, Any],
+    *,
+    entry: str,
+    kernel_ir: Mapping[str, Any],
+    workload_ir: Mapping[str, Any],
+) -> None:
+    del kernel_ir, workload_ir
+    pending_tokens = [
+        dict(item)
+        for item in effects.get("tokens", ())
+        if isinstance(item, Mapping) and str(item.get("status", "")) != "discharged"
+    ]
+    if pending_tokens:
+        first = pending_tokens[0]
+        raise compiler_error(
+            "HTP.EFFECT.UNDISCHARGED_TOKEN",
+            f"token {first.get('token_id')!r} is not discharged by await or barrier.",
+            node_id=str(first.get("produced_by", "")) or None,
+            payload_ref_hint="semantic.effects",
+            fix_hints_ref="docs/design/impls/09_debuggability.md",
+            token=first.get("token_id"),
+        )
+    pending_collectives = [
+        dict(item)
+        for item in effects.get("collectives", ())
+        if isinstance(item, Mapping) and str(item.get("status", "")) == "pending"
+    ]
+    if pending_collectives:
+        first = pending_collectives[0]
+        raise compiler_error(
+            "HTP.EFFECT.UNDISCHARGED_COLLECTIVE",
+            f"collective obligation for {first.get('required_by')} is still pending.",
+            node_id=str(first.get("op_id", "")) or None,
+            payload_ref_hint="semantic.effects",
+            fix_hints_ref="docs/design/features.md",
+            collective=first.get("collective_id"),
+        )
 
 
 def _schedule_legality(target: Mapping[str, str], directives: Mapping[str, Any]) -> dict[str, Any]:

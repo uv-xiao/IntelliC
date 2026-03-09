@@ -31,6 +31,14 @@ def test_portable_intrinsic_registry_exposes_declared_contracts():
     assert decl.produces_effects == ()
     assert any(item.name == "portable.reduction_sum" for item in portable_intrinsics())
 
+    channel_send = get_intrinsic_decl("portable.channel_send")
+    assert channel_send.requires_effects == ("protocol.free_slot",)
+    assert channel_send.produces_effects == ("protocol.used_slot",)
+
+    allreduce = get_intrinsic_decl("portable.allreduce")
+    assert allreduce.requires_effects == ("collective.pending_allreduce",)
+    assert allreduce.discharges_effects == ("collective.pending_allreduce", "collective.allreduce")
+
 
 def test_backend_handler_availability_is_declared_per_target():
     assert has_handler("nvgpu", "portable.matmul", role="lower") is True

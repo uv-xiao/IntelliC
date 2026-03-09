@@ -199,6 +199,7 @@ def _bootstrap() -> None:
             "portable",
             "barrier",
             "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+            requires_effects=("sync.barrier",),
             discharges_effects=("memory.pending_copy", "sync.barrier"),
         ),
         IntrinsicDecl(
@@ -212,10 +213,24 @@ def _bootstrap() -> None:
         ),
         IntrinsicDecl("portable.mma", 1, "portable", "mma", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
         IntrinsicDecl(
-            "portable.channel_send", 1, "portable", "channel_send", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"
+            "portable.channel_send",
+            1,
+            "portable",
+            "channel_send",
+            "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+            requires_effects=("protocol.free_slot",),
+            produces_effects=("protocol.used_slot",),
+            discharges_effects=("protocol.free_slot",),
         ),
         IntrinsicDecl(
-            "portable.channel_recv", 1, "portable", "channel_recv", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"
+            "portable.channel_recv",
+            1,
+            "portable",
+            "channel_recv",
+            "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+            requires_effects=("protocol.used_slot",),
+            produces_effects=("protocol.free_slot",),
+            discharges_effects=("protocol.used_slot",),
         ),
         IntrinsicDecl(
             "portable.allreduce",
@@ -223,8 +238,9 @@ def _bootstrap() -> None:
             "portable",
             "allreduce",
             "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+            requires_effects=("collective.pending_allreduce",),
             produces_effects=("collective.allreduce",),
-            discharges_effects=("collective.allreduce",),
+            discharges_effects=("collective.pending_allreduce", "collective.allreduce"),
         ),
     )
     register_intrinsic_package("htp.core.portable", declarations)

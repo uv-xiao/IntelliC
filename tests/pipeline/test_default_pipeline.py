@@ -161,10 +161,16 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
         "barriers": [],
         "channel_protocols": [],
         "collectives": [],
+        "unresolved_tokens": [],
+        "pending_collectives": [],
+        "barrier_scopes": [],
         "resource_summary": {
             "token_count": 0,
             "barrier_count": 0,
             "collective_count": 0,
+            "pending_token_count": 0,
+            "pending_collective_count": 0,
+            "protocol_hazard_count": 0,
             "op_count": 1,
         },
     }

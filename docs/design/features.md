@@ -38,7 +38,10 @@ Implemented today:
 - buffer, tensor, tile, view, token, and channel value kinds
 - alias validation for view/buffer relationships
 - facet-product layout payload structure
-- typed protocol obligations for channels
+- typed protocol obligations for channels, including participant sets, hazard
+  evidence, and `deadlock_safe` status
+- explicit async-token, barrier-scope, event-dependency, and collective
+  discharge payloads in `effects.json`
 - schedule directives and legality checks
 
 Main anchors:
@@ -82,6 +85,8 @@ Implemented today:
 - target-specific lower/emit/sim handler availability
 - callable `lower` and `emit` dispatch through the registry
 - replay stub diagnostic policy per intrinsic
+- intrinsic-level effect contracts for protocol slots, async tokens, barriers,
+  and collectives
 - backend lowering checks through intrinsic-handler declarations
 - extension-owned intrinsic package registration (current example: `htp_ext.aie.intrinsics`)
 
