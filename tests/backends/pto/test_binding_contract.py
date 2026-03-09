@@ -477,12 +477,15 @@ def test_pto_binding_rejects_schema_drift(tmp_path):
     report = bind(package_dir).validate()
 
     assert report.ok is False
-    assert report.diagnostics == [
-        {
-            "code": "HTP.BINDINGS.PTO_INVALID_CODEGEN_INDEX",
-            "detail": "pto_codegen.json must declare schema 'htp.pto.codegen.v1'.",
-        },
-    ]
+    assert {
+        "code": "HTP.BINDINGS.INVALID_SCHEMA",
+        "detail": "codegen/pto/pto_codegen.json must declare schema 'htp.pto.codegen.v1'.",
+        "artifact_ref": "codegen/pto/pto_codegen.json",
+    } in report.diagnostics
+    assert {
+        "code": "HTP.BINDINGS.PTO_INVALID_CODEGEN_INDEX",
+        "detail": "pto_codegen.json must declare schema 'htp.pto.codegen.v1'.",
+    } in report.diagnostics
 
 
 def test_pto_binding_rejects_toolchain_schema_drift(tmp_path):
@@ -504,12 +507,15 @@ def test_pto_binding_rejects_toolchain_schema_drift(tmp_path):
     report = bind(package_dir).validate()
 
     assert report.ok is False
-    assert report.diagnostics == [
-        {
-            "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
-            "detail": "build/toolchain.json must declare schema 'htp.pto.toolchain.v1'.",
-        },
-    ]
+    assert {
+        "code": "HTP.BINDINGS.INVALID_SCHEMA",
+        "detail": "build/toolchain.json must declare schema 'htp.pto.toolchain.v1'.",
+        "artifact_ref": "build/toolchain.json",
+    } in report.diagnostics
+    assert {
+        "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
+        "detail": "build/toolchain.json must declare schema 'htp.pto.toolchain.v1'.",
+    } in report.diagnostics
 
 
 def test_pto_binding_rejects_nonmapping_codegen_index(tmp_path):
@@ -529,12 +535,15 @@ def test_pto_binding_rejects_nonmapping_codegen_index(tmp_path):
     report = bind(package_dir).validate()
 
     assert report.ok is False
-    assert report.diagnostics == [
-        {
-            "code": "HTP.BINDINGS.PTO_INVALID_CODEGEN_INDEX",
-            "detail": "pto_codegen.json must decode to a mapping.",
-        },
-    ]
+    assert {
+        "code": "HTP.BINDINGS.INVALID_SCHEMA",
+        "detail": "codegen/pto/pto_codegen.json must decode to a mapping with schema 'htp.pto.codegen.v1'.",
+        "artifact_ref": "codegen/pto/pto_codegen.json",
+    } in report.diagnostics
+    assert {
+        "code": "HTP.BINDINGS.PTO_INVALID_CODEGEN_INDEX",
+        "detail": "pto_codegen.json must decode to a mapping.",
+    } in report.diagnostics
 
 
 def test_pto_binding_rejects_nonmapping_toolchain_manifest(tmp_path):
@@ -554,12 +563,15 @@ def test_pto_binding_rejects_nonmapping_toolchain_manifest(tmp_path):
     report = bind(package_dir).validate()
 
     assert report.ok is False
-    assert report.diagnostics == [
-        {
-            "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
-            "detail": "build/toolchain.json must decode to a mapping.",
-        },
-    ]
+    assert {
+        "code": "HTP.BINDINGS.INVALID_SCHEMA",
+        "detail": "build/toolchain.json must decode to a mapping with schema 'htp.pto.toolchain.v1'.",
+        "artifact_ref": "build/toolchain.json",
+    } in report.diagnostics
+    assert {
+        "code": "HTP.BINDINGS.PTO_INVALID_TOOLCHAIN_MANIFEST",
+        "detail": "build/toolchain.json must decode to a mapping.",
+    } in report.diagnostics
 
 
 def test_pto_binding_rejects_nonmapping_kernel_entries(tmp_path):

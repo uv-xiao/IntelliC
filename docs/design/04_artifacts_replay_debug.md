@@ -50,6 +50,9 @@ Replay executes `ir/stages/<id>/program.py` through the runtime surface. This is
 The current implementation already has:
 - structured replay diagnostics
 - binding validation diagnostics
+- uniform `artifact_ref` evidence for generic malformed/invalid sidecars
+- generic schema validation for backend-owned output sidecars across PTO,
+  NV-GPU, and AIE package manifests
 - adapter traces
 - binding logs
 - semantic diff evidence that includes stage sidecars, ids, maps, and pass traces
@@ -88,7 +91,11 @@ Tests worth reading together with this layer:
 - `tests/golden/`
 - `tests/runtime/`
 - `tests/bindings/`
+- `tests/extensions/test_aie_backend.py`
 
 ## Current limits
 
-The artifact and debugging layer is strong, but it is not the final surface. Broader validation/debug depth still lives in `docs/todo/04_artifacts_replay_debug.md`.
+The artifact and debugging layer is now uniform enough that backend and
+extension sidecars are validated through the same package-first evidence model.
+The main remaining gap is broader replay/reference coverage, not a missing
+package/debug contract.

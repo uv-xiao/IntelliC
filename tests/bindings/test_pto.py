@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 
 from htp.backends.pto.emit import emit_package
@@ -136,3 +138,47 @@ def test_pto_run_executes_through_adapter(tmp_path, monkeypatch):
     assert result.trace_ref == "logs/adapter_pto_run.json"
     assert result.diagnostics == []
     assert result.log_path is not None
+
+
+def test_pto_validate_reports_artifact_ref_for_invalid_codegen_schema(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "demo_kernel",
+            "kernel": {
+                "name": "demo_kernel",
+                "args": [
+                    {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                    {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                    {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
+                    {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
+                ],
+                "ops": [
+                    {
+                        "op": "elementwise_binary",
+                        "operator": "add",
+                        "lhs": "lhs",
+                        "rhs": "rhs",
+                        "out": "out",
+                        "shape": ["size"],
+                        "dtype": "f32",
+                    }
+                ],
+            },
+        },
+    )
+
+    codegen_path = package_dir / "codegen" / "pto" / "pto_codegen.json"
+    payload = json.loads(codegen_path.read_text())
+    payload["schema"] = "broken.schema"
+    codegen_path.write_text(json.dumps(payload, indent=2) + "\n")
+
+    report = bind(package_dir).validate()
+
+    assert any(
+        diagnostic.get("code") == "HTP.BINDINGS.INVALID_SCHEMA"
+        and diagnostic.get("artifact_ref") == "codegen/pto/pto_codegen.json"
+        for diagnostic in report.diagnostics
+    )

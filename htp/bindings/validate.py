@@ -15,6 +15,13 @@ from htp.schemas import (
     REPLAY_STUBS_SCHEMA_ID,
 )
 
+PTO_CODEGEN_SCHEMA_ID = "htp.pto.codegen.v1"
+PTO_TOOLCHAIN_SCHEMA_ID = "htp.pto.toolchain.v1"
+NVGPU_CODEGEN_SCHEMA_ID = "htp.nvgpu.codegen.v1"
+NVGPU_TOOLCHAIN_SCHEMA_ID = "htp.nvgpu.toolchain.v1"
+AIE_CODEGEN_SCHEMA_ID = "htp.aie.codegen.v1"
+AIE_TOOLCHAIN_SCHEMA_ID = "htp.aie.toolchain.v1"
+
 CONTRACT_REFS = (
     "docs/design/04_artifacts_replay_debug.md",
     "docs/design/05_backends_and_extensions.md",
@@ -79,6 +86,7 @@ def validation_diagnostics(
             {
                 "code": "HTP.BINDINGS.MISSING_CONTRACT_FILE",
                 "detail": f"Missing required artifact path: {missing_path}",
+                "artifact_ref": missing_path,
             }
         )
     return tuple(diagnostics)
@@ -201,6 +209,7 @@ def _sidecar_schema_diagnostics(
                 {
                     "code": "HTP.BINDINGS.MALFORMED_JSON",
                     "detail": f"{relpath} could not be decoded as JSON: {exc}",
+                    "artifact_ref": relpath,
                 }
             )
             continue
@@ -209,6 +218,7 @@ def _sidecar_schema_diagnostics(
                 {
                     "code": "HTP.BINDINGS.INVALID_SCHEMA",
                     "detail": f"{relpath} must decode to a mapping with schema {expected_schema!r}.",
+                    "artifact_ref": relpath,
                 }
             )
             continue
@@ -217,12 +227,20 @@ def _sidecar_schema_diagnostics(
                 {
                     "code": "HTP.BINDINGS.INVALID_SCHEMA",
                     "detail": f"{relpath} must declare schema {expected_schema!r}.",
+                    "artifact_ref": relpath,
                 }
             )
     return diagnostics
 
 
 def _iter_schema_paths(manifest: Mapping[str, Any]) -> Iterable[tuple[str, str | None]]:
+    outputs = manifest.get("outputs")
+    backend, _variant = manifest_target(manifest)
+    if isinstance(outputs, Mapping):
+        for field, schema in _output_schema_map(backend).items():
+            relpath = outputs.get(field)
+            if isinstance(relpath, str):
+                yield relpath, schema
     for stage in _stage_graph(manifest):
         analysis_index = stage.get("analysis_index")
         if isinstance(analysis_index, str):
@@ -264,6 +282,25 @@ def _iter_schema_paths(manifest: Mapping[str, Any]) -> Iterable[tuple[str, str |
             stubs = runnable_py.get("stubs")
             if isinstance(stubs, str):
                 yield stubs, REPLAY_STUBS_SCHEMA_ID
+
+
+def _output_schema_map(backend: str | None) -> dict[str, str]:
+    if backend == "pto":
+        return {
+            "pto_codegen_index": PTO_CODEGEN_SCHEMA_ID,
+            "toolchain_manifest": PTO_TOOLCHAIN_SCHEMA_ID,
+        }
+    if backend == "nvgpu":
+        return {
+            "nvgpu_codegen_index": NVGPU_CODEGEN_SCHEMA_ID,
+            "toolchain_manifest": NVGPU_TOOLCHAIN_SCHEMA_ID,
+        }
+    if backend == "aie":
+        return {
+            "aie_codegen_index": AIE_CODEGEN_SCHEMA_ID,
+            "toolchain_manifest": AIE_TOOLCHAIN_SCHEMA_ID,
+        }
+    return {}
 
 
 __all__ = [

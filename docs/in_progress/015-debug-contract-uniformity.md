@@ -18,11 +18,11 @@ Broaden package validation and debug evidence so PTO, NV-GPU, AIE, and extension
 
 ## Scope Checklist
 
-- [ ] identify the current validation / debug inconsistencies across PTO, NV-GPU, AIE, and extension sidecars
-- [ ] add stronger uniform artifact references and schema checks for backend/extension sidecars
-- [ ] make backend-specific diagnostics point to the same style of artifact / trace evidence
-- [ ] add targeted regression tests for the new uniformity rules
-- [ ] update `docs/design/04_artifacts_replay_debug.md`, `docs/todo/04_artifacts_replay_debug.md`, and `docs/todo/README.md`
+- [x] identify the current validation / debug inconsistencies across PTO, NV-GPU, AIE, and extension sidecars
+- [x] add stronger uniform artifact references and schema checks for backend/extension sidecars
+- [x] make backend-specific diagnostics point to the same style of artifact / trace evidence
+- [x] add targeted regression tests for the new uniformity rules
+- [x] update `docs/design/04_artifacts_replay_debug.md`, `docs/todo/04_artifacts_replay_debug.md`, and `docs/todo/README.md`
 
 ## Code Surfaces
 
@@ -36,8 +36,8 @@ Broaden package validation and debug evidence so PTO, NV-GPU, AIE, and extension
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path validation test still passes
-- [ ] one malformed-sidecar regression test per affected backend family
+- [x] one happy-path validation test still passes
+- [x] one malformed-sidecar regression test per affected backend family
 - [ ] `pytest -q`
 - [ ] `pre-commit run --all-files`
 
