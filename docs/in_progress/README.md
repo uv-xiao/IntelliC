@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `docs/in_progress/008-reference-calibrated-examples.md`
+- none
