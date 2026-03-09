@@ -75,6 +75,20 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
     trace_lines = (package_dir / "ir" / "pass_trace.jsonl").read_text().strip().splitlines()
     trace_events = [json.loads(line) for line in trace_lines]
     assert [event["pass_id"] for event in trace_events] == list(MANDATORY_PASS_IDS)
+    analyze_trace = next(event for event in trace_events if event["pass_id"] == "htp::analyze_schedule@1")
+    assert analyze_trace["requires_satisfied"] == {
+        "requires": {
+            "Type.LayoutChecked@1": True,
+            "Type.EffectsChecked@1": True,
+        },
+        "analysis_requires": {},
+        "layout_invariants": {
+            "Layout.Typed@1": True,
+        },
+        "effect_invariants": {
+            "Effects.Typed@1": True,
+        },
+    }
 
     semantic_stage = next(stage for stage in stage_graph if stage["pass"] == "htp::semantic_model@1")
     semantic_kernel_ir = json.loads((package_dir / semantic_stage["semantic"]["kernel_ir"]).read_text())

@@ -22,6 +22,8 @@ CONTRACT = PassContract(
         "Type.LayoutChecked@1",
         "Type.EffectsChecked@1",
     ),
+    establishes_layout_invariants=("Layout.Typed@1",),
+    establishes_effect_invariants=("Effects.Typed@1",),
     outputs=("ir.types", "ir.layout", "ir.effects"),
 )
 

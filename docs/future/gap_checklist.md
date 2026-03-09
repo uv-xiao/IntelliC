@@ -56,13 +56,13 @@ Checklist:
   backend-owned declarations (`ArchModel`-style source of truth).
 - `[ ]` Make extension-provided passes and extension-provided pipelines
   first-class solver inputs rather than ad-hoc extension-specific checks.
-- `[ ]` Use `PassContract.requires_layout_invariants` and
+- `[x]` Use `PassContract.requires_layout_invariants` and
   `PassContract.requires_effect_invariants` as real satisfiability checks rather
   than dormant fields.
-- `[ ]` Use `PassContract.establishes_layout_invariants` and
+- `[x]` Use `PassContract.establishes_layout_invariants` and
   `PassContract.establishes_effect_invariants` in the evolving capability state
   beyond simple accumulation.
-- `[ ]` Record solver satisfaction details into `ir/pass_trace.jsonl`
+- `[x]` Record solver satisfaction details into `ir/pass_trace.jsonl`
   (`requires_satisfied`) instead of leaving them empty.
 - `[ ]` Emit solver-visible candidate providers from actual registered passes and
   extensions rather than best-effort local hints.

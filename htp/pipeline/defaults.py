@@ -21,7 +21,12 @@ from htp.passes import (
 )
 from htp.passes.contracts import PassContract
 from htp.passes.program_model import stage_payloads_from_program
-from htp.solver import solve_default_pipeline
+from htp.solver import (
+    apply_contract_to_state,
+    build_initial_capability_state,
+    evaluate_contract_satisfaction,
+    solve_default_pipeline,
+)
 
 
 @dataclass(frozen=True)
@@ -90,20 +95,41 @@ def run_default_pipeline(
         failure_path.parent.mkdir(parents=True, exist_ok=True)
         failure_path.write_text(json.dumps(solver_result.failure.to_json(), indent=2) + "\n")
         raise RuntimeError(f"Default pipeline is unsatisfied: {solver_result.failure.to_json()}")
+    capability_state = build_initial_capability_state(
+        program=program_state,
+        extension_results=solver_result.extension_results,
+    )
 
     for pipeline_pass in MANDATORY_PASSES:
         next_program: dict[str, Any] | None = None
+        satisfaction = evaluate_contract_satisfaction(
+            contract=pipeline_pass.contract,
+            state=capability_state,
+        )
+        if satisfaction.missing_caps or satisfaction.missing_layout or satisfaction.missing_effects:
+            raise RuntimeError(
+                f"Default pipeline contract drift at {pipeline_pass.contract.pass_id}: "
+                f"{satisfaction.requires_satisfied}"
+            )
 
         def execute(stage_before: dict[str, object]) -> PassResult:
             nonlocal next_program
             next_program, result = pipeline_pass.run(program_state, stage_before=stage_before)
             return result
 
-        manager.run(pipeline_pass.contract, execute)
+        manager.run(
+            pipeline_pass.contract,
+            execute,
+            requires_satisfied=satisfaction.requires_satisfied,
+        )
         if next_program is None:
             raise RuntimeError(f"Pass {pipeline_pass.contract.pass_id} did not produce program state")
 
         program_state = next_program
+        capability_state = apply_contract_to_state(
+            contract=pipeline_pass.contract,
+            state=capability_state,
+        )
 
     return DefaultPipelineResult(
         package_dir=package_path,

@@ -19,6 +19,8 @@ CONTRACT = PassContract.analysis(
     pass_id=PASS_ID,
     owner="htp",
     requires=("Type.LayoutChecked@1", "Type.EffectsChecked@1"),
+    requires_layout_invariants=("Layout.Typed@1",),
+    requires_effect_invariants=("Effects.Typed@1",),
     provides=("Analysis.SchedulePlan@1",),
     analysis_produces=(
         AnalysisOutput(

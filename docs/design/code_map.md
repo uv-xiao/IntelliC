@@ -33,6 +33,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/passes/program_model.py` — canonicalization, semantic model, type/layout/effect synthesis
 - `htp/ir/op_specs.py` — centralized op semantics for effects / phase / latency
 - `htp/passes/manager.py` — stage emission, analyses, islands
+- `htp/passes/trace.py` — normalized pass-trace events including `requires_satisfied`
 
 ## Extensions
 
