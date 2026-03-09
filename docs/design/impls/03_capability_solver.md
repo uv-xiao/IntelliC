@@ -3,7 +3,7 @@
 Current code anchors:
 
 - solver model: `htp/solver.py`
-- backend declarations: `htp/backends/pto/declarations.py`, `htp/backends/nvgpu/declarations.py`
+- backend declarations: `htp/backends/pto/declarations.py`, `htp/backends/nvgpu/declarations.py`, `htp_ext/aie/declarations.py`
 - compiler preflight: `htp/compiler.py`
 - template registry: `htp/pipeline/registry.py`
 - pass registry: `htp/passes/registry.py`
@@ -34,6 +34,6 @@ Current scope:
 - a small registered template set with bounded OR-style template expansion
 - extension-owned pass/template registration exists, but the registered set is
   still intentionally small
-- backend-required outputs, supported-op facts, and target capability tags come from backend-owned declarations
+- backend-required outputs, supported-op facts, target capability tags, and manifest output paths come from backend-owned artifact declarations
 
 This is an implemented surface, not roadmap material.

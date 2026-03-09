@@ -142,14 +142,38 @@ def test_compile_program_emits_nvgpu_package_and_keeps_stage_replay(tmp_path):
     assert replay.result["kernel_ir"]["ops"][0]["op"] == "matmul"
 
 
+def test_compile_program_emits_aie_package_and_keeps_stage_replay(tmp_path):
+    package_dir = tmp_path / "aie_pkg"
+
+    compiled = htp.compile_program(
+        package_dir=package_dir,
+        target="aie-xdna2-npu1",
+        program=_vector_add_program(),
+    )
+
+    assert compiled.target.backend == "aie"
+    assert compiled.manifest["target"] == {
+        "backend": "aie",
+        "variant": "mlir-aie",
+        "hardware_profile": "amd-xdna2:xdna2-npu1",
+        "option": "xdna2-npu1",
+    }
+    assert compiled.manifest["outputs"] == {
+        "aie_codegen_index": "codegen/aie/aie_codegen.json",
+        "toolchain_manifest": "codegen/aie/toolchain.json",
+    }
+
+    replay = htp.bind(package_dir).load(mode="sim").replay(compiled.pipeline.current_stage)
+    assert replay.ok is True
+    assert replay.result["target"] == {"backend": "aie", "option": "xdna2-npu1"}
+    assert replay.result["package"]["emitted"] is True
+
+
 def test_compile_program_rejects_unknown_targets(tmp_path):
     package_dir = tmp_path / "bad_pkg"
 
     try:
-        htp.compile_program(
-            package_dir=package_dir,
-            target="aie-xdna2",
-        )
+        htp.compile_program(package_dir=package_dir, target="unknown-x")
     except ValueError as exc:
         assert "Unsupported target backend" in str(exc)
     else:

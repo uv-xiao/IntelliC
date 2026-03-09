@@ -398,7 +398,7 @@ Checklist:
 
 - `[~]` AIE artifact emission exists, but it is still a contract skeleton.
 - `[ ]` Split AIE into planning analyses and emission transforms.
-- `[ ]` Add solver-visible AIE capabilities.
+- `[x]` Add solver-visible AIE capabilities.
 - `[ ]` Emit richer MLIR-AIE content derived from real mapping/FIFO plans rather
   than placeholder MLIR comments.
 - `[ ]` Add host/runtime integration beyond replay-only validation.
@@ -435,7 +435,7 @@ Checklist:
   current minimal shape.
 - `[x]` Validate more than stage graph paths at the generic validation layer
   where appropriate.
-- `[ ]` Make artifact ownership and validation rules fully shared between
+- `[~]` Make artifact ownership and validation rules fully shared between
   emitters, solver, and bindings.
 - `[x]` Add structured schema/version validation for more emitted sidecars.
 - `[ ]` Strengthen staged semantic diff support around identities and maps.

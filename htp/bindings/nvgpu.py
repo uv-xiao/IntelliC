@@ -7,10 +7,14 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from htp.backends.nvgpu.arch import arch_for
+from htp.backends.nvgpu.declarations import (
+    NVGPU_PROJECT_DIR,
+)
+from htp.backends.nvgpu.declarations import (
+    declaration_for as nvgpu_declaration_for,
+)
 from htp.backends.nvgpu.emit import (
     NVGPU_CODEGEN_SCHEMA_ID,
-    NVGPU_PROJECT_DIR,
-    NVGPU_TOOLCHAIN_PATH,
     NVGPU_TOOLCHAIN_SCHEMA_ID,
 )
 from htp.runtime.errors import ReplayDiagnosticError
@@ -18,8 +22,27 @@ from htp.runtime.errors import ReplayDiagnosticError
 from . import nvgpu_cuda_adapter
 from .base import BuildResult, LoadResult, ManifestBinding, RunResult, ValidationResult
 
-DEFAULT_CODEGEN_INDEX = (NVGPU_PROJECT_DIR / "nvgpu_codegen.json").as_posix()
-DEFAULT_TOOLCHAIN_MANIFEST = NVGPU_TOOLCHAIN_PATH.as_posix()
+
+def _contract_outputs(variant: str | None) -> dict[str, str]:
+    try:
+        declaration = nvgpu_declaration_for(variant)
+    except ValueError:
+        declaration = nvgpu_declaration_for(None)
+    return declaration.artifact_contract.as_manifest_outputs()
+
+
+def _contract_profile(manifest: Mapping[str, Any], variant: str | None) -> str | None:
+    target = manifest.get("target")
+    if isinstance(target, Mapping):
+        option = target.get("option")
+        if isinstance(option, str):
+            return option
+        hardware_profile = target.get("hardware_profile")
+        if isinstance(hardware_profile, str) and hardware_profile.startswith("nvidia:"):
+            parts = hardware_profile.split(":")
+            if len(parts) >= 2:
+                return parts[1]
+    return variant
 
 
 class NVGPULoadResult(LoadResult):
@@ -317,16 +340,18 @@ class NVGPUBinding(ManifestBinding):
         }
 
     def _required_paths(self) -> tuple[str, str]:
+        outputs_contract = _contract_outputs(_contract_profile(self.manifest, self.variant))
         outputs = self.manifest.get("outputs")
         if isinstance(outputs, Mapping):
             return (
-                str(outputs.get("nvgpu_codegen_index", DEFAULT_CODEGEN_INDEX)),
-                str(outputs.get("toolchain_manifest", DEFAULT_TOOLCHAIN_MANIFEST)),
+                str(outputs.get("nvgpu_codegen_index", outputs_contract["nvgpu_codegen_index"])),
+                str(outputs.get("toolchain_manifest", outputs_contract["toolchain_manifest"])),
             )
-        return (DEFAULT_CODEGEN_INDEX, DEFAULT_TOOLCHAIN_MANIFEST)
+        return (outputs_contract["nvgpu_codegen_index"], outputs_contract["toolchain_manifest"])
 
     def _validate_metadata(self) -> list[dict[str, Any]]:
         diagnostics: list[dict[str, Any]] = []
+        outputs_contract = _contract_outputs(_contract_profile(self.manifest, self.variant))
         target = self.manifest.get("target")
         hardware_profile = target.get("hardware_profile") if isinstance(target, Mapping) else None
         if not isinstance(hardware_profile, str):
@@ -343,8 +368,28 @@ class NVGPUBinding(ManifestBinding):
         else:
             if not isinstance(outputs.get("nvgpu_codegen_index"), str):
                 diagnostics.append(self._missing_metadata_diagnostic("outputs.nvgpu_codegen_index"))
+            elif outputs.get("nvgpu_codegen_index") != outputs_contract["nvgpu_codegen_index"]:
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.NVGPU_METADATA_MISMATCH",
+                        "detail": "manifest.json outputs.nvgpu_codegen_index must use the canonical NV-GPU artifact path.",
+                        "manifest_field": "outputs.nvgpu_codegen_index",
+                        "manifest_value": outputs.get("nvgpu_codegen_index"),
+                        "expected_value": outputs_contract["nvgpu_codegen_index"],
+                    }
+                )
             if not isinstance(outputs.get("toolchain_manifest"), str):
                 diagnostics.append(self._missing_metadata_diagnostic("outputs.toolchain_manifest"))
+            elif outputs.get("toolchain_manifest") != outputs_contract["toolchain_manifest"]:
+                diagnostics.append(
+                    {
+                        "code": "HTP.BINDINGS.NVGPU_METADATA_MISMATCH",
+                        "detail": "manifest.json outputs.toolchain_manifest must use the canonical NV-GPU artifact path.",
+                        "manifest_field": "outputs.toolchain_manifest",
+                        "manifest_value": outputs.get("toolchain_manifest"),
+                        "expected_value": outputs_contract["toolchain_manifest"],
+                    }
+                )
 
         extension = self._nvgpu_extension()
         if extension is None:

@@ -7,12 +7,11 @@ from typing import Any
 
 from htp.schemas import MANIFEST_SCHEMA_ID
 
+from .declarations import PTO_PROJECT_DIR, PTO_TOOLCHAIN_PATH, declaration_for
 from .lower import PTOCodegenPlan, PTOKernelSpec, lower_program
 
 PTO_CODEGEN_SCHEMA_ID = "htp.pto.codegen.v1"
 PTO_TOOLCHAIN_SCHEMA_ID = "htp.pto.toolchain.v1"
-PTO_PROJECT_DIR = PurePosixPath("codegen/pto")
-PTO_TOOLCHAIN_PATH = PurePosixPath("build/toolchain.json")
 
 
 def emit_package(
@@ -41,13 +40,7 @@ def emit_package(
     manifest["target"] = target
 
     outputs = dict(manifest.get("outputs", {}))
-    outputs.update(
-        {
-            "kernel_config": (PTO_PROJECT_DIR / "kernel_config.py").as_posix(),
-            "pto_codegen_index": (PTO_PROJECT_DIR / "pto_codegen.json").as_posix(),
-            "toolchain_manifest": PTO_TOOLCHAIN_PATH.as_posix(),
-        }
-    )
+    outputs.update(declaration_for(plan.variant).artifact_contract.as_manifest_outputs())
     manifest["outputs"] = outputs
 
     extensions = dict(manifest.get("extensions", {}))

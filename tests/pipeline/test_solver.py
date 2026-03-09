@@ -14,6 +14,7 @@ from htp.solver import (
     solve_pipeline,
     validate_final_artifacts,
 )
+from htp_ext.aie.declarations import declaration_for as aie_declaration_for
 
 
 def _vector_add_program() -> dict[str, object]:
@@ -114,9 +115,11 @@ def test_solver_accepts_default_pipeline_and_tracks_capabilities():
 def test_default_pipeline_uses_backend_required_outputs():
     pto_template = default_pipeline_template(target={"backend": "pto", "option": "a2a3sim"})
     nvgpu_template = default_pipeline_template(target={"backend": "nvgpu", "option": "ampere"})
+    aie_template = default_pipeline_template(target={"backend": "aie", "option": "xdna2-npu1"})
 
     assert pto_template.required_outputs == pto_declaration_for("a2a3sim").required_outputs
     assert nvgpu_template.required_outputs == nvgpu_declaration_for("ampere").required_outputs
+    assert aie_template.required_outputs == aie_declaration_for("xdna2-npu1").required_outputs
 
 
 def test_backend_declarations_define_handler_support_contract():

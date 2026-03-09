@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from htp.backends.declarations import BackendSolverDeclaration
+from pathlib import PurePosixPath
+
+from htp.backends.declarations import ArtifactContract, BackendSolverDeclaration
 
 from .arch import arch_for, normalize_profile
-from .emit import NVGPU_PROJECT_DIR, NVGPU_TOOLCHAIN_PATH
+
+NVGPU_PROJECT_DIR = PurePosixPath("codegen/nvgpu")
+NVGPU_TOOLCHAIN_PATH = PurePosixPath("build/toolchain.json")
 
 
 def declaration_for(profile: str | None = None) -> BackendSolverDeclaration:
@@ -16,7 +20,12 @@ def declaration_for(profile: str | None = None) -> BackendSolverDeclaration:
         hardware_profile=arch.hardware_profile,
         target_capabilities=target_capabilities,
         supported_ops=("elementwise_binary", "matmul"),
-        required_outputs=(codegen_index, NVGPU_TOOLCHAIN_PATH.as_posix()),
+        artifact_contract=ArtifactContract(
+            outputs=(
+                ("nvgpu_codegen_index", codegen_index),
+                ("toolchain_manifest", NVGPU_TOOLCHAIN_PATH.as_posix()),
+            )
+        ),
     )
 
 
