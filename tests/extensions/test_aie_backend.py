@@ -107,6 +107,21 @@ def test_aie_extension_emits_artifact_contract_and_replays(tmp_path):
     assert replay.ok is True
     assert replay.result["package"]["emitted"] is True
 
+    build = htp.bind(package_dir).build(mode="device", force=True)
+    assert build.ok is True
+    assert build.built_outputs == [
+        "build/aie/build_product.json",
+        "build/aie/host_runtime.json",
+    ]
+    assert (package_dir / "build" / "aie" / "build_product.json").is_file()
+    assert (package_dir / "build" / "aie" / "host_runtime.json").is_file()
+
+    run = htp.bind(package_dir).load(mode="device").run("stream_add")
+    assert run.ok is True
+    assert run.result["entry"] == "stream_add"
+    assert run.result["runtime"]["schema"] == "htp.aie.host_runtime.v1"
+    assert run.result["runtime"]["entry"] == "stream_add"
+
 
 def test_aie_extension_emits_objectfifos_from_process_channels(tmp_path):
     package_dir = tmp_path / "aie_pkg"
@@ -203,6 +218,61 @@ def test_aie_binding_reports_missing_mlir_artifact(tmp_path):
         {
             "code": "HTP.BINDINGS.AIE_MISSING_CONTRACT_FILE",
             "detail": "Missing required AIE artifact path: codegen/aie/aie.mlir",
+        }
+    ]
+
+
+def test_aie_binding_reports_invalid_toolchain_manifest(tmp_path):
+    package_dir = tmp_path / "aie_pkg"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "stream_add",
+            "kernel": {"name": "stream_add", "args": [], "ops": []},
+            "workload": {"entry": "stream_add", "tasks": [], "channels": [], "dependencies": []},
+        },
+    )
+    toolchain_path = package_dir / "codegen" / "aie" / "toolchain.json"
+    toolchain = json.loads(toolchain_path.read_text())
+    toolchain["build_driver"] = {
+        "kind": "python_module",
+        "module": "broken.module",
+        "callable": "build_package",
+    }
+    toolchain_path.write_text(json.dumps(toolchain, indent=2) + "\n")
+
+    report = htp.bind(package_dir).validate()
+
+    assert report.ok is False
+    assert report.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.AIE_INVALID_TOOLCHAIN_MANIFEST",
+            "detail": "AIE toolchain manifest must declare the reference build driver.",
+        }
+    ]
+
+
+def test_aie_device_run_requires_built_runtime(tmp_path):
+    package_dir = tmp_path / "aie_pkg"
+    package_dir.mkdir()
+    emit_package(
+        package_dir,
+        program={
+            "entry": "stream_add",
+            "kernel": {"name": "stream_add", "args": [], "ops": []},
+            "workload": {"entry": "stream_add", "tasks": [], "channels": [], "dependencies": []},
+        },
+    )
+
+    run = htp.bind(package_dir).load(mode="device").run("stream_add")
+
+    assert run.ok is False
+    assert run.diagnostics == [
+        {
+            "code": "HTP.BINDINGS.AIE_RUN_ERROR",
+            "detail": "AIE device run requires build/aie/host_runtime.json. Run build(mode='device') first.",
+            "mode": "device",
         }
     ]
 

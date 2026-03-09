@@ -77,10 +77,22 @@ def run_demo(output_dir: Path | str) -> dict[str, Any]:
     output_path.mkdir(parents=True, exist_ok=True)
     compile_summary = compile_example(output_path)
     replay_summary = replay_latest_stage(output_path)
+    build_result = bind(output_path).build(mode="device", force=True)
+    run_result = bind(output_path).load(mode="device").run("aie_pipeline_demo")
     return {
         "example": "aie_channel_pipeline",
         "compile": compile_summary,
         "replay": replay_summary,
+        "build": {
+            "ok": build_result.ok,
+            "built_outputs": build_result.built_outputs,
+            "diagnostics": build_result.diagnostics,
+        },
+        "run": {
+            "ok": run_result.ok,
+            "result": run_result.result,
+            "diagnostics": run_result.diagnostics,
+        },
     }
 
 

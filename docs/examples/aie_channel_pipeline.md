@@ -14,8 +14,7 @@ What it proves today:
 - `compile_program(..., target="aie-xdna2-npu1")` emits a valid AIE package
 - replay still runs from the staged Python program in `sim`
 - AIE sidecars are derived from explicit plans instead of placeholder comments
-
-What it does not prove yet:
-
-- MLIR-AIE toolchain execution
-- device/runtime launch beyond package validation and replay
+- `build(mode="device")` materializes reference AIE toolchain outputs under
+  `build/aie/`
+- `load(mode="device").run(...)` goes through emitted `codegen/aie/host.py`
+  plus the built host-runtime sidecar

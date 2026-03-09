@@ -78,8 +78,11 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp_ext/aie/plan.py` — AIE mapping/FIFO planning analyses
 - `htp_ext/aie/emit.py` — AIE artifact emission extension driven by explicit
   mapping/FIFO plans
+- `htp_ext/aie/toolchain.py` — reference AIE toolchain shim that materializes
+  build outputs from emitted MLIR + sidecars
 - `htp_ext/aie/declarations.py` — AIE solver-visible capability and artifact declarations
-- `htp/bindings/aie.py` — AIE package validation and replay binding
+- `htp/bindings/aie.py` — AIE package validation, build, and run binding
+- `htp/bindings/aie_toolchain_adapter.py` — AIE toolchain build/run adapter
 
 ## Examples
 
