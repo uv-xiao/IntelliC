@@ -2,7 +2,7 @@
 
 - ID: `011-ark-unify-kernel`
 - Branch: `htp/feat-ark-unify-kernel`
-- PR: `TBD`
+- PR: `#46`
 - Status: `in_progress`
 - Owner: `Codex`
 
