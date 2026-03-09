@@ -2,7 +2,7 @@
 
 - ID: `007-frontend-surface-redesign`
 - Branch: `htp/feat-frontend-surface-redesign`
-- PR: `TBD`
+- PR: `https://github.com/uv-xiao/htp/pull/42`
 - Status: `in_progress`
 - Owner: `Codex`
 
