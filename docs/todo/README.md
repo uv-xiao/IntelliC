@@ -37,9 +37,9 @@ For feature work:
 ## Layer summaries
 
 - `docs/todo/layers/01_compiler_model.md`
-  - remaining work: broaden semantic/type/layout/effect breadth and deepen routine semantics
+  - remaining work: broaden semantic/type/layout/effect breadth beyond the newly landed fused-elementwise semantics and deepen routine semantics
 - `docs/todo/layers/02_programming_surfaces.md`
-  - remaining work: continue replacing compact proof cases with harder, reference-calibrated flagship examples
+  - remaining work: continue replacing compact proof cases with harder, reference-calibrated flagship examples beyond the new PTO SwiGLU case
 - `docs/todo/layers/03_pipeline_and_solver.md`
   - remaining work: richer search/composition and broader MLIR island breadth
 - `docs/todo/layers/04_artifacts_replay_debug.md`
