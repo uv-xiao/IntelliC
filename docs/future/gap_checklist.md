@@ -47,6 +47,8 @@ Current code anchors:
 - `htp/solver.py`
 - `htp/compiler.py`
 - `htp/pipeline/defaults.py`
+- `htp/passes/registry.py`
+- `htp/pipeline/registry.py`
 
 Checklist:
 
@@ -139,9 +141,9 @@ Checklist:
 
 - `[~]` The typed substrate now includes structured scalar/shape/buffer/view/channel/token
   payloads, but it still does not cover the full shared user-facing type system.
-- `[~]` Introduce a real shared type surface for:
+- `[x]` Introduce a real shared type surface for:
   `i8/i16/i32/i64/u*/f16/bf16/f32/f64/bool`.
-- `[~]` Add first-class `Index`, `Dim`, and symbolic shape constructs rather
+- `[x]` Add first-class `Index`, `Dim`, and symbolic shape constructs rather
   than storing symbolic dimensions as bare strings.
 - `[x]` Add explicit value kinds for:
   tiles, tensors, buffers, views, async tokens, and channel handles.
@@ -172,6 +174,7 @@ Source intent:
 
 Current code anchors:
 
+- `htp/ir/layout.py`
 - `htp/passes/program_model.py`
 - `htp/passes/typecheck_layout_effects.py`
 - `htp/passes/analyze_schedule.py`
@@ -180,7 +183,7 @@ Checklist:
 
 - `[~]` Layout/effects/schedule are emitted today, but they are still simple
   synthesized metadata rather than the full typed contract model.
-- `[~]` Implement the facet-product layout model:
+- `[x]` Implement the facet-product layout model:
   distribution ⊗ memory ⊗ hardware.
 - `[ ]` Add explicit relayout operations and legality predicates rather than
   backend heuristics only.
@@ -210,9 +213,12 @@ Source intent:
 - `docs/future/feats/02_dialects_wsp.md`
 - `docs/future/feats/03_dialects_csp.md`
 
-Current code reality:
+Current code anchors:
 
-- WSP and CSP authoring helpers now live under `htp/wsp/` and `htp/csp/`.
+- `htp/wsp/__init__.py`
+- `htp/csp/__init__.py`
+- `examples/wsp_warp_gemm/demo.py`
+- `examples/csp_channel_pipeline/demo.py`
 
 Checklist:
 
@@ -271,6 +277,8 @@ Current code anchors:
 
 - `htp/passes/*`
 - `htp/passes/manager.py`
+- `htp/passes/registry.py`
+- `htp/pipeline/registry.py`
 
 Checklist:
 
@@ -286,7 +294,7 @@ Checklist:
 - `[~]` Add staged analysis payloads for warp-role plans, pipeline plans, loop
   dependencies, and async/resource checks.
 - `[ ]` Add preservation/invalidation tracking beyond simple capability removal.
-- `[~]` Thread solver satisfaction and pass trace together so the trace shows
+- `[x]` Thread solver satisfaction and pass trace together so the trace shows
   why each pass was legal.
 
 ---
@@ -303,6 +311,8 @@ Current code anchors:
 - `htp_ext/mlir_cse/import_.py`
 - `htp_ext/mlir_cse/island.py`
 - `htp/passes/manager.py`
+- `htp/passes/registry.py`
+- `htp/pipeline/registry.py`
 
 Checklist:
 
@@ -340,6 +350,7 @@ Source intent:
 Current code anchors:
 
 - `htp/backends/pto/*`
+- `htp/backends/pto/declarations.py`
 - `htp/bindings/pto.py`
 - `htp/bindings/pto_runtime_adapter.py`
 
@@ -351,7 +362,7 @@ Checklist:
 - `[ ]` Add richer kernel/workload lowering for channels, async, and multi-task
   orchestration.
 - `[ ]` Add stronger device-mode (`a2a3`) execution coverage and tests.
-- `[ ]` Add solver-visible PTO capability declarations from backend-owned data.
+- `[x]` Add solver-visible PTO capability declarations from backend-owned data.
 - `[ ]` Add broader artifact and runtime validation for non-trivial PTO package
   shapes.
 
@@ -477,7 +488,7 @@ Checklist:
 - `[ ]` Add serving-routine examples above the current kernel-level examples.
 - `[ ]` Add extension-composition examples showing solver-visible pipeline
   choice.
-- `[ ]` Keep `docs/design/` and `docs/future/` synchronized as features land so
+- `[~]` Keep `docs/design/` and `docs/future/` synchronized as features land so
   the narrative stays honest.
 
 ---
