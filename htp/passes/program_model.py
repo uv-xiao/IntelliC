@@ -5,6 +5,17 @@ from typing import Any
 
 from htp.ir.op_specs import get_op_spec, op_effects
 from htp.ir.semantics import KernelArg, KernelIR, KernelOp, WorkloadIR, WorkloadTask, to_payload
+from htp.ir.types import (
+    BufferType,
+    ChannelType,
+    TensorType,
+    TileType,
+    TokenType,
+    ViewType,
+    dtype_from_name,
+    shape_from_sequence,
+    type_to_payload,
+)
 from htp.schemas import IDS_BINDINGS_SCHEMA_ID, IDS_ENTITIES_SCHEMA_ID
 
 PROGRAM_AST_SCHEMA_ID = "htp.program_ast.v1"
@@ -62,6 +73,8 @@ def build_semantic_model(
             dtype=str(argument["dtype"]),
             shape=tuple(str(dim) for dim in argument.get("shape", ())),
             role=str(argument["role"]) if argument.get("role") is not None else None,
+            alias_of=str(argument["alias_of"]) if argument.get("alias_of") is not None else None,
+            source=str(argument["source"]) if argument.get("source") is not None else None,
         )
         for argument in kernel.get("args", ())
     )
@@ -71,6 +84,7 @@ def build_semantic_model(
             op_id=f"op{index}",
             entity_id=f"{entry}:E{len(args) + index}",
             op=str(op["op"]),
+            intrinsic=get_op_spec(str(op["op"])).intrinsic,
             inputs=_op_inputs(op),
             outputs=_op_outputs(op),
             attrs=_op_attrs(op),
@@ -111,15 +125,17 @@ def build_type_layout_effects(
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     backend = target["backend"]
     _validate_dtype_contracts(kernel_ir, target=target)
+    memory_spaces = _memory_spaces_for_backend(backend, kernel_ir)
+    _validate_alias_contracts(kernel_ir)
     types = {
         "schema": TYPES_SCHEMA_ID,
         "values": {
-            str(argument["name"]): str(argument["dtype"])
+            str(argument["name"]): _value_type_payload(argument)
             for argument in kernel_ir.get("args", ())
             if argument.get("kind") != "buffer"
         },
         "buffers": {
-            str(argument["name"]): _shape_dtype(str(argument["dtype"]), argument.get("shape", ()))
+            str(argument["name"]): _buffer_type_payload(argument, memory_spaces)
             for argument in kernel_ir.get("args", ())
             if argument.get("kind") == "buffer"
         },
@@ -127,7 +143,7 @@ def build_type_layout_effects(
     layout = {
         "schema": LAYOUT_SCHEMA_ID,
         "target": dict(target),
-        "memory_spaces": _memory_spaces_for_backend(backend, kernel_ir),
+        "memory_spaces": memory_spaces,
         "threading": _threading_for_backend(backend, kernel_ir),
         "tiling": _tiling_for_kernel(kernel_ir, backend),
     }
@@ -168,6 +184,7 @@ def build_schedule_plan(
                 "tick": tick_index,
                 "op_id": op_id,
                 "op": str(op["op"]),
+                "intrinsic": str(op.get("intrinsic", get_op_spec(str(op["op"])).intrinsic)),
                 "phase": _phase_for_op(str(op["op"])),
                 "reads": list(op.get("effects", {}).get("reads", ())),
                 "writes": list(op.get("effects", {}).get("writes", ())),
@@ -210,6 +227,7 @@ def scheduled_ops_from_plan(schedule_plan: Mapping[str, Any]) -> list[dict[str, 
                 "tick": int(tick["tick"]),
                 "op_id": str(tick["op_id"]),
                 "op": str(tick["op"]),
+                "intrinsic": str(tick.get("intrinsic", get_op_spec(str(tick["op"])).intrinsic)),
                 "phase": str(tick["phase"]),
             }
         )
@@ -244,6 +262,8 @@ def _normalize_kernel_surface(entry: str, kernel: Mapping[str, Any]) -> dict[str
                 "dtype": str(argument["dtype"]),
                 "shape": [str(dim) for dim in argument.get("shape", ())],
                 "role": str(argument["role"]) if argument.get("role") is not None else None,
+                "alias_of": str(argument["alias_of"]) if argument.get("alias_of") is not None else None,
+                "source": str(argument["source"]) if argument.get("source") is not None else None,
             }
             for argument in kernel.get("args", ())
         ],
@@ -376,14 +396,62 @@ def _op_outputs(op: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def _op_attrs(op: Mapping[str, Any]) -> dict[str, Any]:
-    reserved = {"op", "lhs", "rhs", "out", "inputs", "outputs"}
+    reserved = {
+        "op",
+        "lhs",
+        "rhs",
+        "out",
+        "inputs",
+        "outputs",
+        "source",
+        "target",
+        "value",
+        "token",
+        "channel",
+    }
     return {str(key): value for key, value in op.items() if key not in reserved}
 
 
-def _shape_dtype(dtype: str, shape: Sequence[object]) -> str:
-    if not shape:
-        return dtype
-    return f"{dtype}[{'x'.join(str(dim) for dim in shape)}]"
+def _buffer_type_payload(argument: Mapping[str, Any], memory_spaces: Mapping[str, str]) -> dict[str, Any]:
+    name = str(argument["name"])
+    return type_to_payload(
+        BufferType(
+            dtype=dtype_from_name(str(argument["dtype"])),
+            shape=shape_from_sequence(list(argument.get("shape", ()))),
+            space=str(memory_spaces.get(name, "global")),
+            alias_of=str(argument["alias_of"]) if argument.get("alias_of") is not None else None,
+        )
+    )
+
+
+def _value_type_payload(argument: Mapping[str, Any]) -> dict[str, Any]:
+    kind = str(argument.get("kind", "scalar"))
+    dtype = dtype_from_name(str(argument["dtype"]))
+    shape = shape_from_sequence(list(argument.get("shape", ())))
+    if kind == "view":
+        alias_of = argument.get("alias_of")
+        source = argument.get("source", alias_of)
+        if alias_of is None or source is None:
+            raise ValueError(
+                f"HTP.TYPECHECK.UNKNOWN_ALIAS: view {argument.get('name')!r} requires alias_of/source metadata."
+            )
+        return type_to_payload(ViewType(dtype=dtype, shape=shape, source=str(source), alias_of=str(alias_of)))
+    if kind == "tensor":
+        return type_to_payload(TensorType(dtype=dtype, shape=shape))
+    if kind == "tile":
+        return type_to_payload(TileType(dtype=dtype, shape=shape))
+    if kind == "channel":
+        capacity = argument.get("capacity")
+        return type_to_payload(
+            ChannelType(
+                element=dtype,
+                capacity=int(capacity) if capacity is not None else None,
+                protocol=str(argument.get("protocol", "fifo")),
+            )
+        )
+    if kind in {"async_token", "token"}:
+        return type_to_payload(TokenType(token_kind=str(argument.get("token_kind", "async"))))
+    return type_to_payload(dtype)
 
 
 def _memory_spaces_for_backend(backend: str, kernel_ir: Mapping[str, Any]) -> dict[str, str]:
@@ -453,6 +521,7 @@ def _channel_effects(workload_ir: Mapping[str, Any], kernel_ir: Mapping[str, Any
                 "kind": str(channel.get("kind", "fifo")),
                 "producers": producers,
                 "consumers": consumers,
+                **({"capacity": channel.get("capacity")} if channel.get("capacity") is not None else {}),
             }
         )
     return channel_records
@@ -468,6 +537,32 @@ def _validate_dtype_contracts(kernel_ir: Mapping[str, Any], *, target: Mapping[s
         if backend == "nvgpu" and dtype != "f32":
             raise ValueError(
                 f"HTP.TYPECHECK.UNSUPPORTED_BUFFER_DTYPE: nvgpu buffer {name!r} requires 'f32', got {dtype!r}."
+            )
+
+
+def _validate_alias_contracts(kernel_ir: Mapping[str, Any]) -> None:
+    aliasables = {
+        str(argument["name"]): str(argument.get("kind", ""))
+        for argument in kernel_ir.get("args", ())
+        if str(argument.get("kind", "")) in {"buffer", "view"}
+    }
+    mutable_aliases: dict[str, list[str]] = {}
+    for argument in kernel_ir.get("args", ()):
+        alias_of = argument.get("alias_of")
+        if alias_of is None:
+            continue
+        alias_name = str(alias_of)
+        if alias_name not in aliasables:
+            raise ValueError(
+                f"HTP.TYPECHECK.UNKNOWN_ALIAS: {argument.get('name')!r} aliases unknown value {alias_name!r}."
+            )
+        role = str(argument.get("role") or "")
+        if role in {"output", "temp"}:
+            mutable_aliases.setdefault(alias_name, []).append(str(argument["name"]))
+    for alias_name, users in mutable_aliases.items():
+        if len(users) > 1:
+            raise ValueError(
+                f"HTP.TYPECHECK.ALIAS_WRITE_CONFLICT: alias base {alias_name!r} has multiple mutable aliases {users!r}."
             )
 
 

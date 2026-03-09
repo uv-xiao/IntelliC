@@ -7,6 +7,7 @@ from typing import Any
 @dataclass(frozen=True)
 class OpSpec:
     name: str
+    intrinsic: str
     phase: str
     latency: int
     reads: tuple[str, ...] = ()
@@ -19,6 +20,7 @@ class OpSpec:
 OP_SPECS = {
     "elementwise_binary": OpSpec(
         name="elementwise_binary",
+        intrinsic="portable.elementwise_binary",
         phase="compute",
         latency=1,
         reads=("lhs", "rhs"),
@@ -26,19 +28,85 @@ OP_SPECS = {
     ),
     "matmul": OpSpec(
         name="matmul",
+        intrinsic="portable.matmul",
         phase="compute",
         latency=2,
         reads=("lhs", "rhs"),
         writes=("out",),
     ),
-    "load": OpSpec(name="load", phase="producer", latency=1, reads=("source",), writes=("out",)),
-    "load_tile": OpSpec(name="load_tile", phase="producer", latency=1, reads=("source",), writes=("out",)),
-    "store": OpSpec(name="store", phase="consumer", latency=1, reads=("value",), writes=("target",)),
+    "load": OpSpec(
+        name="load",
+        intrinsic="portable.load",
+        phase="producer",
+        latency=1,
+        reads=("source",),
+        writes=("out",),
+    ),
+    "load_tile": OpSpec(
+        name="load_tile",
+        intrinsic="portable.load",
+        phase="producer",
+        latency=1,
+        reads=("source",),
+        writes=("out",),
+    ),
+    "store": OpSpec(
+        name="store",
+        intrinsic="portable.store",
+        phase="consumer",
+        latency=1,
+        reads=("value",),
+        writes=("target",),
+    ),
     "store_tile": OpSpec(
-        name="store_tile", phase="consumer", latency=1, reads=("value",), writes=("target",)
+        name="store_tile",
+        intrinsic="portable.store",
+        phase="consumer",
+        latency=1,
+        reads=("value",),
+        writes=("target",),
+    ),
+    "cast": OpSpec(
+        name="cast", intrinsic="portable.cast", phase="compute", latency=1, reads=("source",), writes=("out",)
+    ),
+    "broadcast": OpSpec(
+        name="broadcast",
+        intrinsic="portable.broadcast",
+        phase="compute",
+        latency=1,
+        reads=("source",),
+        writes=("out",),
+    ),
+    "transpose": OpSpec(
+        name="transpose",
+        intrinsic="portable.transpose",
+        phase="compute",
+        latency=1,
+        reads=("source",),
+        writes=("out",),
+    ),
+    "view": OpSpec(
+        name="view", intrinsic="portable.view", phase="compute", latency=1, reads=("source",), writes=("out",)
+    ),
+    "reshape": OpSpec(
+        name="reshape",
+        intrinsic="portable.reshape",
+        phase="compute",
+        latency=1,
+        reads=("source",),
+        writes=("out",),
+    ),
+    "reduction_sum": OpSpec(
+        name="reduction_sum",
+        intrinsic="portable.reduction_sum",
+        phase="compute",
+        latency=2,
+        reads=("source",),
+        writes=("out",),
     ),
     "async_copy": OpSpec(
         name="async_copy",
+        intrinsic="portable.async_copy",
         phase="producer",
         latency=1,
         reads=("source",),
@@ -47,6 +115,7 @@ OP_SPECS = {
     ),
     "mma": OpSpec(
         name="mma",
+        intrinsic="portable.mma",
         phase="compute",
         latency=2,
         reads=("lhs", "rhs"),
@@ -55,6 +124,7 @@ OP_SPECS = {
     ),
     "channel_send": OpSpec(
         name="channel_send",
+        intrinsic="portable.channel_send",
         phase="sync",
         latency=1,
         reads=("value",),
@@ -62,18 +132,29 @@ OP_SPECS = {
     ),
     "channel_recv": OpSpec(
         name="channel_recv",
+        intrinsic="portable.channel_recv",
         phase="sync",
         latency=1,
         writes=("out",),
         channel_reads=("channel",),
     ),
-    "barrier": OpSpec(name="barrier", phase="sync", latency=1),
-    "await": OpSpec(name="await", phase="sync", latency=1),
+    "allreduce": OpSpec(
+        name="allreduce",
+        intrinsic="portable.allreduce",
+        phase="sync",
+        latency=2,
+        reads=("source",),
+        writes=("out",),
+    ),
+    "barrier": OpSpec(name="barrier", intrinsic="portable.barrier", phase="sync", latency=1),
+    "await": OpSpec(name="await", intrinsic="portable.await", phase="sync", latency=1, reads=("token",)),
 }
 
 
 def get_op_spec(op_name: str) -> OpSpec:
-    return OP_SPECS.get(op_name, OpSpec(name=op_name, phase="compute", latency=1))
+    return OP_SPECS.get(
+        op_name, OpSpec(name=op_name, intrinsic=f"portable.{op_name}", phase="compute", latency=1)
+    )
 
 
 def op_effects(op_name: str, op: dict[str, Any]) -> dict[str, tuple[str, ...]]:

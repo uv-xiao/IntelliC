@@ -29,7 +29,9 @@ programs.
 
 - identity and maps live in `htp/ir/`
 - typed semantic state lives in `htp/ir/semantics.py`
+- structured type payloads live in `htp/ir/types.py`
 - op registry and semantic broadening live in `htp/ir/op_specs.py`
+- intrinsic declarations and backend handler availability live in `htp/intrinsics.py`
 - every stage emits `program.py` for `sim` replay
 - every stage also emits semantic payloads (`kernel_ir.json`, `workload_ir.json`,
   `types.json`, `layout.json`, `effects.json`, `schedule.json`)
@@ -63,6 +65,13 @@ These passes live in `htp/passes/` and emit:
 - `ir/stages/<id>/analysis/index.json`
 - `ir/stages/<id>/ids/*.json`
 - `ir/stages/<id>/summary.json`
+
+Within that pass spine, the current semantic substrate now includes:
+
+- structured scalar / shape / buffer / view / channel / token payloads in `types.json`
+- explicit op → intrinsic assignment in `kernel_ir.json`
+- alias validation for view-style arguments
+- staged reduction / transpose / reshape / broadcast / channel semantics in the op registry
 
 ## 4. Artifact contract
 
