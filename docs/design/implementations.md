@@ -7,7 +7,7 @@ avoids roadmap-only features; those live in `docs/future/`.
 
 1. `htp.compile_program(...)` captures a Python-level program description.
 2. The capability solver validates the default pipeline and emits `ir/solver_failure.json` on unsat.
-3. The default pass pipeline stages runnable Python artifacts under `ir/stages/`.
+3. The default pass pipeline stages runnable Python artifacts under `ir/stages/`, and writes `ir/compiler_failure.json` for structured compiler-side legality failures.
 4. Backend emitters write package-owned sources under `codegen/<backend>/`.
 5. Bindings validate, build, load, run, and replay from the emitted package.
 6. Agent-facing tools consume artifact packages through replay/verify/diff/explain.

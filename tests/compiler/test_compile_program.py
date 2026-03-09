@@ -224,3 +224,143 @@ def test_compile_program_writes_solver_failure_for_unsupported_backend_op(tmp_pa
     failure = json.loads((package_dir / "ir" / "solver_failure.json").read_text())
     assert failure["failed_at_pass"] == "target.handlers"
     assert failure["missing_handlers"] == [{"backend": "pto", "op": "channel_send"}]
+
+
+def test_compile_program_writes_compiler_failure_for_layout_typecheck(tmp_path):
+    package_dir = tmp_path / "bad_pkg"
+
+    try:
+        htp.compile_program(
+            package_dir=package_dir,
+            target="nvgpu-ampere",
+            program={
+                "entry": "bad_kernel",
+                "kernel": {
+                    "name": "bad_kernel",
+                    "args": [
+                        {
+                            "name": "A",
+                            "kind": "buffer",
+                            "dtype": "bf16",
+                            "shape": ["M", "K"],
+                            "role": "input",
+                        },
+                        {
+                            "name": "B",
+                            "kind": "buffer",
+                            "dtype": "f32",
+                            "shape": ["K", "N"],
+                            "role": "input",
+                        },
+                        {
+                            "name": "C",
+                            "kind": "buffer",
+                            "dtype": "f32",
+                            "shape": ["M", "N"],
+                            "role": "output",
+                        },
+                        {"name": "M", "kind": "scalar", "dtype": "i32", "role": "shape"},
+                        {"name": "N", "kind": "scalar", "dtype": "i32", "role": "shape"},
+                        {"name": "K", "kind": "scalar", "dtype": "i32", "role": "shape"},
+                    ],
+                    "ops": [
+                        {
+                            "op": "matmul",
+                            "lhs": "A",
+                            "rhs": "B",
+                            "out": "C",
+                            "m": "M",
+                            "n": "N",
+                            "k": "K",
+                            "dtype": "f32",
+                        }
+                    ],
+                },
+                "workload": {
+                    "entry": "bad_kernel",
+                    "tasks": [
+                        {
+                            "task_id": "task0",
+                            "kind": "kernel_call",
+                            "kernel": "bad_kernel",
+                            "args": ["A", "B", "C", "M", "N", "K"],
+                        }
+                    ],
+                    "channels": [],
+                    "dependencies": [],
+                },
+                "analysis": {},
+                "package": {"emitted": False},
+            },
+        )
+    except RuntimeError as exc:
+        assert "Compiler failed at htp::typecheck_layout_effects@1" in str(exc)
+    else:
+        raise AssertionError("compile_program should reject unsupported layout/type combinations")
+
+    failure = json.loads((package_dir / "ir" / "compiler_failure.json").read_text())
+    assert failure == {
+        "schema": "htp.compiler_failure.v1",
+        "failed_at_pass": "htp::typecheck_layout_effects@1",
+        "stage_before": "s02",
+        "diagnostic": {
+            "code": "HTP.TYPECHECK.UNSUPPORTED_BUFFER_DTYPE",
+            "detail": "nvgpu buffer 'A' requires 'f32', got 'bf16'.",
+            "node_id": "bad_kernel:Arg:0",
+            "entity_id": "bad_kernel:E0",
+            "stage_id": "s02",
+            "pass_id": "htp::typecheck_layout_effects@1",
+            "payload_ref": "ir/stages/s02/kernel_ir.json",
+            "fix_hints_ref": "docs/design/features.md",
+            "backend": "nvgpu",
+            "manifest_value": "bf16",
+        },
+    }
+
+
+def test_compile_program_writes_compiler_failure_for_protocol_violation(tmp_path):
+    package_dir = tmp_path / "bad_protocol_pkg"
+
+    try:
+        htp.compile_program(
+            package_dir=package_dir,
+            target="pto-a2a3sim",
+            program={
+                "entry": "channel_kernel",
+                "kernel": {
+                    "name": "channel_kernel",
+                    "args": [],
+                    "ops": [],
+                },
+                "workload": {
+                    "entry": "channel_kernel",
+                    "tasks": [],
+                    "channels": [{"name": "pipe0", "dtype": "i32", "capacity": 1, "protocol": "fifo"}],
+                    "dependencies": [],
+                    "processes": [
+                        {
+                            "name": "producer",
+                            "task_id": "task0",
+                            "kernel": "channel_kernel",
+                            "puts": [{"channel": "pipe0", "count": 2}],
+                            "gets": [],
+                        }
+                    ],
+                },
+                "analysis": {},
+                "package": {"emitted": False},
+            },
+        )
+    except RuntimeError as exc:
+        assert "Compiler failed at htp::typecheck_layout_effects@1" in str(exc)
+    else:
+        raise AssertionError("compile_program should reject unbalanced protocol obligations")
+
+    failure = json.loads((package_dir / "ir" / "compiler_failure.json").read_text())
+    assert failure["failed_at_pass"] == "htp::typecheck_layout_effects@1"
+    assert failure["diagnostic"]["code"] == "HTP.PROTOCOL.UNBALANCED_CHANNEL"
+    assert failure["diagnostic"]["node_id"] == "channel_kernel:Channel:0"
+    assert failure["diagnostic"]["payload_ref"] == "ir/stages/s02/workload_ir.json"
+    assert failure["diagnostic"]["channel"] == "pipe0"
+    assert failure["diagnostic"]["puts"] == 2
+    assert failure["diagnostic"]["gets"] == 0

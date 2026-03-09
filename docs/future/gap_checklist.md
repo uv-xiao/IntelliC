@@ -201,7 +201,7 @@ Checklist:
   plan, launch structure.
 - `[x]` Add schedule legality checks against hardware/layout constraints rather
   than generating a plan opportunistically.
-- `[ ]` Keep structured node/entity references in diagnostics for layout/effect
+- `[x]` Keep structured node/entity references in diagnostics for layout/effect
   violations throughout this richer model.
 
 ---
@@ -460,10 +460,12 @@ Current code anchors:
 
 Checklist:
 
-- `[~]` Structured diagnostics exist, but the broader debug contract is not
-  complete.
+- `[~]` Structured diagnostics exist, and compiler-side failures now persist as
+  `ir/compiler_failure.json`, but the broader debug contract is not complete.
 - `[~]` Make diagnostics consistently include `node_id`, payload refs, and fix
-  hint refs across compiler, bindings, and extensions.
+  hint refs across compiler, bindings, and extensions. Compiler-side
+  type/layout/protocol failures now do; binding/extension coverage is still
+  uneven.
 - `[x]` Add richer diagnostic families for layout conflicts, protocol
   violations, and solver unsat cores.
 - `[x]` Add first-class semantic diff tooling across stages and packages using

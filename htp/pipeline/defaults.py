@@ -9,6 +9,7 @@ from typing import Any
 
 from htp.artifacts.manifest import write_manifest
 from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
+from htp.compiler_errors import CompilerDiagnosticError, failure_payload
 from htp.passes import PassManager, PassResult
 from htp.passes.contracts import PassContract
 from htp.passes.program_model import stage_payloads_from_program
@@ -111,12 +112,23 @@ def run_default_pipeline(
             state=capability_state,
         )
 
-        manager.run(
-            pipeline_pass.contract,
-            execute,
-            requires_satisfied=satisfaction.requires_satisfied,
-            state_delta=describe_state_delta(before=capability_state, after=next_state),
-        )
+        try:
+            manager.run(
+                pipeline_pass.contract,
+                execute,
+                requires_satisfied=satisfaction.requires_satisfied,
+                state_delta=describe_state_delta(before=capability_state, after=next_state),
+            )
+        except CompilerDiagnosticError as exc:
+            _write_compiler_failure(
+                package_path,
+                pass_id=pipeline_pass.contract.pass_id,
+                stage_before=manager.current_stage,
+                diagnostic=exc,
+            )
+            raise RuntimeError(
+                f"Compiler failed at {pipeline_pass.contract.pass_id}: {exc.to_json()}"
+            ) from None
         if next_program is None:
             raise RuntimeError(f"Pass {pipeline_pass.contract.pass_id} did not produce program state")
 
@@ -176,6 +188,28 @@ def _example_program() -> dict[str, Any]:
         "package": {"emitted": False},
         "target": {"backend": "pto", "option": "a2a3sim"},
     }
+
+
+def _write_compiler_failure(
+    package_dir: Path,
+    *,
+    pass_id: str,
+    stage_before: str,
+    diagnostic: CompilerDiagnosticError,
+) -> None:
+    failure_path = package_dir / "ir" / "compiler_failure.json"
+    failure_path.parent.mkdir(parents=True, exist_ok=True)
+    failure_path.write_text(
+        json.dumps(
+            failure_payload(
+                pass_id=pass_id,
+                stage_before=stage_before,
+                diagnostic=diagnostic,
+            ),
+            indent=2,
+        )
+        + "\n"
+    )
 
 
 __all__ = [

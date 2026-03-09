@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from htp.compiler_errors import compiler_error
 from htp.ir.layout import (
     DistributionFacet,
     DistributionPlacement,
@@ -143,19 +144,18 @@ def build_type_layout_effects(
     _validate_dtype_contracts(kernel_ir, target=target)
     memory_spaces = _memory_spaces_for_backend(backend, kernel_ir)
     _validate_alias_contracts(kernel_ir)
+    entry = str(kernel_ir.get("entry", workload_ir.get("entry", "")))
     types = {
         "schema": TYPES_SCHEMA_ID,
-        "values": {
-            str(argument["name"]): _value_type_payload(argument)
-            for argument in kernel_ir.get("args", ())
-            if argument.get("kind") != "buffer"
-        },
-        "buffers": {
-            str(argument["name"]): _buffer_type_payload(argument, memory_spaces)
-            for argument in kernel_ir.get("args", ())
-            if argument.get("kind") == "buffer"
-        },
+        "values": {},
+        "buffers": {},
     }
+    for index, argument in enumerate(kernel_ir.get("args", ())):
+        name = str(argument["name"])
+        if argument.get("kind") == "buffer":
+            types["buffers"][name] = _buffer_type_payload(argument, memory_spaces)
+        else:
+            types["values"][name] = _value_type_payload(argument, entry=entry, index=index)
     layout = {
         "schema": LAYOUT_SCHEMA_ID,
         "target": dict(target),
@@ -685,7 +685,7 @@ def _buffer_type_payload(argument: Mapping[str, Any], memory_spaces: Mapping[str
     )
 
 
-def _value_type_payload(argument: Mapping[str, Any]) -> dict[str, Any]:
+def _value_type_payload(argument: Mapping[str, Any], *, entry: str, index: int) -> dict[str, Any]:
     kind = str(argument.get("kind", "scalar"))
     dtype = dtype_from_name(str(argument["dtype"]))
     shape = shape_from_sequence(list(argument.get("shape", ())))
@@ -693,8 +693,13 @@ def _value_type_payload(argument: Mapping[str, Any]) -> dict[str, Any]:
         alias_of = argument.get("alias_of")
         source = argument.get("source", alias_of)
         if alias_of is None or source is None:
-            raise ValueError(
-                f"HTP.TYPECHECK.UNKNOWN_ALIAS: view {argument.get('name')!r} requires alias_of/source metadata."
+            raise compiler_error(
+                "HTP.TYPECHECK.UNKNOWN_ALIAS",
+                f"view {argument.get('name')!r} requires alias_of/source metadata.",
+                node_id=f"{entry}:Arg:{index}" if entry else None,
+                entity_id=f"{entry}:E{index}" if entry else None,
+                payload_ref_hint="semantic.types",
+                fix_hints_ref="docs/design/features.md",
             )
         return type_to_payload(ViewType(dtype=dtype, shape=shape, source=str(source), alias_of=str(alias_of)))
     if kind == "tensor":
@@ -811,7 +816,8 @@ def _channel_effects(workload_ir: Mapping[str, Any], kernel_ir: Mapping[str, Any
 def _protocol_effects(workload_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
     processes = [dict(item) for item in workload_ir.get("processes", ())]
     obligations: list[dict[str, Any]] = []
-    for channel in workload_ir.get("channels", ()):
+    entry = str(workload_ir.get("entry", ""))
+    for index, channel in enumerate(workload_ir.get("channels", ())):
         channel_name = str(channel["name"])
         puts = sum(
             int(item.get("count", 1))
@@ -835,8 +841,15 @@ def _protocol_effects(workload_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
             "balanced": balanced,
         }
         if not balanced:
-            raise ValueError(
-                f"HTP.PROTOCOL.UNBALANCED_CHANNEL: channel {channel_name!r} has puts={puts} and gets={gets}."
+            raise compiler_error(
+                "HTP.PROTOCOL.UNBALANCED_CHANNEL",
+                f"channel {channel_name!r} has puts={puts} and gets={gets}.",
+                node_id=f"{entry}:Channel:{index}" if entry else None,
+                payload_ref_hint="semantic.workload_ir",
+                fix_hints_ref="docs/design/impls/09_debuggability.md",
+                channel=channel_name,
+                puts=puts,
+                gets=gets,
             )
         obligations.append(obligation)
     return obligations
@@ -863,40 +876,67 @@ def _collective_effects(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 def _validate_dtype_contracts(kernel_ir: Mapping[str, Any], *, target: Mapping[str, str]) -> None:
     backend = target["backend"]
-    for argument in kernel_ir.get("args", ()):
+    entry = str(kernel_ir.get("entry", ""))
+    for index, argument in enumerate(kernel_ir.get("args", ())):
         if argument.get("kind") != "buffer":
             continue
         dtype = str(argument["dtype"])
         name = str(argument["name"])
         if backend == "nvgpu" and dtype != "f32":
-            raise ValueError(
-                f"HTP.TYPECHECK.UNSUPPORTED_BUFFER_DTYPE: nvgpu buffer {name!r} requires 'f32', got {dtype!r}."
+            raise compiler_error(
+                "HTP.TYPECHECK.UNSUPPORTED_BUFFER_DTYPE",
+                f"nvgpu buffer {name!r} requires 'f32', got {dtype!r}.",
+                node_id=f"{entry}:Arg:{index}" if entry else None,
+                entity_id=f"{entry}:E{index}" if entry else None,
+                payload_ref_hint="semantic.kernel_ir",
+                fix_hints_ref="docs/design/features.md",
+                backend=backend,
+                manifest_value=dtype,
             )
 
 
 def _validate_alias_contracts(kernel_ir: Mapping[str, Any]) -> None:
+    entry = str(kernel_ir.get("entry", ""))
     aliasables = {
         str(argument["name"]): str(argument.get("kind", ""))
         for argument in kernel_ir.get("args", ())
         if str(argument.get("kind", "")) in {"buffer", "view"}
     }
     mutable_aliases: dict[str, list[str]] = {}
-    for argument in kernel_ir.get("args", ()):
+    for index, argument in enumerate(kernel_ir.get("args", ())):
         alias_of = argument.get("alias_of")
         if alias_of is None:
             continue
         alias_name = str(alias_of)
         if alias_name not in aliasables:
-            raise ValueError(
-                f"HTP.TYPECHECK.UNKNOWN_ALIAS: {argument.get('name')!r} aliases unknown value {alias_name!r}."
+            raise compiler_error(
+                "HTP.TYPECHECK.UNKNOWN_ALIAS",
+                f"{argument.get('name')!r} aliases unknown value {alias_name!r}.",
+                node_id=f"{entry}:Arg:{index}" if entry else None,
+                entity_id=f"{entry}:E{index}" if entry else None,
+                payload_ref_hint="semantic.kernel_ir",
+                fix_hints_ref="docs/design/features.md",
+                alias_of=alias_name,
             )
         role = str(argument.get("role") or "")
         if role in {"output", "temp"}:
             mutable_aliases.setdefault(alias_name, []).append(str(argument["name"]))
     for alias_name, users in mutable_aliases.items():
         if len(users) > 1:
-            raise ValueError(
-                f"HTP.TYPECHECK.ALIAS_WRITE_CONFLICT: alias base {alias_name!r} has multiple mutable aliases {users!r}."
+            first_index = next(
+                idx
+                for idx, argument in enumerate(kernel_ir.get("args", ()))
+                if str(argument.get("name")) in users
+            )
+            raise compiler_error(
+                "HTP.TYPECHECK.ALIAS_WRITE_CONFLICT",
+                f"alias base {alias_name!r} has multiple mutable aliases {users!r}.",
+                node_id=f"{entry}:Arg:{first_index}" if entry else None,
+                entity_id=f"{entry}:E{first_index}" if entry else None,
+                payload_ref_hint="semantic.kernel_ir",
+                fix_hints_ref="docs/design/features.md",
+                alias_of=alias_name,
+                mutable_aliases=users,
             )
 
 

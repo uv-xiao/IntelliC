@@ -13,6 +13,8 @@ Implemented behavior:
 
 - diagnostics are stable-coded and machine-readable
 - `htp explain <code>` resolves both exact-code and family explanations
+- compiler-side legality failures now persist as `ir/compiler_failure.json`
+  with stable `pass_id`, `stage_before`, and structured diagnostic payloads
 - family coverage now includes:
   - `HTP.BINDINGS.*`
   - `HTP.REPLAY.*`
@@ -47,6 +49,10 @@ Current debug guidance:
   - `logs/replay_<stage>_<mode>_*.log`
   - `ir/stages/<id>/replay/stubs.json` when present
   - the blamed stage directory under `ir/stages/<id>/`
+- If compilation fails inside a pass, inspect:
+  - `ir/compiler_failure.json`
+  - the `stage_before` directory referenced by that failure
+  - the payload ref recorded on the diagnostic
 
 ## Extension-island debugging
 
