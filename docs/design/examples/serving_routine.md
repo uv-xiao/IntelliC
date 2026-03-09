@@ -16,6 +16,8 @@ What it proves:
 
 - higher-level routine authoring can stay Python-native instead of collapsing
   into a raw program dict
+- kernel bodies inside the routine can use expression-form authoring such as
+  `store(next_hidden, hidden @ weights)`
 - the compiler keeps workload structure explicit in staged artifacts
 - routine structure is visible to replay, diagnostics, and backend-facing
   lowering sidecars

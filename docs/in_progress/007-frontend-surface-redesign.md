@@ -18,11 +18,11 @@ Redesign the public HTP programming surface so flagship kernels and routines rea
 
 ## Scope Checklist
 
-- [ ] study and extract concrete surface patterns from `pypto.language` and `little_kernel.language`
-- [ ] redesign the HTP public kernel/routine surface around more native authoring patterns
-- [ ] rewrite 2–3 flagship examples onto the new surface
-- [ ] add focused contract and regression tests for the new surface
-- [ ] update `docs/design/` and narrow the corresponding TODOs
+- [x] study and extract concrete surface patterns from `pypto.language` and `little_kernel.language`
+- [x] redesign the HTP public kernel/routine surface around more native authoring patterns
+- [x] rewrite 2–3 flagship examples onto the new surface
+- [x] add focused contract and regression tests for the new surface
+- [x] update `docs/design/` and narrow the corresponding TODOs
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Code Surfaces
@@ -35,11 +35,11 @@ Redesign the public HTP programming surface so flagship kernels and routines rea
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test for the redesigned surface
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for a previously awkward or broken authoring pattern
-- [ ] human-friendly flagship examples updated
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test for the redesigned surface
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for a previously awkward or broken authoring pattern
+- [x] human-friendly flagship examples updated
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
 

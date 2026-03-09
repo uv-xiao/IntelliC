@@ -30,10 +30,11 @@ This layer tracks the remaining gap between today’s authoring surfaces and the
 
 The surfaces are real, but they still look more like proof scaffolding than the
 final public programming experience. Recent progress includes the
-PyPTO-calibrated PTO SwiGLU example, which is materially closer to the bar set
-by `references/pypto/examples/language/intermediate/`. The remaining work is
-about pushing more flagship examples to that level and broadening orchestration
-surfaces further.
+PyPTO-calibrated PTO SwiGLU example and the newer expression-first kernel
+surface (`store(out, lhs + rhs)`, `store(C, A @ B)`), which are materially
+closer to the bar set by `references/pypto/examples/language/intermediate/`
+and `little_kernel.language`. The remaining work is about pushing more flagship
+examples to that level and broadening orchestration surfaces further.
 
 ## Coding pointers
 
