@@ -192,7 +192,7 @@ Checklist:
 - `[x]` Add collective-effect obligations and discharge rules.
 - `[x]` Upgrade channel effects from producer/consumer annotation to typed
   protocol obligations.
-- `[~]` Add deadlock-prevention checks for channel/process protocols rather than
+- `[x]` Add deadlock-prevention checks for channel/process protocols rather than
   only local channel metadata.
 - `[x]` Model async tokens, barrier scopes, and event dependencies explicitly in
   effects.

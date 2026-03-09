@@ -315,3 +315,64 @@ def test_async_and_protocol_effects_require_discharge_and_safe_initial_progress(
     kernel_ir, workload_ir, _entities, _bindings = build_semantic_model(deadlock_program)
     with pytest.raises(ValueError, match="HTP.PROTOCOL.DEADLOCK_RISK"):
         build_type_layout_effects(kernel_ir, workload_ir, target={"backend": "generic", "option": "default"})
+
+    safe_program = canonicalize_program(
+        csp_program(
+            entry="safe_pipeline",
+            kernel=_matmul_kernel(),
+            channels=[
+                channel("tiles0", dtype="f32", capacity=1),
+                channel("tiles1", dtype="f32", capacity=0),
+            ],
+            processes=[
+                process(
+                    "producer0",
+                    task_id="p0",
+                    kernel="gemm_tile",
+                    steps=[
+                        {"kind": "put", "channel": "tiles0", "count": 1},
+                        {"kind": "get", "channel": "tiles1", "count": 1},
+                    ],
+                ),
+                process(
+                    "producer1",
+                    task_id="p1",
+                    kernel="gemm_tile",
+                    steps=[
+                        {"kind": "get", "channel": "tiles0", "count": 1},
+                        {"kind": "put", "channel": "tiles1", "count": 1},
+                    ],
+                ),
+            ],
+        )
+    )
+    kernel_ir, workload_ir, _entities, _bindings = build_semantic_model(safe_program)
+    _types, _layout, effects = build_type_layout_effects(
+        kernel_ir,
+        workload_ir,
+        target={"backend": "generic", "option": "default"},
+    )
+    assert effects["protocols"] == [
+        {
+            "channel": "tiles0",
+            "protocol": "fifo",
+            "capacity": 1,
+            "puts": 1,
+            "gets": 1,
+            "balanced": True,
+            "participants": ["producer0", "producer1"],
+            "hazards": [],
+            "deadlock_safe": True,
+        },
+        {
+            "channel": "tiles1",
+            "protocol": "fifo",
+            "capacity": 0,
+            "puts": 1,
+            "gets": 1,
+            "balanced": True,
+            "participants": ["producer0", "producer1"],
+            "hazards": [],
+            "deadlock_safe": True,
+        },
+    ]

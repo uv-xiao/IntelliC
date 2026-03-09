@@ -1002,6 +1002,7 @@ def _protocol_effects(workload_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
     processes = [dict(item) for item in workload_ir.get("processes", ())]
     obligations: list[dict[str, Any]] = []
     entry = str(workload_ir.get("entry", ""))
+    hazard_records = _protocol_hazards(workload_ir)
     for index, channel in enumerate(workload_ir.get("channels", ())):
         channel_name = str(channel["name"])
         participants = sorted(
@@ -1043,7 +1044,7 @@ def _protocol_effects(workload_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
                 puts=puts,
                 gets=gets,
             )
-        hazards = _protocol_hazards(channel_name, channel, processes)
+        hazards = [dict(item) for item in hazard_records if channel_name in item.get("channels", ())]
         obligation["hazards"] = hazards
         obligation["deadlock_safe"] = not hazards
         if hazards:
@@ -1071,101 +1072,123 @@ def _process_steps(process: Mapping[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def _protocol_hazards(
-    channel_name: str, channel: Mapping[str, Any], processes: Sequence[Mapping[str, Any]]
-) -> list[dict[str, Any]]:
-    hazards: list[dict[str, Any]] = []
-    channel_processes = [
-        process
-        for process in processes
-        if any(str(item.get("channel")) == channel_name for item in process.get("puts", ()))
-        or any(str(item.get("channel")) == channel_name for item in process.get("gets", ()))
-    ]
-    first_steps = []
-    for process in channel_processes:
-        steps = _process_steps(process)
-        if steps:
-            first_steps.append(
-                {
-                    "process": str(process.get("name", process.get("task_id", ""))),
-                    "step": dict(steps[0]),
-                }
-            )
-    initial_puts = [
-        item
-        for item in first_steps
-        if str(item["step"].get("kind")) == "put" and str(item["step"].get("channel")) == channel_name
-    ]
-    initial_gets = [
-        item
-        for item in first_steps
-        if str(item["step"].get("kind")) == "get" and str(item["step"].get("channel")) == channel_name
-    ]
-    capacity = int(channel.get("capacity", 0) or 0)
-    if initial_gets and not initial_puts and capacity <= 0:
-        hazards.append(
-            {
-                "kind": "all_processes_block_on_empty_channel",
-                "channel": channel_name,
-                "participants": [item["process"] for item in initial_gets],
-                "detail": "every participating process performs an initial get on an empty zero-capacity channel",
-            }
-        )
-    wait_edges: list[dict[str, str]] = []
-    process_by_name = {
-        str(process.get("name", process.get("task_id", ""))): process for process in channel_processes
+def _protocol_hazards(workload_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
+    processes = [dict(item) for item in workload_ir.get("processes", ())]
+    channels = {
+        str(channel["name"]): int(channel.get("capacity", 0) or 0)
+        for channel in workload_ir.get("channels", ())
+        if isinstance(channel, Mapping) and "name" in channel
     }
-    initial_producers_by_channel: dict[str, list[str]] = {}
-    for item in first_steps:
-        if str(item["step"].get("kind")) == "put":
-            initial_producers_by_channel.setdefault(str(item["step"].get("channel", "")), []).append(
-                item["process"]
-            )
-    for item in first_steps:
-        if str(item["step"].get("kind")) != "get":
+    process_names = tuple(str(process.get("name", process.get("task_id", ""))) for process in processes)
+    process_steps = tuple(tuple(_process_steps(process)) for process in processes)
+    initial_used = tuple(0 for _ in channels)
+    channel_names = tuple(channels)
+    initial_state = ((0,) * len(processes), initial_used)
+    seen = {initial_state}
+    frontier = [initial_state]
+    blocked_state = initial_state
+    while frontier:
+        pointers, used_slots = frontier.pop()
+        if all(pointer >= len(process_steps[index]) for index, pointer in enumerate(pointers)):
+            return []
+        blocked_state = (pointers, used_slots)
+        for next_state in _next_protocol_states(
+            pointers=pointers,
+            used_slots=used_slots,
+            process_steps=process_steps,
+            channel_names=channel_names,
+            capacities=channels,
+        ):
+            if next_state not in seen:
+                seen.add(next_state)
+                frontier.append(next_state)
+    blocked_processes = []
+    relevant_channels: set[str] = set()
+    pointers, used_slots = blocked_state
+    for index, pointer in enumerate(pointers):
+        if pointer >= len(process_steps[index]):
             continue
-        src = item["process"]
-        awaited_channel = str(item["step"].get("channel", ""))
-        producers = initial_producers_by_channel.get(awaited_channel, ())
-        for producer in producers:
-            wait_edges.append({"src": src, "dst": producer})
-    if wait_edges and _has_wait_cycle(wait_edges):
-        hazards.append(
-            {
-                "kind": "initial_wait_cycle",
-                "channel": channel_name,
-                "participants": sorted(process_by_name),
-                "detail": "initial blocking channel operations form a wait cycle across processes",
-                "edges": wait_edges,
-            }
-        )
-    return hazards
+        step = process_steps[index][pointer]
+        blocked_processes.append({"process": process_names[index], "step": dict(step), "pointer": pointer})
+        if isinstance(step, Mapping) and step.get("channel") is not None:
+            relevant_channels.add(str(step["channel"]))
+    return [
+        {
+            "kind": "protocol_progress_deadlock",
+            "channels": sorted(relevant_channels) or list(channel_names),
+            "participants": list(process_names),
+            "detail": "no legal execution order can complete the declared process/channel steps under channel capacities",
+            "blocked_processes": blocked_processes,
+            "state": {
+                "pointers": {process_names[idx]: pointer for idx, pointer in enumerate(pointers)},
+                "used_slots": {name: used_slots[idx] for idx, name in enumerate(channel_names)},
+                "free_slots": {
+                    name: channels[name] - used_slots[idx] for idx, name in enumerate(channel_names)
+                },
+            },
+        }
+    ]
 
 
-def _has_wait_cycle(edges: Sequence[Mapping[str, str]]) -> bool:
-    graph: dict[str, set[str]] = {}
-    for edge in edges:
-        src = str(edge.get("src", ""))
-        dst = str(edge.get("dst", ""))
-        if src and dst:
-            graph.setdefault(src, set()).add(dst)
-    seen: set[str] = set()
-    stack: set[str] = set()
-
-    def visit(node: str) -> bool:
-        if node in stack:
-            return True
-        if node in seen:
-            return False
-        seen.add(node)
-        stack.add(node)
-        for nxt in graph.get(node, ()):
-            if visit(nxt):
-                return True
-        stack.remove(node)
-        return False
-
-    return any(visit(node) for node in graph)
+def _next_protocol_states(
+    *,
+    pointers: tuple[int, ...],
+    used_slots: tuple[int, ...],
+    process_steps: tuple[tuple[dict[str, Any], ...], ...],
+    channel_names: tuple[str, ...],
+    capacities: Mapping[str, int],
+) -> list[tuple[tuple[int, ...], tuple[int, ...]]]:
+    next_states: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
+    index_by_channel = {name: idx for idx, name in enumerate(channel_names)}
+    ready_steps: list[tuple[int, dict[str, Any]]] = []
+    for process_index, pointer in enumerate(pointers):
+        if pointer >= len(process_steps[process_index]):
+            continue
+        step = process_steps[process_index][pointer]
+        ready_steps.append((process_index, step))
+        channel_name = str(step.get("channel", ""))
+        if channel_name not in index_by_channel:
+            continue
+        channel_index = index_by_channel[channel_name]
+        count = int(step.get("count", 1) or 1)
+        used = used_slots[channel_index]
+        capacity = int(capacities[channel_name])
+        kind = str(step.get("kind", ""))
+        executable = False
+        next_used = list(used_slots)
+        if kind == "put" and used + count <= capacity:
+            next_used[channel_index] = used + count
+            executable = True
+        elif kind == "get" and used >= count:
+            next_used[channel_index] = used - count
+            executable = True
+        if not executable:
+            continue
+        next_pointers = list(pointers)
+        next_pointers[process_index] += 1
+        next_states.append((tuple(next_pointers), tuple(next_used)))
+    for left_index, left_step in ready_steps:
+        left_channel = str(left_step.get("channel", ""))
+        if left_channel not in index_by_channel or int(capacities[left_channel]) != 0:
+            continue
+        left_kind = str(left_step.get("kind", ""))
+        left_count = int(left_step.get("count", 1) or 1)
+        for right_index, right_step in ready_steps:
+            if right_index <= left_index:
+                continue
+            if str(right_step.get("channel", "")) != left_channel:
+                continue
+            right_kind = str(right_step.get("kind", ""))
+            if {left_kind, right_kind} != {"get", "put"}:
+                continue
+            right_count = int(right_step.get("count", 1) or 1)
+            if left_count != right_count:
+                continue
+            next_pointers = list(pointers)
+            next_pointers[left_index] += 1
+            next_pointers[right_index] += 1
+            next_states.append((tuple(next_pointers), used_slots))
+    return next_states
 
 
 def _token_effects(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
