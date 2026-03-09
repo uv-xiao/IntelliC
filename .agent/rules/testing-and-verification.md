@@ -1,6 +1,6 @@
 # Testing and Verification Rules
 
-## Test Policy
+## Test policy
 
 - Add tests for every new contract surface or bug fix.
 - Prefer focused regression tests first, then rerun the affected local suite.
@@ -10,25 +10,23 @@
 - Be able to justify each new test in one sentence: what bug or contract does it protect?
 - If several tests cover the same path with no new signal, collapse them.
 
+## Example quality
+
+- Public examples are part of the proof surface and must be human-friendly.
+- Prefer Python-native authoring and readable builders over giant raw dict globals.
+- Use references and real systems to calibrate example difficulty.
+- Flagship examples should demonstrate real functionality, not only a minimal smoke case.
+
 ## Verification
 
 - Do not claim completion without fresh command output.
-- For Python changes, the default verification stack is:
+- Default verification stack:
   - `pixi run verify`
 - Fallback only when Pixi is unavailable:
+  - `python -m pip install --user --upgrade pip setuptools wheel`
   - `python -m pip install -e '.[dev]'`
   - `pytest`
-  - `pre-commit run --all-files` when hook config changes
-- CI should stay small and deterministic:
-  - pre-commit through the shared Pixi environment
-  - pytest on supported Python versions via named Pixi environments
-- A PR is not complete until all configured CI checks are green, not merely locally reproduced.
-- Do not “fix” CI by deleting coverage, loosening assertions, skipping real failure paths, or removing jobs unless the
-  underlying contract has intentionally changed and the docs/tests are updated consistently.
-- When CI fails, investigate whether the failure reveals a real defect in code, fixtures, dependencies, or environment
-  handling before changing the test or workflow.
-
-## Agent Expectations
-
-- Review should look for contract bypasses, malformed-input crashes, and artifact drift.
-- Testing should prefer explicit failure diagnostics over implicit exceptions.
+  - `pre-commit run --all-files`
+- A PR is not complete until all configured CI checks are green.
+- Do not fix CI by deleting coverage, loosening assertions, skipping real failure paths, or removing jobs unless the underlying contract intentionally changed and the docs/tests were updated consistently.
+- When CI fails, first investigate whether the failure reveals a real defect in code, fixtures, dependencies, or environment handling.

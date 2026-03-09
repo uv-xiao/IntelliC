@@ -22,13 +22,21 @@ DEFAULT_POLICY = {
             "passes": {
                 "allowed_roots": ["htp/passes", "tests/passes", "docs/design/impls/02_pass_manager.md"],
                 "required_tests": ["tests/passes", "tests/pipeline"],
-                "required_docs": ["docs/design/impls/02_pass_manager.md", "docs/future/gap_checklist.md"],
+                "required_docs": [
+                    "docs/design/impls/02_pass_manager.md",
+                    "docs/todo/README.md",
+                    "docs/todo/gap_checklist.md",
+                ],
                 "contract_surfaces": ["pass contracts", "analysis payloads", "ir/pass_trace.jsonl"],
             },
             "intrinsics": {
                 "allowed_roots": ["htp/intrinsics.py", "htp/runtime/intrinsics.py", "tests/ir"],
                 "required_tests": ["tests/ir", "tests/runtime"],
-                "required_docs": ["docs/design/features.md", "docs/future/gap_checklist.md"],
+                "required_docs": [
+                    "docs/design/features.md",
+                    "docs/todo/README.md",
+                    "docs/todo/gap_checklist.md",
+                ],
                 "contract_surfaces": ["intrinsic registry", "simulate/lower handlers", "stub diagnostics"],
             },
             "backend_contracts": {
@@ -43,7 +51,8 @@ DEFAULT_POLICY = {
                     "docs/design/impls/05_backend_pto.md",
                     "docs/design/impls/07_binding_interface.md",
                     "docs/design/impls/13_backend_nvgpu.md",
-                    "docs/future/gap_checklist.md",
+                    "docs/todo/README.md",
+                    "docs/todo/gap_checklist.md",
                 ],
                 "contract_surfaces": ["manifest.outputs", "backend codegen index", "adapter traces"],
             },

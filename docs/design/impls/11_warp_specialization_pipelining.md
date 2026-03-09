@@ -66,4 +66,4 @@ What is not implemented yet:
 - loop-dependence analysis as a separate staged artifact
 - target-specific discharge of the plans into backend-only primitives
 
-Those remain future work under `docs/future/`.
+Those remain future work under `docs/todo/`.

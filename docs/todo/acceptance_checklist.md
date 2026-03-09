@@ -11,7 +11,7 @@ The intent is to eliminate hidden invariants: every extension point and semantic
 - A new contributor can read in order:
   - `docs/design/README.md`
   - `docs/design/story.md`
-  - `docs/future/analysis.md`
+  - `docs/todo/analysis.md`
   - `docs/design/features.md`
   - `docs/design/implementations.md`
   - `docs/design/examples.md`
@@ -137,7 +137,7 @@ For optional extension backends/toolchains such as AIE:
   - staged analyses exist for any fact that justifies a transform
   - provenance for autonomous edits is specified (`extensions.agent.*`)
 - There is a clear agent loop/tooling story that consumes only artifacts and produces auditable evidence:
-  - `docs/future/feats/10_agentic_development.md`
+  - `docs/todo/feats/10_agentic_development.md`
   - `docs/design/impls/10_agentic_tooling.md`
 
 ---
@@ -169,5 +169,5 @@ For optional extension backends/toolchains such as AIE:
 - MLIR-based round-trips are extensions; the core compiler only provides the extension mechanism.
 - The examples document covers kernel/backend, CSP pipeline, optional extension backend, multi-backend serving, compiler
   extension, and staged warp-specialization-style optimization stories.
-- The currently implemented proof examples are discoverable through `docs/design/code_map.md`, `docs/examples/`, and
+- The currently implemented proof examples are discoverable through `docs/design/code_map.md`, `docs/design/examples/`, and
   `examples/`.

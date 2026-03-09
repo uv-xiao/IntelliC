@@ -226,7 +226,7 @@ _FAMILY_CATALOG = (
             summary="The workload/process protocol is unbalanced or otherwise illegal.",
             docs=(
                 "docs/design/features.md",
-                "docs/examples/csp_channel_pipeline.md",
+                "docs/design/examples/csp_channel_pipeline.md",
             ),
             fix_hints=("Balance channel puts/gets and re-check process protocol obligations.",),
             fix_hint_policy="repair_protocol_obligations",

@@ -262,11 +262,11 @@ Everything else is extension territory.
 ## 7. Reading map (this redo set)
 
 - `docs/design/features.md` — implemented feature catalog
-- `docs/future/features.md` — broader target feature catalog (WHAT)
+- `docs/todo/features.md` — broader target feature catalog (WHAT)
 - `docs/design/implementations.md` — architecture and component design (HOW)
 - `docs/design/story.md` — cohesive end-to-end narrative (WHY→WHAT→HOW)
 - `docs/design/examples.md` — end-to-end examples across backends
-- `docs/future/feats/` — broader-target deep dives per feature
+- `docs/todo/feats/` — broader-target deep dives per feature
 - `docs/design/impls/` — deep dives per implementation component
 
 ## 8. Recommended next-phase focus

@@ -37,8 +37,8 @@ HTP is agent-friendly if the following are true:
   handlers, so an agent changes one surface at a time.
 
 These requirements align directly with existing HTP principles:
-- capability-typed composition (`docs/future/feats/01_extensibility.md`)
-- pass tracing and dumps (`docs/future/feats/09_debuggability.md`)
+- capability-typed composition (`docs/todo/feats/01_extensibility.md`)
+- pass tracing and dumps (`docs/todo/feats/09_debuggability.md`)
 - artifact-first manifests (`docs/design/impls/04_artifact_manifest.md`)
 
 ## Design requirements (language/framework level)
@@ -157,7 +157,7 @@ healthy.
 
 Concrete evidence from existing systems (code-grounded):
 - Triton’s warp specialization shows “attrs as APIs” and phase-coupled pipelines that are correct but non-obvious to extend
-  safely; see `docs/future/reports/retargetable_extensibility_report.md`.
+  safely; see `docs/todo/reports/retargetable_extensibility_report.md`.
 - TileLang’s high-end instruction selection (e.g., TMA/Bulk/LDSM/TMEM) is explicitly target-conditional, and contains
   backend-specific escape hatches; see the same report plus its code pointers.
 

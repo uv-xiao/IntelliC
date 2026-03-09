@@ -1,7 +1,7 @@
 # HTP Story — What the Current Repository Proves
 
 This document explains the **implemented** HTP story. It is intentionally narrower than
-`docs/future/story.md`: everything here is backed by code in `htp/`, `htp_ext/`, `examples/`,
+`docs/todo/story.md`: everything here is backed by code in `htp/`, `htp_ext/`, `examples/`,
 and `tests/`.
 
 ## 1. Repository goal
@@ -112,7 +112,7 @@ The main anchors are:
 
 The repository does **not** yet prove the full future story.
 
-Important remaining gaps still live under `docs/future/`:
+Important remaining gaps still live under `docs/todo/`:
 
 - richer solver search and cost-driven alternative selection,
 - deeper autonomous agent loops and bounded edit policies,
@@ -120,7 +120,7 @@ Important remaining gaps still live under `docs/future/`:
 - wider backend semantic coverage, especially richer PTO, NV-GPU, and AIE paths,
 - broader MLIR island subsets beyond the current implemented round-trip slice.
 
-Use `docs/future/gap_checklist.md` as the authoritative list of remaining gaps.
+Use `docs/todo/README.md` as the authoritative list of remaining gaps.
 
 ## 4. How to read the implemented design
 

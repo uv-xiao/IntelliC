@@ -1,23 +1,28 @@
 # Docs and Artifact Rules
 
-## Documentation
+## Documentation structure
+
+- `docs/design/` documents only implemented behavior with references to real code.
+- `docs/todo/` holds unimplemented and partial design, roadmap, and research-backed feature descriptions.
+- `docs/in_progress/` holds active feature-branch task files only.
+- `docs/story.md` is the top-level intended framework story.
+- Do not leave stale duplicates across these areas.
+
+## Documentation updates
 
 - Update docs when behavior or contracts change.
-- Keep docs aligned with the current emitted artifact layout and binding behavior.
-- Prefer focused edits to the existing design docs over ad-hoc markdown elsewhere.
-- Keep the tree split explicit:
-  - `docs/design/` documents only implemented behavior with references to real code
-  - `docs/future/` holds unimplemented design, research, and roadmap material
-- Move docs when implementation status changes; do not leave stale duplicates.
+- Keep docs aligned with current emitted artifact layout and binding behavior.
+- Prefer editing the normative existing docs instead of adding ad-hoc markdown.
+- When implementation status changes, move docs to the correct area rather than leaving them behind.
 
-## Artifact Contracts
+## Artifact contracts
 
-- Treat emitted files as a stable contract, not incidental output.
+- Treat emitted files as stable contracts, not incidental output.
 - Canonical paths matter for downstream tooling and verification.
 - Schema ids matter; validate them and update docs when they change.
 - If a backend emits duplicate metadata surfaces, validation must check their parity.
 
-## Replay and Stages
+## Replay and stages
 
 - Every stage should remain runnable in `sim` or fail with a structured replay diagnostic.
 - Stage identity, maps, analyses, and summaries are part of the observable contract.

@@ -3,7 +3,7 @@
 - ID: `001-docs-process-overhaul`
 - Branch: `htp/feat-doc-process-overhaul`
 - PR: `TBD`
-- Status: `in_progress`
+- Status: `in_review`
 - Owner: `Codex`
 
 ## Goal
@@ -18,14 +18,14 @@ Reorganize `docs/` into a stable implemented-vs-todo-vs-in-progress structure, a
 
 ## Scope Checklist
 
-- [ ] move implemented docs under `docs/design/`
-- [ ] move unimplemented docs under `docs/todo/`
-- [ ] add top-level `docs/story.md`
-- [ ] add `docs/in_progress/` workflow and template
-- [ ] remove obsolete docs directories
-- [ ] update repo and agent guidance for the new process
-- [ ] update example/test/documentation quality rules
-- [ ] rewrite `README.md`
+- [x] move implemented docs under `docs/design/`
+- [x] move unimplemented docs under `docs/todo/`
+- [x] add top-level `docs/story.md`
+- [x] add `docs/in_progress/` workflow and template
+- [x] remove obsolete docs directories
+- [x] update repo and agent guidance for the new process
+- [x] update example/test/documentation quality rules
+- [x] rewrite `README.md`
 
 ## Code Surfaces
 
@@ -37,18 +37,18 @@ Reorganize `docs/` into a stable implemented-vs-todo-vs-in-progress structure, a
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path policy test if automation changes
-- [ ] one malformed-input / contract-violation test if automation changes
-- [ ] one regression test for changed PR-policy path rules if needed
-- [ ] human-friendly example guidance updated
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path policy test if automation changes
+- [x] one malformed-input / contract-violation test if automation changes
+- [x] one regression test for changed PR-policy path rules if needed
+- [x] human-friendly example guidance updated
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for implemented behavior
-- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] update `docs/design/` for implemented behavior
+- [x] update `docs/todo/` to remove or narrow the gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan

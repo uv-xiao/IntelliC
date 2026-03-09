@@ -303,13 +303,13 @@ Current status: **partial**.
 
 Feature deep dives for the broader target live in:
 
-- `docs/future/feats/01_extensibility.md`
-- `docs/future/feats/02_dialects_wsp.md`
-- `docs/future/feats/03_dialects_csp.md`
-- `docs/future/feats/04_intrinsics.md`
-- `docs/future/feats/05_layout.md`
-- `docs/future/feats/06_passes_pipelines.md`
-- `docs/future/feats/07_backends_artifacts.md`
-- `docs/future/feats/08_binding_runtime.md`
-- `docs/future/feats/09_debuggability.md`
-- `docs/future/feats/10_agentic_development.md`
+- `docs/todo/feats/01_extensibility.md`
+- `docs/todo/feats/02_dialects_wsp.md`
+- `docs/todo/feats/03_dialects_csp.md`
+- `docs/todo/feats/04_intrinsics.md`
+- `docs/todo/feats/05_layout.md`
+- `docs/todo/feats/06_passes_pipelines.md`
+- `docs/todo/feats/07_backends_artifacts.md`
+- `docs/todo/feats/08_binding_runtime.md`
+- `docs/todo/feats/09_debuggability.md`
+- `docs/todo/feats/10_agentic_development.md`
