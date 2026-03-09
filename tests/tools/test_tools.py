@@ -9,6 +9,7 @@ from htp.tools import (
     bisect_stages,
     explain_diagnostic,
     minimize_package,
+    promotion_plan,
     replay_package,
     semantic_diff,
     verify_package,
@@ -119,11 +120,16 @@ def test_verify_package_records_agent_provenance(tmp_path):
     report = verify_package(package_dir, goal="regression-check")
 
     assert report["ok"] is True
-    assert report["gates"] == {"validate": True, "replay": True}
+    assert report["gates"] == {"validate": True, "replay": True, "target_suite": True}
     manifest = json.loads((package_dir / "manifest.json").read_text())
     assert manifest["extensions"]["agent"]["goal"] == "regression-check"
-    assert manifest["extensions"]["agent"]["gates"] == {"validate": True, "replay": True}
+    assert manifest["extensions"]["agent"]["gates"] == {
+        "validate": True,
+        "replay": True,
+        "target_suite": True,
+    }
     assert manifest["extensions"]["agent"]["evidence"]["replay_log"] == report["evidence"]["replay_log"]
+    assert manifest["extensions"]["agent"]["promotion"]["allowed"] is True
 
 
 def test_semantic_diff_reports_manifest_and_semantic_changes(tmp_path):
@@ -141,6 +147,7 @@ def test_semantic_diff_reports_manifest_and_semantic_changes(tmp_path):
     assert diff["stage_ids"] == {"left": expected_stage, "right": expected_stage}
     assert "details" in diff
     assert "current_stage.kernel_ir" in diff["details"]
+    assert "current_stage.identity" in diff["details"]
 
 
 def test_explain_diagnostic_returns_contract_reference():
@@ -195,7 +202,70 @@ def test_verify_package_can_enforce_golden_diff_gate(tmp_path):
 
     assert report["ok"] is True
     assert report["gates"]["golden_diff"] is True
+    assert report["gates"]["target_suite"] is True
     assert report["evidence"]["golden_diff"]["equal"] is True
+
+
+def test_verify_package_can_emit_promotion_plan_and_perf_gate(tmp_path):
+    package_dir = copy_golden_fixture("nvgpu_demo", tmp_path)
+    baseline_dir = tmp_path / "baseline"
+    baseline_dir.mkdir()
+    copy_golden_fixture("nvgpu_demo", baseline_dir)
+
+    perf_dir = package_dir / "metrics"
+    perf_dir.mkdir()
+    (perf_dir / "perf.json").write_text(json.dumps({"runtime_ms": 10.0}) + "\n")
+    baseline_perf_dir = baseline_dir / "nvgpu_demo" / "metrics"
+    baseline_perf_dir.mkdir()
+    (baseline_perf_dir / "perf.json").write_text(json.dumps({"runtime_ms": 9.8}) + "\n")
+
+    policy_path = tmp_path / "agent_policy.toml"
+    policy_path.write_text(
+        "\n".join(
+            (
+                "[agent]",
+                'required_gates = ["validate", "replay", "target_suite", "perf"]',
+                'promotion_mode = "pr"',
+                "",
+                "[perf]",
+                "enabled = true",
+                "max_regression_pct = 5.0",
+                "",
+            )
+        )
+    )
+
+    report = verify_package(
+        package_dir,
+        goal="perf-check",
+        perf_baseline_dir=baseline_dir / "nvgpu_demo",
+        policy_path=policy_path,
+    )
+
+    assert report["gates"]["perf"] is True
+    assert report["promotion"]["allowed"] is True
+    assert report["promotion"]["mode"] == "pr"
+
+
+def test_promotion_plan_holds_when_required_gate_fails(tmp_path):
+    package_dir = copy_golden_fixture("pto_demo", tmp_path)
+    policy_path = tmp_path / "agent_policy.toml"
+    policy_path.write_text(
+        "\n".join(
+            (
+                "[agent]",
+                'required_gates = ["validate", "replay", "golden_diff"]',
+                'promotion_mode = "auto-land"',
+                "",
+            )
+        )
+    )
+
+    plan = promotion_plan(package_dir, policy_path=policy_path)
+
+    assert plan["allowed"] is False
+    assert plan["next_action"] == "hold"
+    assert plan["failed_required_gates"] == ["golden_diff"]
 
 
 def test_bisect_stages_reports_first_divergent_stage(tmp_path):

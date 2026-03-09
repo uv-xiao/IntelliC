@@ -44,6 +44,17 @@ class AIEBinding(ManifestBinding):
             missing_files=missing_files,
         )
 
+    def correctness_suite(self, *, mode: str = "sim") -> dict[str, Any]:
+        del mode
+        validation = self.validate()
+        return {
+            "name": "aie.package_suite",
+            "mode": "artifact",
+            "ok": validation.ok,
+            "diagnostics": list(validation.diagnostics),
+            "checks": [{"name": "aie_contract_validate", "ok": validation.ok}],
+        }
+
 
 def _validate_metadata(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
     diagnostics: list[dict[str, Any]] = []

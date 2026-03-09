@@ -17,6 +17,7 @@ from htp.passes import (
     typecheck_layout_effects,
 )
 from htp.passes.contracts import PassContract
+from htp_ext.registry import active_extensions
 
 
 @dataclass(frozen=True)
@@ -41,12 +42,9 @@ def core_passes() -> tuple[RegisteredPass, ...]:
 
 
 def extension_passes(*, program: Mapping[str, Any]) -> tuple[RegisteredPass, ...]:
-    requested = tuple(program.get("extensions", {}).get("requested", ()))
     passes: list[RegisteredPass] = []
-    if "htp_ext.mlir_cse" in requested:
-        from htp_ext.mlir_cse.island import registered_passes as mlir_cse_registered_passes
-
-        passes.extend(mlir_cse_registered_passes())
+    for extension in active_extensions(program):
+        passes.extend(extension.registered_passes())
     return tuple(passes)
 
 

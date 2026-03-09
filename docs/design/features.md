@@ -129,11 +129,14 @@ Implemented today:
 
 - `htp replay`
 - `htp verify`
+- `htp promote-plan`
 - `htp diff --semantic`
 - `htp explain`
 - `htp bisect`
 - `htp minimize`
 - agent policy loading
+- promotion recommendation from `agent_policy.toml`
+- optional perf threshold checks with package-local metrics
 - structured diagnostic catalog
 - agent provenance under `extensions.agent.*`
 

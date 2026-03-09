@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from htp.passes.registry import core_passes
+from htp_ext.registry import active_extensions
 
 
 def default_template(*, target: dict[str, str], required_outputs: tuple[str, ...]):
@@ -23,11 +24,8 @@ def extension_templates(
     required_outputs: tuple[str, ...],
 ):
     templates = []
-    requested = tuple(program.get("extensions", {}).get("requested", ()))
-    if "htp_ext.mlir_cse" in requested:
-        from htp_ext.mlir_cse.island import pipeline_templates as mlir_cse_templates
-
-        templates.extend(mlir_cse_templates(program=program, required_outputs=required_outputs))
+    for extension in active_extensions(program):
+        templates.extend(extension.pipeline_templates(program=program, required_outputs=required_outputs))
     return tuple(templates)
 
 

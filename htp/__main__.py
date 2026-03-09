@@ -8,6 +8,7 @@ from htp.tools import (
     bisect_stages,
     explain_diagnostic,
     minimize_package,
+    promotion_plan,
     replay_package,
     semantic_diff,
     verify_package,
@@ -29,6 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify_parser.add_argument("--goal", default="verify")
     verify_parser.add_argument("--mode", default="sim")
     verify_parser.add_argument("--golden")
+    verify_parser.add_argument("--perf-baseline")
     verify_parser.add_argument("--policy")
 
     diff_parser = subparsers.add_parser("diff")
@@ -49,6 +51,14 @@ def build_parser() -> argparse.ArgumentParser:
     minimize_parser.add_argument("package_dir")
     minimize_parser.add_argument("output_dir")
     minimize_parser.add_argument("--stage")
+
+    promote_parser = subparsers.add_parser("promote-plan")
+    promote_parser.add_argument("package_dir")
+    promote_parser.add_argument("--goal", default="promote")
+    promote_parser.add_argument("--mode", default="sim")
+    promote_parser.add_argument("--golden")
+    promote_parser.add_argument("--perf-baseline")
+    promote_parser.add_argument("--policy")
     return parser
 
 
@@ -71,6 +81,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             goal=args.goal,
             mode=args.mode,
             golden_package_dir=args.golden,
+            perf_baseline_dir=args.perf_baseline,
             policy_path=args.policy,
         )
         print(json.dumps(result, indent=2))
@@ -98,6 +109,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = minimize_package(args.package_dir, args.output_dir, stage_id=args.stage)
         print(json.dumps(result, indent=2))
         return 0 if result["ok"] else 1
+    if args.command == "promote-plan":
+        result = promotion_plan(
+            args.package_dir,
+            goal=args.goal,
+            mode=args.mode,
+            golden_package_dir=args.golden,
+            perf_baseline_dir=args.perf_baseline,
+            policy_path=args.policy,
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if result["allowed"] else 1
     parser.error(f"Unhandled command: {args.command}")
     return 2
 

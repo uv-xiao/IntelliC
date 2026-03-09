@@ -56,7 +56,7 @@ Checklist:
   hard-coded default template.
 - `[x]` Move backend capability facts out of local solver tables and into
   backend-owned declarations (`ArchModel`-style source of truth).
-- `[~]` Make extension-provided passes and extension-provided pipelines
+- `[x]` Make extension-provided passes and extension-provided pipelines
   first-class solver inputs rather than ad-hoc extension-specific checks.
 - `[x]` Use `PassContract.requires_layout_invariants` and
   `PassContract.requires_effect_invariants` as real satisfiability checks rather
@@ -66,9 +66,9 @@ Checklist:
   beyond simple accumulation.
 - `[x]` Record solver satisfaction details into `ir/pass_trace.jsonl`
   (`requires_satisfied`) instead of leaving them empty.
-- `[~]` Emit solver-visible candidate providers from actual registered passes and
+- `[x]` Emit solver-visible candidate providers from actual registered passes and
   extensions rather than best-effort local hints.
-- `[~]` Add bounded alternative choice support (OR nodes) for pipeline
+- `[x]` Add bounded alternative choice support (OR nodes) for pipeline
   selection.
 - `[ ]` Add cost-model-based selection only after satisfiability is complete.
 - `[~]` Unify final artifact requirements with backend/extension contracts so
@@ -102,7 +102,7 @@ Checklist:
   reproducers.
 - `[x]` Add stage bisect/localization tooling on top of replay so agents can
   find the first divergent stage automatically.
-- `[~]` Extend `htp diff --semantic` from current-stage JSON comparison to
+- `[x]` Extend `htp diff --semantic` from current-stage JSON comparison to
   staged identity-aware semantic diffs.
 - `[x]` Add a real diagnostic catalog with stable fix-hint policies rather than
   a small hard-coded explanation table.
@@ -111,14 +111,14 @@ Checklist:
 - `[x]` Extend provenance under `extensions.agent.*` to include:
   decision trace, attempted candidates, rejected candidates, patch summary, and
   timing.
-- `[ ]` Add promotion workflow support (patch-only / PR / auto-land) without
+- `[x]` Add promotion workflow support (patch-only / PR / auto-land) without
   placing git policy inside core compiler passes.
 - `[x]` Add artifact-based golden diff gates into `verify_package(...)`, not
   just validate + replay.
-- `[ ]` Add target-specific correctness suites into `verify_package(...)` rather
+- `[x]` Add target-specific correctness suites into `verify_package(...)` rather
   than leaving them as external test selection.
-- `[ ]` Add optional performance gates and threshold policy to the tool surface.
-- `[ ]` Add bounded edit-corridor templates for passes, intrinsic handlers, and
+- `[x]` Add optional performance gates and threshold policy to the tool surface.
+- `[~]` Add bounded edit-corridor templates for passes, intrinsic handlers, and
   backend contracts to support healthy autonomous changes.
 
 ---

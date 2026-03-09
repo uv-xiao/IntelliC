@@ -15,6 +15,8 @@ Implemented behavior:
 - the default pipeline is validated before pass execution
 - template selection now comes from a registered template set and can choose
   between the plain default template and eligible extension-backed templates
+- extension passes and extension-backed templates are discovered through
+  `htp_ext/registry.py`, not hard-coded checks in the solver
 - unsupported backend handlers fail early with `ir/solver_failure.json`
 - missing pass capabilities and invalidated analyses fail through the same report
 - layout/effect invariants participate in solver satisfiability through pass contracts
@@ -29,7 +31,7 @@ Implemented behavior:
 Current scope:
 
 - deterministic forward checking only
-- a small registered template set with bounded template-level choice
+- a small registered template set with bounded OR-style template expansion
 - extension-owned pass/template registration exists, but the registered set is
   still intentionally small
 - backend-required outputs, supported-op facts, and target capability tags come from backend-owned declarations

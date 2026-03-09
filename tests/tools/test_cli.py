@@ -67,7 +67,7 @@ def test_cli_verify_emits_json_report(tmp_path, capsys):
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
-    assert payload["gates"] == {"validate": True, "replay": True}
+    assert payload["gates"] == {"validate": True, "replay": True, "target_suite": True}
 
 
 def test_cli_bisect_emits_json(tmp_path, capsys):
@@ -107,3 +107,15 @@ def test_cli_minimize_emits_json(tmp_path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["stage_id"] == "s03"
     assert payload["output_dir"] == str(output_dir)
+
+
+def test_cli_promote_plan_emits_json(tmp_path, capsys):
+    package_dir = tmp_path / "pto_pkg"
+    compile_program(package_dir=package_dir, target="pto-a2a3sim", program=_vector_add_program())
+
+    exit_code = main(["promote-plan", str(package_dir)])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["allowed"] is True
+    assert payload["mode"] == "pr"

@@ -8,6 +8,7 @@ from htp.passes.contracts import PassContract
 from htp.pipeline.defaults import MANDATORY_PASS_IDS
 from htp.solver import (
     PipelineTemplate,
+    available_pipeline_templates,
     default_pipeline_template,
     solve_default_pipeline,
     solve_pipeline,
@@ -260,6 +261,84 @@ def test_solver_writes_failure_report_for_missing_final_artifact(tmp_path):
         "codegen/pto/pto_codegen.json",
         "build/toolchain.json",
     ]
+
+
+def test_available_pipeline_templates_expand_bounded_choices():
+    template = PipelineTemplate(
+        template_id="test.or.v1",
+        passes=(),
+        pass_choices=(
+            (
+                PassContract.analysis(pass_id="test::a@1", owner="test"),
+                PassContract.analysis(pass_id="test::b@1", owner="test"),
+            ),
+        ),
+    )
+
+    from htp.solver import _expand_template_choices
+
+    expanded = _expand_template_choices(template)
+
+    assert [item.template_id for item in expanded] == [
+        "test.or.v1+choice0:test::a@1",
+        "test.or.v1+choice0:test::b@1",
+    ]
+    assert [[contract.pass_id for contract in item.passes] for item in expanded] == [
+        ["test::a@1"],
+        ["test::b@1"],
+    ]
+
+
+def test_solver_uses_extension_registry_for_templates():
+    program = {
+        "entry": "dup_expr_kernel",
+        "kernel": {
+            "name": "dup_expr_kernel",
+            "args": [
+                {"name": "lhs", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
+                {"name": "rhs", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
+            ],
+            "ops": [
+                {
+                    "op": "elementwise_binary",
+                    "operator": "add",
+                    "lhs": "lhs",
+                    "rhs": "rhs",
+                    "out": "sum0",
+                    "shape": [],
+                    "dtype": "i32",
+                },
+                {
+                    "op": "elementwise_binary",
+                    "operator": "add",
+                    "lhs": "lhs",
+                    "rhs": "rhs",
+                    "out": "sum1",
+                    "shape": [],
+                    "dtype": "i32",
+                },
+            ],
+        },
+        "workload": {
+            "entry": "dup_expr_kernel",
+            "tasks": [
+                {
+                    "task_id": "task0",
+                    "kind": "kernel_call",
+                    "kernel": "dup_expr_kernel",
+                    "args": ["lhs", "rhs"],
+                }
+            ],
+            "channels": [],
+            "dependencies": [],
+        },
+        "target": {"backend": "nvgpu", "option": "ampere"},
+        "extensions": {"requested": ["htp_ext.mlir_cse"]},
+    }
+
+    templates = available_pipeline_templates(program=program)
+
+    assert any(template.template_id == "htp.default+htp_ext.mlir_cse.v1" for template in templates)
 
 
 def test_solver_exposes_mlir_cse_extension_eligibility():

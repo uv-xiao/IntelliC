@@ -302,6 +302,20 @@ class NVGPUBinding(ManifestBinding):
             ok=not diagnostics,
         )
 
+    def correctness_suite(self, *, mode: str = "sim") -> dict[str, Any]:
+        validation = self.validate()
+        diagnostics = [*validation.diagnostics, *self._mode_diagnostics(mode)]
+        return {
+            "name": "nvgpu.package_suite",
+            "mode": mode,
+            "ok": not diagnostics,
+            "diagnostics": diagnostics,
+            "checks": [
+                {"name": "nvgpu_contract_validate", "ok": validation.ok},
+                {"name": "nvgpu_mode_supported", "ok": not self._mode_diagnostics(mode)},
+            ],
+        }
+
     def _required_paths(self) -> tuple[str, str]:
         outputs = self.manifest.get("outputs")
         if isinstance(outputs, Mapping):

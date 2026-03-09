@@ -420,6 +420,21 @@ class ManifestBinding:
             ok=validation.ok,
         )
 
+    def correctness_suite(self, *, mode: str = "sim") -> dict[str, Any]:
+        validation = self.validate()
+        return {
+            "name": f"{self.backend}.contract",
+            "mode": mode,
+            "ok": validation.ok,
+            "diagnostics": list(validation.diagnostics),
+            "checks": [
+                {
+                    "name": "binding_validate",
+                    "ok": validation.ok,
+                }
+            ],
+        }
+
 
 def _load_program_module(program_path: Path, *, stage_id: str) -> Any:
     spec = importlib.util.spec_from_file_location(f"htp_stage_{stage_id}", program_path)

@@ -165,6 +165,24 @@ class PTOBinding(ManifestBinding):
             ok=not diagnostics,
         )
 
+    def correctness_suite(self, *, mode: str = "sim") -> dict[str, Any]:
+        validation = self.validate()
+        checks = [
+            {"name": "pto_contract_validate", "ok": validation.ok},
+            {
+                "name": "pto_runtime_platform",
+                "ok": not self._mode_diagnostics(mode),
+            },
+        ]
+        diagnostics = [*validation.diagnostics, *self._mode_diagnostics(mode)]
+        return {
+            "name": "pto.package_suite",
+            "mode": mode,
+            "ok": not diagnostics,
+            "diagnostics": diagnostics,
+            "checks": checks,
+        }
+
     def _validate_pto_contract(
         self,
         *,
