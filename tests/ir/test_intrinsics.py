@@ -4,12 +4,17 @@ import pytest
 
 from htp.intrinsics import (
     IntrinsicDecl,
+    backend_intrinsics,
+    emit_intrinsic,
     get_intrinsic_decl,
     get_stub_diagnostic_code,
     has_handler,
     lower_intrinsic,
+    portable_intrinsics,
     register_handlers,
     register_intrinsic,
+    register_intrinsic_package,
+    registered_intrinsic_packages,
     require_handler,
     resolve_handler,
     simulate_intrinsic,
@@ -24,6 +29,7 @@ def test_portable_intrinsic_registry_exposes_declared_contracts():
     assert decl.portability == "portable"
     assert decl.stub_diagnostic == "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"
     assert decl.produces_effects == ()
+    assert any(item.name == "portable.reduction_sum" for item in portable_intrinsics())
 
 
 def test_backend_handler_availability_is_declared_per_target():
@@ -58,11 +64,34 @@ def test_intrinsic_registry_dispatches_registered_lower_and_simulate_handlers():
             "intrinsic": op["intrinsic"],
             "factor": 2,
         },
+        emit=lambda *, op, target: {"target": target, "emitted": op["intrinsic"]},
         simulate=lambda *, args, attrs, mode, trace: args[0] * 2,
     )
 
     lowered = lower_intrinsic("demo", {"intrinsic": "vendor.scale2"})
+    emitted = emit_intrinsic("demo", {"intrinsic": "vendor.scale2"})
 
     assert lowered == {"target": "demo", "intrinsic": "vendor.scale2", "factor": 2}
+    assert emitted == {"target": "demo", "emitted": "vendor.scale2"}
     assert simulate_intrinsic("vendor.scale2", args=(7,), attrs={}, mode="sim", target="demo") == 14
     assert resolve_handler("demo", "vendor.scale2", role="lower") is not None
+
+
+def test_intrinsic_packages_split_portable_and_backend_owned_sets():
+    register_intrinsic_package(
+        "htp_ext.demo.intrinsics",
+        (
+            IntrinsicDecl(
+                "demo.backend_scale",
+                1,
+                "backend",
+                "backend_scale",
+                "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+            ),
+        ),
+    )
+
+    assert "htp.core.portable" in registered_intrinsic_packages()
+    assert "htp_ext.demo.intrinsics" in registered_intrinsic_packages()
+    assert any(item.name == "portable.matmul" for item in portable_intrinsics())
+    assert any(item.name == "demo.backend_scale" for item in backend_intrinsics())

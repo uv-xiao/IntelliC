@@ -73,9 +73,12 @@ Main anchors:
 Implemented today:
 
 - explicit `IntrinsicDecl`
+- portable-vs-backend intrinsic registry queries
 - target-specific lower/emit/sim handler availability
+- callable `lower` and `emit` dispatch through the registry
 - replay stub diagnostic policy per intrinsic
 - backend lowering checks through intrinsic-handler declarations
+- extension-owned intrinsic package registration (current example: `htp_ext.aie.intrinsics`)
 
 Main anchors:
 
