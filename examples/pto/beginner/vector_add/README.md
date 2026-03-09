@@ -15,7 +15,7 @@ Run it from the repo root:
 python -m examples.pto.beginner.vector_add.demo
 ```
 
-The example writes outputs under `artifacts/pto_pypto_vector_add/`.
+The example writes outputs under `artifacts/pto/beginner/vector_add/`.
 
 Notes:
 

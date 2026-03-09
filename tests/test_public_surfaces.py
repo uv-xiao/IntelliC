@@ -288,76 +288,87 @@ def test_public_wsp_surface_supports_traced_program_authoring():
 
 def test_public_csp_surface_supports_traced_program_authoring():
     @kernel
-    def affine_stage(
-        src: buffer(dtype="f32", shape=("size",), role="input"),
-        scale: buffer(dtype="f32", shape=("size",), role="input"),
-        bias: buffer(dtype="f32", shape=("size",), role="input"),
-        dst: buffer(dtype="f32", shape=("size",), role="output"),
-        size: scalar(dtype="i32", role="shape"),
+    def dispatch_token_tile(
+        src_tokens: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="input"),
+        route_weights: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="input"),
+        dst_tokens: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="output"),
+        tile_tokens: scalar(dtype="i32", role="shape"),
+        hidden: scalar(dtype="i32", role="shape"),
     ) -> None:
-        store(dst, src * scale + bias)
+        store(dst_tokens, src_tokens * route_weights)
 
     @csp_program(target="nvgpu-ampere")
-    def channel_pipeline(
-        activations: buffer(dtype="f32", shape=("size",), role="input"),
-        norm_scale: buffer(dtype="f32", shape=("size",), role="input"),
-        norm_bias: buffer(dtype="f32", shape=("size",), role="input"),
-        proj_scale: buffer(dtype="f32", shape=("size",), role="input"),
-        proj_bias: buffer(dtype="f32", shape=("size",), role="input"),
-        out_scale: buffer(dtype="f32", shape=("size",), role="input"),
-        out_bias: buffer(dtype="f32", shape=("size",), role="input"),
-        hidden: buffer(dtype="f32", shape=("size",), role="output"),
-        projected: buffer(dtype="f32", shape=("size",), role="output"),
-        output: buffer(dtype="f32", shape=("size",), role="output"),
-        size: scalar(dtype="i32", role="shape"),
+    def token_dispatch_pipeline(
+        token_tile: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="input"),
+        stage_weights: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="input"),
+        route_weights: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="input"),
+        commit_weights: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="input"),
+        retire_weights: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="input"),
+        staged_tile: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="output"),
+        routed_tile: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="output"),
+        delivered_tile: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="output"),
+        retired_tile: buffer(dtype="f32", shape=("tile_tokens", "hidden"), role="output"),
+        tile_tokens: scalar(dtype="i32", role="shape"),
+        hidden: scalar(dtype="i32", role="shape"),
     ) -> None:
-        input_tiles = fifo("input_tiles", dtype="f32", capacity=2)
-        hidden_tiles = fifo("hidden_tiles", dtype="f32", capacity=1)
-        completions = fifo("completions", dtype="f32", capacity=1)
+        staged_tiles = fifo("staged_tiles", dtype="f32", capacity=2)
+        routed_tiles = fifo("routed_tiles", dtype="f32", capacity=2)
+        completion_tokens = fifo("completion_tokens", dtype="f32", capacity=1)
         process(
-            "load_norm",
-            kernel=affine_stage,
-            args=(activations, norm_scale, norm_bias, hidden, size),
-            steps=[put(input_tiles), put(hidden_tiles)],
+            "stage_hbm_tile",
+            kernel=dispatch_token_tile,
+            args=(token_tile, stage_weights, staged_tile, tile_tokens, hidden),
+            steps=[put(staged_tiles)],
         )
         process(
-            "project",
-            kernel=affine_stage,
-            args=(hidden, proj_scale, proj_bias, projected, size),
-            steps=[get(input_tiles), get(hidden_tiles), put(completions)],
+            "route_peer_tile",
+            kernel=dispatch_token_tile,
+            args=(staged_tile, route_weights, routed_tile, tile_tokens, hidden),
+            steps=[get(staged_tiles), put(routed_tiles)],
         )
         process(
-            "writeback",
-            kernel=affine_stage,
-            args=(projected, out_scale, out_bias, output, size),
-            steps=[get(completions)],
+            "commit_remote_tile",
+            kernel=dispatch_token_tile,
+            args=(routed_tile, commit_weights, delivered_tile, tile_tokens, hidden),
+            steps=[get(routed_tiles), put(completion_tokens)],
+        )
+        process(
+            "retire_delivery",
+            kernel=dispatch_token_tile,
+            args=(delivered_tile, retire_weights, retired_tile, tile_tokens, hidden),
+            steps=[get(completion_tokens)],
         )
 
-    payload = channel_pipeline.to_program()
+    payload = token_dispatch_pipeline.to_program()
 
     assert [channel["name"] for channel in payload["csp"]["channels"]] == [
-        "input_tiles",
-        "hidden_tiles",
-        "completions",
+        "staged_tiles",
+        "routed_tiles",
+        "completion_tokens",
     ]
     assert [process["task_id"] for process in payload["csp"]["processes"]] == [
-        "load_norm",
-        "project",
-        "writeback",
+        "stage_hbm_tile",
+        "route_peer_tile",
+        "commit_remote_tile",
+        "retire_delivery",
     ]
     assert payload["csp"]["processes"][0]["puts"] == [
-        {"kind": "put", "channel": "input_tiles", "count": 1},
-        {"kind": "put", "channel": "hidden_tiles", "count": 1},
+        {"kind": "put", "channel": "staged_tiles", "count": 1},
     ]
     assert payload["csp"]["processes"][1]["gets"] == [
-        {"kind": "get", "channel": "input_tiles", "count": 1},
-        {"kind": "get", "channel": "hidden_tiles", "count": 1},
+        {"kind": "get", "channel": "staged_tiles", "count": 1},
     ]
     assert payload["csp"]["processes"][1]["puts"] == [
-        {"kind": "put", "channel": "completions", "count": 1},
+        {"kind": "put", "channel": "routed_tiles", "count": 1},
     ]
     assert payload["csp"]["processes"][2]["gets"] == [
-        {"kind": "get", "channel": "completions", "count": 1},
+        {"kind": "get", "channel": "routed_tiles", "count": 1},
+    ]
+    assert payload["csp"]["processes"][2]["puts"] == [
+        {"kind": "put", "channel": "completion_tokens", "count": 1},
+    ]
+    assert payload["csp"]["processes"][3]["gets"] == [
+        {"kind": "get", "channel": "completion_tokens", "count": 1},
     ]
 
 

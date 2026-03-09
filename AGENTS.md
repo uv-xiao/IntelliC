@@ -34,7 +34,7 @@ Before editing:
    - `.agent/rules/core-development.md`
    - `.agent/rules/docs-and-artifacts.md`
    - `.agent/rules/testing-and-verification.md`
-4. if touching a backend, binding, runtime, replay path, artifact layout, or extension seam, read the corresponding doc in `docs/design/layers/` and `docs/design/examples/`
+4. if touching a backend, binding, runtime, replay path, artifact layout, or extension seam, read the corresponding doc in `docs/design/layers/` and the relevant example-local `examples/**/README.md`
 
 Do not begin with speculative edits.
 

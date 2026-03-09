@@ -38,7 +38,7 @@ Agent Product + Workflow
 - `docs/design/layers/04_artifacts_replay_debug.md`
 - `docs/design/layers/05_backends_and_extensions.md`
 - `docs/design/layers/06_agent_product_and_workflow.md`
-- `docs/design/examples/README.md`
+- the relevant `examples/**/README.md` files
 
 ## Implemented layers
 
@@ -51,7 +51,8 @@ Agent Product + Workflow
 
 ## Examples
 
-Runnable example walkthroughs live in `docs/design/examples/` and are backed by code under `examples/`.
+Runnable example documentation now lives with the examples themselves under
+`examples/**/README.md`.
 
 ## Out of scope for this tree
 

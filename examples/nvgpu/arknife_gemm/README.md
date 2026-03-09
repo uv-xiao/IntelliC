@@ -16,7 +16,7 @@ Run it from the repo root:
 python -m examples.nvgpu.arknife_gemm.demo
 ```
 
-The example writes outputs under `artifacts/nvgpu_arknife_gemm/`.
+The example writes outputs under `artifacts/nvgpu/arknife_gemm/`.
 
 Notes:
 

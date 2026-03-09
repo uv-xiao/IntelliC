@@ -32,7 +32,7 @@ Replace the remaining payload-shaped WSP/CSP public authoring with traced, human
 - producer: `htp/wsp/__init__.py`, `htp/csp/__init__.py`, possibly `htp/kernel.py` / `htp/routine.py`
 - compiler integration: `htp/compiler.py`, `htp/passes/program_model.py`
 - tests/examples: `tests/test_public_surfaces.py`, `tests/examples/test_examples.py`, `examples/patterns/wsp/*`, `examples/patterns/csp/*`
-- docs: `docs/design/layers/02_programming_surfaces.md`, `docs/design/examples/`, `docs/todo/`, `AGENTS.md`
+- docs: `docs/design/layers/02_programming_surfaces.md`, `examples/**/README.md`, `docs/todo/`, `AGENTS.md`
 
 ## Test and Verification Plan
 

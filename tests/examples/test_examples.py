@@ -143,43 +143,44 @@ def test_csp_example_compiles_and_replays(tmp_path):
     assert replay_summary["ok"] is True
     assert replay_summary["effects"]["protocols"] == [
         {
-            "channel": "input_tiles",
+            "channel": "staged_tiles",
             "protocol": "fifo",
             "capacity": 2,
             "puts": 1,
             "gets": 1,
             "balanced": True,
-            "participants": ["load_norm", "project"],
+            "participants": ["route_peer_tile", "stage_hbm_tile"],
             "hazards": [],
             "deadlock_safe": True,
         },
         {
-            "channel": "hidden_tiles",
+            "channel": "routed_tiles",
+            "protocol": "fifo",
+            "capacity": 2,
+            "puts": 1,
+            "gets": 1,
+            "balanced": True,
+            "participants": ["commit_remote_tile", "route_peer_tile"],
+            "hazards": [],
+            "deadlock_safe": True,
+        },
+        {
+            "channel": "completion_tokens",
             "protocol": "fifo",
             "capacity": 1,
             "puts": 1,
             "gets": 1,
             "balanced": True,
-            "participants": ["load_norm", "project"],
-            "hazards": [],
-            "deadlock_safe": True,
-        },
-        {
-            "channel": "completions",
-            "protocol": "fifo",
-            "capacity": 1,
-            "puts": 1,
-            "gets": 1,
-            "balanced": True,
-            "participants": ["project", "writeback"],
+            "participants": ["commit_remote_tile", "retire_delivery"],
             "hazards": [],
             "deadlock_safe": True,
         },
     ]
     assert [process["name"] for process in replay_summary["workload_ir"]["processes"]] == [
-        "load_norm",
-        "project",
-        "writeback",
+        "stage_hbm_tile",
+        "route_peer_tile",
+        "commit_remote_tile",
+        "retire_delivery",
     ]
 
 

@@ -39,7 +39,7 @@ For feature work:
 - `docs/todo/layers/01_compiler_model.md`
   - remaining work: broaden semantic/type/layout/effect breadth beyond the newly landed fused-elementwise semantics and deepen routine semantics
 - `docs/todo/layers/02_programming_surfaces.md`
-  - remaining work: finish the written AST-centric comparison against LittleKernel and use it to drive the next surface pass; the current example tree is now grouped under `examples/pto`, `examples/nvgpu`, `examples/patterns`, `examples/extensions`, and `examples/workloads`
+  - remaining work: finish the written AST-centric comparison against LittleKernel and use it to drive the next surface pass; example walkthroughs now live beside the code under `examples/pto`, `examples/nvgpu`, `examples/patterns`, `examples/extensions`, and `examples/workloads`
 - `docs/todo/layers/03_pipeline_and_solver.md`
   - remaining work: richer search/composition and broader MLIR island breadth
 - `docs/todo/layers/04_artifacts_replay_debug.md`

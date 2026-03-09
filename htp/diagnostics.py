@@ -66,7 +66,7 @@ _CATALOG = {
         summary="Binding selection requires manifest.target.backend.",
         docs=(
             "docs/design/layers/04_artifacts_replay_debug.md",
-            "docs/design/examples/README.md",
+            "docs/design/README.md",
         ),
         fix_hints=(
             "Emit target.backend during package emission.",
@@ -226,7 +226,7 @@ _FAMILY_CATALOG = (
             summary="The workload/process protocol is unbalanced or otherwise illegal.",
             docs=(
                 "docs/design/layers/01_compiler_model.md",
-                "docs/design/examples/csp_channel_pipeline.md",
+                "examples/patterns/csp/channel_pipeline/README.md",
             ),
             fix_hints=("Balance channel puts/gets and re-check process protocol obligations.",),
             fix_hint_policy="repair_protocol_obligations",

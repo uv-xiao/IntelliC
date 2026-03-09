@@ -161,7 +161,7 @@ Code anchors:
 
 - `htp/routine.py`
 - `examples/workloads/serving_routine/demo.py`
-- `docs/design/examples/serving_routine.md`
+- `examples/workloads/serving_routine/README.md`
 
 ### 2.3 WSP surface
 
@@ -255,12 +255,13 @@ The traced form is now the preferred way to express process/channel structure:
 ```python
 @csp.program(target="nvgpu-ampere")
 def channel_pipeline(...):
-    input_tiles = fifo("input_tiles", dtype="f32", capacity=2)
-    hidden_tiles = fifo("hidden_tiles", dtype="f32", capacity=1)
-    completions = fifo("completions", dtype="f32", capacity=1)
-    process("load_norm", kernel=affine_stage, args=(...), steps=[put(input_tiles), put(hidden_tiles)])
-    process("project", kernel=affine_stage, args=(...), steps=[get(input_tiles), get(hidden_tiles), put(completions)])
-    process("writeback", kernel=affine_stage, args=(...), steps=[get(completions)])
+    staged_tiles = fifo("staged_tiles", dtype="f32", capacity=2)
+    routed_tiles = fifo("routed_tiles", dtype="f32", capacity=2)
+    completion_tokens = fifo("completion_tokens", dtype="f32", capacity=1)
+    process("stage_hbm_tile", kernel=dispatch_token_tile, args=(...), steps=[put(staged_tiles)])
+    process("route_peer_tile", kernel=dispatch_token_tile, args=(...), steps=[get(staged_tiles), put(routed_tiles)])
+    process("commit_remote_tile", kernel=dispatch_token_tile, args=(...), steps=[get(routed_tiles), put(completion_tokens)])
+    process("retire_delivery", kernel=dispatch_token_tile, args=(...), steps=[get(completion_tokens)])
 ```
 
 Implemented CSP properties:
@@ -279,14 +280,15 @@ Important current constraint:
 
 That mirrors the current WSP simplification and keeps the public API smaller
 than the eventual framework envelope, while still allowing meaningful protocol
-stories:
+stories. The current flagship CSP example is calibrated against the
+LittleKernel FlashComm dispatch design:
 
-- `load_norm` produces normalized tiles
-- `project` consumes them and forwards projected tiles
-- `writeback` drains completions into the final output
+- `stage_hbm_tile` moves a token tile into a staged buffer
+- `route_peer_tile` forwards the staged tile into the routed queue
+- `commit_remote_tile` publishes the delivered tile and emits a completion
+- `retire_delivery` drains the completion token and retires the transfer
 
-That is a real staged dataflow narrative, not a synthetic “three names in a
-list” example.
+That is a real transport protocol narrative, not a synthetic stage-label list.
 
 Code anchors:
 
@@ -471,7 +473,7 @@ If you are changing this layer, start here:
 - `tests/test_public_surfaces.py`
 - `tests/examples/test_examples.py`
 - `examples/`
-- `docs/design/examples/`
+- `examples/**/README.md`
 
 Reference calibration anchors:
 

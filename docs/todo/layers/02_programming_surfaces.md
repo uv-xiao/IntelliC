@@ -58,7 +58,7 @@ Relevant anchors:
 - `htp/wsp/__init__.py`
 - `htp/csp/__init__.py`
 - `examples/`
-- `docs/design/examples/`
+- `examples/**/README.md`
 - `references/pypto/examples/language/`
 - `references/arknife/tests/python/`
 - `references/triton-distributed-knowingnothing/python/little_kernel/`

@@ -29,10 +29,17 @@ def test_docs_root_does_not_contain_legacy_layout_dirs():
 def test_design_tree_has_only_supported_top_level_entries():
     design_root = Path("docs/design")
     entries = {path.name for path in design_root.iterdir()}
-    assert entries == {"README.md", "examples", "layers"}
+    assert entries == {"README.md", "layers"}
 
 
 def test_todo_tree_has_only_supported_top_level_entries():
     todo_root = Path("docs/todo")
     entries = {path.name for path in todo_root.iterdir()}
     assert entries == {"README.md", "layers", "reports"}
+
+
+def test_example_leaf_dirs_include_local_readmes():
+    example_root = Path("examples")
+    demo_dirs = {path.parent for path in example_root.rglob("demo.py") if "__pycache__" not in path.parts}
+    missing = sorted(str(path) for path in demo_dirs if not (path / "README.md").is_file())
+    assert missing == []
