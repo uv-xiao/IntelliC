@@ -381,13 +381,17 @@ def _cxx_expression(
     *, op_name: str, inputs: list[str], attrs: Mapping[str, Any], env: Mapping[str, str]
 ) -> str:
     if op_name == "elementwise_binary":
-        lhs = env[inputs[0]]
-        rhs = env[inputs[1]]
+        lhs = _resolve_scalar_expression(inputs=inputs, index=0, const_key="lhs_const", attrs=attrs, env=env)
+        rhs = _resolve_scalar_expression(inputs=inputs, index=1, const_key="rhs_const", attrs=attrs, env=env)
         operator = str(attrs.get("operator", "add"))
         if operator == "add":
             return f"({lhs} + {rhs})"
+        if operator == "sub":
+            return f"({lhs} - {rhs})"
         if operator == "mul":
             return f"({lhs} * {rhs})"
+        if operator == "div":
+            return f"({lhs} / {rhs})"
         raise ValueError(f"Unsupported PTO elementwise_binary operator {operator!r}.")
     if op_name == "elementwise_unary":
         source = env[inputs[0]]
@@ -404,6 +408,28 @@ def _cxx_expression(
             return f"(1.0f / (1.0f + std::exp(-{source})))"
         raise ValueError(f"Unsupported PTO elementwise_unary operator {operator!r}.")
     raise ValueError(f"Unsupported PTO fused op {op_name!r}.")
+
+
+def _resolve_scalar_expression(
+    *,
+    inputs: list[str],
+    index: int,
+    const_key: str,
+    attrs: Mapping[str, Any],
+    env: Mapping[str, str],
+) -> str:
+    if len(inputs) > index:
+        return env[inputs[index]]
+    if const_key in attrs:
+        return _float_literal(attrs[const_key])
+    raise ValueError(f"Missing PTO fused operand {index} for attrs={attrs!r}.")
+
+
+def _float_literal(value: Any) -> str:
+    literal = f"{float(value):.8g}"
+    if "." not in literal and "e" not in literal and "E" not in literal:
+        literal = f"{literal}.0"
+    return f"{literal}f"
 
 
 def _core_type_expr(core_type: str) -> str:

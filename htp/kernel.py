@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from inspect import signature
 from typing import Any
 
+ScalarLiteral = int | float
+
 
 @dataclass(frozen=True)
 class KernelArgSpec:
@@ -61,17 +63,38 @@ class KernelValue:
     kind: str = "value"
     role: str | None = None
 
-    def __add__(self, other: KernelValue) -> KernelValue:
+    def __add__(self, other: Operand) -> KernelValue:
         return _binary_expr("add", self, other)
 
-    def __mul__(self, other: KernelValue) -> KernelValue:
+    def __radd__(self, other: Operand) -> KernelValue:
+        return _binary_expr("add", other, self)
+
+    def __sub__(self, other: Operand) -> KernelValue:
+        return _binary_expr("sub", self, other)
+
+    def __rsub__(self, other: Operand) -> KernelValue:
+        return _binary_expr("sub", other, self)
+
+    def __mul__(self, other: Operand) -> KernelValue:
         return _binary_expr("mul", self, other)
+
+    def __rmul__(self, other: Operand) -> KernelValue:
+        return _binary_expr("mul", other, self)
+
+    def __truediv__(self, other: Operand) -> KernelValue:
+        return _binary_expr("div", self, other)
+
+    def __rtruediv__(self, other: Operand) -> KernelValue:
+        return _binary_expr("div", other, self)
 
     def __matmul__(self, other: KernelValue) -> KernelValue:
         return _matmul_expr(self, other)
 
     def __neg__(self) -> KernelValue:
         return _unary_expr("neg", self)
+
+
+Operand = str | ScalarLiteral | KernelValue
 
 
 @dataclass
@@ -185,8 +208,8 @@ def _trace_kernel(function: Callable[..., Any]) -> KernelSpec:
 
 
 def elementwise_add(
-    lhs: str | KernelValue,
-    rhs: str | KernelValue,
+    lhs: Operand,
+    rhs: Operand,
     *,
     out: str | KernelValue | None = None,
     shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | None = None,
@@ -203,19 +226,18 @@ def elementwise_add(
         {
             "op": "elementwise_binary",
             "operator": "add",
-            "lhs": _ref(lhs),
-            "rhs": _ref(rhs),
             "out": result.name,
             "shape": list(result.shape),
             "dtype": result.dtype,
+            **_binary_operand_payload(lhs=lhs, rhs=rhs),
         },
         result=result,
     )
 
 
 def elementwise_mul(
-    lhs: str | KernelValue,
-    rhs: str | KernelValue,
+    lhs: Operand,
+    rhs: Operand,
     *,
     out: str | KernelValue | None = None,
     shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | None = None,
@@ -232,11 +254,66 @@ def elementwise_mul(
         {
             "op": "elementwise_binary",
             "operator": "mul",
-            "lhs": _ref(lhs),
-            "rhs": _ref(rhs),
             "out": result.name,
             "shape": list(result.shape),
             "dtype": result.dtype,
+            **_binary_operand_payload(lhs=lhs, rhs=rhs),
+        },
+        result=result,
+    )
+
+
+def elementwise_sub(
+    lhs: Operand,
+    rhs: Operand,
+    *,
+    out: str | KernelValue | None = None,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | None = None,
+    dtype: str | None = None,
+) -> dict[str, Any] | KernelValue:
+    result = _resolve_result_value(
+        out=out,
+        shape=shape,
+        dtype=dtype,
+        sources=(lhs, rhs),
+        prefix="sub",
+    )
+    return _emit_or_return(
+        {
+            "op": "elementwise_binary",
+            "operator": "sub",
+            "out": result.name,
+            "shape": list(result.shape),
+            "dtype": result.dtype,
+            **_binary_operand_payload(lhs=lhs, rhs=rhs),
+        },
+        result=result,
+    )
+
+
+def elementwise_div(
+    lhs: Operand,
+    rhs: Operand,
+    *,
+    out: str | KernelValue | None = None,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | None = None,
+    dtype: str | None = None,
+) -> dict[str, Any] | KernelValue:
+    result = _resolve_result_value(
+        out=out,
+        shape=shape,
+        dtype=dtype,
+        sources=(lhs, rhs),
+        prefix="div",
+    )
+    return _emit_or_return(
+        {
+            "op": "elementwise_binary",
+            "operator": "div",
+            "out": result.name,
+            "shape": list(result.shape),
+            "dtype": result.dtype,
+            **_binary_operand_payload(lhs=lhs, rhs=rhs),
         },
         result=result,
     )
@@ -508,16 +585,33 @@ def _emit_or_return(op: dict[str, Any], *, result: KernelValue | None = None) ->
     return op
 
 
-def _binary_expr(operator: str, lhs: KernelValue, rhs: KernelValue) -> KernelValue:
+def _binary_expr(operator: str, lhs: Operand, rhs: Operand) -> KernelValue:
     if operator == "add":
         result = elementwise_add(lhs, rhs)
+    elif operator == "sub":
+        result = elementwise_sub(lhs, rhs)
     elif operator == "mul":
         result = elementwise_mul(lhs, rhs)
+    elif operator == "div":
+        result = elementwise_div(lhs, rhs)
     else:
         raise ValueError(f"Unsupported binary operator {operator!r}.")
     if not isinstance(result, KernelValue):
         raise RuntimeError("Expression-form binary ops require traced kernel execution.")
     return result
+
+
+def _binary_operand_payload(*, lhs: Operand, rhs: Operand) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    if _is_scalar_literal(lhs):
+        payload["lhs_const"] = float(lhs)
+    else:
+        payload["lhs"] = _ref(lhs)
+    if _is_scalar_literal(rhs):
+        payload["rhs_const"] = float(rhs)
+    else:
+        payload["rhs"] = _ref(rhs)
+    return payload
 
 
 def _unary_expr(operator: str, source: KernelValue) -> KernelValue:
@@ -539,7 +633,7 @@ def _resolve_result_value(
     out: str | KernelValue | None,
     shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | tuple[str, ...] | None,
     dtype: str | None,
-    sources: tuple[str | KernelValue, ...],
+    sources: tuple[Operand, ...],
     prefix: str,
 ) -> KernelValue:
     source_value = _first_kernel_value(sources)
@@ -569,7 +663,7 @@ def _resolve_result_value(
     return KernelValue(name=out, dtype=resolved_dtype, shape=resolved_shape)
 
 
-def _first_kernel_value(values: tuple[str | KernelValue, ...]) -> KernelValue | None:
+def _first_kernel_value(values: tuple[Operand, ...]) -> KernelValue | None:
     for value in values:
         if isinstance(value, KernelValue):
             return value
@@ -611,10 +705,14 @@ def _require_kernel_value(value: str | KernelValue, *, op_name: str) -> KernelVa
     raise ValueError(f"Expression-form {op_name} requires typed symbolic operands, not raw strings.")
 
 
-def _ref(value: str | KernelValue | int) -> str | int:
+def _ref(value: str | KernelValue | int | float) -> str | int | float:
     if isinstance(value, KernelValue):
         return value.name
     return value
+
+
+def _is_scalar_literal(value: Operand) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _normalize_dims(shape: tuple[str | KernelValue, ...] | list[str | KernelValue]) -> tuple[str, ...]:
@@ -641,7 +739,9 @@ __all__ = [
     "channel_recv",
     "channel_send",
     "elementwise_add",
+    "elementwise_div",
     "elementwise_mul",
+    "elementwise_sub",
     "elementwise_unary",
     "exp",
     "kernel",
