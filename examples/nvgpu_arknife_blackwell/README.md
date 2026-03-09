@@ -9,6 +9,10 @@ It demonstrates:
 - `wgmma`,
 - profile-specific hardware and channel metadata in emitted HTP artifacts.
 
+Like the Ampere example, this surface does not introduce a separate tensor
+class. The Arknife-specific memory/layout intent is attached to native HTP
+kernel values.
+
 Run it from the repo root:
 
 ```bash

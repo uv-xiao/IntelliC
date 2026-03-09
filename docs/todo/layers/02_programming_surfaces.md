@@ -35,10 +35,12 @@ This layer tracks the remaining gap between today’s authoring surfaces and the
 The public surface and examples are now materially stronger: PTO examples cover
 vector add, SwiGLU, GELU, and a broader arithmetic DAG; WSP/CSP public examples
 no longer depend on nested top-level payload dicts; and a LittleKernel-inspired
-WSP example now exists. The remaining gap in this layer is no longer “make the
-surface readable at all”. It is the written comparative analysis tracked in
-`docs/todo/reports/littlekernel_ast_comparison.md`, which should drive the next
-front-end pass.
+WSP example now exists. Arknife has also been pulled onto native
+`htp.kernel.KernelValue` objects so explicit hardware/layout authoring no longer
+depends on a sidecar tensor type. The remaining gap in this layer is no longer
+“make the surface readable at all”. It is the written comparative analysis
+tracked in `docs/todo/reports/littlekernel_ast_comparison.md`, which should
+drive the next front-end pass.
 
 ## Coding pointers
 

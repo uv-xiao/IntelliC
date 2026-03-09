@@ -10,6 +10,10 @@ mainloop story:
 - run the package in `sim`,
 - optionally build and launch the generated CUDA package on Ampere-class GPUs.
 
+The authoring surface stays inside HTP's native value model: `ark.tensor(...)`
+is just the readable sugar for attaching Arknife memory/layout metadata to
+ordinary HTP kernel values.
+
 Run it from the repo root:
 
 ```bash

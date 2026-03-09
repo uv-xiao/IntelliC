@@ -56,6 +56,9 @@ What is real today:
 
 - Ampere and Blackwell remain profiles of the same `nvgpu` backend.
 - `htp.ark` programs lower into the standard HTP program model.
+- `htp.ark` no longer owns a separate tensor class; it attaches Arknife
+  memory-space and axis-layout metadata to native `htp.kernel.KernelValue`
+  objects.
 - the NV-GPU lowerer inspects the `ark` sidecar and validates profile /
   capability compatibility.
 - the emitted `nvgpu_codegen.json` now carries:

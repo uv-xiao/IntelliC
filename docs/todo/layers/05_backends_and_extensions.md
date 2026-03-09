@@ -30,7 +30,11 @@ This layer tracks the remaining backend depth and extension breadth.
 
 ## Why these tasks remain
 
-The important point is that backend depth remains the issue, not the overall architecture. HTP already proves multi-backend participation. What remains is broader target coverage and more mature backend discharge paths.
+The important point is that backend depth remains the issue, not the overall
+architecture. HTP already proves multi-backend participation, and the Arknife
+path now reuses native HTP values instead of relying on a sidecar tensor model.
+What remains is broader target coverage and more mature backend discharge
+paths.
 
 ## Coding pointers
 
