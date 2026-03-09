@@ -1,0 +1,16 @@
+name: PR Policy
+
+on:
+  pull_request:
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce branch and checklist policy
+        run: python .github/scripts/check_pr_policy.py

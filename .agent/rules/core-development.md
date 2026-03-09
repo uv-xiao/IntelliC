@@ -9,6 +9,9 @@ These are the base rules for HTP development.
 - Treat `htp/dev` as stable and CI-passed.
 - Start new feature work on `htp/feat-<topic>` branches and merge back through a PR-style review step.
 - Do not treat a feature branch as ready until its PR passes all configured CI checks.
+- PR automation enforces `base=htp/dev`, `head=htp/feat-*`, and checklist sync
+  when code-backed or `docs/design/` surfaces change; do not work against that
+  policy.
 - Use `.github/pull_request_template.md` for every PR description.
 - Do not leave a PR body as a loose note dump; rewrite it into the template headings with concrete content.
 - Keep the canonical compiler form in Python-space; do not introduce hidden semantic owners outside the staged artifact model.
