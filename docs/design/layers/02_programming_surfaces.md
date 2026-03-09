@@ -66,6 +66,17 @@ This is materially closer to the readability bar set by
 `references/pypto/python/pypto/language` and
 `references/triton-distributed-knowingnothing/python/little_kernel/language`.
 
+That expression-first surface now also includes literal-bearing arithmetic for
+the public examples. Kernels can write:
+
+```text
+store(out, x * sigmoid(x * 1.702))
+store(out, (lhs + rhs + 1.0) * (lhs + rhs + 2.0) + (lhs + rhs))
+```
+
+without dropping into raw payload fields or explicit constant nodes in the
+example code.
+
 ### `htp.compile_program(...)`
 
 The generic compilation entrypoint already supports:
@@ -84,6 +95,9 @@ The current proof points include:
 - warp-role planning
 - software-pipeline planning
 - shared lowering through the same pass manager and artifact model
+- helper surfaces such as `task(...)`, `tile(...)`, `pipeline(...)`, and
+  `resources(...)` so public WSP examples no longer need to be dominated by
+  nested dict literals
 
 ### CSP
 
@@ -92,6 +106,8 @@ The current proof points include:
 - protocol obligations
 - deadlock/progress evidence
 - lowering into shared workload/effect state
+- helper surfaces such as `fifo(...)`, `put(...)`, and `get(...)` so the public
+  CSP examples read like process descriptions rather than payload assembly
 
 ### Workload-level routines
 
@@ -117,8 +133,11 @@ HTP semantic substrate.
 Code-backed example families currently include:
 - PTO vector add
 - PTO fused SwiGLU
+- PTO GELU
+- PTO vector DAG
 - NV-GPU GEMM
 - WSP warp GEMM
+- LittleKernel-calibrated WSP pipelined GEMM
 - CSP channel pipeline
 - AIE channel pipeline
 - MLIR CSE extension composition
@@ -149,8 +168,14 @@ If you are working in this layer, start here:
 Recent concrete proof points:
 - `examples/pto_pypto_swiglu/demo.py` shows a harder PyPTO-calibrated flagship
   example authored entirely as a traced Python kernel.
+- `examples/pto_pypto_gelu/demo.py` and
+  `examples/pto_pypto_vector_dag/demo.py` show that literal-bearing arithmetic
+  DAGs now survive replay and PTO `a2a3sim`.
 - `examples/nvgpu_arknife_gemm/demo.py` now uses expression-form `A @ B` plus
   `store(C, ...)` instead of explicit low-level output plumbing.
+- `examples/wsp_littlekernel_pipelined_gemm/demo.py` calibrates WSP schedule
+  readability against LittleKernel-style pipelined GEMM code without giving up
+  HTP's shared artifact model.
 - `tests/examples/test_examples.py` now defends sequential PTO example
   execution in one process so public examples remain reliable instead of being
   “one-shot” demos.

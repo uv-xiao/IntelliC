@@ -128,6 +128,9 @@ Rules:
   something simple, the surface is not good enough yet.
 - Calibrate the flagship authoring experience against `references/pypto/` and
   `references/arknife/`. HTP should be at least as readable as those examples.
+- Calibrate scheduling/dataflow authoring against
+  `references/triton-distributed-knowingnothing/python/little_kernel/` as well;
+  examples that are technically correct but syntactically ugly still fail review.
 
 Difficulty rules:
 
@@ -143,6 +146,10 @@ Difficulty rules:
 - Use `references/pypto/examples/language/{beginner,intermediate,llm_models}/`
   and `references/arknife/tests/python/` as the minimum bar for flagship
   example ambition.
+- Review public programming surfaces and flagship examples for human
+  friendliness and syntax prettiness explicitly. If the surface reads like
+  constructor soup, nested raw payload assembly, or non-native Python, the PR
+  is not done yet even if the tests pass.
 
 ## 8. Code readability and documentation rules
 
@@ -197,6 +204,8 @@ Check all of the following:
 - generated fixtures still match current emitters
 - new files were placed in the correct layer
 - `docs/design/`, `docs/todo/`, and `docs/in_progress/` are consistent with the branch state
+- public programming surfaces and flagship examples are readable without
+  reconstructing hidden payload structure
 
 ## 11. Prohibited patterns
 

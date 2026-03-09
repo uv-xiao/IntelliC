@@ -14,3 +14,5 @@ What it proves:
 - The type/layout/effect pass emits balanced protocol obligations into staged
   `effects.json`.
 - The final package remains replayable in `sim`.
+- The public example can now be written through a traced `@kernel`, `fifo(...)`,
+  `put(...)`, and `get(...)` helpers instead of inline nested dict payloads.

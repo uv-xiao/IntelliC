@@ -21,6 +21,9 @@
   call stacks in public examples.
 - Use raw dict payloads only for low-level contract tests.
 - Flagship examples must be substantial enough to demonstrate a real compiler capability, not only a smoke path.
+- Review programming surfaces and public examples for human friendliness and
+  syntax prettiness explicitly; technically correct but awkward authoring does
+  not clear the quality bar.
 
 ## Code readability
 
