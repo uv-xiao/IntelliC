@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from examples.aie_channel_pipeline.demo import compile_example as compile_aie_example
+from examples.aie_channel_pipeline.demo import replay_latest_stage as replay_aie_stage
 from examples.csp_channel_pipeline.demo import compile_example as compile_csp_example
 from examples.csp_channel_pipeline.demo import replay_latest_stage as replay_csp_stage
 from examples.nvgpu_arknife_gemm.demo import compile_example as compile_nvgpu_example
@@ -68,6 +70,29 @@ def test_csp_example_compiles_and_replays(tmp_path):
             "balanced": True,
         }
     ]
+
+
+def test_aie_example_compiles_and_replays(tmp_path):
+    package_dir = tmp_path / "aie_example"
+    compile_summary = compile_aie_example(package_dir)
+    replay_summary = replay_aie_stage(package_dir)
+
+    assert compile_summary["target"] == {"backend": "aie", "option": "xdna2-npu1"}
+    assert replay_summary["ok"] is True
+    assert replay_summary["analysis_index"]["analyses"] == [
+        {
+            "analysis_id": "htp_ext.aie::MappingPlan@1",
+            "schema": "htp.analysis.aie_mapping_plan.v1",
+            "path": f"ir/stages/{replay_summary['stage_id']}/analysis/aie_mapping_plan.json",
+        },
+        {
+            "analysis_id": "htp_ext.aie::FIFOPlan@1",
+            "schema": "htp.analysis.aie_fifo_plan.v1",
+            "path": f"ir/stages/{replay_summary['stage_id']}/analysis/aie_fifo_plan.json",
+        },
+    ]
+    assert [tile["task_id"] for tile in replay_summary["mapping"]["tiles"]] == ["p0", "p1"]
+    assert replay_summary["fifos"]["channels"][0]["name"] == "tiles"
 
 
 @pytest.mark.skipif(

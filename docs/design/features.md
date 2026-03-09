@@ -116,6 +116,7 @@ Implemented today:
 - PTO package emission and real `a2a3sim` execution
 - NV-GPU `.cu`-first package emission and real CUDA execution
 - AIE extension-owned artifact path plus `compile_program(...)` target support
+- AIE planning analyses (`mapping` / `fifo`) staged before MLIR-AIE emission
 - normalized binding lifecycle:
   - `validate`
   - `build`

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from htp.artifacts.manifest import write_manifest
-from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
+from htp.artifacts.stages import AnalysisSpec, RunnablePySpec, StageSpec, write_stage
 from htp.passes.program_model import (
     build_schedule_plan,
     build_semantic_model,
@@ -17,6 +17,12 @@ from htp.passes.program_model import (
 )
 from htp.passes.replay_program import render_program_state_module
 from htp_ext.aie.declarations import AIE_PROJECT_DIR, declaration_for
+from htp_ext.aie.plan import (
+    FIFO_PLAN_SCHEMA_ID,
+    MAPPING_PLAN_SCHEMA_ID,
+    build_fifo_plan,
+    build_mapping_plan,
+)
 
 AIE_CODEGEN_SCHEMA_ID = "htp.aie.codegen.v1"
 AIE_TOOLCHAIN_SCHEMA_ID = "htp.aie.toolchain.v1"
@@ -62,20 +68,39 @@ def emit_package(
 
 def _load_or_seed_manifest(package_path: Path, state: Mapping[str, Any]) -> dict[str, Any]:
     manifest_path = package_path / "manifest.json"
+    stage_id = "s01"
+    existing_stages: list[dict[str, Any]] = []
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text())
         if isinstance(manifest.get("stages"), Mapping):
-            return manifest
+            existing_stages = [
+                dict(stage) for stage in manifest["stages"].get("graph", ()) if isinstance(stage, Mapping)
+            ]
+            stage_id = f"s{len(existing_stages):02d}"
     payloads = stage_payloads_from_program(state)
     stage = write_stage(
         package_path,
         StageSpec(
-            stage_id="s01",
+            stage_id=stage_id,
             pass_id="htp_ext.aie::emit@1",
             runnable_py=RunnablePySpec(
                 status="preserves",
                 modes=("sim",),
                 program_text=render_program_state_module(state),
+            ),
+            analyses=(
+                AnalysisSpec(
+                    analysis_id="htp_ext.aie::MappingPlan@1",
+                    schema=MAPPING_PLAN_SCHEMA_ID,
+                    filename="aie_mapping_plan.json",
+                    payload=dict(state["analysis"]["aie_mapping"]),
+                ),
+                AnalysisSpec(
+                    analysis_id="htp_ext.aie::FIFOPlan@1",
+                    schema=FIFO_PLAN_SCHEMA_ID,
+                    filename="aie_fifo_plan.json",
+                    payload=dict(state["analysis"]["aie_fifo"]),
+                ),
             ),
             program_ast_payload=payloads["program_ast_payload"],
             kernel_ir_payload=payloads["kernel_ir_payload"],
@@ -88,7 +113,7 @@ def _load_or_seed_manifest(package_path: Path, state: Mapping[str, Any]) -> dict
             bindings_payload=payloads["bindings_payload"],
         ),
     )
-    return write_manifest(package_path, current_stage="s01", stages=[stage])
+    return write_manifest(package_path, current_stage=stage_id, stages=[*existing_stages, stage])
 
 
 def _semanticize_program(program: Mapping[str, Any], *, profile: str) -> dict[str, Any]:
@@ -115,6 +140,8 @@ def _semanticize_program(program: Mapping[str, Any], *, profile: str) -> dict[st
         target={"backend": "aie", "option": profile},
     )
     state["analysis"]["schedule"] = schedule_plan
+    state["analysis"]["aie_mapping"] = build_mapping_plan(state, profile=profile)
+    state["analysis"]["aie_fifo"] = build_fifo_plan(state)
     state["schedule"] = {
         "schema": "htp.schedule.v1",
         "applied": True,
@@ -129,40 +156,20 @@ def _write_codegen_tree(package_dir: Path, *, state: Mapping[str, Any], profile:
     codegen_dir = package_dir / AIE_PROJECT_DIR
     codegen_dir.mkdir(parents=True, exist_ok=True)
 
-    channels = state["effects"]["channels"]
-    mapping = {
-        "schema": "htp.aie.mapping.v1",
-        "entry": state["entry"],
-        "profile": profile,
-        "tiles": [
-            {"task_id": task["task_id"], "tile": [0, index]}
-            for index, task in enumerate(state["workload_ir"]["tasks"])
-        ],
-    }
-    fifos = {
-        "schema": "htp.aie.fifos.v1",
-        "entry": state["entry"],
-        "channels": channels,
-    }
+    mapping = dict(state["analysis"]["aie_mapping"])
+    mapping["schema"] = "htp.aie.mapping.v1"
+    fifos = dict(state["analysis"]["aie_fifo"])
+    fifos["schema"] = "htp.aie.fifos.v1"
     host = "\n".join(
         (
             f"ENTRY = {state['entry']!r}",
             "def launch(*args, **kwargs):",
             "    del args, kwargs",
-            "    return {'status': 'sim-only'}",
+            f"    return {{'status': 'sim-only', 'mapping_plan': {mapping['tiles']!r}, 'fifo_plan': {fifos['channels']!r}}}",
             "",
         )
     )
-    mlir_lines = [
-        "module {",
-        f"  // profile: {profile}",
-        f"  func.func @{state['entry']}() {{",
-    ]
-    for task in state["workload_ir"]["tasks"]:
-        mlir_lines.append(f"    // task {task['task_id']} -> {task['kernel']}")
-    for channel in channels:
-        mlir_lines.append(f"    // fifo {channel['name']} dtype={channel['dtype']} kind={channel['kind']}")
-    mlir_lines.extend(("    return", "  }", "}"))
+    mlir_lines = _render_aie_mlir(state=state, mapping=mapping, fifos=fifos, profile=profile)
     codegen_index = {
         "schema": AIE_CODEGEN_SCHEMA_ID,
         "entry": state["entry"],
@@ -186,6 +193,55 @@ def _write_codegen_tree(package_dir: Path, *, state: Mapping[str, Any], profile:
     (codegen_dir / "host.py").write_text(host)
     (codegen_dir / "aie_codegen.json").write_text(json.dumps(codegen_index, indent=2) + "\n")
     (codegen_dir / "toolchain.json").write_text(json.dumps(toolchain, indent=2) + "\n")
+
+
+def _render_aie_mlir(
+    *,
+    state: Mapping[str, Any],
+    mapping: Mapping[str, Any],
+    fifos: Mapping[str, Any],
+    profile: str,
+) -> list[str]:
+    lines = [
+        "module {",
+        f'  aie.device("{profile}") {{',
+    ]
+    tile_symbols: dict[str, str] = {}
+    for tile in mapping.get("tiles", ()):
+        task_id = str(tile["task_id"])
+        row, col = tile["coords"]
+        symbol = f"%tile_{row}_{col}"
+        tile_symbols[task_id] = symbol
+        lines.append(f"    {symbol} = aie.tile({row}, {col})")
+    for fifo in fifos.get("channels", ()):
+        producers = list(fifo.get("producers", ()))
+        consumers = list(fifo.get("consumers", ()))
+        if not producers or not consumers:
+            continue
+        producer_symbol = tile_symbols.get(str(producers[0]["task_id"]), "%tile_0_0")
+        consumer_symbols = ", ".join(
+            tile_symbols.get(str(item["task_id"]), "%tile_0_0") for item in consumers
+        )
+        lines.append(
+            "    "
+            f"aie.objectfifo @{fifo['name']}({producer_symbol}, {{{consumer_symbols}}}, "
+            f"{int(fifo['capacity'])} : {fifo['dtype']})"
+        )
+    lines.append(f"    func.func @{state['entry']}() {{")
+    for tile in mapping.get("tiles", ()):
+        lines.append(
+            "      "
+            f"// task {tile['task_id']} kernel={tile['kernel']} tile={tuple(tile['coords'])} memory={tile['memory_space']}"
+        )
+    for fifo in fifos.get("channels", ()):
+        producer_names = [str(item["task_id"]) for item in fifo.get("producers", ())]
+        consumer_names = [str(item["task_id"]) for item in fifo.get("consumers", ())]
+        lines.append(
+            "      "
+            f"// fifo {fifo['name']} producers={producer_names!r} consumers={consumer_names!r} protocol={fifo['protocol']}"
+        )
+    lines.extend(("      return", "    }", "  }", "}"))
+    return lines
 
 
 __all__ = [

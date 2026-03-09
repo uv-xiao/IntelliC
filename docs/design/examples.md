@@ -71,6 +71,25 @@ Flow:
 This example proves that CSP process/channel metadata lowers into typed effect
 state in the implemented compiler.
 
+## AIE example
+
+Files:
+
+- `examples/aie_channel_pipeline/demo.py`
+- `docs/examples/aie_channel_pipeline.md`
+
+Flow:
+
+1. compile an AIE package from the `htp.csp` authoring surface
+2. replay the latest staged Python program in `sim`
+3. inspect staged AIE analyses under
+   `ir/stages/s01/analysis/aie_mapping_plan.json` and
+   `ir/stages/s01/analysis/aie_fifo_plan.json`
+4. inspect emitted `codegen/aie/aie.mlir`, `mapping.json`, and `fifos.json`
+
+This example proves that the AIE extension now splits planning from emission,
+and that the emitted MLIR/sidecars derive from explicit mapping/FIFO plans.
+
 ## Future examples
 
 Design-only examples and roadmap material were moved to `docs/future/`.
