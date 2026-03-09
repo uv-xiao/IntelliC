@@ -41,6 +41,8 @@ Implemented today:
 - conservative distribution join rules plus explicit `relayout` operations
 - typed protocol obligations for channels, including participant sets, hazard
   evidence, and `deadlock_safe` status
+- bounded protocol-progress checking across ordered CSP process steps,
+  including zero-capacity rendezvous channels
 - explicit async-token, barrier-scope, event-dependency, and collective
   discharge payloads in `effects.json`
 - schedule directives and legality checks

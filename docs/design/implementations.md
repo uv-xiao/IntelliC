@@ -82,6 +82,8 @@ Within that pass spine, the current semantic substrate now includes:
 - typed protocol obligations, hazard evidence, async-token discharge state,
   barrier scopes, event dependencies, and collective discharge records in
   `effects.json`
+- bounded deadlock-prevention analysis over ordered CSP process steps, with
+  explicit blocked-state evidence and zero-capacity rendezvous support
 - schedule directives, legality, launch structure, and warp-role plan in `analysis/schedule_plan.json` and `schedule.json`
 - staged warp-role plans in `analysis/warp_role_plan.json`
 - staged software-pipeline plans in `analysis/pipeline_plan.json`

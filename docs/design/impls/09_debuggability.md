@@ -37,7 +37,8 @@ Implemented behavior:
   - async token ids and discharge sites
   - barrier scopes and event dependencies
   - collective pending/discharged state
-  - protocol participants, hazards, and `deadlock_safe` summaries
+  - protocol participants, hazards, `deadlock_safe` summaries, and blocked
+    progress states for CSP process/channel deadlocks
 
 Current debug guidance:
 
