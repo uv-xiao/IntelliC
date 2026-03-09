@@ -73,4 +73,4 @@ Current scope:
 - the pass pipeline is recorded textually (`pipeline.txt`); there is no
   external `mlir-opt` integration yet
 
-Broader MLIR coverage remains future work and stays under `docs/future/`.
+Broader MLIR coverage remains future work and stays under `docs/todo/`.

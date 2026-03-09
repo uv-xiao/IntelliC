@@ -1,0 +1,26 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+def test_docs_root_has_only_supported_entries():
+    docs_root = Path("docs")
+    assert docs_root.is_dir()
+
+    entries = {path.name for path in docs_root.iterdir()}
+    assert entries == {
+        "design",
+        "in_progress",
+        "reference",
+        "research",
+        "story.md",
+        "todo",
+    }
+
+
+def test_docs_root_does_not_contain_legacy_layout_dirs():
+    docs_root = Path("docs")
+
+    assert not (docs_root / "future").exists()
+    assert not (docs_root / "examples").exists()
+    assert not (docs_root / "plans").exists()

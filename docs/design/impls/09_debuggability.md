@@ -101,4 +101,4 @@ Current debug guidance:
 Scope note:
 
 - this documents the currently implemented debug substrate
-- broader future debug contracts stay under `docs/future/feats/09_debuggability.md`
+- broader future debug contracts stay under `docs/todo/feats/09_debuggability.md`

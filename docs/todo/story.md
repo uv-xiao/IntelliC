@@ -10,12 +10,12 @@ into per-target pass soups.
 Read order for details:
 
 - implemented story: `docs/design/story.md`
-- broader WHY (problem + critique + evidence): `docs/future/analysis.md`
-- broader WHAT (feature surfaces + contracts): `docs/future/features.md`
+- broader WHY (problem + critique + evidence): `docs/todo/analysis.md`
+- broader WHAT (feature surfaces + contracts): `docs/todo/features.md`
 - current HOW (implemented architecture): `docs/design/implementations.md`
 - current examples: `docs/design/examples.md`
 - current code map: `docs/design/code_map.md`
-- deep evidence report (Triton/JAX/TileLang/MLIR): `docs/future/reports/retargetable_extensibility_report.md`
+- deep evidence report (Triton/JAX/TileLang/MLIR): `docs/todo/reports/retargetable_extensibility_report.md`
 
 ---
 
@@ -253,7 +253,7 @@ auditable via artifacts.
 
 For detailed comparative evidence (including Triton’s roadmap features and concrete pass complexity), see:
 
-- `docs/future/reports/retargetable_extensibility_report.md`
+- `docs/todo/reports/retargetable_extensibility_report.md`
 
 ---
 

@@ -1,7 +1,7 @@
 # HTP Implemented Features
 
 This document lists the feature surface that is **already implemented** in the repository.
-It is the implemented counterpart to `docs/future/features.md`.
+It is the implemented counterpart to `docs/todo/features.md`.
 
 ## 1. Compiler substrate
 
@@ -192,6 +192,6 @@ Do not use this document for roadmap-only claims.
 
 Remaining work belongs in:
 
-- `docs/future/features.md`
-- `docs/future/story.md`
-- `docs/future/gap_checklist.md`
+- `docs/todo/features.md`
+- `docs/todo/story.md`
+- `docs/todo/README.md`

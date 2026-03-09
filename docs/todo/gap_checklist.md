@@ -1,7 +1,7 @@
-# HTP Future Gap Checklist
+# HTP TODO Gap Checklist
 
 This file tracks the **true remaining gaps** between the current codebase and
-the broader target described under `docs/future/`.
+the broader target described under `docs/todo/`.
 
 It is intentionally operational:
 
@@ -9,7 +9,7 @@ It is intentionally operational:
 - `[~]` means there is a partial landing, but the broader future contract is not complete
 - `[ ]` means the future contract is not implemented yet
 
-Use this file as the tracking surface for future feature branches.
+Use this file as the detailed tracking surface for feature branches working from `docs/todo/`.
 
 ---
 
@@ -38,9 +38,9 @@ The remaining sections below are the **actual open gaps**.
 
 Source intent:
 
-- `docs/future/impls/03_capability_solver.md`
-- `docs/future/feats/01_extensibility.md`
-- `docs/future/feats/06_passes_pipelines.md`
+- `docs/todo/impls/03_capability_solver.md`
+- `docs/todo/feats/01_extensibility.md`
+- `docs/todo/feats/06_passes_pipelines.md`
 
 Current code anchors:
 
@@ -84,8 +84,8 @@ Checklist:
 
 Source intent:
 
-- `docs/future/impls/10_agentic_tooling.md`
-- `docs/future/feats/10_agentic_development.md`
+- `docs/todo/impls/10_agentic_tooling.md`
+- `docs/todo/feats/10_agentic_development.md`
 
 Current code anchors:
 
@@ -127,9 +127,9 @@ Checklist:
 
 Source intent:
 
-- `docs/future/features.md`
-- `docs/future/feats/04_intrinsics.md`
-- `docs/future/feats/05_layout.md`
+- `docs/todo/features.md`
+- `docs/todo/feats/04_intrinsics.md`
+- `docs/todo/feats/05_layout.md`
 
 Current code anchors:
 
@@ -168,9 +168,9 @@ Checklist:
 
 Source intent:
 
-- `docs/future/feats/05_layout.md`
-- `docs/future/feats/03_dialects_csp.md`
-- `docs/future/feats/09_debuggability.md`
+- `docs/todo/feats/05_layout.md`
+- `docs/todo/feats/03_dialects_csp.md`
+- `docs/todo/feats/09_debuggability.md`
 
 Current code anchors:
 
@@ -210,8 +210,8 @@ Checklist:
 
 Source intent:
 
-- `docs/future/feats/02_dialects_wsp.md`
-- `docs/future/feats/03_dialects_csp.md`
+- `docs/todo/feats/02_dialects_wsp.md`
+- `docs/todo/feats/03_dialects_csp.md`
 
 Current code anchors:
 
@@ -239,7 +239,7 @@ Checklist:
 
 Source intent:
 
-- `docs/future/feats/04_intrinsics.md`
+- `docs/todo/feats/04_intrinsics.md`
 
 Current code anchors:
 
@@ -270,8 +270,8 @@ Checklist:
 
 Source intent:
 
-- `docs/future/feats/06_passes_pipelines.md`
-- `docs/future/impls/11_case_study_warp_specialization_pipelining.md`
+- `docs/todo/feats/06_passes_pipelines.md`
+- `docs/todo/impls/11_case_study_warp_specialization_pipelining.md`
 
 Current code anchors:
 
@@ -303,7 +303,7 @@ Checklist:
 
 Source intent:
 
-- `docs/future/impls/12_mlir_roundtrip_island.md`
+- `docs/todo/impls/12_mlir_roundtrip_island.md`
 
 Current code anchors:
 
@@ -343,9 +343,9 @@ Checklist:
 
 Source intent:
 
-- `docs/future/feats/07_backends_artifacts.md`
-- `docs/future/feats/08_binding_runtime.md`
-- `docs/future/impls/06_backend_aie.md`
+- `docs/todo/feats/07_backends_artifacts.md`
+- `docs/todo/feats/08_binding_runtime.md`
+- `docs/todo/impls/06_backend_aie.md`
 
 ### 9.1 PTO
 
@@ -419,9 +419,9 @@ Checklist:
 
 Source intent:
 
-- `docs/future/acceptance_checklist.md`
-- `docs/future/feats/07_backends_artifacts.md`
-- `docs/future/feats/09_debuggability.md`
+- `docs/todo/acceptance_checklist.md`
+- `docs/todo/feats/07_backends_artifacts.md`
+- `docs/todo/feats/09_debuggability.md`
 
 Current code anchors:
 
@@ -451,7 +451,7 @@ Checklist:
 
 Source intent:
 
-- `docs/future/feats/09_debuggability.md`
+- `docs/todo/feats/09_debuggability.md`
 
 Current code anchors:
 
@@ -480,9 +480,9 @@ Checklist:
 
 Source intent:
 
-- `docs/future/impls/11_case_study_warp_specialization_pipelining.md`
-- `docs/future/story.md`
-- `docs/future/reports/retargetable_extensibility_report.md`
+- `docs/todo/impls/11_case_study_warp_specialization_pipelining.md`
+- `docs/todo/story.md`
+- `docs/todo/reports/retargetable_extensibility_report.md`
 
 Checklist:
 
@@ -494,7 +494,7 @@ Checklist:
 - `[x]` Add serving-routine examples above the current kernel-level examples.
 - `[x]` Add extension-composition examples showing solver-visible pipeline
   choice.
-- `[~]` Keep `docs/design/` and `docs/future/` synchronized as features land so
+- `[~]` Keep `docs/design/` and `docs/todo/` synchronized as features land so
   the narrative stays honest.
 
 ---
@@ -509,7 +509,7 @@ work healthy.
 - `[x]` Enforce that branch policy in contributor workflow and automation, not
   only prose guidance.
 - `[x]` Keep this checklist current whenever a future item lands in code.
-- `[~]` When an item is implemented, move the normative doc from `docs/future/`
+- `[~]` When an item is implemented, move the normative doc from `docs/todo/`
   to `docs/design/` and add code references there. Debuggability is now moved;
   more future docs still need the same treatment.
 

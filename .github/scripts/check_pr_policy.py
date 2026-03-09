@@ -5,7 +5,8 @@ import subprocess
 
 REQUIRED_BASE = "htp/dev"
 REQUIRED_PREFIX = "htp/feat-"
-CHECKLIST_PATH = "docs/future/gap_checklist.md"
+SUMMARY_PATH = "docs/todo/README.md"
+DETAIL_PATH = "docs/todo/gap_checklist.md"
 SYNC_PREFIXES = ("htp/", "htp_ext/", "examples/", "docs/design/")
 
 
@@ -25,8 +26,11 @@ def main() -> int:
         errors.append(f"PR head branch must start with '{REQUIRED_PREFIX}', got '{head_ref or '<missing>'}'.")
 
     changed_files = _changed_files(base_ref)
-    if _requires_checklist_sync(changed_files) and CHECKLIST_PATH not in changed_files:
-        errors.append(f"Changes touching {', '.join(SYNC_PREFIXES)} must also update '{CHECKLIST_PATH}'.")
+    if _requires_todo_sync(changed_files):
+        if SUMMARY_PATH not in changed_files:
+            errors.append(f"Changes touching {', '.join(SYNC_PREFIXES)} must also update '{SUMMARY_PATH}'.")
+        if DETAIL_PATH not in changed_files:
+            errors.append(f"Changes touching {', '.join(SYNC_PREFIXES)} must also update '{DETAIL_PATH}'.")
 
     if errors:
         for error in errors:
@@ -37,7 +41,7 @@ def main() -> int:
     return 0
 
 
-def _requires_checklist_sync(changed_files: list[str]) -> bool:
+def _requires_todo_sync(changed_files: list[str]) -> bool:
     return any(path.startswith(prefix) for path in changed_files for prefix in SYNC_PREFIXES)
 
 

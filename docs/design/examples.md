@@ -9,7 +9,7 @@ Files:
 
 - `examples/pto_pypto_vector_add/demo.py`
 - `examples/pto_pypto_vector_add/notebook.ipynb`
-- `docs/examples/pto_pypto_vector_add.md`
+- `docs/design/examples/pto_pypto_vector_add.md`
 
 Flow:
 
@@ -28,7 +28,7 @@ Files:
 
 - `examples/nvgpu_arknife_gemm/demo.py`
 - `examples/nvgpu_arknife_gemm/notebook.ipynb`
-- `docs/examples/nvgpu_arknife_gemm.md`
+- `docs/design/examples/nvgpu_arknife_gemm.md`
 
 Flow:
 
@@ -43,7 +43,7 @@ Flow:
 Files:
 
 - `examples/wsp_warp_gemm/demo.py`
-- `docs/examples/wsp_warp_gemm.md`
+- `docs/design/examples/wsp_warp_gemm.md`
 
 Flow:
 
@@ -60,7 +60,7 @@ surfaces, and that warp/pipeline planning is implemented as staged passes.
 Files:
 
 - `examples/csp_channel_pipeline/demo.py`
-- `docs/examples/csp_channel_pipeline.md`
+- `docs/design/examples/csp_channel_pipeline.md`
 
 Flow:
 
@@ -76,7 +76,7 @@ state in the implemented compiler.
 Files:
 
 - `examples/aie_channel_pipeline/demo.py`
-- `docs/examples/aie_channel_pipeline.md`
+- `docs/design/examples/aie_channel_pipeline.md`
 
 Flow:
 
@@ -95,7 +95,7 @@ and that the emitted MLIR/sidecars derive from explicit mapping/FIFO plans.
 Files:
 
 - `examples/mlir_cse_extension/demo.py`
-- `docs/examples/mlir_cse_extension.md`
+- `docs/design/examples/mlir_cse_extension.md`
 
 Flow:
 
@@ -111,7 +111,7 @@ solver-visible template choice, not only a design claim.
 Files:
 
 - `examples/serving_routine/demo.py`
-- `docs/examples/serving_routine.md`
+- `docs/design/examples/serving_routine.md`
 
 Flow:
 
@@ -125,7 +125,7 @@ above the kernel-only examples.
 
 ## Future examples
 
-Design-only examples and roadmap material were moved to `docs/future/`.
+Design-only examples and roadmap material were moved to `docs/todo/`.
 
 ## Tooling surface
 
