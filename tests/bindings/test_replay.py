@@ -233,6 +233,31 @@ def run(*args, **kwargs):
     assert [item["code"] for item in result.diagnostics].count("HTP.BINDINGS.MALFORMED_MANIFEST_SECTION") == 3
 
 
+def test_binding_validate_reports_invalid_stage_schema(tmp_path):
+    package_dir = tmp_path / "package"
+    package_dir.mkdir()
+    stage_record = _write_stage(
+        package_dir,
+        program_text="""
+def run(*args, **kwargs):
+    return "ok"
+""".lstrip(),
+    )
+    program_ast_path = package_dir / stage_record["program_pyast"]
+    payload = json.loads(program_ast_path.read_text())
+    payload["schema"] = "wrong.schema"
+    program_ast_path.write_text(json.dumps(payload, indent=2) + "\n")
+    _write_manifest(package_dir, stage_records=[stage_record])
+
+    result = htp.bind(package_dir).validate()
+
+    assert result.ok is False
+    assert {
+        "code": "HTP.BINDINGS.INVALID_SCHEMA",
+        "detail": f"{stage_record['program_pyast']} must declare schema 'htp.program_ast.v1'.",
+    } in result.diagnostics
+
+
 def test_replay_returns_structured_diagnostic_for_malformed_stages_shape(tmp_path):
     package_dir = tmp_path / "package"
     package_dir.mkdir()

@@ -379,7 +379,7 @@ class ManifestBinding:
 
     def validate(self) -> ValidationResult:
         missing_files = list(collect_missing_files(self.package_dir, self.manifest))
-        diagnostics = list(validation_diagnostics(self.manifest, tuple(missing_files)))
+        diagnostics = list(validation_diagnostics(self.manifest, tuple(missing_files), self.package_dir))
         return ValidationResult(
             ok=not diagnostics,
             backend=self.backend,
