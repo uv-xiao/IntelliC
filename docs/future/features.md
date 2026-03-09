@@ -71,7 +71,7 @@ Rationale: preserve the “workload first; schedule later” workflow across bac
 Design decision: WSP is a dialect package. It defines syntax (`@workload`, `@schedule`) plus typing rules and
 canonicalization/lowering passes into a canonical WSP graph/loop form.
 
-Current status: **future**.
+Current status: **partial**.
 
 ### 1.3 CSP: process/channel pipelines
 
@@ -86,7 +86,7 @@ Rationale: pipelines are the natural representation for megakernels and serving 
 Design decision: CSP is a dialect package. It defines process/channel syntax and effect typing rules, and it must lower
 into a canonical CSP graph form consumable by backends.
 
-Current status: **future**.
+Current status: **partial**.
 
 ### 1.4 Serving routine programming (host orchestration)
 
@@ -143,7 +143,7 @@ backend portability is achieved by:
 
 ## 3. Intrinsics & dialect libraries
 
-Current status: **future**.
+Current status: **partial**.
 
 ### 3.1 Intrinsic sets with typed contracts
 
@@ -215,7 +215,7 @@ This is not a “compilation island” in the IR sense; it is a codegen artifact
 
 Rationale: extensibility without “if backend == …” branching.
 
-Current status: **future**.
+Current status: **partial**.
 
 ---
 
@@ -278,7 +278,7 @@ Design constraint:
   - compute tile mapping, FIFO/stream wiring, host runtime glue
 - Reuse known mapping concepts (kernel grid mapping + layout annotations).
 
-Current status: **future**.
+Current status: **partial**.
 
 ---
 
@@ -292,22 +292,22 @@ Current status: **future**.
 - Optional execution tracing hooks in bindings.
 
 Current status: **partial**.
-- implemented: pass traces, staged artifacts, structured diagnostics, replay
-- missing: semantic diff/minimize/explain as first-class user tools
+- implemented: pass traces, staged artifacts, structured diagnostics, replay, semantic diff, minimize, bisect, and explain
+- missing: identity-aware semantic diff and richer backend/extension debug traces
 
 ---
 
 ## 8. Deep dives index
 
-Feature deep dives live in:
+Feature deep dives for the broader target live in:
 
-- `docs/design/feats/01_extensibility.md`
-- `docs/design/feats/02_dialects_wsp.md`
-- `docs/design/feats/03_dialects_csp.md`
-- `docs/design/feats/04_intrinsics.md`
-- `docs/design/feats/05_layout.md`
-- `docs/design/feats/06_passes_pipelines.md`
-- `docs/design/feats/07_backends_artifacts.md`
-- `docs/design/feats/08_binding_runtime.md`
-- `docs/design/feats/09_debuggability.md`
-- `docs/design/feats/10_agentic_development.md`
+- `docs/future/feats/01_extensibility.md`
+- `docs/future/feats/02_dialects_wsp.md`
+- `docs/future/feats/03_dialects_csp.md`
+- `docs/future/feats/04_intrinsics.md`
+- `docs/future/feats/05_layout.md`
+- `docs/future/feats/06_passes_pipelines.md`
+- `docs/future/feats/07_backends_artifacts.md`
+- `docs/future/feats/08_binding_runtime.md`
+- `docs/future/feats/09_debuggability.md`
+- `docs/future/feats/10_agentic_development.md`

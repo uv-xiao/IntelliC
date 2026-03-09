@@ -11,7 +11,7 @@ The intent is to eliminate hidden invariants: every extension point and semantic
 - A new contributor can read in order:
   - `docs/design/README.md`
   - `docs/design/story.md`
-  - `docs/design/analysis.md`
+  - `docs/future/analysis.md`
   - `docs/design/features.md`
   - `docs/design/implementations.md`
   - `docs/design/examples.md`
@@ -137,7 +137,7 @@ For optional extension backends/toolchains such as AIE:
   - staged analyses exist for any fact that justifies a transform
   - provenance for autonomous edits is specified (`extensions.agent.*`)
 - There is a clear agent loop/tooling story that consumes only artifacts and produces auditable evidence:
-  - `docs/design/feats/10_agentic_development.md`
+  - `docs/future/feats/10_agentic_development.md`
   - `docs/design/impls/10_agentic_tooling.md`
 
 ---

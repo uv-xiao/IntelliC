@@ -1,5 +1,7 @@
 # HTP Full Story — Contract-First, Artifact-First Compilation for Retargetable Kernels
 
+This document is the broader target story beyond the already implemented repository surface described in `docs/design/story.md`.
+
 This document is the single narrative that ties together **WHY → WHAT → HOW** in a form that is meant to be
 “ready to implement”. It is written in a paper-like style because HTP is fundamentally a systems-design claim:
 retargetable extensibility is not a bag of features; it is an architecture that prevents feature work from collapsing
@@ -7,12 +9,13 @@ into per-target pass soups.
 
 Read order for details:
 
-- WHY (problem + critique + evidence): `docs/design/analysis.md`
-- WHAT (feature surfaces + contracts): `docs/design/features.md`
-- HOW (architecture + components): `docs/design/implementations.md`
-- E2E examples: `docs/design/examples.md`
-- Code map: `docs/design/code_map.md`
-- Deep evidence report (Triton/JAX/TileLang/MLIR): `docs/design/reports/retargetable_extensibility_report.md`
+- implemented story: `docs/design/story.md`
+- broader WHY (problem + critique + evidence): `docs/future/analysis.md`
+- broader WHAT (feature surfaces + contracts): `docs/future/features.md`
+- current HOW (implemented architecture): `docs/design/implementations.md`
+- current examples: `docs/design/examples.md`
+- current code map: `docs/design/code_map.md`
+- deep evidence report (Triton/JAX/TileLang/MLIR): `docs/future/reports/retargetable_extensibility_report.md`
 
 ---
 
@@ -250,7 +253,7 @@ auditable via artifacts.
 
 For detailed comparative evidence (including Triton’s roadmap features and concrete pass complexity), see:
 
-- `docs/design/reports/retargetable_extensibility_report.md`
+- `docs/future/reports/retargetable_extensibility_report.md`
 
 ---
 

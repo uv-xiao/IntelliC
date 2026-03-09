@@ -5,6 +5,8 @@ Unimplemented or research-only material lives under `docs/future/`.
 
 ## Read order
 
+- `docs/design/story.md` — current repository claim and proof points
+- `docs/design/features.md` — implemented feature surface
 - `docs/design/code_map.md` — implementation entrypoints and file map
 - `docs/design/implementations.md` — current architecture and contracts
 - `docs/design/examples.md` — implemented example flows
@@ -28,6 +30,8 @@ Unimplemented or research-only material lives under `docs/future/`.
 
 - `examples/pto_pypto_vector_add/`
 - `examples/nvgpu_arknife_gemm/`
+- `examples/wsp_warp_gemm/`
+- `examples/csp_channel_pipeline/`
 - `docs/examples/`
 
 ## Future material
