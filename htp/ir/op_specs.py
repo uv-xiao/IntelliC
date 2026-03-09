@@ -96,6 +96,14 @@ OP_SPECS = {
         reads=("source",),
         writes=("out",),
     ),
+    "relayout": OpSpec(
+        name="relayout",
+        intrinsic="portable.relayout",
+        phase="compute",
+        latency=1,
+        reads=("source",),
+        writes=("out",),
+    ),
     "reduction_sum": OpSpec(
         name="reduction_sum",
         intrinsic="portable.reduction_sum",

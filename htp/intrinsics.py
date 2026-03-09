@@ -183,6 +183,9 @@ def _bootstrap() -> None:
         IntrinsicDecl("portable.view", 1, "portable", "view", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
         IntrinsicDecl("portable.reshape", 1, "portable", "reshape", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
         IntrinsicDecl(
+            "portable.relayout", 1, "portable", "relayout", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"
+        ),
+        IntrinsicDecl(
             "portable.reduction_sum", 1, "portable", "reduction_sum", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"
         ),
         IntrinsicDecl(
@@ -258,6 +261,7 @@ def _bootstrap() -> None:
         "portable.transpose",
         "portable.view",
         "portable.reshape",
+        "portable.relayout",
         "portable.reduction_sum",
         "portable.async_copy",
         "portable.barrier",

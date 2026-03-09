@@ -13,6 +13,7 @@ class KernelArg:
     role: str | None = None
     alias_of: str | None = None
     source: str | None = None
+    distribution: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True)

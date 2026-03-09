@@ -78,6 +78,7 @@ Within that pass spine, the current semantic substrate now includes:
 - alias validation for view-style arguments
 - staged reduction / transpose / reshape / broadcast / channel semantics in the op registry
 - facet-product buffer layout payloads (`distribution ⊗ memory ⊗ hardware`) in `layout.json`
+- staged layout joins and explicit relayout records in `layout.json`
 - typed protocol obligations, hazard evidence, async-token discharge state,
   barrier scopes, event dependencies, and collective discharge records in
   `effects.json`

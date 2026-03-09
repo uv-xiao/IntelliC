@@ -185,9 +185,9 @@ Checklist:
   synthesized metadata rather than the full typed contract model.
 - `[x]` Implement the facet-product layout model:
   distribution ⊗ memory ⊗ hardware.
-- `[ ]` Add explicit relayout operations and legality predicates rather than
+- `[x]` Add explicit relayout operations and legality predicates rather than
   backend heuristics only.
-- `[ ]` Add distribution joins / shard / replicate semantics as typed layout
+- `[x]` Add distribution joins / shard / replicate semantics as typed layout
   facts.
 - `[x]` Add collective-effect obligations and discharge rules.
 - `[x]` Upgrade channel effects from producer/consumer annotation to typed

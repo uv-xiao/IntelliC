@@ -93,6 +93,18 @@ def test_default_pipeline_derives_nvgpu_semantics_and_schedule(tmp_path):
                 },
             }
         },
+        "joins": [
+            {
+                "op_id": "op0",
+                "rule": "matmul",
+                "lhs": "A",
+                "rhs": "B",
+                "out": "C",
+                "ok": True,
+                "joined": {"dims": [{"kind": "replicate"}, {"kind": "replicate"}]},
+            }
+        ],
+        "relayouts": [],
     }
     assert result.program["effects"] == {
         "schema": "htp.effects.v1",
