@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import pytest
+
 from htp.ir.types import (
     BufferType,
     ChannelType,
     DimExpr,
+    IndexType,
     ScalarType,
     ShapeExpr,
     TokenType,
     ViewType,
+    dtype_from_name,
     shape_from_sequence,
     type_to_payload,
 )
@@ -79,3 +83,12 @@ def test_view_channel_and_token_types_have_first_class_value_kinds():
         "kind": "async_token",
         "token_kind": "async_copy",
     }
+
+
+def test_dtype_surface_validates_supported_scalars_and_index_type():
+    assert type_to_payload(dtype_from_name("bf16")) == {"kind": "scalar", "name": "bf16"}
+    assert type_to_payload(dtype_from_name("bool")) == {"kind": "scalar", "name": "bool"}
+    assert type_to_payload(IndexType()) == {"kind": "index", "name": "index"}
+
+    with pytest.raises(ValueError, match="Unsupported scalar dtype"):
+        dtype_from_name("fp19")

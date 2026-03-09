@@ -3,10 +3,16 @@ from __future__ import annotations
 import pytest
 
 from htp.intrinsics import (
+    IntrinsicDecl,
     get_intrinsic_decl,
     get_stub_diagnostic_code,
     has_handler,
+    lower_intrinsic,
+    register_handlers,
+    register_intrinsic,
     require_handler,
+    resolve_handler,
+    simulate_intrinsic,
 )
 
 
@@ -32,3 +38,31 @@ def test_require_handler_raises_contract_error_for_missing_backend_support():
         require_handler("pto", "portable.matmul", role="lower")
 
     assert get_stub_diagnostic_code("portable.channel_send") == "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"
+
+
+def test_intrinsic_registry_dispatches_registered_lower_and_simulate_handlers():
+    register_intrinsic(
+        IntrinsicDecl(
+            "vendor.scale2",
+            1,
+            "backend",
+            "scale2",
+            "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+        )
+    )
+    register_handlers(
+        "demo",
+        "vendor.scale2",
+        lower=lambda *, op, target: {
+            "target": target,
+            "intrinsic": op["intrinsic"],
+            "factor": 2,
+        },
+        simulate=lambda *, args, attrs, mode, trace: args[0] * 2,
+    )
+
+    lowered = lower_intrinsic("demo", {"intrinsic": "vendor.scale2"})
+
+    assert lowered == {"target": "demo", "intrinsic": "vendor.scale2", "factor": 2}
+    assert simulate_intrinsic("vendor.scale2", args=(7,), attrs={}, mode="sim", target="demo") == 14
+    assert resolve_handler("demo", "vendor.scale2", role="lower") is not None

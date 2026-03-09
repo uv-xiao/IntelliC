@@ -31,7 +31,7 @@ programs.
 - typed semantic state lives in `htp/ir/semantics.py`
 - structured type payloads live in `htp/ir/types.py`
 - op registry and semantic broadening live in `htp/ir/op_specs.py`
-- intrinsic declarations and backend handler availability live in `htp/intrinsics.py`
+- intrinsic declarations and lower/emit/sim handler registration live in `htp/intrinsics.py`
 - every stage emits `program.py` for `sim` replay
 - every stage also emits semantic payloads (`kernel_ir.json`, `workload_ir.json`,
   `types.json`, `layout.json`, `effects.json`, `schedule.json`)
@@ -69,6 +69,7 @@ These passes live in `htp/passes/` and emit:
 Within that pass spine, the current semantic substrate now includes:
 
 - structured scalar / shape / buffer / view / channel / token payloads in `types.json`
+- validated scalar dtype names plus explicit `index` type support in `htp/ir/types.py`
 - explicit op → intrinsic assignment in `kernel_ir.json`
 - alias validation for view-style arguments
 - staged reduction / transpose / reshape / broadcast / channel semantics in the op registry
@@ -139,6 +140,12 @@ HTP keeps two execution surfaces distinct:
 
 - replay: `ir/stages/<id>/program.py` through `htp/runtime/`
 - package execution: backend-owned build/load/run through `htp/bindings/`
+
+Replay now also has an intrinsic fallback path:
+
+- runtime-local intrinsic handlers still take precedence
+- otherwise `htp/runtime/core.py` dispatches through the registered intrinsic
+  simulate handlers in `htp/intrinsics.py`
 
 This distinction is part of the public contract and is documented in
 `docs/design/impls/07_binding_interface.md`.

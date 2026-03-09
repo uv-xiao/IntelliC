@@ -3,10 +3,31 @@ from __future__ import annotations
 from dataclasses import dataclass, fields, is_dataclass
 from typing import Any
 
+_SCALAR_DTYPES = {
+    "bool",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "f16",
+    "bf16",
+    "f32",
+    "f64",
+}
+
 
 @dataclass(frozen=True)
 class ScalarType:
     name: str
+
+
+@dataclass(frozen=True)
+class IndexType:
+    name: str = "index"
 
 
 @dataclass(frozen=True)
@@ -69,8 +90,13 @@ class ChannelType:
     protocol: str
 
 
-def dtype_from_name(name: str) -> ScalarType:
-    return ScalarType(str(name))
+def dtype_from_name(name: str) -> ScalarType | IndexType:
+    normalized = str(name)
+    if normalized == "index":
+        return IndexType()
+    if normalized not in _SCALAR_DTYPES:
+        raise ValueError(f"Unsupported scalar dtype {normalized!r}")
+    return ScalarType(normalized)
 
 
 def dim_from_value(value: object) -> DimExpr:
@@ -101,6 +127,8 @@ def type_to_payload(value: Any) -> Any:
 def _decorate_dataclass_payload(value: Any, payload: dict[str, Any]) -> dict[str, Any]:
     if isinstance(value, ScalarType):
         payload["kind"] = "scalar"
+    elif isinstance(value, IndexType):
+        payload["kind"] = "index"
     elif isinstance(value, DimExpr):
         if value.kind != "const":
             payload.pop("value", None)
@@ -127,6 +155,7 @@ __all__ = [
     "BufferType",
     "ChannelType",
     "DimExpr",
+    "IndexType",
     "ScalarType",
     "ShapeExpr",
     "TensorType",
