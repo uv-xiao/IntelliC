@@ -11,4 +11,6 @@ Rules:
 
 ## Active tasks
 
-- `004-docs-depth-restoration.md` — deepen the layered docs with restored rationale, feature detail, and TODO accounting
+## Active tasks
+
+- `005-python-native-surfaces.md` — public authoring surfaces and harder flagship examples
