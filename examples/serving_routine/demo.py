@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from htp import bind, compile_program
-from htp.kernel import buffer, kernel, matmul, scalar
+from htp.kernel import buffer, kernel, scalar, store
 from htp.routine import call, fifo_channel, program
 
 
@@ -17,7 +17,7 @@ def decode_step(
     B: scalar(dtype="i32", role="shape"),
     H: scalar(dtype="i32", role="shape"),
 ) -> None:
-    matmul(hidden, weights, out=next_hidden, m=B, n=H, k=H, dtype="f32")
+    store(next_hidden, hidden @ weights)
 
 
 @program(target="nvgpu-ampere")

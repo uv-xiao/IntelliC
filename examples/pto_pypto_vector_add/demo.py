@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 from htp import bind, compile_program
-from htp.kernel import buffer, elementwise_add, kernel, scalar
+from htp.kernel import buffer, kernel, scalar, store
 
 
 @kernel
@@ -19,7 +19,7 @@ def vector_add(
 ) -> None:
     """Vector add kernel written as ordinary Python instead of a raw payload."""
 
-    elementwise_add(lhs, rhs, out=out, shape=(size,), dtype="f32")
+    store(out, lhs + rhs)
 
 
 def make_inputs(size: int = 128 * 128) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
