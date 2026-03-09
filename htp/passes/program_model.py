@@ -3,6 +3,14 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from htp.ir.layout import (
+    DistributionFacet,
+    DistributionPlacement,
+    HardwareFacet,
+    LayoutFacetProduct,
+    MemoryFacet,
+    layout_to_payload,
+)
 from htp.ir.op_specs import get_op_spec, op_effects
 from htp.ir.semantics import KernelArg, KernelIR, KernelOp, WorkloadIR, WorkloadTask, to_payload
 from htp.ir.types import (
@@ -44,6 +52,12 @@ def canonicalize_program(program: Mapping[str, Any]) -> dict[str, Any]:
     target = normalize_target(program)
     kernel = program.get("kernel")
     workload = program.get("workload")
+    schedule_directives: dict[str, Any] = {}
+    if isinstance(program.get("wsp"), Mapping):
+        workload = dict(program["wsp"].get("workload", {}))
+        schedule_directives = _normalize_schedule_directives(program["wsp"].get("schedule", {}))
+    elif isinstance(program.get("csp"), Mapping):
+        workload = _lower_csp_surface(entry, program["csp"], kernel)
     if isinstance(kernel, Mapping):
         normalized_kernel = _normalize_kernel_surface(entry, kernel)
     else:
@@ -57,6 +71,7 @@ def canonicalize_program(program: Mapping[str, Any]) -> dict[str, Any]:
         "target": target,
         "kernel": normalized_kernel,
         "workload": normalized_workload,
+        "schedule_directives": schedule_directives,
     }
 
 
@@ -108,6 +123,7 @@ def build_semantic_model(
         tasks=tasks,
         channels=tuple(dict(channel) for channel in workload.get("channels", ())),
         dependencies=tuple(dict(dep) for dep in workload.get("dependencies", ())),
+        processes=tuple(dict(item) for item in workload.get("processes", ())),
     )
     return (
         {"schema": KERNEL_IR_SCHEMA_ID, **to_payload(kernel_ir)},
@@ -146,6 +162,7 @@ def build_type_layout_effects(
         "memory_spaces": memory_spaces,
         "threading": _threading_for_backend(backend, kernel_ir),
         "tiling": _tiling_for_kernel(kernel_ir, backend),
+        "facets": _layout_facets(memory_spaces, kernel_ir),
     }
     effects = {
         "schema": EFFECTS_SCHEMA_ID,
@@ -159,6 +176,9 @@ def build_type_layout_effects(
         },
         "barriers": _barriers_for_kernel(kernel_ir),
         "channels": _channel_effects(workload_ir, kernel_ir),
+        "protocols": _protocol_effects(workload_ir),
+        "tokens": _token_effects(kernel_ir),
+        "collectives": _collective_effects(kernel_ir),
     }
     return types, layout, effects
 
@@ -169,12 +189,15 @@ def build_schedule_plan(
     kernel_ir: Mapping[str, Any],
     effects: Mapping[str, Any],
     target: Mapping[str, str],
+    schedule_directives: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     barrier_after = {
         str(item["after"]): str(item["reason"])
         for item in effects.get("barriers", ())
         if isinstance(item, Mapping) and "after" in item and "reason" in item
     }
+    directives = _normalize_schedule_directives(schedule_directives or {})
+    legality = _schedule_legality(target, directives)
     ticks: list[dict[str, Any]] = []
     tick_index = 0
     for op in kernel_ir.get("ops", ()):
@@ -210,9 +233,24 @@ def build_schedule_plan(
         "entry": entry,
         "target": dict(target),
         "pipeline_depth": max(
+            int(directives.get("pipeline", {}).get("depth", 0) or 0),
             1,
             sum(1 for op in kernel_ir.get("ops", ()) if _phase_for_op(str(op["op"])) == "compute"),
         ),
+        "directives": directives,
+        "buffering_strategy": directives.get("pipeline", {}).get("buffering", "single"),
+        "launch": {
+            "grid": directives.get("bind", {}).get("grid", "grid"),
+            "lane": directives.get("bind", {}).get("lane", "thread"),
+            "num_warps": int(directives.get("resources", {}).get("num_warps", 1) or 1),
+        },
+        "warp_role_plan": {
+            "kind": "single_role"
+            if int(directives.get("resources", {}).get("num_warps", 1) or 1) <= 1
+            else "split_roles",
+            "roles": ["compute"],
+        },
+        "legality": legality,
         "ticks": ticks,
     }
 
@@ -314,6 +352,49 @@ def _normalize_workload_surface(
         "channels": normalized_channels,
         "dependencies": normalized_dependencies,
         "kernel": str(kernel.get("name", entry)),
+        **(
+            {"processes": [dict(item) for item in workload.get("processes", ())]}
+            if workload.get("processes")
+            else {}
+        ),
+    }
+
+
+def _lower_csp_surface(entry: str, csp: Mapping[str, Any], kernel: object) -> dict[str, Any]:
+    kernel_name = str(kernel.get("name", entry)) if isinstance(kernel, Mapping) else entry
+    processes = [dict(item) for item in csp.get("processes", ())]
+    tasks = [
+        {
+            "task_id": str(item["task_id"]),
+            "kind": "process",
+            "kernel": str(item.get("kernel", kernel_name)),
+            "args": [str(arg) for arg in item.get("args", ())],
+        }
+        for item in processes
+    ]
+    return {
+        "entry": entry,
+        "tasks": tasks,
+        "channels": [dict(item) for item in csp.get("channels", ())],
+        "dependencies": [],
+        "kernel": kernel_name,
+        "processes": processes,
+    }
+
+
+def _normalize_schedule_directives(schedule: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "tile": dict(schedule.get("tile", {})) if isinstance(schedule.get("tile"), Mapping) else {},
+        "bind": dict(schedule.get("bind", {})) if isinstance(schedule.get("bind"), Mapping) else {},
+        "pipeline": dict(schedule.get("pipeline", {}))
+        if isinstance(schedule.get("pipeline"), Mapping)
+        else {},
+        "resources": dict(schedule.get("resources", {}))
+        if isinstance(schedule.get("resources"), Mapping)
+        else {},
+        "specialize": dict(schedule.get("specialize", {}))
+        if isinstance(schedule.get("specialize"), Mapping)
+        else {},
     }
 
 
@@ -469,6 +550,26 @@ def _memory_spaces_for_backend(backend: str, kernel_ir: Mapping[str, Any]) -> di
     return spaces
 
 
+def _layout_facets(memory_spaces: Mapping[str, str], kernel_ir: Mapping[str, Any]) -> dict[str, Any]:
+    buffer_layouts: dict[str, Any] = {}
+    for argument in kernel_ir.get("args", ()):
+        if argument.get("kind") != "buffer":
+            continue
+        shape = list(argument.get("shape", ()))
+        buffer_layouts[str(argument["name"])] = layout_to_payload(
+            LayoutFacetProduct(
+                distribution=DistributionFacet(tuple(DistributionPlacement(kind="replicate") for _ in shape)),
+                memory=MemoryFacet(
+                    space=str(memory_spaces.get(str(argument["name"]), "global")),
+                    layout="row_major",
+                    order=tuple(range(len(shape))),
+                ),
+                hardware=HardwareFacet(scope="thread_block", vector_width=1),
+            )
+        )
+    return {"buffers": buffer_layouts}
+
+
 def _threading_for_backend(backend: str, kernel_ir: Mapping[str, Any]) -> dict[str, Any]:
     has_matmul = any(str(op.get("op")) == "matmul" for op in kernel_ir.get("ops", ()))
     if backend == "pto":
@@ -527,6 +628,59 @@ def _channel_effects(workload_ir: Mapping[str, Any], kernel_ir: Mapping[str, Any
     return channel_records
 
 
+def _protocol_effects(workload_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
+    processes = [dict(item) for item in workload_ir.get("processes", ())]
+    obligations: list[dict[str, Any]] = []
+    for channel in workload_ir.get("channels", ()):
+        channel_name = str(channel["name"])
+        puts = sum(
+            int(item.get("count", 1))
+            for process in processes
+            for item in process.get("puts", ())
+            if str(item.get("channel")) == channel_name
+        )
+        gets = sum(
+            int(item.get("count", 1))
+            for process in processes
+            for item in process.get("gets", ())
+            if str(item.get("channel")) == channel_name
+        )
+        balanced = puts == gets
+        obligation = {
+            "channel": channel_name,
+            "protocol": str(channel.get("protocol", "fifo")),
+            "capacity": int(channel.get("capacity", 0) or 0),
+            "puts": puts,
+            "gets": gets,
+            "balanced": balanced,
+        }
+        if not balanced:
+            raise ValueError(
+                f"HTP.PROTOCOL.UNBALANCED_CHANNEL: channel {channel_name!r} has puts={puts} and gets={gets}."
+            )
+        obligations.append(obligation)
+    return obligations
+
+
+def _token_effects(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
+    tokens = []
+    for op in kernel_ir.get("ops", ()):
+        intrinsic = str(op.get("intrinsic", ""))
+        if intrinsic == "portable.async_copy":
+            tokens.append({"op_id": str(op["op_id"]), "token_kind": "async_copy", "status": "produced"})
+        if intrinsic == "portable.await":
+            tokens.append({"op_id": str(op["op_id"]), "token_kind": "async_copy", "status": "awaited"})
+    return tokens
+
+
+def _collective_effects(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
+    collectives = []
+    for op in kernel_ir.get("ops", ()):
+        if str(op.get("intrinsic", "")) == "portable.allreduce":
+            collectives.append({"op_id": str(op["op_id"]), "kind": "allreduce", "status": "pending"})
+    return collectives
+
+
 def _validate_dtype_contracts(kernel_ir: Mapping[str, Any], *, target: Mapping[str, str]) -> None:
     backend = target["backend"]
     for argument in kernel_ir.get("args", ()):
@@ -564,6 +718,17 @@ def _validate_alias_contracts(kernel_ir: Mapping[str, Any]) -> None:
             raise ValueError(
                 f"HTP.TYPECHECK.ALIAS_WRITE_CONFLICT: alias base {alias_name!r} has multiple mutable aliases {users!r}."
             )
+
+
+def _schedule_legality(target: Mapping[str, str], directives: Mapping[str, Any]) -> dict[str, Any]:
+    reasons: list[str] = []
+    num_warps = int(directives.get("resources", {}).get("num_warps", 1) or 1)
+    if target.get("backend") == "nvgpu" and num_warps > 8:
+        reasons.append("num_warps exceeds supported NV-GPU limit (8)")
+    pipeline_depth = int(directives.get("pipeline", {}).get("depth", 1) or 1)
+    if pipeline_depth < 1:
+        reasons.append("pipeline depth must be >= 1")
+    return {"ok": not reasons, "reasons": reasons}
 
 
 def _entities_payload(
@@ -639,7 +804,14 @@ def _default_kernel_ir() -> dict[str, Any]:
 
 
 def _default_workload_ir() -> dict[str, Any]:
-    return {"schema": WORKLOAD_IR_SCHEMA_ID, "entry": "", "tasks": [], "channels": [], "dependencies": []}
+    return {
+        "schema": WORKLOAD_IR_SCHEMA_ID,
+        "entry": "",
+        "tasks": [],
+        "channels": [],
+        "dependencies": [],
+        "processes": [],
+    }
 
 
 def _default_types() -> dict[str, Any]:
@@ -647,15 +819,40 @@ def _default_types() -> dict[str, Any]:
 
 
 def _default_layout() -> dict[str, Any]:
-    return {"schema": LAYOUT_SCHEMA_ID, "memory_spaces": {}, "threading": {}, "tiling": {}}
+    return {
+        "schema": LAYOUT_SCHEMA_ID,
+        "memory_spaces": {},
+        "threading": {},
+        "tiling": {},
+        "facets": {"buffers": {}},
+    }
 
 
 def _default_effects() -> dict[str, Any]:
-    return {"schema": EFFECTS_SCHEMA_ID, "reads": {}, "writes": {}, "barriers": [], "channels": []}
+    return {
+        "schema": EFFECTS_SCHEMA_ID,
+        "reads": {},
+        "writes": {},
+        "barriers": [],
+        "channels": [],
+        "protocols": [],
+        "tokens": [],
+        "collectives": [],
+    }
 
 
 def _default_schedule() -> dict[str, Any]:
-    return {"schema": SCHEDULE_SCHEMA_ID, "ticks": [], "ordered_ops": [], "pipeline_depth": 0}
+    return {
+        "schema": SCHEDULE_SCHEMA_ID,
+        "ticks": [],
+        "ordered_ops": [],
+        "pipeline_depth": 0,
+        "directives": {},
+        "buffering_strategy": "single",
+        "launch": {},
+        "warp_role_plan": {"kind": "single_role", "roles": []},
+        "legality": {"ok": True, "reasons": []},
+    }
 
 
 def _default_entities_payload() -> dict[str, Any]:

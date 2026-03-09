@@ -72,6 +72,16 @@ Within that pass spine, the current semantic substrate now includes:
 - explicit op → intrinsic assignment in `kernel_ir.json`
 - alias validation for view-style arguments
 - staged reduction / transpose / reshape / broadcast / channel semantics in the op registry
+- facet-product buffer layout payloads (`distribution ⊗ memory ⊗ hardware`) in `layout.json`
+- typed protocol obligations, token effects, and collective placeholders in `effects.json`
+- schedule directives, legality, launch structure, and warp-role plan in `analysis/schedule_plan.json` and `schedule.json`
+
+The implemented authoring surfaces now also include:
+
+- `htp.wsp` for explicit workload/schedule construction
+- `htp.csp` for explicit process/channel construction
+
+These lower into the same shared workload + schedule substrate rather than creating a second compiler path.
 
 ## 4. Artifact contract
 

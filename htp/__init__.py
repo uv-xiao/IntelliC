@@ -1,6 +1,6 @@
 """HTP package skeleton."""
 
-from . import intrinsics, passes, schemas
+from . import csp, intrinsics, passes, schemas, wsp
 from .bindings import bind
 from .compiler import compile_program, parse_target
 from .tools import explain_diagnostic, replay_package, semantic_diff, verify_package
@@ -8,6 +8,7 @@ from .tools import explain_diagnostic, replay_package, semantic_diff, verify_pac
 __all__ = [
     "bind",
     "compile_program",
+    "csp",
     "explain_diagnostic",
     "intrinsics",
     "parse_target",
@@ -16,4 +17,5 @@ __all__ = [
     "schemas",
     "semantic_diff",
     "verify_package",
+    "wsp",
 ]

@@ -37,6 +37,11 @@ def run(
         "ticks": list(schedule_plan["ticks"]),
         "pipeline_depth": schedule_plan["pipeline_depth"],
         "ordered_ops": [op["op_id"] for op in scheduled_ops],
+        "directives": dict(schedule_plan.get("directives", {})),
+        "buffering_strategy": str(schedule_plan.get("buffering_strategy", "single")),
+        "launch": dict(schedule_plan.get("launch", {})),
+        "warp_role_plan": dict(schedule_plan.get("warp_role_plan", {})),
+        "legality": dict(schedule_plan.get("legality", {})),
     }
     next_program["scheduled_ops"] = scheduled_ops
     stage_payloads = stage_payloads_from_program(next_program)
