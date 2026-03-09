@@ -81,7 +81,10 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
             "Type.LayoutChecked@1": True,
             "Type.EffectsChecked@1": True,
         },
-        "analysis_requires": {},
+        "analysis_requires": {
+            "Analysis.LoopDeps@1": True,
+            "Analysis.AsyncResourceChecks@1": True,
+        },
         "layout_invariants": {
             "Layout.Typed@1": True,
         },
@@ -128,6 +131,34 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
                 "path": f"ir/stages/{analyze_stage['id']}/analysis/schedule_plan.json",
             }
         ],
+    }
+    loop_dep_stage = next(
+        stage for stage in stage_graph if stage["pass"] == "htp::analyze_loop_dependencies@1"
+    )
+    loop_deps = json.loads((package_dir / loop_dep_stage["dir"] / "analysis" / "loop_deps.json").read_text())
+    assert loop_deps == {
+        "schema": "htp.analysis.loop_deps.v1",
+        "entry": "gemm_tile",
+        "op_ids": ["op0"],
+        "edges": [],
+    }
+    async_stage = next(stage for stage in stage_graph if stage["pass"] == "htp::analyze_async_resources@1")
+    async_checks = json.loads(
+        (package_dir / async_stage["dir"] / "analysis" / "async_resources.json").read_text()
+    )
+    assert async_checks == {
+        "schema": "htp.analysis.async_resources.v1",
+        "entry": "gemm_tile",
+        "tokens": [],
+        "barriers": [],
+        "channel_protocols": [],
+        "collectives": [],
+        "resource_summary": {
+            "token_count": 0,
+            "barrier_count": 0,
+            "collective_count": 0,
+            "op_count": 1,
+        },
     }
 
     schedule_plan = json.loads(
@@ -181,6 +212,8 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
     }
     assert result.program["layout"]["memory_spaces"]["C"] == "global"
     assert result.program["effects"]["reads"] == {"op0": ["A", "B"]}
+    assert result.program["analysis"]["loop_deps"]["edges"] == []
+    assert result.program["analysis"]["async_resources"]["resource_summary"]["op_count"] == 1
     assert result.program["analysis"]["schedule"]["ticks"] == schedule_plan["ticks"]
     assert result.program["schedule"]["ordered_ops"] == ["op0"]
     assert result.program["schedule"]["legality"] == {"ok": True, "reasons": []}

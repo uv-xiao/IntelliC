@@ -46,6 +46,8 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/passes/apply_warp_specialization.py` — applied warp-role schedule transform
 - `htp/passes/analyze_software_pipeline.py` — staged software-pipeline analysis
 - `htp/passes/apply_software_pipeline.py` — applied software-pipeline schedule transform
+- `htp/passes/analyze_loop_dependencies.py` — staged dependency analysis over kernel ops
+- `htp/passes/analyze_async_resources.py` — staged async/barrier/channel resource checks
 - `htp/passes/registry.py` — registered core and extension pass surface
 - `htp/pipeline/registry.py` — registered pipeline template surface
 - `htp/ir/op_specs.py` — centralized op semantics for effects / phase / latency

@@ -93,6 +93,8 @@ Implemented today:
 
 - canonical pass management with staged artifacts
 - richer staged passes:
+  - loop-dependency analysis
+  - async/resource analysis
   - schedule analysis/application
   - warp specialization analysis/application
   - software-pipeline analysis/application

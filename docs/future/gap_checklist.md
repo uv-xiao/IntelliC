@@ -291,7 +291,7 @@ Checklist:
   contract surfaces as core passes.
 - `[x]` Add richer transform examples such as warp specialization and software
   pipelining as real passes, not only design docs.
-- `[~]` Add staged analysis payloads for warp-role plans, pipeline plans, loop
+- `[x]` Add staged analysis payloads for warp-role plans, pipeline plans, loop
   dependencies, and async/resource checks.
 - `[ ]` Add preservation/invalidation tracking beyond simple capability removal.
 - `[x]` Thread solver satisfaction and pass trace together so the trace shows
