@@ -371,6 +371,35 @@ def apply_contract_to_state(*, contract: PassContract, state: CapabilityState) -
     )
 
 
+def describe_state_delta(
+    *,
+    before: CapabilityState,
+    after: CapabilityState,
+) -> dict[str, list[str]]:
+    before_caps = set(before.capabilities)
+    after_caps = set(after.capabilities)
+    before_analyses = set(before.analyses)
+    after_analyses = set(after.analyses)
+    before_layout = set(before.layout_invariants)
+    after_layout = set(after.layout_invariants)
+    before_effects = set(before.effect_invariants)
+    after_effects = set(after.effect_invariants)
+    return {
+        "provides": sorted(after_caps - before_caps),
+        "invalidates": sorted(before_caps - after_caps),
+        "preserved_capabilities": sorted(before_caps & after_caps),
+        "added_analyses": sorted(after_analyses - before_analyses),
+        "removed_analyses": sorted(before_analyses - after_analyses),
+        "preserved_analyses": sorted(before_analyses & after_analyses),
+        "added_layout_invariants": sorted(after_layout - before_layout),
+        "removed_layout_invariants": sorted(before_layout - after_layout),
+        "preserved_layout_invariants": sorted(before_layout & after_layout),
+        "added_effect_invariants": sorted(after_effects - before_effects),
+        "removed_effect_invariants": sorted(before_effects - after_effects),
+        "preserved_effect_invariants": sorted(before_effects & after_effects),
+    }
+
+
 def _backend_declaration(target: dict[str, str]) -> BackendSolverDeclaration:
     backend = target["backend"]
     option = target.get("option")
@@ -605,6 +634,7 @@ __all__ = [
     "SolverFailure",
     "SolverResult",
     "apply_contract_to_state",
+    "describe_state_delta",
     "available_pipeline_templates",
     "build_initial_capability_state",
     "default_pipeline_template",

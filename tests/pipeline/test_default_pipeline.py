@@ -93,6 +93,14 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
             "Effects.Typed@1": True,
         },
     }
+    assert analyze_trace["cap_delta"]["preserved_layout_invariants"] == ["Layout.Typed@1"]
+    assert analyze_trace["cap_delta"]["preserved_effect_invariants"] == [
+        "Effects.ProtocolBalanced@1",
+        "Effects.Typed@1",
+    ]
+    semantic_trace = next(event for event in trace_events if event["pass_id"] == "htp::semantic_model@1")
+    assert semantic_trace["cap_delta"]["provides"] == ["Semantic.ModelBuilt@1"]
+    assert semantic_trace["cap_delta"]["added_analyses"] == ["Semantic.ModelBuilt@1"]
 
     semantic_stage = next(stage for stage in stage_graph if stage["pass"] == "htp::semantic_model@1")
     semantic_kernel_ir = json.loads((package_dir / semantic_stage["semantic"]["kernel_ir"]).read_text())

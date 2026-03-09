@@ -27,6 +27,7 @@ Implemented behavior:
   - ids / maps
   - current-stage replay stubs
   - `ir/pass_trace.jsonl`
+  - node-aware blame for added/removed entities and bindings
 - replay, build, and run paths emit stable refs to logs or adapter traces where
   available
 
@@ -40,7 +41,8 @@ Current debug guidance:
   - semantic sidecars,
   - ids/maps,
   - replay stubs,
-  - pass trace.
+  - pass trace,
+  - node-aware blame for changed entities/bindings.
 - If replay fails, inspect:
   - `logs/replay_<stage>_<mode>_*.log`
   - `ir/stages/<id>/replay/stubs.json` when present

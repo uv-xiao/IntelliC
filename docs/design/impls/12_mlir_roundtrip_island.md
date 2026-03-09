@@ -56,6 +56,13 @@ Implemented import/export model:
 - import also emits `maps/entity_map.json` and `maps/binding_map.json` on the
   import stage so identity preservation/rewrite evidence is staged with the
   rest of the compiler state
+- import summaries now record explicit identity policy:
+  - preserved entities/bindings
+  - rebound entities/bindings caused by CSE reuse
+  - stable map refs for `maps/entity_map.json` and `maps/binding_map.json`
+- stage-owned map payloads are normalized with `pass_id`, `stage_before`, and
+  `stage_after` when the pass manager writes the import stage, so the staged map
+  contract stays aligned with core rewrite maps
 - malformed MLIR import fails explicitly instead of silently falling back to
   Python-side rewrites
 

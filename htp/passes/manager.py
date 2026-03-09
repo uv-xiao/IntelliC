@@ -10,6 +10,7 @@ from htp.artifacts.manifest import write_manifest
 from htp.artifacts.stages import AnalysisSpec, RunnablePySpec, StageSpec, write_stage
 from htp.passes.contracts import PassContract
 from htp.passes.trace import build_pass_trace_event, emit_pass_trace_event
+from htp.schemas import BINDING_MAP_SCHEMA_ID, ENTITY_MAP_SCHEMA_ID
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,7 @@ class PassManager:
         execute: Callable[[dict[str, object]], PassResult],
         *,
         requires_satisfied: dict[str, Any] | None = None,
+        state_delta: dict[str, list[str]] | None = None,
     ) -> dict[str, object]:
         stage_before = self._current_stage_record()
         stage_after_id = self._next_stage_id()
@@ -96,8 +98,22 @@ class PassManager:
                 schedule_payload=result.schedule_payload,
                 entities_payload=result.entities_payload,
                 bindings_payload=result.bindings_payload,
-                entity_map_payload=result.entity_map_payload,
-                binding_map_payload=result.binding_map_payload,
+                entity_map_payload=self._normalize_map_payload(
+                    payload=result.entity_map_payload,
+                    schema=ENTITY_MAP_SCHEMA_ID,
+                    stage_before=str(stage_before["id"]),
+                    stage_after=stage_after_id,
+                    pass_id=contract.pass_id,
+                    field_name="entities",
+                ),
+                binding_map_payload=self._normalize_map_payload(
+                    payload=result.binding_map_payload,
+                    schema=BINDING_MAP_SCHEMA_ID,
+                    stage_before=str(stage_before["id"]),
+                    stage_after=stage_after_id,
+                    pass_id=contract.pass_id,
+                    field_name="bindings",
+                ),
                 summary_payload=result.summary_payload,
                 digests=result.digests,
             ),
@@ -123,6 +139,7 @@ class PassManager:
             ),
             diagnostics=result.diagnostics,
             requires_satisfied=requires_satisfied,
+            state_delta=state_delta,
         )
         emit_pass_trace_event(self.package_dir, event)
         return stage_record
@@ -209,6 +226,29 @@ class PassManager:
                 destination.write_text(item.text)
             else:
                 destination.write_text(json.dumps(item.payload, indent=2) + "\n")
+
+    def _normalize_map_payload(
+        self,
+        *,
+        payload: dict[str, Any] | None,
+        schema: str,
+        stage_before: str,
+        stage_after: str,
+        pass_id: str,
+        field_name: str,
+    ) -> dict[str, Any] | None:
+        if payload is None:
+            return None
+        normalized = dict(payload)
+        payload_schema = normalized.get("schema")
+        if payload_schema is not None and payload_schema != schema:
+            raise ValueError(f"Unexpected map schema: {payload_schema!r} != {schema!r}")
+        normalized["schema"] = schema
+        normalized.setdefault(field_name, [])
+        normalized["pass_id"] = pass_id
+        normalized["stage_before"] = stage_before
+        normalized["stage_after"] = stage_after
+        return normalized
 
 
 __all__ = ["PassManager", "PassResult", "RunnablePySpec", "StageFile"]

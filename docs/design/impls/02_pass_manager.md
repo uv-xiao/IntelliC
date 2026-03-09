@@ -216,7 +216,12 @@ Emit a line-delimited JSON log at `ir/pass_trace.jsonl`. Each line is one pass i
 - `stage_before`, `stage_after`
 - `time_ms` (and optional breakdown)
 - `requires` (declared) and `requires_satisfied` (evidence pointers)
-- `cap_delta`: `provides`, `invalidates`
+- `cap_delta`:
+  - `provides`, `invalidates`
+  - `preserved_capabilities`
+  - `added_analyses`, `removed_analyses`, `preserved_analyses`
+  - `added_layout_invariants`, `removed_layout_invariants`, `preserved_layout_invariants`
+  - `added_effect_invariants`, `removed_effect_invariants`, `preserved_effect_invariants`
 - `analysis`:
   - `requires`: analysis ids consumed
   - `produces`: analysis ids emitted + file paths (stage-relative)
@@ -253,3 +258,9 @@ Design note: `pass_trace.jsonl` is the primary “agent substrate” because it 
 
 The pass trace is designed so future extension case studies can be added
 without changing the schema.
+
+Current implementation note:
+
+- `htp/pipeline/defaults.py` computes each event’s `cap_delta` from the actual
+  evolving `CapabilityState`, so the trace records preservation and invalidation
+  facts rather than only the pass contract’s declared `provides/invalidates`.

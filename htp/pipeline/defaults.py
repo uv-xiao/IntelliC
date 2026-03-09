@@ -16,6 +16,7 @@ from htp.passes.registry import RegisteredPass, core_passes, resolve_passes
 from htp.solver import (
     apply_contract_to_state,
     build_initial_capability_state,
+    describe_state_delta,
     evaluate_contract_satisfaction,
     solve_default_pipeline,
 )
@@ -105,19 +106,22 @@ def run_default_pipeline(
             next_program, result = pipeline_pass.run(program_state, stage_before=stage_before)
             return result
 
+        next_state = apply_contract_to_state(
+            contract=pipeline_pass.contract,
+            state=capability_state,
+        )
+
         manager.run(
             pipeline_pass.contract,
             execute,
             requires_satisfied=satisfaction.requires_satisfied,
+            state_delta=describe_state_delta(before=capability_state, after=next_state),
         )
         if next_program is None:
             raise RuntimeError(f"Pass {pipeline_pass.contract.pass_id} did not produce program state")
 
         program_state = next_program
-        capability_state = apply_contract_to_state(
-            contract=pipeline_pass.contract,
-            state=capability_state,
-        )
+        capability_state = next_state
 
     return DefaultPipelineResult(
         package_dir=package_path,
