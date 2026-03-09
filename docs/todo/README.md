@@ -39,13 +39,13 @@ For feature work:
 - `docs/todo/layers/01_compiler_model.md`
   - remaining work: broaden semantic/type/layout/effect breadth beyond the newly landed fused-elementwise semantics and deepen routine semantics
 - `docs/todo/layers/02_programming_surfaces.md`
-  - remaining work: finish the written AST-centric comparison against LittleKernel and use it to drive the next surface pass
+  - remaining work: finish the written AST-centric comparison against LittleKernel and use it to drive the next surface pass now that Arknife has been pulled onto native `KernelValue` objects
 - `docs/todo/layers/03_pipeline_and_solver.md`
   - remaining work: richer search/composition and broader MLIR island breadth
 - `docs/todo/layers/04_artifacts_replay_debug.md`
   - remaining work: broader consistency checks and deeper replay/reference coverage
 - `docs/todo/layers/05_backends_and_extensions.md`
-  - remaining work: deepen PTO, NV-GPU, and AIE rather than changing the architecture
+  - remaining work: deepen PTO, NV-GPU, and AIE rather than changing the architecture; the remaining gap is backend depth, not the Arknife reuse boundary
 - `docs/todo/layers/06_agent_product_and_workflow.md`
   - remaining work: stronger autonomous loops and continued quality-discipline tightening
 
