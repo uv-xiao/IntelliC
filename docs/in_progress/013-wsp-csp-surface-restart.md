@@ -18,12 +18,12 @@ Replace the remaining dict-assembly feel in `htp.wsp` and `htp.csp` with decorat
 
 ## Scope Checklist
 
-- [ ] add decorator/builder-based WSP authoring on top of the existing contract surface
-- [ ] add decorator/builder-based CSP authoring on top of the existing contract surface
-- [ ] keep backward compatibility for the current helper functions unless a stronger contract change is necessary
-- [ ] rewrite flagship WSP/CSP examples to use the new surface and richer kernel/protocol structure
-- [ ] update tests to defend the new public surface and the improved examples
-- [ ] sync `docs/design/` and `docs/todo/` after the surface/example upgrade
+- [x] add decorator/builder-based WSP authoring on top of the existing contract surface
+- [x] add decorator/builder-based CSP authoring on top of the existing contract surface
+- [x] keep backward compatibility for the current helper functions unless a stronger contract change is necessary
+- [x] rewrite flagship WSP/CSP examples to use the new surface and richer kernel/protocol structure
+- [x] update tests to defend the new public surface and the improved examples
+- [x] sync `docs/design/` and `docs/todo/` after the surface/example upgrade
 
 ## Code Surfaces
 
@@ -35,18 +35,18 @@ Replace the remaining dict-assembly feel in `htp.wsp` and `htp.csp` with decorat
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for the motivating bug or gap
-- [ ] human-friendly example updated or added
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating bug or gap
+- [x] human-friendly example updated or added
+- [x] documented fallback verification (`pytest -q`, focused example runs, `pre-commit run --all-files`)
 
 Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for implemented behavior
-- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] update `docs/design/` for implemented behavior
+- [x] update `docs/todo/` to remove or narrow the gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan

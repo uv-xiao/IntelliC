@@ -5,7 +5,8 @@ pipeline.
 
 It proves three implemented contracts:
 
-- WSP schedule directives are part of the user-facing program surface.
+- WSP schedule directives are part of a decorator/builder user-facing program surface.
+- the kernel body can describe staged copies, barriers, and MMA intent instead of collapsing to a single `store(C, A @ B)`,
 - The default pipeline preserves those directives into staged
   `schedule.json`.
 - The final package remains replayable in `sim`.

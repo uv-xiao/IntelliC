@@ -14,7 +14,19 @@ def declaration_for(profile: str | None = None) -> BackendSolverDeclaration:
     arch = arch_for(normalize_profile(profile))
     codegen_index = (NVGPU_PROJECT_DIR / "nvgpu_codegen.json").as_posix()
     target_capabilities = tuple(f"Target.{arch.backend}.{capability}@1" for capability in arch.capabilities)
-    supported_ops = ["elementwise_binary", "elementwise_unary", "matmul", "commit"]
+    supported_ops = [
+        "elementwise_binary",
+        "elementwise_unary",
+        "matmul",
+        "async_copy",
+        "barrier",
+        "broadcast",
+        "channel_recv",
+        "channel_send",
+        "commit",
+        "mma",
+        "reduction_sum",
+    ]
     if arch.profile == "ampere":
         supported_ops.extend(["cp_async", "ldmatrix", "mma_sync"])
     else:

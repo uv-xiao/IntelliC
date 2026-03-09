@@ -4,7 +4,6 @@ import pytest
 
 import htp
 from htp import ark
-from htp.csp import fifo, get, process, put
 from htp.csp import program as csp_program
 from htp.kernel import (
     KernelValue,
@@ -26,14 +25,7 @@ from htp.kernel import (
     value,
 )
 from htp.routine import call, fifo_channel, program
-from htp.wsp import bind as wsp_bind
-from htp.wsp import pipeline as wsp_pipeline
 from htp.wsp import program as wsp_program
-from htp.wsp import resources as wsp_resources
-from htp.wsp import schedule as wsp_schedule
-from htp.wsp import specialize as wsp_specialize
-from htp.wsp import task as wsp_task
-from htp.wsp import tile as wsp_tile
 
 
 def test_compile_program_accepts_public_program_surface(tmp_path):
@@ -282,19 +274,18 @@ def test_wsp_program_surface_accepts_kernel_specs_and_task_helpers():
     ) -> None:
         store(C, A @ B)
 
-    payload = wsp_program(
-        entry="gemm_tile",
-        target="nvgpu-ampere",
-        kernel=gemm_tile,
-        tasks=[wsp_task(gemm_tile, "A", "B", "C", "M", "N", "K", task_id="gemm_main")],
-        schedule=wsp_schedule(
-            tile=wsp_tile(block=(32, 64, 16)),
-            bind=wsp_bind(grid="block", lane="warp"),
-            pipeline=wsp_pipeline(depth=2, buffering="double"),
-            resources=wsp_resources(num_warps=4),
-            specialize=wsp_specialize(operator="matmul"),
-        ),
-    )
+    @wsp_program(target="nvgpu-ampere", kernel=gemm_tile)
+    def gemm_workload(w) -> None:
+        (
+            w.launch(gemm_tile, "A", "B", "C", "M", "N", "K", task_id="gemm_main")
+            .tile(block=(32, 64, 16))
+            .bind(grid="block", lane="warp")
+            .pipeline(depth=2, buffering="double")
+            .resources(num_warps=4)
+            .specialize(operator="matmul")
+        )
+
+    payload = gemm_workload.to_program()
 
     assert payload["kernel"]["name"] == "gemm_tile"
     assert payload["wsp"]["workload"]["tasks"][0]["task_id"] == "gemm_main"
@@ -313,32 +304,38 @@ def test_csp_program_surface_accepts_kernel_specs_and_step_helpers():
     ) -> None:
         store(C, A @ B)
 
-    payload = csp_program(
-        entry="pipeline_demo",
-        target="nvgpu-ampere",
-        kernel=gemm_tile,
-        channels=[fifo("tiles", dtype="f32", capacity=2)],
-        processes=[
-            process(
-                "producer",
-                task_id="p0",
-                kernel=gemm_tile,
-                args=("A", "B", "C", "M", "N", "K"),
-                steps=[put("tiles")],
-            ),
-            process(
-                "consumer",
-                task_id="p1",
-                kernel=gemm_tile,
-                args=("A", "B", "C", "M", "N", "K"),
-                steps=[get("tiles")],
-            ),
-        ],
-    )
+    @csp_program(target="nvgpu-ampere", kernel=gemm_tile)
+    def pipeline_demo(p) -> None:
+        tiles = p.fifo("tiles", dtype="f32", capacity=2)
+        p.process(
+            "producer",
+            task_id="p0",
+            kernel=gemm_tile,
+            args=("A", "B", "C", "M", "N", "K"),
+        ).put(tiles)
+        p.process(
+            "consumer",
+            task_id="p1",
+            kernel=gemm_tile,
+            args=("A", "B", "C", "M", "N", "K"),
+        ).get(tiles)
+
+    payload = pipeline_demo.to_program()
 
     assert payload["kernel"]["name"] == "gemm_tile"
     assert payload["csp"]["channels"][0]["name"] == "tiles"
     assert payload["csp"]["processes"][0]["steps"][0]["kind"] == "put"
+    assert payload["csp"]["processes"][1]["steps"][0]["kind"] == "get"
+
+
+def test_wsp_decorator_surface_rejects_non_kernel_spec():
+    with pytest.raises(TypeError, match="KernelSpec"):
+        wsp_program(target="nvgpu-ampere", kernel={"name": "raw_kernel"})
+
+
+def test_csp_decorator_surface_rejects_non_kernel_spec():
+    with pytest.raises(TypeError, match="KernelSpec"):
+        csp_program(target="nvgpu-ampere", kernel={"name": "raw_kernel"})
 
 
 def test_compile_program_rejects_broken_program_surface(tmp_path):

@@ -134,6 +134,8 @@ def _primary_kernel_op(kernel_ir: Mapping[str, Any]) -> Mapping[str, Any]:
         raise ValueError("NV-GPU codegen requires a non-empty kernel_ir.ops list")
     if _is_fused_elementwise_kernel(ops):
         return _lower_fused_elementwise_kernel(ops)
+    if len(ops) > 1:
+        return _lower_composite_kernel(ops, kernel_ir=kernel_ir)
     primary = ops[0]
     if not isinstance(primary, Mapping):
         raise ValueError("NV-GPU kernel_ir.ops entries must be mappings")
@@ -156,6 +158,13 @@ def _launch_geometry_for_op(op: Mapping[str, Any]) -> NVGPULaunchGeometry:
     if str(op.get("op")) in {"matmul", "arknife_mainloop"}:
         attrs = op.get("attrs", {})
         return NVGPULaunchGeometry(kind="grid_2d", extents=(str(attrs["m"]), str(attrs["n"])))
+    if str(op.get("op")) == "composite":
+        attrs = op.get("attrs", {})
+        shape = [str(value) for value in attrs.get("shape", ["size"])]
+        if len(shape) >= 2:
+            return NVGPULaunchGeometry(kind="grid_2d", extents=(shape[0], shape[1]))
+        extent = shape[0] if shape else "size"
+        return NVGPULaunchGeometry(kind="grid_1d", extents=(extent,))
     attrs = op.get("attrs", {})
     shape = attrs.get("shape", ["size"])
     extent = str(shape[0]) if shape else "size"
@@ -191,6 +200,36 @@ def _lower_fused_elementwise_kernel(ops: list[Any]) -> dict[str, Any]:
             "dtype": dtype or "f32",
         },
     }
+
+
+def _lower_composite_kernel(ops: list[Any], *, kernel_ir: Mapping[str, Any]) -> dict[str, Any]:
+    lowered_ops: list[dict[str, Any]] = []
+    for op in ops:
+        if not isinstance(op, Mapping):
+            raise ValueError("NV-GPU composite kernels require mapping ops.")
+        intrinsic = str(op.get("intrinsic", ""))
+        require_handler("nvgpu", intrinsic, role="lower")
+        lowered_ops.append(dict(lower_intrinsic("nvgpu", op)))
+    output_shape = _first_output_shape(kernel_ir)
+    return {
+        "op": "composite",
+        "attrs": {
+            "ops": lowered_ops,
+            "shape": output_shape or ["size"],
+        },
+    }
+
+
+def _first_output_shape(kernel_ir: Mapping[str, Any]) -> list[str] | None:
+    args = kernel_ir.get("args", ())
+    if not isinstance(args, list):
+        return None
+    for argument in args:
+        if not isinstance(argument, Mapping):
+            continue
+        if str(argument.get("role")) in {"output", "inout"}:
+            return [str(value) for value in argument.get("shape", ())]
+    return None
 
 
 def _validate_arknife_payload(arknife: Mapping[str, Any], *, arch: Any) -> None:

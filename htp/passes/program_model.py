@@ -920,7 +920,8 @@ def _distribution_from_buffer_layouts(
     payload = buffer_layouts.get(buffer_name, {})
     distribution = payload.get("distribution", {}) if isinstance(payload, Mapping) else {}
     dims = distribution.get("dims", ()) if isinstance(distribution, Mapping) else ()
-    return distribution_from_payload(list(dims), rank=rank)
+    resolved_rank = rank or len(list(dims))
+    return distribution_from_payload(list(dims), rank=resolved_rank)
 
 
 def _layout_joins(kernel_ir: Mapping[str, Any], layout: Mapping[str, Any]) -> list[dict[str, Any]]:

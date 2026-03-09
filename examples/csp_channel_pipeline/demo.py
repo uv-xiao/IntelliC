@@ -5,13 +5,22 @@ from pathlib import Path
 from typing import Any
 
 from htp import bind, compile_program
-from htp.csp import fifo, get, process, put
 from htp.csp import program as csp_program
-from htp.kernel import buffer, kernel, scalar, store
+from htp.kernel import (
+    barrier,
+    broadcast,
+    buffer,
+    channel_recv,
+    channel_send,
+    kernel,
+    reduction_sum,
+    scalar,
+    store,
+)
 
 
 @kernel
-def gemm_tile(
+def channel_stage(
     A: buffer(dtype="f32", shape=("M", "K"), role="input"),
     B: buffer(dtype="f32", shape=("K", "N"), role="input"),
     C: buffer(dtype="f32", shape=("M", "N"), role="output"),
@@ -19,40 +28,47 @@ def gemm_tile(
     N: scalar(dtype="i32", role="shape"),
     K: scalar(dtype="i32", role="shape"),
 ) -> None:
-    """Pipeline kernel used by the producer and consumer processes."""
+    """Streaming tile stage with explicit channel protocol effects."""
 
-    store(C, A @ B)
+    channel_recv("tiles", out="tile_payload", dtype="f32")
+    reduction_sum("tile_payload", out="tile_summary", axis=0, dtype="f32")
+    channel_send("tile_summary", channel="partials")
+    channel_recv("partials", out="merged_summary", dtype="f32")
+    broadcast("merged_summary", out="expanded_summary", shape=("M", "N"), dtype="f32")
+    barrier()
+    store(C, "expanded_summary")
 
 
-CSP_PIPELINE_PROGRAM: dict[str, Any] = csp_program(
-    entry="pipeline_demo",
-    target="nvgpu-ampere",
-    kernel=gemm_tile,
-    channels=[fifo("tiles", dtype="f32", capacity=2)],
-    processes=[
-        process(
-            "producer",
-            task_id="p0",
-            kernel=gemm_tile,
-            args=("A", "B", "C", "M", "N", "K"),
-            steps=[put("tiles")],
-        ),
-        process(
-            "consumer",
-            task_id="p1",
-            kernel=gemm_tile,
-            args=("A", "B", "C", "M", "N", "K"),
-            steps=[get("tiles")],
-        ),
-    ],
-)
+@csp_program(target="nvgpu-ampere", kernel=channel_stage)
+def token_pipeline(p) -> None:
+    tiles = p.fifo("tiles", dtype="f32", capacity=2)
+    partials = p.fifo("partials", dtype="f32", capacity=1)
+
+    p.process(
+        "dispatch_tiles",
+        task_id="dispatch_tiles",
+        kernel=channel_stage,
+        args=("A", "B", "C", "M", "N", "K"),
+    ).put(tiles)
+    p.process(
+        "combine_tiles",
+        task_id="combine_tiles",
+        kernel=channel_stage,
+        args=("A", "B", "C", "M", "N", "K"),
+    ).get(tiles).put(partials)
+    p.process(
+        "writeback_tiles",
+        task_id="writeback_tiles",
+        kernel=channel_stage,
+        args=("A", "B", "C", "M", "N", "K"),
+    ).get(partials)
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
     package = compile_program(
         package_dir=Path(output_dir),
         target="nvgpu-ampere",
-        program=dict(CSP_PIPELINE_PROGRAM),
+        program=token_pipeline,
     )
     return {
         "package_dir": package.package_dir.as_posix(),

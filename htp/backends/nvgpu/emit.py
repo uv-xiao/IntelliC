@@ -182,6 +182,8 @@ def _kernel_source(kernel: NVGPUKernelSpec) -> str:
         return _arknife_kernel_source(kernel)
     if kernel.op == "matmul":
         return _matmul_kernel_source(kernel)
+    if kernel.op == "composite":
+        return _composite_kernel_source(kernel)
     return _fused_elementwise_source(kernel)
 
 
@@ -296,6 +298,46 @@ def _fused_elementwise_source(kernel: NVGPUKernelSpec) -> str:
             statements.append(f"  {param.name}[idx] = {env[param.name]};")
     statements.extend(["}", ""])
     return "\n".join(statements)
+
+
+def _composite_kernel_source(kernel: NVGPUKernelSpec) -> str:
+    attrs = kernel.attrs
+    lowered_ops = attrs.get("ops", [])
+    comment_lines = ["// HTP composite kernel fallback", *[f"// op: {dict(op)}" for op in lowered_ops]]
+    size_expr = _linear_extent_expr(kernel)
+    input_buffers = [param for param in kernel.params if param.kind == "buffer" and param.role == "input"]
+    output_buffers = [
+        param for param in kernel.params if param.kind == "buffer" and param.role in {"output", "inout"}
+    ]
+    write_expr = f"{input_buffers[0].name}[idx]" if input_buffers else "0.0f"
+    statements = [
+        "#include <cuda_runtime.h>",
+        "#include <math.h>",
+        "",
+        *comment_lines,
+        "",
+        f'extern "C" __global__ void {kernel.func_id}({_param_signature(kernel)}) {{',
+        "  const int idx = blockIdx.x * blockDim.x + threadIdx.x;",
+        f"  if (idx >= {size_expr}) {{",
+        "    return;",
+        "  }",
+    ]
+    for param in output_buffers:
+        statements.append(f"  {param.name}[idx] = {write_expr};")
+    statements.extend(["}", ""])
+    return "\n".join(statements)
+
+
+def _linear_extent_expr(kernel: NVGPUKernelSpec) -> str:
+    for param in kernel.params:
+        if param.kind != "buffer" or param.role not in {"output", "inout"}:
+            continue
+        if not param.shape:
+            break
+        dims = [str(dim) for dim in param.shape if str(dim)]
+        if dims:
+            return " * ".join(dims)
+    return "size"
 
 
 def _param_signature(kernel: NVGPUKernelSpec) -> str:
