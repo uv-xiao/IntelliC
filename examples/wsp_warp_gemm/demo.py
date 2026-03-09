@@ -20,11 +20,11 @@ def warp_mainloop_tile(
 ) -> None:
     """Warp-level GEMM mainloop with staged copies and tensor-core math."""
 
-    async_copy(A, target="a_shared", dtype="f32")
-    async_copy(B, target="b_shared", dtype="f32")
+    a_shared = async_copy(A, dtype="f32", memory_space="shared")
+    b_shared = async_copy(B, dtype="f32", memory_space="shared")
     barrier()
-    mma("a_shared", "b_shared", out="accum", m=M, n=N, k=K, dtype="f32")
-    store(C, "accum")
+    accum = mma(a_shared, b_shared, m=M, n=N, k=K, dtype="f32")
+    store(C, accum)
 
 
 @wsp_program(target="nvgpu-ampere", kernel=warp_mainloop_tile)

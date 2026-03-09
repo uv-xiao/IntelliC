@@ -30,13 +30,13 @@ def channel_stage(
 ) -> None:
     """Streaming tile stage with explicit channel protocol effects."""
 
-    channel_recv("tiles", out="tile_payload", dtype="f32")
-    reduction_sum("tile_payload", out="tile_summary", axis=0, dtype="f32")
-    channel_send("tile_summary", channel="partials")
-    channel_recv("partials", out="merged_summary", dtype="f32")
-    broadcast("merged_summary", out="expanded_summary", shape=("M", "N"), dtype="f32")
+    tile_payload = channel_recv("tiles", dtype="f32", shape=("M", "N"))
+    tile_summary = reduction_sum(tile_payload, axis=0, dtype="f32", shape=("N",))
+    channel_send(tile_summary, channel="partials")
+    merged_summary = channel_recv("partials", dtype="f32", shape=("N",))
+    expanded_summary = broadcast(merged_summary, shape=("M", "N"), dtype="f32")
     barrier()
-    store(C, "expanded_summary")
+    store(C, expanded_summary)
 
 
 @csp_program(target="nvgpu-ampere", kernel=channel_stage)

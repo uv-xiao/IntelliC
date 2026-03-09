@@ -18,25 +18,25 @@ Finish the written AST-centric comparison against LittleKernel and use that anal
 
 ## Scope Checklist
 
-- [ ] study the relevant LittleKernel and PyPTO reference surfaces
-- [ ] write the full comparison report under `docs/todo/reports/littlekernel_ast_comparison.md`
-- [ ] extract concrete surface requirements from that comparison
-- [ ] implement at least one meaningful public-surface improvement implied by the comparison
-- [ ] update examples/tests/docs to reflect the improvement
-- [ ] close the programming-surface TODO entry in `docs/todo/02_programming_surfaces.md`
+- [x] study the relevant LittleKernel and PyPTO reference surfaces
+- [x] write the full comparison report under `docs/design/07_littlekernel_ast_comparison.md`
+- [x] extract concrete surface requirements from that comparison
+- [x] implement at least one meaningful public-surface improvement implied by the comparison
+- [x] update examples/tests/docs to reflect the improvement
+- [x] close the programming-surface TODO entry in `docs/todo/02_programming_surfaces.md`
 
 ## Code Surfaces
 
 - producer: `htp/kernel.py`, `htp/routine.py`, `htp/wsp/__init__.py`, `htp/csp/__init__.py`, and example demos if the comparison implies a surface change
-- docs: `docs/design/02_programming_surfaces.md`, `docs/todo/02_programming_surfaces.md`, `docs/todo/reports/littlekernel_ast_comparison.md`, example-local `README.md`
+- docs: `docs/design/02_programming_surfaces.md`, `docs/design/07_littlekernel_ast_comparison.md`, `docs/todo/02_programming_surfaces.md`, example-local `README.md`
 - tests: targeted public-surface and example tests that defend the specific new improvement
 
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one regression test for the surface improvement
-- [ ] one example updated to use the improved surface
+- [x] one happy-path test
+- [x] one regression test for the surface improvement
+- [x] one example updated to use the improved surface
 - [ ] `pytest -q`
 - [ ] `pre-commit run --all-files`
 

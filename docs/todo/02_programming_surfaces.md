@@ -5,9 +5,9 @@ This layer tracks the remaining gap between today’s authoring surfaces and the
 ## Completion snapshot
 
 - total checklist items: 10
-- complete: 9
+- complete: 10
 - partial: 0
-- open: 1
+- open: 0
 
 ## Detailed checklist
 
@@ -28,20 +28,22 @@ This layer tracks the remaining gap between today’s authoring surfaces and the
 - [x] Make serving routines a broader first-class public programming surface.
 
 ### Comparative analysis
-- [ ] Finish the written AST-centric comparison against LittleKernel and turn it into the next round of surface requirements.
+- [x] Finish the written AST-centric comparison against LittleKernel and turn it into the next round of surface requirements.
 
 ## Why these tasks remain
 
-The public surface and examples are now materially stronger: PTO examples cover
-vector add, SwiGLU, GELU, and a broader arithmetic DAG; WSP/CSP public examples
-now use decorator/builder authoring instead of direct dict assembly; and the
-LittleKernel-calibrated WSP and CSP protocol examples both carry richer staged
-intent than a single `store(C, A @ B)` body. Arknife has also been pulled onto
-native `htp.kernel.KernelValue` objects so explicit hardware/layout authoring
-no longer depends on a sidecar tensor type. The remaining gap in this layer is
-no longer “make the surface readable at all”. It is the written comparative
-analysis tracked in `docs/todo/reports/littlekernel_ast_comparison.md`, which
-should drive the next front-end pass.
+This layer is currently closed as a standalone surface gap. The public surface
+and examples are materially stronger: PTO examples cover vector add, SwiGLU,
+GELU, and a broader arithmetic DAG; WSP/CSP public examples use
+decorator/builder authoring instead of direct dict assembly; the
+LittleKernel-calibrated WSP and CSP examples carry richer staged intent than a
+single `store(C, A @ B)` body; and the completed LittleKernel comparison has
+already driven one more surface pass by making staged data-movement and
+protocol-style ops return typed temporaries instead of forcing string scratch
+names.
+
+Future surface work now belongs to the adjacent semantic and backend layers,
+not to a standalone programming-surface comparison gap.
 
 ## Coding pointers
 
@@ -57,4 +59,4 @@ Relevant anchors:
 - `references/pypto/examples/language/`
 - `references/arknife/tests/python/`
 - `references/triton-distributed-knowingnothing/python/little_kernel/`
-- `docs/todo/reports/littlekernel_ast_comparison.md`
+- `docs/design/07_littlekernel_ast_comparison.md`
