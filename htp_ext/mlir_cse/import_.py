@@ -60,7 +60,7 @@ def import_program(program: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str
 
 def import_program_from_module(
     module_text: str, ledger: Mapping[str, Any]
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
     parsed = _parse_module(module_text)
     ledger_by_result = {
         str(item["mlir_result"]): dict(item)
@@ -124,12 +124,60 @@ def import_program_from_module(
         "inputs": args,
         "result": result_symbol,
     }
-    return imported_program, {
-        "schema": "htp_ext.mlir_cse.import_summary.v1",
-        "entry": str(parsed["entry"]),
+    entity_map = {
+        "schema": "htp.map.entity.v1",
+        "kind": "mlir_import",
+        "preserved": [
+            {
+                "entity_id": str(item["entity_id"]),
+                "target": str(item["target"]),
+                "mlir_result": str(item["mlir_result"]),
+            }
+            for item in ledger.get("ops", ())
+            if isinstance(item, Mapping) and str(item.get("mlir_result")) in surviving_targets
+        ],
         "rewrites": rewrites,
-        "result": result_symbol,
     }
+    binding_map = {
+        "schema": "htp.map.binding.v1",
+        "kind": "mlir_import",
+        "preserved": [
+            {
+                "binding_id": str(item["binding_id"]),
+                "name": str(item["name"]),
+                "mlir_values": list(item.get("mlir_values", ())),
+            }
+            for item in ledger.get("binding_links", ())
+            if isinstance(item, Mapping)
+        ],
+        "rewrites": [
+            {
+                "eliminated_binding": f"{parsed['entry']}:B:{item['eliminated_target']}",
+                "reused_binding": f"{parsed['entry']}:B:{item['reused_target']}",
+            }
+            for item in rewrites
+        ],
+    }
+    return (
+        imported_program,
+        {
+            "schema": "htp_ext.mlir_cse.import_summary.v1",
+            "entry": str(parsed["entry"]),
+            "rewrites": rewrites,
+            "result": result_symbol,
+            "entity_counts": {
+                "preserved": len(entity_map["preserved"]),
+                "introduced": 0,
+                "rewritten": len(rewrites),
+            },
+            "binding_counts": {
+                "preserved": len(binding_map["preserved"]),
+                "rewritten": len(binding_map["rewrites"]),
+            },
+        },
+        entity_map,
+        binding_map,
+    )
 
 
 _FUNC_RE = re.compile(r"func\.func\s+@(?P<entry>[A-Za-z_][\w]*)\((?P<args>[^)]*)\)\s*->\s*i32\s*\{")

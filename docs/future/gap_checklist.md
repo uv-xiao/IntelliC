@@ -315,11 +315,11 @@ Checklist:
 - `[x]` Record the exact MLIR pass pipeline used, not only the net result.
 - `[x]` Parse and import real transformed MLIR rather than doing Python-side CSE
   and treating MLIR as a side artifact.
-- `[ ]` Implement explicit eligible-subset matching over canonical typed program
+- `[x]` Implement explicit eligible-subset matching over canonical typed program
   structure, not only scalar elementwise kernel normalization.
-- `[ ]` Add `entity_map.json` and `binding_map.json` emission for non-trivial
+- `[x]` Add `entity_map.json` and `binding_map.json` emission for non-trivial
   rewrites.
-- `[ ]` Preserve or rebind identities according to the import policy described
+- `[~]` Preserve or rebind identities according to the import policy described
   in the future docs.
 - `[x]` Add malformed-island validation and round-trip correctness tests.
 - `[~]` Make solver-visible extension composition cover MLIR island entry/exit

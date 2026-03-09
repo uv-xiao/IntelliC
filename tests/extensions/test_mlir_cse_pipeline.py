@@ -101,6 +101,8 @@ def test_mlir_extension_writes_full_roundtrip_artifact_set(tmp_path: Path):
     assert (export_dir / "ledger.json").exists()
     assert (import_dir / "output.mlir").exists()
     assert (import_dir / "import_summary.json").exists()
+    assert (package_dir / "ir" / "stages" / import_stage["id"] / "maps" / "entity_map.json").exists()
+    assert (package_dir / "ir" / "stages" / import_stage["id"] / "maps" / "binding_map.json").exists()
 
 
 def test_mlir_extension_imports_transformed_output_mlir(tmp_path: Path):
@@ -141,3 +143,42 @@ def test_mlir_extension_rejects_malformed_output_module():
 
     with pytest.raises(ValueError, match="unknown SSA value"):
         import_program_from_module(malformed_module, ledger)
+
+
+def test_mlir_extension_eligibility_rejects_protocol_heavy_program():
+    from htp_ext.mlir_cse.export import eligibility_for
+
+    program = {
+        "entry": "channel_kernel",
+        "kernel": {
+            "name": "channel_kernel",
+            "args": [
+                {"name": "value", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
+                {"name": "channel", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
+            ],
+            "ops": [
+                {"op": "channel_send", "value": "value", "channel": "channel", "outputs": []},
+            ],
+        },
+        "workload": {
+            "entry": "channel_kernel",
+            "tasks": [
+                {
+                    "task_id": "task0",
+                    "kind": "kernel_call",
+                    "kernel": "channel_kernel",
+                    "args": ["value", "channel"],
+                }
+            ],
+            "channels": [{"name": "channel", "dtype": "i32", "capacity": 1, "protocol": "fifo"}],
+            "dependencies": [],
+            "processes": [{"name": "worker", "task_id": "task0", "kernel": "channel_kernel"}],
+        },
+    }
+
+    eligibility = eligibility_for(program)
+
+    assert eligibility["ok"] is False
+    assert "typed.no_channels" in eligibility["failed_rules"]
+    assert "typed.scalar_i32_only" in eligibility["satisfied_rules"]
+    assert "typed.expr_program" in eligibility["failed_rules"]

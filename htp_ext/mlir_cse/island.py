@@ -58,7 +58,9 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
     normalized_program = normalize_expr_program(program)
     input_mlir, ledger = export_program(normalized_program)
     output_mlir, _transform = _run_mlir_cse_pipeline(input_mlir)
-    imported_program, import_summary = import_program_from_module(output_mlir, ledger)
+    imported_program, import_summary, entity_map, binding_map = import_program_from_module(
+        output_mlir, ledger
+    )
     analysis = analyze_program(normalized_program)
     _write_extension_artifacts(
         package_path,
@@ -67,6 +69,8 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
         eligibility=eligibility,
         ledger=ledger,
         import_summary=import_summary,
+        entity_map=entity_map,
+        binding_map=binding_map,
     )
     _write_stage_island_artifacts(
         package_path,
@@ -75,6 +79,8 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
         eligibility=eligibility,
         ledger=ledger,
         import_summary=import_summary,
+        entity_map=entity_map,
+        binding_map=binding_map,
     )
 
     export_program_state = _semanticize_expr_program(normalized_program)
@@ -140,6 +146,8 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
                 "extension": EXTENSION_ID,
                 "rewrites": import_summary["rewrites"],
             },
+            entity_map_payload=entity_map,
+            binding_map_payload=binding_map,
         ),
     )
     manifest = write_manifest(package_path, current_stage="s02", stages=[stage_export, stage_import])
@@ -152,6 +160,8 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
             "ledger": (EXTENSION_DIR / "ledger.json").as_posix(),
             "eligibility": (EXTENSION_DIR / "eligibility.json").as_posix(),
             "import_summary": (EXTENSION_DIR / "import_summary.json").as_posix(),
+            "entity_map": (EXTENSION_DIR / "entity_map.json").as_posix(),
+            "binding_map": (EXTENSION_DIR / "binding_map.json").as_posix(),
         }
     }
     manifest_path = package_path / "manifest.json"
@@ -248,7 +258,9 @@ def run_import_pass(
     normalized_program = normalize_expr_program(program)
     input_mlir, ledger = export_program(normalized_program)
     output_mlir, _transform = _run_mlir_cse_pipeline(input_mlir)
-    imported_program, import_summary = import_program_from_module(output_mlir, ledger)
+    imported_program, import_summary, entity_map, binding_map = import_program_from_module(
+        output_mlir, ledger
+    )
     next_program = _program_state_from_expr_program(imported_program, template_program=program)
     stage_payloads = stage_payloads_from_program(next_program)
     return next_program, PassResult(
@@ -271,6 +283,8 @@ def run_import_pass(
             StageFile(path="islands/mlir_cse/output.mlir", text=output_mlir),
             StageFile(path="islands/mlir_cse/import_summary.json", payload=dict(import_summary)),
         ),
+        entity_map_payload=entity_map,
+        binding_map_payload=binding_map,
         summary_payload={
             "extension": EXTENSION_ID,
             "pass": IMPORT_PASS_ID,
@@ -305,6 +319,8 @@ def _write_extension_artifacts(
     eligibility: Mapping[str, Any],
     ledger: Mapping[str, Any],
     import_summary: Mapping[str, Any],
+    entity_map: Mapping[str, Any],
+    binding_map: Mapping[str, Any],
 ) -> None:
     extension_dir = package_path / EXTENSION_DIR
     extension_dir.mkdir(parents=True, exist_ok=True)
@@ -314,6 +330,8 @@ def _write_extension_artifacts(
     (extension_dir / "eligibility.json").write_text(json.dumps(dict(eligibility), indent=2) + "\n")
     (extension_dir / "ledger.json").write_text(json.dumps(dict(ledger), indent=2) + "\n")
     (extension_dir / "import_summary.json").write_text(json.dumps(dict(import_summary), indent=2) + "\n")
+    (extension_dir / "entity_map.json").write_text(json.dumps(dict(entity_map), indent=2) + "\n")
+    (extension_dir / "binding_map.json").write_text(json.dumps(dict(binding_map), indent=2) + "\n")
 
 
 def _write_stage_island_artifacts(
@@ -324,6 +342,8 @@ def _write_stage_island_artifacts(
     eligibility: Mapping[str, Any],
     ledger: Mapping[str, Any],
     import_summary: Mapping[str, Any],
+    entity_map: Mapping[str, Any],
+    binding_map: Mapping[str, Any],
 ) -> None:
     export_dir = package_path / EXPORT_STAGE_DIR
     import_dir = package_path / IMPORT_STAGE_DIR
@@ -335,6 +355,8 @@ def _write_stage_island_artifacts(
     (export_dir / "ledger.json").write_text(json.dumps(dict(ledger), indent=2) + "\n")
     (import_dir / "output.mlir").write_text(output_mlir)
     (import_dir / "import_summary.json").write_text(json.dumps(dict(import_summary), indent=2) + "\n")
+    (import_dir / "entity_map.json").write_text(json.dumps(dict(entity_map), indent=2) + "\n")
+    (import_dir / "binding_map.json").write_text(json.dumps(dict(binding_map), indent=2) + "\n")
 
 
 def _run_mlir_cse_pipeline(module_text: str) -> tuple[str, dict[str, Any]]:
