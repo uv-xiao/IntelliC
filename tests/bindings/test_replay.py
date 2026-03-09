@@ -161,7 +161,7 @@ def run(*args, **kwargs):
     assert result.diagnostics[0]["node_id"] == "node.intrinsic.7"
     assert result.diagnostics[0]["artifact_ref"] == "ir/stages/s01/replay/stubs.json"
     assert result.diagnostics[0]["payload_ref"] == "ir/stages/s01/replay/stubs.json"
-    assert result.diagnostics[0]["fix_hints_ref"] == "docs/design/impls/09_debuggability.md"
+    assert result.diagnostics[0]["fix_hints_ref"] == "docs/design/layers/04_artifacts_replay_debug.md"
     assert result.trace_ref == "ir/stages/s01/replay/stubs.json"
 
 

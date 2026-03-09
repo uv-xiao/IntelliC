@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- none currently
+- `003-docs-layered-rewrite.md` — thorough layered rewrite of `docs/design`, `docs/todo`, and `docs/story.md`

@@ -197,7 +197,7 @@ def test_explain_diagnostic_returns_contract_reference():
     assert explanation["known"] is True
     assert explanation["title"] == "Missing contract artifact"
     assert explanation["fix_hint_policy"] == "rebuild_or_validate_artifacts"
-    assert "docs/design/impls/07_binding_interface.md" in explanation["docs"]
+    assert "docs/design/layers/04_artifacts_replay_debug.md" in explanation["docs"]
 
 
 def test_explain_diagnostic_uses_family_catalog_for_protocol_codes():
@@ -217,7 +217,7 @@ def test_explain_diagnostic_uses_replay_family_catalog():
     assert explanation["known"] is True
     assert explanation["matched_by"] == "family"
     assert explanation["fix_hint_policy"] == "inspect_replay_stub_and_stage_evidence"
-    assert "docs/design/impls/09_debuggability.md" in explanation["docs"]
+    assert "docs/design/layers/04_artifacts_replay_debug.md" in explanation["docs"]
 
 
 def test_explain_diagnostic_returns_generic_fallback_for_unknown_code():

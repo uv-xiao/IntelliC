@@ -6,7 +6,6 @@ import subprocess
 REQUIRED_BASE = "htp/dev"
 REQUIRED_PREFIX = "htp/feat-"
 SUMMARY_PATH = "docs/todo/README.md"
-DETAIL_PATH = "docs/todo/gap_checklist.md"
 SYNC_PREFIXES = ("htp/", "htp_ext/", "examples/", "docs/design/")
 
 
@@ -29,8 +28,6 @@ def main() -> int:
     if _requires_todo_sync(changed_files):
         if SUMMARY_PATH not in changed_files:
             errors.append(f"Changes touching {', '.join(SYNC_PREFIXES)} must also update '{SUMMARY_PATH}'.")
-        if DETAIL_PATH not in changed_files:
-            errors.append(f"Changes touching {', '.join(SYNC_PREFIXES)} must also update '{DETAIL_PATH}'.")
 
     if errors:
         for error in errors:

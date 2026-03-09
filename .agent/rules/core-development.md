@@ -2,7 +2,7 @@
 
 - Treat `htp/dev` as stable and CI-passed.
 - Start feature work on `htp/feat-<topic>` branches only.
-- Pick features from `docs/todo/README.md` and the detailed docs under `docs/todo/`.
+- Pick features from `docs/todo/README.md` and the layer docs under `docs/todo/layers/`.
 - Create a task file under `docs/in_progress/` as the first commit on the branch.
 - Keep the canonical compiler form in Python-space.
 - Preserve runnable `sim` replay for stage programs.
@@ -11,7 +11,7 @@
 - Keep changes narrow and local; fix the contract boundary rather than symptoms downstream.
 - Do not respond to failures by weakening tests or CI unless the repository contract intentionally changed.
 - Use Python 3.10+ idioms and explicit type annotations on public APIs.
-- Before merge, move landed behavior into `docs/design/`, update `docs/todo/`, and remove the corresponding file from `docs/in_progress/`.
+- Before merge, move landed behavior into `docs/design/`, update `docs/todo/README.md` plus the affected `docs/todo/layers/*.md`, and remove the corresponding file from `docs/in_progress/`.
 
 ## Example and test authoring
 

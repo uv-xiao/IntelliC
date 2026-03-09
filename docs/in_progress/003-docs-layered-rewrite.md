@@ -3,7 +3,7 @@
 - ID: `003-docs-layered-rewrite`
 - Branch: `htp/feat-docs-layered-rewrite`
 - PR: `TBD`
-- Status: `in_progress`
+- Status: `in_review`
 - Owner: `Codex`
 
 ## Goal
@@ -18,15 +18,15 @@ Rewrite the repository documentation so `docs/design/` and `docs/todo/` are both
 
 ## Scope Checklist
 
-- [ ] define the target layered structure for `docs/design/` and `docs/todo/`
-- [ ] rewrite `docs/design/README.md` into an architecture-first index
-- [ ] rewrite `docs/design/` into layered, code-backed documents with narrative and visual description
-- [ ] rewrite `docs/todo/README.md` into a true checklist summary
-- [ ] rewrite `docs/todo/` into layered future-feature documents
-- [ ] rewrite `docs/story.md` as the top-level intended framework narrative
-- [ ] remove obsolete leftover docs shapes and stale duplication
-- [ ] update repo guidance if doc lifecycle rules change
-- [ ] verify tree shape and references
+- [x] define the target layered structure for `docs/design/` and `docs/todo/`
+- [x] rewrite `docs/design/README.md` into an architecture-first index
+- [x] rewrite `docs/design/` into layered, code-backed documents with narrative and visual description
+- [x] rewrite `docs/todo/README.md` into a true checklist summary
+- [x] rewrite `docs/todo/` into layered future-feature documents
+- [x] rewrite `docs/story.md` as the top-level intended framework narrative
+- [x] remove obsolete leftover docs shapes and stale duplication
+- [x] update repo guidance if doc lifecycle rules change
+- [x] verify tree shape and references
 
 ## Code Surfaces
 
@@ -38,17 +38,17 @@ Rewrite the repository documentation so `docs/design/` and `docs/todo/` are both
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path policy/layout test if automation changes
-- [ ] one malformed-input / contract-violation test if automation changes
-- [ ] one regression test for the doc-layout expectations if needed
-- [ ] human-readable docs structure verified
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path policy/layout test if automation changes
+- [x] one malformed-input / contract-violation test if automation changes
+- [x] one regression test for the doc-layout expectations if needed
+- [x] human-readable docs structure verified
+- [x] `pixi run verify` or documented fallback
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for the implemented layered structure
-- [ ] update `docs/todo/` for the remaining layered structure
-- [ ] update `docs/story.md`
+- [x] update `docs/design/` for the implemented layered structure
+- [x] update `docs/todo/` for the remaining layered structure
+- [x] update `docs/story.md`
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan
