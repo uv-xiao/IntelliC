@@ -86,6 +86,7 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
             "Layout.Typed@1": True,
         },
         "effect_invariants": {
+            "Effects.ProtocolBalanced@1": True,
             "Effects.Typed@1": True,
         },
     }
