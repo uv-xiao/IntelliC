@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from htp.backends.declarations import BackendSolverDeclaration
+from htp.backends.declarations import ArtifactContract, BackendSolverDeclaration
 from htp.backends.nvgpu.declarations import declaration_for as nvgpu_declaration_for
 from htp.backends.pto.declarations import declaration_for as pto_declaration_for
 from htp.bindings.validate import load_manifest
@@ -357,13 +357,17 @@ def _backend_declaration(target: dict[str, str]) -> BackendSolverDeclaration:
         return pto_declaration_for(option)
     if backend == "nvgpu":
         return nvgpu_declaration_for(option)
+    if backend == "aie":
+        from htp_ext.aie.declarations import declaration_for as aie_declaration_for
+
+        return aie_declaration_for(option)
     return BackendSolverDeclaration(
         backend=backend,
         variant=option or "default",
         hardware_profile=f"{backend}:{option or 'default'}",
         target_capabilities=(),
         supported_ops=("elementwise_binary", "matmul"),
-        required_outputs=(),
+        artifact_contract=ArtifactContract(outputs=()),
     )
 
 

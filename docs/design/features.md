@@ -53,6 +53,7 @@ Main anchors:
 Implemented today:
 
 - kernel-style program descriptions compiled through `htp.compile_program(...)`
+- `htp.compile_program(...)` target support for `pto-*`, `nvgpu-*`, and `aie-*`
 - WSP authoring helpers under `htp.wsp`
 - CSP authoring helpers under `htp.csp`
 - code-backed examples for:
@@ -114,7 +115,7 @@ Implemented today:
 
 - PTO package emission and real `a2a3sim` execution
 - NV-GPU `.cu`-first package emission and real CUDA execution
-- AIE extension-owned artifact path
+- AIE extension-owned artifact path plus `compile_program(...)` target support
 - normalized binding lifecycle:
   - `validate`
   - `build`
@@ -122,12 +123,15 @@ Implemented today:
   - `run`
   - `replay`
 - structured binding log payloads with schema `htp.binding_log.v1`
+- shared backend artifact contracts consumed by emitters, solver required outputs, and binding path validation
 
 Main anchors:
 
 - `htp/backends/pto/`
 - `htp/backends/nvgpu/`
+- `htp/backends/declarations.py`
 - `htp/bindings/`
+- `htp_ext/aie/declarations.py`
 - `htp_ext/aie/emit.py`
 
 ## 7. Tooling for verification and agent work

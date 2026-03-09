@@ -7,12 +7,11 @@ from typing import Any
 
 from htp.schemas import MANIFEST_SCHEMA_ID
 
+from .declarations import NVGPU_PROJECT_DIR, NVGPU_TOOLCHAIN_PATH, declaration_for
 from .lower import NVGPUCodegenPlan, NVGPUKernelSpec, lower_program
 
 NVGPU_CODEGEN_SCHEMA_ID = "htp.nvgpu.codegen.v1"
 NVGPU_TOOLCHAIN_SCHEMA_ID = "htp.nvgpu.toolchain.v1"
-NVGPU_PROJECT_DIR = PurePosixPath("codegen/nvgpu")
-NVGPU_TOOLCHAIN_PATH = PurePosixPath("build/toolchain.json")
 
 
 def emit_package(
@@ -41,12 +40,7 @@ def emit_package(
     manifest["target"] = target
 
     outputs = dict(manifest.get("outputs", {}))
-    outputs.update(
-        {
-            "nvgpu_codegen_index": (NVGPU_PROJECT_DIR / "nvgpu_codegen.json").as_posix(),
-            "toolchain_manifest": NVGPU_TOOLCHAIN_PATH.as_posix(),
-        }
-    )
+    outputs.update(declaration_for(profile).artifact_contract.as_manifest_outputs())
     manifest["outputs"] = outputs
 
     extensions = dict(manifest.get("extensions", {}))

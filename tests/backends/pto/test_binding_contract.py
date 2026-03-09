@@ -654,16 +654,22 @@ def test_pto_binding_rejects_noncanonical_output_paths(tmp_path):
             "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
             "detail": "manifest.json outputs.kernel_config must use the canonical PTO artifact path.",
             "manifest_field": "outputs.kernel_config",
+            "expected_value": "codegen/pto/kernel_config.py",
+            "manifest_value": "alt/kernel_config.py",
         },
         {
             "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
             "detail": "manifest.json outputs.pto_codegen_index must use the canonical PTO artifact path.",
             "manifest_field": "outputs.pto_codegen_index",
+            "expected_value": "codegen/pto/pto_codegen.json",
+            "manifest_value": "alt/pto_codegen.json",
         },
         {
             "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
             "detail": "manifest.json outputs.toolchain_manifest must use the canonical PTO artifact path.",
             "manifest_field": "outputs.toolchain_manifest",
+            "expected_value": "build/toolchain.json",
+            "manifest_value": "alt/toolchain.json",
         },
         {
             "code": "HTP.BINDINGS.PTO_MISSING_CONTRACT_FILE",

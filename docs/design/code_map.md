@@ -63,6 +63,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 
 - `htp_ext/mlir_cse/` — MLIR CSE round-trip extension, including registered export/import passes and identity maps
 - `htp_ext/aie/emit.py` — AIE artifact emission extension
+- `htp_ext/aie/declarations.py` — AIE solver-visible capability and artifact declarations
 - `htp/bindings/aie.py` — AIE package validation and replay binding
 
 ## Examples

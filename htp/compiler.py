@@ -28,8 +28,8 @@ def parse_target(target: str) -> TargetSpec:
     if not target or not isinstance(target, str):
         raise ValueError("target must be a non-empty string")
     backend, separator, option = target.partition("-")
-    if backend not in {"pto", "nvgpu"}:
-        raise ValueError(f"Unsupported target backend {backend!r}; expected one of: nvgpu, pto")
+    if backend not in {"pto", "nvgpu", "aie"}:
+        raise ValueError(f"Unsupported target backend {backend!r}; expected one of: aie, nvgpu, pto")
     return TargetSpec(backend=backend, option=(option if separator else None))
 
 
@@ -109,6 +109,11 @@ def _emit_backend_package(*, package_dir: Path, target_spec: TargetSpec, program
         from htp.backends.nvgpu.emit import emit_package as emit_nvgpu_package
 
         emit_nvgpu_package(package_dir, program=program, profile=target_spec.option)
+        return
+    if target_spec.backend == "aie":
+        from htp_ext.aie.emit import emit_package as emit_aie_package
+
+        emit_aie_package(package_dir, program=program, profile=target_spec.option or "xdna2-npu1")
         return
     raise AssertionError(f"Unhandled target backend: {target_spec.backend}")
 

@@ -7,19 +7,23 @@ from pathlib import Path
 from typing import Any
 
 from htp.backends.pto.arch import arch_for
+from htp.backends.pto.declarations import declaration_for as pto_declaration_for
 from htp.backends.pto.emit import (
     PTO_CODEGEN_SCHEMA_ID,
     PTO_PROJECT_DIR,
-    PTO_TOOLCHAIN_PATH,
     PTO_TOOLCHAIN_SCHEMA_ID,
 )
 
 from . import pto_runtime_adapter
 from .base import BuildResult, LoadResult, ManifestBinding, RunResult, ValidationResult
 
-DEFAULT_KERNEL_CONFIG = (PTO_PROJECT_DIR / "kernel_config.py").as_posix()
-DEFAULT_CODEGEN_INDEX = (PTO_PROJECT_DIR / "pto_codegen.json").as_posix()
-DEFAULT_TOOLCHAIN_MANIFEST = PTO_TOOLCHAIN_PATH.as_posix()
+
+def _contract_outputs(variant: str | None) -> dict[str, str]:
+    try:
+        declaration = pto_declaration_for(variant)
+    except ValueError:
+        declaration = pto_declaration_for(None)
+    return declaration.artifact_contract.as_manifest_outputs()
 
 
 class PTOLoadResult(LoadResult):
@@ -501,17 +505,24 @@ class PTOBinding(ManifestBinding):
         return diagnostics
 
     def _required_paths(self) -> tuple[str, str, str]:
+        outputs_contract = _contract_outputs(self.variant)
         outputs = self.manifest.get("outputs")
         if not isinstance(outputs, Mapping):
-            return DEFAULT_KERNEL_CONFIG, DEFAULT_CODEGEN_INDEX, DEFAULT_TOOLCHAIN_MANIFEST
+            return (
+                outputs_contract["kernel_config"],
+                outputs_contract["pto_codegen_index"],
+                outputs_contract["toolchain_manifest"],
+            )
 
         kernel_config = outputs.get("kernel_config")
         codegen_index = outputs.get("pto_codegen_index")
         toolchain_manifest = outputs.get("toolchain_manifest")
         return (
-            kernel_config if isinstance(kernel_config, str) else DEFAULT_KERNEL_CONFIG,
-            codegen_index if isinstance(codegen_index, str) else DEFAULT_CODEGEN_INDEX,
-            toolchain_manifest if isinstance(toolchain_manifest, str) else DEFAULT_TOOLCHAIN_MANIFEST,
+            kernel_config if isinstance(kernel_config, str) else outputs_contract["kernel_config"],
+            codegen_index if isinstance(codegen_index, str) else outputs_contract["pto_codegen_index"],
+            toolchain_manifest
+            if isinstance(toolchain_manifest, str)
+            else outputs_contract["toolchain_manifest"],
         )
 
     def _should_enforce_pto_contract(self) -> bool:
@@ -589,6 +600,7 @@ class PTOBinding(ManifestBinding):
             return []
 
         diagnostics: list[dict[str, Any]] = []
+        outputs_contract = _contract_outputs(self.variant)
         target = self._target_record()
         target_backend = target.get("backend") if isinstance(target.get("backend"), str) else None
         if target_backend != self.backend:
@@ -656,32 +668,38 @@ class PTOBinding(ManifestBinding):
             toolchain_manifest = outputs.get("toolchain_manifest")
             if not isinstance(kernel_config, str):
                 diagnostics.append(self._missing_metadata_diagnostic("outputs.kernel_config"))
-            elif kernel_config != DEFAULT_KERNEL_CONFIG:
+            elif kernel_config != outputs_contract["kernel_config"]:
                 diagnostics.append(
                     {
                         "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
                         "detail": "manifest.json outputs.kernel_config must use the canonical PTO artifact path.",
                         "manifest_field": "outputs.kernel_config",
+                        "expected_value": outputs_contract["kernel_config"],
+                        "manifest_value": kernel_config,
                     }
                 )
             if not isinstance(codegen_index, str):
                 diagnostics.append(self._missing_metadata_diagnostic("outputs.pto_codegen_index"))
-            elif codegen_index != DEFAULT_CODEGEN_INDEX:
+            elif codegen_index != outputs_contract["pto_codegen_index"]:
                 diagnostics.append(
                     {
                         "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
                         "detail": "manifest.json outputs.pto_codegen_index must use the canonical PTO artifact path.",
                         "manifest_field": "outputs.pto_codegen_index",
+                        "expected_value": outputs_contract["pto_codegen_index"],
+                        "manifest_value": codegen_index,
                     }
                 )
             if not isinstance(toolchain_manifest, str):
                 diagnostics.append(self._missing_metadata_diagnostic("outputs.toolchain_manifest"))
-            elif toolchain_manifest != DEFAULT_TOOLCHAIN_MANIFEST:
+            elif toolchain_manifest != outputs_contract["toolchain_manifest"]:
                 diagnostics.append(
                     {
                         "code": "HTP.BINDINGS.PTO_ARTIFACT_MISMATCH",
                         "detail": "manifest.json outputs.toolchain_manifest must use the canonical PTO artifact path.",
                         "manifest_field": "outputs.toolchain_manifest",
+                        "expected_value": outputs_contract["toolchain_manifest"],
+                        "manifest_value": toolchain_manifest,
                     }
                 )
 

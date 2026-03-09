@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any
 
 from htp.artifacts.manifest import write_manifest
@@ -16,10 +16,10 @@ from htp.passes.program_model import (
     stage_payloads_from_program,
 )
 from htp.passes.replay_program import render_program_state_module
+from htp_ext.aie.declarations import AIE_PROJECT_DIR, declaration_for
 
 AIE_CODEGEN_SCHEMA_ID = "htp.aie.codegen.v1"
 AIE_TOOLCHAIN_SCHEMA_ID = "htp.aie.toolchain.v1"
-AIE_PROJECT_DIR = PurePosixPath("codegen/aie")
 
 
 def emit_package(
@@ -33,7 +33,39 @@ def emit_package(
 
     state = _semanticize_program(program, profile=profile)
     _write_codegen_tree(package_path, state=state, profile=profile)
+    manifest = _load_or_seed_manifest(package_path, state)
+    manifest["target"] = {
+        "backend": "aie",
+        "variant": "mlir-aie",
+        "hardware_profile": f"amd-xdna2:{profile}",
+    }
+    manifest["outputs"] = declaration_for(profile).artifact_contract.as_manifest_outputs()
+    manifest["extensions"] = {
+        "aie": {
+            "toolchain_contract": "mlir-aie:dev",
+            "mlir": (AIE_PROJECT_DIR / "aie.mlir").as_posix(),
+            "toolchain_manifest": declaration_for(profile).artifact_contract.output_path(
+                "toolchain_manifest"
+            ),
+            "sidecars": {
+                "mapping": (AIE_PROJECT_DIR / "mapping.json").as_posix(),
+                "fifos": (AIE_PROJECT_DIR / "fifos.json").as_posix(),
+                "host": (AIE_PROJECT_DIR / "host.py").as_posix(),
+            },
+            "runtime_contract": "mlir-aie:host-python",
+        }
+    }
+    manifest_path = package_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest
 
+
+def _load_or_seed_manifest(package_path: Path, state: Mapping[str, Any]) -> dict[str, Any]:
+    manifest_path = package_path / "manifest.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text())
+        if isinstance(manifest.get("stages"), Mapping):
+            return manifest
     payloads = stage_payloads_from_program(state)
     stage = write_stage(
         package_path,
@@ -56,31 +88,7 @@ def emit_package(
             bindings_payload=payloads["bindings_payload"],
         ),
     )
-    manifest = write_manifest(package_path, current_stage="s01", stages=[stage])
-    manifest["target"] = {
-        "backend": "aie",
-        "variant": "mlir-aie",
-        "hardware_profile": f"amd-xdna2:{profile}",
-    }
-    manifest["outputs"] = {
-        "aie_codegen_index": (AIE_PROJECT_DIR / "aie_codegen.json").as_posix(),
-        "toolchain_manifest": (AIE_PROJECT_DIR / "toolchain.json").as_posix(),
-    }
-    manifest["extensions"] = {
-        "aie": {
-            "toolchain_contract": "mlir-aie:dev",
-            "mlir": (AIE_PROJECT_DIR / "aie.mlir").as_posix(),
-            "sidecars": {
-                "mapping": (AIE_PROJECT_DIR / "mapping.json").as_posix(),
-                "fifos": (AIE_PROJECT_DIR / "fifos.json").as_posix(),
-                "host": (AIE_PROJECT_DIR / "host.py").as_posix(),
-            },
-            "runtime_contract": "mlir-aie:host-python",
-        }
-    }
-    manifest_path = package_path / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
-    return manifest
+    return write_manifest(package_path, current_stage="s01", stages=[stage])
 
 
 def _semanticize_program(program: Mapping[str, Any], *, profile: str) -> dict[str, Any]:

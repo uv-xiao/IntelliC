@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from htp.backends.declarations import BackendSolverDeclaration
+from pathlib import PurePosixPath
+
+from htp.backends.declarations import ArtifactContract, BackendSolverDeclaration
 
 from .arch import arch_for, normalize_variant
-from .emit import PTO_PROJECT_DIR, PTO_TOOLCHAIN_PATH
+
+PTO_PROJECT_DIR = PurePosixPath("codegen/pto")
+PTO_TOOLCHAIN_PATH = PurePosixPath("build/toolchain.json")
 
 
 def declaration_for(variant: str | None = None) -> BackendSolverDeclaration:
@@ -18,10 +22,12 @@ def declaration_for(variant: str | None = None) -> BackendSolverDeclaration:
         hardware_profile=arch.hardware_profile,
         target_capabilities=target_capabilities,
         supported_ops=("elementwise_binary",),
-        required_outputs=(
-            (PTO_PROJECT_DIR / "kernel_config.py").as_posix(),
-            (PTO_PROJECT_DIR / "pto_codegen.json").as_posix(),
-            PTO_TOOLCHAIN_PATH.as_posix(),
+        artifact_contract=ArtifactContract(
+            outputs=(
+                ("kernel_config", (PTO_PROJECT_DIR / "kernel_config.py").as_posix()),
+                ("pto_codegen_index", (PTO_PROJECT_DIR / "pto_codegen.json").as_posix()),
+                ("toolchain_manifest", PTO_TOOLCHAIN_PATH.as_posix()),
+            )
         ),
     )
 
