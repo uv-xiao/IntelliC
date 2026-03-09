@@ -500,9 +500,9 @@ work healthy.
 
 - `[~]` The repo policy now states that `htp/dev` must stay stable and that new
   features should land via `htp/feat-*` branches and PR review.
-- `[ ]` Enforce that branch policy in contributor workflow and automation, not
+- `[x]` Enforce that branch policy in contributor workflow and automation, not
   only prose guidance.
-- `[ ]` Keep this checklist current whenever a future item lands in code.
+- `[x]` Keep this checklist current whenever a future item lands in code.
 - `[ ]` When an item is implemented, move the normative doc from `docs/future/`
   to `docs/design/` and add code references there.
 
