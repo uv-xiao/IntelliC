@@ -9,10 +9,12 @@ Code:
 This example mirrors the shape of the `references/pypto` / `references/pto-runtime`
 vector-add flow, but uses HTP’s artifact-first pipeline:
 
-1. compile a small tile kernel to `pto-a2a3sim`,
-2. replay the final Python stage in `sim`,
-3. build the PTO package through the binding adapter,
-4. execute the package through `pto-runtime` in `a2a3sim`.
+1. author the program through the public `htp.kernel` / `htp.routine`
+   traced surface,
+2. compile a small tile kernel to `pto-a2a3sim`,
+3. replay the final Python stage in `sim`,
+4. build the PTO package through the binding adapter,
+5. execute the package through `pto-runtime` in `a2a3sim`.
 
 The example is designed so replay always works. Package execution is also real
 when the local PTO reference runtime is available under `3rdparty/pto-runtime/`
@@ -20,3 +22,7 @@ when the local PTO reference runtime is available under `3rdparty/pto-runtime/`
 `numpy.float32` input/output buffers plus the logical `size` scalar into the
 `host_build_graph` ABI, and `a2a3sim` returns the numerically validated
 `out = lhs + rhs` result.
+
+Compared to the earlier dict-style example, the user now writes the kernel as a
+plain Python function with argument annotations and a single `elementwise_add`
+call.

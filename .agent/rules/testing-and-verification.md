@@ -16,6 +16,8 @@
 - Prefer Python-native authoring and readable builders over giant raw dict globals.
 - Use references and real systems to calibrate example difficulty.
 - Flagship examples should demonstrate real functionality, not only a minimal smoke case.
+- Use `references/pypto/` and `references/arknife/` as the baseline when
+  judging whether a flagship example is too small or too mechanical.
 
 ## Verification
 

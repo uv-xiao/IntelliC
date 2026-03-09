@@ -124,12 +124,20 @@ def test_serving_routine_example_compiles_and_replays(tmp_path):
     assert replay_summary["ok"] is True
     assert [task["task_id"] for task in replay_summary["workload_ir"]["tasks"]] == [
         "prefill",
-        "decode",
+        "decode_step_0",
+        "decode_step_1",
+        "sample",
         "writeback",
     ]
+    assert [channel["name"] for channel in replay_summary["workload_ir"]["channels"]] == [
+        "token_batches",
+        "decoded_batches",
+    ]
     assert replay_summary["workload_ir"]["dependencies"] == [
-        {"src": "prefill", "dst": "decode"},
-        {"src": "decode", "dst": "writeback"},
+        {"src": "prefill", "dst": "decode_step_0"},
+        {"src": "decode_step_0", "dst": "decode_step_1"},
+        {"src": "decode_step_1", "dst": "sample"},
+        {"src": "sample", "dst": "writeback"},
     ]
 
 

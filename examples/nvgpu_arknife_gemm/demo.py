@@ -8,37 +8,21 @@ import numpy as np
 
 import htp.runtime as runtime_api
 from htp import bind, compile_program
+from htp.kernel import buffer, kernel, matmul, scalar
 
-ARKNIFE_GEMM_PROGRAM: dict[str, Any] = {
-    "entry": "gemm_tile",
-    "kernel": {
-        "name": "gemm_tile",
-        "args": [
-            {"name": "A", "kind": "buffer", "dtype": "f32", "shape": ["M", "K"], "role": "input"},
-            {"name": "B", "kind": "buffer", "dtype": "f32", "shape": ["K", "N"], "role": "input"},
-            {"name": "C", "kind": "buffer", "dtype": "f32", "shape": ["M", "N"], "role": "output"},
-            {"name": "M", "kind": "scalar", "dtype": "i32", "role": "shape"},
-            {"name": "N", "kind": "scalar", "dtype": "i32", "role": "shape"},
-            {"name": "K", "kind": "scalar", "dtype": "i32", "role": "shape"},
-        ],
-        "ops": [
-            {"op": "matmul", "lhs": "A", "rhs": "B", "out": "C", "m": "M", "n": "N", "k": "K", "dtype": "f32"}
-        ],
-    },
-    "workload": {
-        "entry": "gemm_tile",
-        "tasks": [
-            {
-                "task_id": "task0",
-                "kind": "kernel_call",
-                "kernel": "gemm_tile",
-                "args": ["A", "B", "C", "M", "N", "K"],
-            }
-        ],
-        "channels": [],
-        "dependencies": [],
-    },
-}
+
+@kernel
+def gemm_tile(
+    A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+    B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+    C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+    M: scalar(dtype="i32", role="shape"),
+    N: scalar(dtype="i32", role="shape"),
+    K: scalar(dtype="i32", role="shape"),
+) -> None:
+    """Arknife-inspired GEMM tile expressed as ordinary Python."""
+
+    matmul(A, B, out=C, m=M, n=N, k=K, dtype="f32")
 
 
 def make_inputs(
@@ -55,7 +39,7 @@ def compile_example(output_dir: Path | str) -> dict[str, Any]:
     package = compile_program(
         package_dir=Path(output_dir),
         target="nvgpu-ampere",
-        program=dict(ARKNIFE_GEMM_PROGRAM),
+        program=gemm_tile,
     )
     return {
         "package_dir": package.package_dir.as_posix(),

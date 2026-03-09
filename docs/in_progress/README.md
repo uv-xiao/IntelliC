@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `004-docs-depth-restoration.md` — deepen the layered docs with restored rationale, feature detail, and TODO accounting
+- none

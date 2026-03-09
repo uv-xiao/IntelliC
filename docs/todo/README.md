@@ -18,17 +18,17 @@ For feature work:
 ### Overall
 
 - total tracked TODO checklist items: 53
-- complete: 33
+- complete: 34
 - partial: 13
-- open: 7
-- completion ratio: about 62%
+- open: 6
+- completion ratio: about 64%
 
 ### By layer
 
 | Layer | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Compiler model, semantics, typing | 6 | 2 | 2 | 10 |
-| Programming surfaces | 4 | 2 | 2 | 8 |
+| Programming surfaces | 6 | 2 | 0 | 8 |
 | Pipeline and solver | 6 | 2 | 1 | 9 |
 | Artifacts, replay, debug | 5 | 2 | 1 | 8 |
 | Backends and extensions | 6 | 3 | 1 | 10 |
@@ -39,7 +39,7 @@ For feature work:
 - `docs/todo/layers/01_compiler_model.md`
   - remaining work: broaden semantic/type/layout/effect breadth and deepen routine semantics
 - `docs/todo/layers/02_programming_surfaces.md`
-  - remaining work: make public authoring more Python-native and raise example difficulty
+  - remaining work: continue replacing compact proof cases with harder, reference-calibrated flagship examples
 - `docs/todo/layers/03_pipeline_and_solver.md`
   - remaining work: richer search/composition and broader MLIR island breadth
 - `docs/todo/layers/04_artifacts_replay_debug.md`
