@@ -38,6 +38,7 @@ Implemented today:
 - buffer, tensor, tile, view, token, and channel value kinds
 - alias validation for view/buffer relationships
 - facet-product layout payload structure
+- conservative distribution join rules plus explicit `relayout` operations
 - typed protocol obligations for channels, including participant sets, hazard
   evidence, and `deadlock_safe` status
 - explicit async-token, barrier-scope, event-dependency, and collective

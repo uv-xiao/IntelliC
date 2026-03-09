@@ -7,10 +7,12 @@ from htp.compiler_errors import compiler_error
 from htp.intrinsics import get_intrinsic_decl
 from htp.ir.layout import (
     DistributionFacet,
-    DistributionPlacement,
     HardwareFacet,
     LayoutFacetProduct,
     MemoryFacet,
+    distribution_from_payload,
+    distribution_matches,
+    join_distribution_facets,
     layout_to_payload,
 )
 from htp.ir.op_specs import get_op_spec, op_effects
@@ -92,6 +94,15 @@ def build_semantic_model(
             role=str(argument["role"]) if argument.get("role") is not None else None,
             alias_of=str(argument["alias_of"]) if argument.get("alias_of") is not None else None,
             source=str(argument["source"]) if argument.get("source") is not None else None,
+            distribution=tuple(
+                {
+                    "kind": str(item.get("kind", "replicate")),
+                    **({"axis": str(item["axis"])} if item.get("axis") is not None else {}),
+                }
+                if isinstance(item, Mapping)
+                else {"kind": str(item)}
+                for item in argument.get("distribution", ())
+            ),
         )
         for argument in kernel.get("args", ())
     )
@@ -165,6 +176,9 @@ def build_type_layout_effects(
         "tiling": _tiling_for_kernel(kernel_ir, backend),
         "facets": _layout_facets(memory_spaces, kernel_ir),
     }
+    layout["joins"] = _layout_joins(kernel_ir, layout)
+    layout["relayouts"] = _layout_relayouts(kernel_ir, layout)
+    _validate_layout_contracts(kernel_ir, layout, entry=entry)
     protocols = _protocol_effects(workload_ir)
     tokens = _token_effects(kernel_ir)
     barriers = _barriers_for_kernel(kernel_ir, tokens=tokens)
@@ -523,6 +537,16 @@ def _normalize_kernel_surface(entry: str, kernel: Mapping[str, Any]) -> dict[str
                 "role": str(argument["role"]) if argument.get("role") is not None else None,
                 "alias_of": str(argument["alias_of"]) if argument.get("alias_of") is not None else None,
                 "source": str(argument["source"]) if argument.get("source") is not None else None,
+                **(
+                    {
+                        "distribution": [
+                            dict(item) if isinstance(item, Mapping) else {"kind": str(item)}
+                            for item in argument.get("distribution", ())
+                        ]
+                    }
+                    if argument.get("distribution") is not None
+                    else {}
+                ),
             }
             for argument in kernel.get("args", ())
         ],
@@ -796,9 +820,10 @@ def _layout_facets(memory_spaces: Mapping[str, str], kernel_ir: Mapping[str, Any
         if argument.get("kind") != "buffer":
             continue
         shape = list(argument.get("shape", ()))
+        distribution = distribution_from_payload(argument.get("distribution"), rank=len(shape))
         buffer_layouts[str(argument["name"])] = layout_to_payload(
             LayoutFacetProduct(
-                distribution=DistributionFacet(tuple(DistributionPlacement(kind="replicate") for _ in shape)),
+                distribution=distribution,
                 memory=MemoryFacet(
                     space=str(memory_spaces.get(str(argument["name"]), "global")),
                     layout="row_major",
@@ -808,6 +833,59 @@ def _layout_facets(memory_spaces: Mapping[str, str], kernel_ir: Mapping[str, Any
             )
         )
     return {"buffers": buffer_layouts}
+
+
+def _distribution_for_buffer(layout: Mapping[str, Any], buffer_name: str) -> DistributionFacet:
+    payload = layout.get("facets", {}).get("buffers", {}).get(buffer_name, {})
+    distribution = payload.get("distribution", {}) if isinstance(payload, Mapping) else {}
+    dims = distribution.get("dims", ()) if isinstance(distribution, Mapping) else ()
+    return distribution_from_payload(list(dims), rank=len(list(dims)))
+
+
+def _layout_joins(kernel_ir: Mapping[str, Any], layout: Mapping[str, Any]) -> list[dict[str, Any]]:
+    joins: list[dict[str, Any]] = []
+    for op in kernel_ir.get("ops", ()):
+        op_name = str(op.get("op"))
+        if op_name not in {"elementwise_binary", "matmul"}:
+            continue
+        lhs_name = str(op.get("inputs", [None])[0] or "")
+        rhs_name = str(op.get("inputs", [None, None])[1] or "")
+        out_name = str(op.get("outputs", [None])[0] or "")
+        if not lhs_name or not rhs_name or not out_name:
+            continue
+        lhs = _distribution_for_buffer(layout, lhs_name)
+        rhs = _distribution_for_buffer(layout, rhs_name)
+        joined = join_distribution_facets(lhs, rhs)
+        joins.append(
+            {
+                "op_id": str(op["op_id"]),
+                "lhs": lhs_name,
+                "rhs": rhs_name,
+                "out": out_name,
+                "ok": joined is not None,
+                "joined": layout_to_payload(joined) if joined is not None else None,
+            }
+        )
+    return joins
+
+
+def _layout_relayouts(kernel_ir: Mapping[str, Any], layout: Mapping[str, Any]) -> list[dict[str, Any]]:
+    relayouts: list[dict[str, Any]] = []
+    for op in kernel_ir.get("ops", ()):
+        if str(op.get("op")) != "relayout":
+            continue
+        source_name = str(op.get("inputs", [None])[0] or "")
+        out_name = str(op.get("outputs", [None])[0] or "")
+        relayouts.append(
+            {
+                "op_id": str(op["op_id"]),
+                "source": source_name,
+                "out": out_name,
+                "source_distribution": layout_to_payload(_distribution_for_buffer(layout, source_name)),
+                "out_distribution": layout_to_payload(_distribution_for_buffer(layout, out_name)),
+            }
+        )
+    return relayouts
 
 
 def _threading_for_backend(backend: str, kernel_ir: Mapping[str, Any]) -> dict[str, Any]:
@@ -1255,6 +1333,71 @@ def _validate_alias_contracts(kernel_ir: Mapping[str, Any]) -> None:
                 fix_hints_ref="docs/design/features.md",
                 alias_of=alias_name,
                 mutable_aliases=users,
+            )
+
+
+def _validate_layout_contracts(
+    kernel_ir: Mapping[str, Any], layout: Mapping[str, Any], *, entry: str
+) -> None:
+    for join in layout.get("joins", ()):
+        if not bool(join.get("ok", False)):
+            raise compiler_error(
+                "HTP.LAYOUT.DISTRIBUTION_INCOMPATIBLE",
+                (
+                    f"op {join.get('op_id')!r} joins incompatible distributions for "
+                    f"{join.get('lhs')!r} and {join.get('rhs')!r}."
+                ),
+                node_id=f"{entry}:{join.get('op_id')}" if entry else None,
+                payload_ref_hint="semantic.layout",
+                fix_hints_ref="docs/design/features.md",
+                op_id=join.get("op_id"),
+            )
+        expected = join_distribution_facets(
+            _distribution_for_buffer(layout, str(join.get("lhs", ""))),
+            _distribution_for_buffer(layout, str(join.get("rhs", ""))),
+        )
+        if expected is None:
+            continue
+        out_distribution = _distribution_for_buffer(layout, str(join.get("out", "")))
+        if not distribution_matches(out_distribution, expected):
+            has_relayout = any(
+                str(item.get("out", "")) == str(join.get("out", "")) for item in layout.get("relayouts", ())
+            )
+            if not has_relayout:
+                raise compiler_error(
+                    "HTP.LAYOUT.RELAYOUT_REQUIRED",
+                    (f"op {join.get('op_id')!r} requires explicit relayout for output {join.get('out')!r}."),
+                    node_id=f"{entry}:{join.get('op_id')}" if entry else None,
+                    payload_ref_hint="semantic.layout",
+                    fix_hints_ref="docs/design/features.md",
+                    op_id=join.get("op_id"),
+                    output=join.get("out"),
+                )
+    for relayout in layout.get("relayouts", ()):
+        src_distribution = distribution_from_payload(
+            relayout.get("source_distribution", {}).get("dims", ())
+            if isinstance(relayout.get("source_distribution"), Mapping)
+            else (),
+            rank=len(relayout.get("source_distribution", {}).get("dims", ()))
+            if isinstance(relayout.get("source_distribution"), Mapping)
+            else 0,
+        )
+        out_distribution = distribution_from_payload(
+            relayout.get("out_distribution", {}).get("dims", ())
+            if isinstance(relayout.get("out_distribution"), Mapping)
+            else (),
+            rank=len(relayout.get("out_distribution", {}).get("dims", ()))
+            if isinstance(relayout.get("out_distribution"), Mapping)
+            else 0,
+        )
+        if distribution_matches(src_distribution, out_distribution):
+            raise compiler_error(
+                "HTP.LAYOUT.REDUNDANT_RELAYOUT",
+                f"relayout op {relayout.get('op_id')!r} does not change distribution.",
+                node_id=f"{entry}:{relayout.get('op_id')}" if entry else None,
+                payload_ref_hint="semantic.layout",
+                fix_hints_ref="docs/design/features.md",
+                op_id=relayout.get("op_id"),
             )
 
 
