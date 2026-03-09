@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from htp.bindings.api import bind
 from htp.pipeline.defaults import DefaultPipelineResult, run_default_pipeline
@@ -24,6 +24,10 @@ class CompiledPackage:
     pipeline: DefaultPipelineResult
 
 
+class ProgramSurface(Protocol):
+    def to_program(self) -> dict[str, Any]: ...
+
+
 def parse_target(target: str) -> TargetSpec:
     if not target or not isinstance(target, str):
         raise ValueError("target must be a non-empty string")
@@ -37,18 +41,17 @@ def compile_program(
     *,
     package_dir: str | Path,
     target: str,
-    program: dict[str, Any] | None = None,
+    program: dict[str, Any] | ProgramSurface | None = None,
 ) -> CompiledPackage:
     target_spec = parse_target(target)
     package_path = Path(package_dir)
-    pipeline_program = dict(program or {})
-    pipeline_program.setdefault(
-        "target",
-        {
-            "backend": target_spec.backend,
-            "option": target_spec.option,
-        },
-    )
+    pipeline_program = _normalize_program_input(program)
+    target_payload = pipeline_program.get("target")
+    if not isinstance(target_payload, dict) or not target_payload:
+        target_payload = {}
+    target_payload.setdefault("backend", target_spec.backend)
+    target_payload.setdefault("option", target_spec.option)
+    pipeline_program["target"] = target_payload
     package_path.mkdir(parents=True, exist_ok=True)
     solver_result = solve_default_pipeline(program=pipeline_program)
     if not solver_result.ok:
@@ -87,6 +90,20 @@ def compile_program(
         manifest=manifest,
         pipeline=pipeline_result,
     )
+
+
+def _normalize_program_input(program: dict[str, Any] | ProgramSurface | None) -> dict[str, Any]:
+    if program is None:
+        return {}
+    if isinstance(program, dict):
+        return dict(program)
+    to_program = getattr(program, "to_program", None)
+    if callable(to_program):
+        payload = to_program()
+        if not isinstance(payload, dict):
+            raise TypeError("program.to_program() must return a dict payload")
+        return dict(payload)
+    raise TypeError("program must be a dict or expose to_program()")
 
 
 def _write_solver_failure(package_dir: Path, solver_result: object) -> None:

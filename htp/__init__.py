@@ -1,6 +1,6 @@
-"""HTP package skeleton."""
+"""HTP public package surface."""
 
-from . import csp, intrinsics, passes, schemas, wsp
+from . import csp, intrinsics, kernel, passes, routine, schemas, wsp
 from .bindings import bind
 from .compiler import compile_program, parse_target
 from .tools import explain_diagnostic, promotion_plan, replay_package, semantic_diff, verify_package
@@ -11,6 +11,7 @@ __all__ = [
     "csp",
     "explain_diagnostic",
     "intrinsics",
+    "kernel",
     "parse_target",
     "passes",
     "promotion_plan",
@@ -19,4 +20,5 @@ __all__ = [
     "semantic_diff",
     "verify_package",
     "wsp",
+    "routine",
 ]

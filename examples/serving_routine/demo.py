@@ -5,68 +5,57 @@ from pathlib import Path
 from typing import Any
 
 from htp import bind, compile_program
+from htp.kernel import buffer, kernel, matmul, scalar
+from htp.routine import call, fifo_channel, program
 
-SERVING_ROUTINE_PROGRAM: dict[str, Any] = {
-    "entry": "serving_routine",
-    "target": {"backend": "nvgpu", "option": "ampere"},
-    "kernel": {
-        "name": "decode_step",
-        "args": [
-            {"name": "hidden", "kind": "buffer", "dtype": "f32", "shape": ["B", "H"], "role": "input"},
-            {"name": "weights", "kind": "buffer", "dtype": "f32", "shape": ["H", "H"], "role": "input"},
-            {"name": "next_hidden", "kind": "buffer", "dtype": "f32", "shape": ["B", "H"], "role": "output"},
-            {"name": "B", "kind": "scalar", "dtype": "i32", "shape": [], "role": "shape"},
-            {"name": "H", "kind": "scalar", "dtype": "i32", "shape": [], "role": "shape"},
-        ],
-        "ops": [
-            {
-                "op": "matmul",
-                "lhs": "hidden",
-                "rhs": "weights",
-                "out": "next_hidden",
-                "m": "B",
-                "n": "H",
-                "k": "H",
-                "dtype": "f32",
-            }
-        ],
-    },
-    "workload": {
-        "entry": "serving_routine",
-        "tasks": [
-            {
-                "task_id": "prefill",
-                "kind": "kernel_call",
-                "kernel": "decode_step",
-                "args": ["hidden", "weights", "next_hidden", "B", "H"],
-            },
-            {
-                "task_id": "decode",
-                "kind": "kernel_call",
-                "kernel": "decode_step",
-                "args": ["next_hidden", "weights", "next_hidden", "B", "H"],
-            },
-            {
-                "task_id": "writeback",
-                "kind": "kernel_call",
-                "kernel": "decode_step",
-                "args": ["next_hidden", "weights", "next_hidden", "B", "H"],
-            },
-        ],
-        "channels": [],
-        "dependencies": [
-            {"src": "prefill", "dst": "decode"},
-            {"src": "decode", "dst": "writeback"},
-        ],
-    },
-}
+
+@kernel
+def decode_step(
+    hidden: buffer(dtype="f32", shape=("B", "H"), role="input"),
+    weights: buffer(dtype="f32", shape=("H", "H"), role="input"),
+    next_hidden: buffer(dtype="f32", shape=("B", "H"), role="output"),
+    B: scalar(dtype="i32", role="shape"),
+    H: scalar(dtype="i32", role="shape"),
+) -> None:
+    matmul(hidden, weights, out=next_hidden, m=B, n=H, k=H, dtype="f32")
+
+
+@program(target="nvgpu-ampere")
+def serving_routine(
+    hidden: buffer(dtype="f32", shape=("B", "H"), role="input"),
+    weights: buffer(dtype="f32", shape=("H", "H"), role="input"),
+    next_hidden: buffer(dtype="f32", shape=("B", "H"), role="output"),
+    B: scalar(dtype="i32", role="shape"),
+    H: scalar(dtype="i32", role="shape"),
+) -> None:
+    """Serving routine with explicit decode stages and typed channels."""
+
+    fifo_channel("token_batches", dtype="f32", capacity=2)
+    fifo_channel("decoded_batches", dtype="f32", capacity=2)
+
+    prefill = call(decode_step, hidden, weights, next_hidden, B, H, task="prefill")
+    decode_step_0 = call(
+        decode_step, next_hidden, weights, next_hidden, B, H, task="decode_step_0", after=prefill
+    )
+    decode_step_1 = call(
+        decode_step,
+        next_hidden,
+        weights,
+        next_hidden,
+        B,
+        H,
+        task="decode_step_1",
+        after=decode_step_0,
+    )
+    sample = call(decode_step, next_hidden, weights, next_hidden, B, H, task="sample", after=decode_step_1)
+    call(decode_step, next_hidden, weights, next_hidden, B, H, task="writeback", after=sample)
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
     package = compile_program(
         package_dir=Path(output_dir),
         target="nvgpu-ampere",
-        program=dict(SERVING_ROUTINE_PROGRAM),
+        program=serving_routine,
     )
     return {
         "package_dir": package.package_dir.as_posix(),

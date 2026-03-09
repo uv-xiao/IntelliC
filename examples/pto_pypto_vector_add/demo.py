@@ -7,43 +7,19 @@ from typing import Any
 import numpy as np
 
 from htp import bind, compile_program
+from htp.kernel import buffer, elementwise_add, kernel, scalar
 
-PYPT0_VECTOR_ADD_PROGRAM: dict[str, Any] = {
-    "entry": "vector_add",
-    "kernel": {
-        "name": "vector_add",
-        "args": [
-            {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-            {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-            {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
-            {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
-        ],
-        "ops": [
-            {
-                "op": "elementwise_binary",
-                "operator": "add",
-                "lhs": "lhs",
-                "rhs": "rhs",
-                "out": "out",
-                "shape": ["size"],
-                "dtype": "f32",
-            }
-        ],
-    },
-    "workload": {
-        "entry": "vector_add",
-        "tasks": [
-            {
-                "task_id": "task0",
-                "kind": "kernel_call",
-                "kernel": "vector_add",
-                "args": ["lhs", "rhs", "out", "size"],
-            }
-        ],
-        "channels": [],
-        "dependencies": [],
-    },
-}
+
+@kernel
+def vector_add(
+    lhs: buffer(dtype="f32", shape=("size",), role="input"),
+    rhs: buffer(dtype="f32", shape=("size",), role="input"),
+    out: buffer(dtype="f32", shape=("size",), role="output"),
+    size: scalar(dtype="i32", role="shape"),
+) -> None:
+    """Vector add kernel written as ordinary Python instead of a raw payload."""
+
+    elementwise_add(lhs, rhs, out=out, shape=(size,), dtype="f32")
 
 
 def make_inputs(size: int = 128 * 128) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -67,7 +43,7 @@ def compile_example(output_dir: Path | str) -> dict[str, Any]:
     package = compile_program(
         package_dir=Path(output_dir),
         target="pto-a2a3sim",
-        program=dict(PYPT0_VECTOR_ADD_PROGRAM),
+        program=vector_add,
     )
     return {
         "package_dir": package.package_dir.as_posix(),
