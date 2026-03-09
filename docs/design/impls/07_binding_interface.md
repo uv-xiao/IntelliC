@@ -158,6 +158,15 @@ Run/replay failures must emit:
 For replay-time stub hits, bindings should surface structured replay
 diagnostics rather than raw runtime exceptions.
 
+Current implementation details:
+
+- replay stub payloads now surface both `artifact_ref` and `payload_ref`
+  together, plus a stable `fix_hints_ref`
+- `RunResult.trace_ref` / `ReplayResult.trace_ref` are populated from
+  structured diagnostics when the underlying adapter or replay path emits one
+- `BuildResult.trace_refs` records adapter build traces when build materializes
+  through PTO or NV-GPU adapters
+
 ---
 
 ## 5) Logs and run records
@@ -173,6 +182,15 @@ logs/
 
 Each `.log` file is now a JSON payload with schema `htp.binding_log.v1` and
 normalized `kind` / `fields` content, rather than ad-hoc text lines.
+
+Bindings also emit adapter-specific trace payloads with schema
+`htp.adapter_trace.v1` under `logs/adapter_<backend>_<action>_*.json`.
+These traces record:
+
+- selected adapter (`pto-runtime`, `nvcc`, `cuda-driver`, ...)
+- action (`build` or `run`)
+- normalized backend-specific payload details
+- success, cached-build, or failure status
 
 and record the paths in `manifest.outputs` or `manifest.extensions.<backend>`.
 

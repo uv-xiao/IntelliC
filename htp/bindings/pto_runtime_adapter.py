@@ -10,10 +10,14 @@ import sys
 from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import numpy as np
+
+from htp.schemas import ADAPTER_TRACE_SCHEMA_ID
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -46,7 +50,7 @@ def build_package(
     *,
     mode: str,
     force: bool = False,
-) -> tuple[list[str], list[dict[str, Any]]]:
+) -> tuple[list[str], list[dict[str, Any]], str | None]:
     contract = load_contract(package_dir, manifest)
     output_paths = _output_paths(contract)
     if (
@@ -54,12 +58,43 @@ def build_package(
         and all((package_dir / relpath).exists() for relpath in output_paths)
         and not _requires_rebuild(contract, output_paths)
     ):
-        return output_paths, []
+        return (
+            output_paths,
+            [],
+            _write_adapter_trace(
+                package_dir,
+                adapter="pto-runtime",
+                action="build",
+                payload={
+                    "mode": mode,
+                    "platform": contract.platform,
+                    "runtime_name": contract.runtime_name,
+                    "entrypoint": contract.entrypoint,
+                    "built_outputs": output_paths,
+                    "cached": True,
+                },
+            ),
+        )
 
     try:
         runtime_builder_module, bindings_module = _load_reference_modules()
     except Exception as exc:
-        return [], [_diagnostic("HTP.BINDINGS.PTO_REFERENCE_UNAVAILABLE", str(exc))]
+        diagnostics = [_diagnostic("HTP.BINDINGS.PTO_REFERENCE_UNAVAILABLE", str(exc))]
+        return (
+            [],
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="pto-runtime",
+                action="build",
+                payload={
+                    "mode": mode,
+                    "platform": contract.platform,
+                    "error": str(exc),
+                    "diagnostics": diagnostics,
+                },
+            ),
+        )
 
     try:
         builder = runtime_builder_module.RuntimeBuilder(platform=contract.platform)
@@ -82,7 +117,22 @@ def build_package(
                 extra_include_dirs=[str(contract.package_dir / "codegen" / "pto")],
             )
     except Exception as exc:
-        return [], [_diagnostic("HTP.BINDINGS.PTO_BUILD_ERROR", str(exc), mode=mode)]
+        diagnostics = [_diagnostic("HTP.BINDINGS.PTO_BUILD_ERROR", str(exc), mode=mode)]
+        return (
+            [],
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="pto-runtime",
+                action="build",
+                payload={
+                    "mode": mode,
+                    "platform": contract.platform,
+                    "error": str(exc),
+                    "diagnostics": diagnostics,
+                },
+            ),
+        )
 
     artifacts = {
         output_paths[0]: host_runtime,
@@ -112,7 +162,24 @@ def build_package(
         )
         + "\n"
     )
-    return output_paths, []
+    return (
+        output_paths,
+        [],
+        _write_adapter_trace(
+            package_dir,
+            adapter="pto-runtime",
+            action="build",
+            payload={
+                "mode": mode,
+                "platform": contract.platform,
+                "runtime_name": contract.runtime_name,
+                "entrypoint": contract.entrypoint,
+                "built_outputs": output_paths,
+                "cached": False,
+                "build_record": build_record_path.relative_to(package_dir).as_posix(),
+            },
+        ),
+    )
 
 
 def run_package(
@@ -123,41 +190,73 @@ def run_package(
     entry: str,
     args: tuple[Any, ...],
     kwargs: Mapping[str, Any] | None,
-) -> tuple[bool, Any, list[dict[str, Any]]]:
+) -> tuple[bool, Any, list[dict[str, Any]], str | None]:
     contract = load_contract(package_dir, manifest)
     if kwargs:
+        diagnostics = [
+            _diagnostic(
+                "HTP.BINDINGS.PTO_UNSUPPORTED_KEYWORD_ARGS",
+                "PTO package execution only supports positional buffer/scalar arguments.",
+            )
+        ]
         return (
             False,
             None,
-            [
-                _diagnostic(
-                    "HTP.BINDINGS.PTO_UNSUPPORTED_KEYWORD_ARGS",
-                    "PTO package execution only supports positional buffer/scalar arguments.",
-                )
-            ],
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="pto-runtime",
+                action="run",
+                payload={
+                    "mode": mode,
+                    "entry": entry,
+                    "error": diagnostics[0]["detail"],
+                    "diagnostics": diagnostics,
+                },
+            ),
         )
     if entry != contract.entrypoint:
+        diagnostics = [
+            {
+                "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
+                "detail": f"Entrypoint {entry!r} is not defined for the PTO package.",
+                "entry": entry,
+                "available_entries": [contract.entrypoint],
+            }
+        ]
         return (
             False,
             None,
-            [
-                {
-                    "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
-                    "detail": f"Entrypoint {entry!r} is not defined for the PTO package.",
-                    "entry": entry,
-                    "available_entries": [contract.entrypoint],
-                }
-            ],
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="pto-runtime",
+                action="run",
+                payload={"mode": mode, "entry": entry, "diagnostics": diagnostics},
+            ),
         )
 
-    built_outputs, build_diagnostics = build_package(package_dir, manifest, mode=mode, force=False)
+    built_outputs, build_diagnostics, build_trace_ref = build_package(
+        package_dir, manifest, mode=mode, force=False
+    )
     if build_diagnostics:
-        return False, None, build_diagnostics
+        return False, None, build_diagnostics, build_trace_ref
 
     try:
         _, bindings_module = _load_reference_modules()
     except Exception as exc:
-        return False, None, [_diagnostic("HTP.BINDINGS.PTO_REFERENCE_UNAVAILABLE", str(exc))]
+        diagnostics = [_diagnostic("HTP.BINDINGS.PTO_REFERENCE_UNAVAILABLE", str(exc))]
+        return (
+            False,
+            None,
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="pto-runtime",
+                action="run",
+                payload={"mode": mode, "entry": entry, "error": str(exc), "diagnostics": diagnostics},
+            ),
+        )
 
     try:
         Runtime = bindings_module.bind_host_binary((package_dir / built_outputs[0]).read_bytes())
@@ -186,8 +285,33 @@ def run_package(
         )
         runtime.finalize()
     except Exception as exc:
-        return False, None, [_diagnostic("HTP.BINDINGS.PTO_RUN_ERROR", str(exc), mode=mode)]
+        diagnostics = [_diagnostic("HTP.BINDINGS.PTO_RUN_ERROR", str(exc), mode=mode)]
+        return (
+            False,
+            None,
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="pto-runtime",
+                action="run",
+                payload={"mode": mode, "entry": entry, "error": str(exc), "diagnostics": diagnostics},
+            ),
+        )
 
+    trace_ref = _write_adapter_trace(
+        package_dir,
+        adapter="pto-runtime",
+        action="run",
+        payload={
+            "mode": mode,
+            "entry": contract.entrypoint,
+            "platform": contract.platform,
+            "runtime_name": contract.runtime_name,
+            "built_outputs": built_outputs,
+            "output_names": list(marshaled.output_names),
+            "build_trace_ref": build_trace_ref,
+        },
+    )
     return (
         True,
         {
@@ -197,14 +321,43 @@ def run_package(
             "runtime_name": contract.runtime_name,
             "built_outputs": built_outputs,
             "output_names": list(marshaled.output_names),
+            "trace_ref": trace_ref,
         },
         [],
+        trace_ref,
     )
 
 
 def declared_outputs(package_dir: Path, manifest: Mapping[str, Any]) -> list[str]:
     contract = load_contract(package_dir, manifest)
     return _output_paths(contract)
+
+
+def _write_adapter_trace(
+    package_dir: Path,
+    *,
+    adapter: str,
+    action: str,
+    payload: Mapping[str, Any],
+) -> str:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    relative_path = Path("logs") / f"adapter_pto_{action}_{timestamp}_{uuid4().hex[:8]}.json"
+    trace_path = package_dir / relative_path
+    trace_path.parent.mkdir(parents=True, exist_ok=True)
+    trace_path.write_text(
+        json.dumps(
+            {
+                "schema": ADAPTER_TRACE_SCHEMA_ID,
+                "backend": "pto",
+                "adapter": adapter,
+                "action": action,
+                "payload": dict(payload),
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    return relative_path.as_posix()
 
 
 def load_contract(package_dir: Path, manifest: Mapping[str, Any]) -> PTOContract:

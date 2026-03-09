@@ -72,12 +72,16 @@ def test_nvgpu_cuda_adapter_builds_ptx_and_cubin(tmp_path, monkeypatch):
 
     monkeypatch.setattr(nvgpu_cuda_adapter, "_run_nvcc", fake_run_nvcc)
 
-    built_outputs, diagnostics = nvgpu_cuda_adapter.build_package(package_dir, manifest, force=True)
+    built_outputs, diagnostics, trace_ref = nvgpu_cuda_adapter.build_package(
+        package_dir, manifest, force=True
+    )
 
     assert diagnostics == []
     assert built_outputs == ["build/nvgpu/gemm_tile.ptx", "build/nvgpu/gemm_tile.cubin"]
     assert (package_dir / "build" / "nvgpu" / "gemm_tile.ptx").read_bytes() == b"ptx"
     assert (package_dir / "build" / "nvgpu" / "gemm_tile.cubin").read_bytes() == b"cubin"
+    assert trace_ref is not None
+    assert (package_dir / trace_ref).is_file()
 
 
 def test_nvgpu_cuda_adapter_runs_kernel_with_tensor_arguments(tmp_path, monkeypatch):
@@ -119,7 +123,7 @@ def test_nvgpu_cuda_adapter_runs_kernel_with_tensor_arguments(tmp_path, monkeypa
     a = np.ones((4, 4), dtype=np.float32)
     b = np.ones((4, 4), dtype=np.float32)
     c = np.zeros((4, 4), dtype=np.float32)
-    ok, result, diagnostics = nvgpu_cuda_adapter.run_package(
+    ok, result, diagnostics, trace_ref = nvgpu_cuda_adapter.run_package(
         package_dir,
         manifest,
         entry="gemm_tile",
@@ -137,7 +141,10 @@ def test_nvgpu_cuda_adapter_runs_kernel_with_tensor_arguments(tmp_path, monkeypa
         "thread_block": [16, 16, 1],
         "grid": [1, 1, 1],
         "params": ["A", "B", "C", "M", "N", "K"],
+        "trace_ref": trace_ref,
     }
+    assert trace_ref is not None
+    assert (package_dir / trace_ref).is_file()
     assert calls == [
         {
             "entry": "gemm_tile",
@@ -157,7 +164,9 @@ def test_nvgpu_cuda_adapter_reports_missing_nvcc(tmp_path, monkeypatch):
     manifest = load_manifest(package_dir)
     monkeypatch.setattr(nvgpu_cuda_adapter, "_find_nvcc", lambda: None)
 
-    built_outputs, diagnostics = nvgpu_cuda_adapter.build_package(package_dir, manifest, force=True)
+    built_outputs, diagnostics, trace_ref = nvgpu_cuda_adapter.build_package(
+        package_dir, manifest, force=True
+    )
 
     assert built_outputs == []
     assert diagnostics == [
@@ -167,6 +176,7 @@ def test_nvgpu_cuda_adapter_reports_missing_nvcc(tmp_path, monkeypatch):
             "expected_compiler": "nvcc",
         }
     ]
+    assert trace_ref is not None
 
 
 def test_nvgpu_cuda_adapter_normalizes_cuda_arch_flag():
@@ -191,7 +201,9 @@ def test_nvgpu_cuda_adapter_rebuilds_when_cuda_source_changes(tmp_path, monkeypa
 
     monkeypatch.setattr(nvgpu_cuda_adapter, "_run_nvcc", fake_run_nvcc)
 
-    built_outputs, diagnostics = nvgpu_cuda_adapter.build_package(package_dir, manifest, force=True)
+    built_outputs, diagnostics, _trace_ref = nvgpu_cuda_adapter.build_package(
+        package_dir, manifest, force=True
+    )
     assert diagnostics == []
     cubin_path = package_dir / built_outputs[-1]
     initial_mtime = cubin_path.stat().st_mtime
@@ -200,7 +212,7 @@ def test_nvgpu_cuda_adapter_rebuilds_when_cuda_source_changes(tmp_path, monkeypa
     kernel_source_path = package_dir / "codegen" / "nvgpu" / "kernels" / "gemm_tile.cu"
     kernel_source_path.write_text(kernel_source_path.read_text() + "\n// rebuild marker\n")
 
-    rebuilt_outputs, rebuild_diagnostics = nvgpu_cuda_adapter.build_package(
+    rebuilt_outputs, rebuild_diagnostics, _rebuild_trace_ref = nvgpu_cuda_adapter.build_package(
         package_dir, manifest, force=False
     )
 

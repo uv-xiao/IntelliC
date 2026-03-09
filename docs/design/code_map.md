@@ -7,12 +7,15 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/compiler.py` — `compile_program(...)`
 - `htp/bindings/api.py` — `bind(...)`
 - `htp/runtime/core.py` — replay runtime and kernel/intrinsic dispatch
+- `htp/runtime/errors.py` — structured replay/stub diagnostics with payload and
+  fix-hint refs
 - `htp/solver.py` — capability solver and final artifact checks
 - `htp_ext/registry.py` — extension registration for solver / pass / template discovery
 - `htp/diagnostics.py` — diagnostic catalog and fix-hint policies
 - `htp/agent_policy.py` — agent policy loading for verify/promote tooling
 - `htp/perf.py` — perf metric loading and baseline-threshold comparison
 - `htp/bindings/validate.py` — generic manifest/artifact validation, including optional manifest sections and sidecar schema checks
+- `htp/schemas.py` — shared schema ids including binding logs and adapter traces
 - `htp/intrinsics.py` — intrinsic declarations plus lower/emit/sim handler registration
 - `htp_ext/aie/intrinsics.py` — extension-owned backend intrinsic package example
 - `htp/pipeline/defaults.py` — default pipeline execution over solver-validated pass contracts
@@ -25,7 +28,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/backends/pto/emit.py` — PTO artifact emission
 - `htp/bindings/pto.py` — PTO validation / build / run / replay
 - `htp/bindings/pto_runtime_adapter.py` — real `pto-runtime` integration, including
-  `numpy` buffer/scalar marshaling for `a2a3sim`
+  `numpy` buffer/scalar marshaling for `a2a3sim` and structured adapter traces
 - `3rdparty/pto-runtime/` — preferred external runtime checkout used by PTO execution
 
 ## NV-GPU path
@@ -34,7 +37,8 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/backends/nvgpu/lower.py` — NV-GPU codegen plan
 - `htp/backends/nvgpu/emit.py` — `.cu`-first artifact emission
 - `htp/bindings/nvgpu.py` — NV-GPU validation / build / run / replay
-- `htp/bindings/nvgpu_cuda_adapter.py` — `nvcc` + CUDA-driver device path
+- `htp/bindings/nvgpu_cuda_adapter.py` — `nvcc` + CUDA-driver device path with
+  structured adapter traces
 
 ## Semantic substrate
 

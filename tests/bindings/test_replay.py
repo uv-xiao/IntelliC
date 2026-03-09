@@ -160,6 +160,9 @@ def run(*args, **kwargs):
     assert result.diagnostics[0]["code"] == "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"
     assert result.diagnostics[0]["node_id"] == "node.intrinsic.7"
     assert result.diagnostics[0]["artifact_ref"] == "ir/stages/s01/replay/stubs.json"
+    assert result.diagnostics[0]["payload_ref"] == "ir/stages/s01/replay/stubs.json"
+    assert result.diagnostics[0]["fix_hints_ref"] == "docs/design/impls/01_ir_model.md"
+    assert result.trace_ref == "ir/stages/s01/replay/stubs.json"
 
 
 def test_run_returns_structured_diagnostic_for_stage_execution_exception(tmp_path):

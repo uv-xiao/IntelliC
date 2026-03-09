@@ -115,7 +115,7 @@ class NVGPULoadResult(LoadResult):
         launch_path = self.package_dir / launch_entry["source"]
         if self.mode == "device":
             logical_entry = expected_entry if expected_entry is not None else function_name
-            ok, result, adapter_diagnostics = nvgpu_cuda_adapter.run_package(
+            ok, result, adapter_diagnostics, trace_ref = nvgpu_cuda_adapter.run_package(
                 self.package_dir,
                 self.manifest,
                 entry=logical_entry,
@@ -131,12 +131,15 @@ class NVGPULoadResult(LoadResult):
                 trace=trace,
                 ok=ok and not diagnostics,
                 diagnostics=diagnostics,
+                trace_ref=trace_ref,
+                adapter={"name": "cuda-driver"} if trace_ref is not None else None,
             )
             return RunResult(
                 ok=ok and not diagnostics,
                 mode=self.mode,
                 entry=function_name,
                 result=result,
+                trace_ref=trace_ref,
                 diagnostics=diagnostics,
                 log_path=log_path,
             )
@@ -284,7 +287,7 @@ class NVGPUBinding(ManifestBinding):
                 built_outputs.append(launch_entry["source"])
             built_outputs.extend(_kernel_sources(self.package_dir / codegen_index_path))
             if mode == "device":
-                adapter_outputs, adapter_diagnostics = nvgpu_cuda_adapter.build_package(
+                adapter_outputs, adapter_diagnostics, trace_ref = nvgpu_cuda_adapter.build_package(
                     self.package_dir,
                     self.manifest,
                     force=force,
@@ -292,7 +295,10 @@ class NVGPUBinding(ManifestBinding):
                 built_outputs.extend(adapter_outputs)
                 diagnostics.extend(adapter_diagnostics)
             else:
+                trace_ref = None
                 built_outputs.extend(_derived_outputs(self.package_dir / toolchain_manifest_path))
+        else:
+            trace_ref = None
         session = self.load(mode=mode)
         log_path = session._write_log(
             kind="build",
@@ -303,12 +309,16 @@ class NVGPUBinding(ManifestBinding):
                 f"validated={validation.ok}",
                 f"built_outputs={tuple(built_outputs)!r}",
             ),
+            refs={"trace_ref": trace_ref} if trace_ref is not None else None,
+            diagnostics=diagnostics or None,
+            adapter={"name": "nvcc"} if trace_ref is not None and mode == "device" else None,
         )
         return BuildResult(
             ok=not diagnostics,
             mode=mode,
             built_outputs=built_outputs,
             log_paths=[log_path],
+            trace_refs=[trace_ref] if trace_ref is not None else [],
             diagnostics=diagnostics,
         )
 

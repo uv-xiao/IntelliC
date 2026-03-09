@@ -23,12 +23,14 @@ def test_raise_stub_produces_structured_diagnostic():
         "entity_id": "demo.intrinsic",
         "kind": "intrinsic",
         "artifact_ref": "ir/stages/s01/replay/stubs.json",
+        "payload_ref": "ir/stages/s01/replay/stubs.json",
         "detail": "No simulator registered for demo.intrinsic",
         "reason": "missing_simulator",
         "next_actions": [
             "Register a simulator for the intrinsic in the replay runtime.",
             "Route replay through an owning extension if simulation is toolchain-specific.",
         ],
+        "fix_hints_ref": "docs/design/impls/01_ir_model.md",
     }
     assert error.fix_hints == (
         "Register a simulator for the intrinsic in the replay runtime.",

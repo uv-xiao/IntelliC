@@ -47,6 +47,7 @@ def test_pto_build_returns_structured_result(tmp_path, monkeypatch):
                 "build/pto/kernels/0.bin",
             ],
             [],
+            "logs/adapter_pto_build.json",
         ),
     )
 
@@ -62,6 +63,7 @@ def test_pto_build_returns_structured_result(tmp_path, monkeypatch):
         "build/pto/kernels/0.bin",
     ]
     assert len(result.log_paths) == 1
+    assert result.trace_refs == ["logs/adapter_pto_build.json"]
     assert result.diagnostics == []
 
 
@@ -100,8 +102,14 @@ def test_pto_run_executes_through_adapter(tmp_path, monkeypatch):
         "run_package",
         lambda *args, **kwargs: (
             True,
-            {"adapter": "pto-runtime", "platform": "a2a3sim", "output_names": ["out"]},
+            {
+                "adapter": "pto-runtime",
+                "platform": "a2a3sim",
+                "output_names": ["out"],
+                "trace_ref": "logs/adapter_pto_run.json",
+            },
             [],
+            "logs/adapter_pto_run.json",
         ),
     )
 
@@ -119,6 +127,12 @@ def test_pto_run_executes_through_adapter(tmp_path, monkeypatch):
     assert result.ok is True
     assert result.mode == "sim"
     assert result.entry == "demo_kernel"
-    assert result.result == {"adapter": "pto-runtime", "platform": "a2a3sim", "output_names": ["out"]}
+    assert result.result == {
+        "adapter": "pto-runtime",
+        "platform": "a2a3sim",
+        "output_names": ["out"],
+        "trace_ref": "logs/adapter_pto_run.json",
+    }
+    assert result.trace_ref == "logs/adapter_pto_run.json"
     assert result.diagnostics == []
     assert result.log_path is not None
