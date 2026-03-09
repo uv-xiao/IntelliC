@@ -77,6 +77,28 @@ store(out, x * sigmoid(x * 1.702))
 store(out, (lhs + rhs + 1.0) * (lhs + rhs + 2.0) + (lhs + rhs))
 ```
 
+The current surface now applies the same rule to staged data-movement and
+protocol-style operations that previously still leaked raw string scratch names.
+Public kernels can write:
+
+```text
+a_shared = async_copy(A, dtype="f32", memory_space="shared")
+b_shared = async_copy(B, dtype="f32", memory_space="shared")
+accum = mma(a_shared, b_shared, m=M, n=N, k=K, dtype="f32")
+store(C, accum)
+```
+
+and:
+
+```text
+tile_payload = channel_recv("tiles", dtype="f32", shape=("M", "N"))
+tile_summary = reduction_sum(tile_payload, axis=0, dtype="f32", shape=("N",))
+expanded = broadcast(tile_summary, shape=("M", "N"), dtype="f32")
+store(C, expanded)
+```
+
+instead of spelling those intermediate values as string slots in every call.
+
 without dropping into raw payload fields or explicit constant nodes in the
 example code.
 
@@ -216,6 +238,22 @@ HTP deliberately separates:
 
 That separation is what allows one frontend surface to target multiple backends without each backend becoming the semantic owner.
 
+## What HTP learned from LittleKernel
+
+The completed comparison in `docs/design/07_littlekernel_ast_comparison.md`
+pins down the actual difference between the two systems.
+
+LittleKernel's strongest public-surface advantage is that temporary storage,
+hardware intrinsics, and control constructs read like values in a program.
+HTP should absorb that readability lesson, but not LittleKernel's ownership
+boundary. HTP still keeps canonical ownership in runnable staged Python plus
+attached semantic payloads, while LittleKernel moves into its own Expr/Stmt IR
+earlier.
+
+The latest surface pass was taken directly from that comparison: HTP now lets
+data-movement and channel-style ops yield typed temporaries instead of forcing
+raw string outputs in the flagship examples.
+
 ## Coding pointers
 
 If you are working in this layer, start here:
@@ -225,6 +263,7 @@ If you are working in this layer, start here:
 - `htp/wsp/__init__.py` — WSP builder/decorator surface plus legacy helper functions
 - `htp/csp/__init__.py` — CSP builder/decorator surface plus legacy helper functions
 - `htp/ark/__init__.py` — Arknife-style hardware and instruction authoring surface
+- `docs/design/07_littlekernel_ast_comparison.md` — completed reference-backed comparison and extracted design rules
 - `examples/` — runnable proof surface
 - `examples/**/README.md` — example-local walkthroughs
 
@@ -240,12 +279,13 @@ Recent concrete proof points:
   programming model can author cluster/TMA/WGMMA plans for the Blackwell
   profile without creating a second compiler path.
 - `examples/wsp_warp_gemm/demo.py` now shows a fluent WSP builder plus an
-  op-rich staged kernel body.
+  op-rich staged kernel body with implicit shared-memory temporaries.
 - `examples/wsp_littlekernel_pipelined_gemm/demo.py` calibrates WSP schedule
   readability against LittleKernel-style pipelined GEMM code without giving up
   HTP's shared artifact model.
 - `examples/csp_channel_pipeline/demo.py` now shows a multi-channel
-  dispatch/combine/writeback protocol authored through the CSP builder surface.
+  dispatch/combine/writeback protocol authored through the CSP builder surface
+  and typed receive/broadcast temporaries.
 - `tests/examples/test_examples.py` now defends sequential PTO example
   execution in one process so public examples remain reliable instead of being
   “one-shot” demos.
@@ -272,4 +312,9 @@ code examples and the example-local docs.
 
 ## Current limits
 
-The user-facing surfaces are still narrower and more mechanical than the final intended framework. The missing work now lives in `docs/todo/02_programming_surfaces.md`.
+The remaining surface work is no longer about basic readability. It is about
+broader loop / region authoring, richer scratch-memory declarations, and
+continuing to raise flagship examples toward the best reference examples. The
+next gaps live in `docs/todo/01_compiler_model.md` and
+`docs/todo/05_backends_and_extensions.md`, not in a separate programming-surface
+comparison TODO anymore.

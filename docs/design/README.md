@@ -38,6 +38,7 @@ Agent Product + Workflow
 - `docs/design/04_artifacts_replay_debug.md`
 - `docs/design/05_backends_and_extensions.md`
 - `docs/design/06_agent_product_and_workflow.md`
+- `docs/design/07_littlekernel_ast_comparison.md`
 
 ## Implemented feature documents
 
@@ -47,6 +48,7 @@ Agent Product + Workflow
 - `docs/design/04_artifacts_replay_debug.md` — manifest, staged artifacts, replay, diagnostics, and verification surface
 - `docs/design/05_backends_and_extensions.md` — PTO, NV-GPU, AIE, extension integration, and Arknife-style NV-GPU support
 - `docs/design/06_agent_product_and_workflow.md` — agent-facing tooling and repository workflow
+- `docs/design/07_littlekernel_ast_comparison.md` — completed LittleKernel comparison and the surface rules extracted from it
 
 ## Examples
 

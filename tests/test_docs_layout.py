@@ -37,6 +37,7 @@ def test_design_tree_has_only_supported_top_level_entries():
         "04_artifacts_replay_debug.md",
         "05_backends_and_extensions.md",
         "06_agent_product_and_workflow.md",
+        "07_littlekernel_ast_comparison.md",
     }
 
 

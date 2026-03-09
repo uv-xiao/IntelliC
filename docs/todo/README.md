@@ -18,17 +18,17 @@ For feature work:
 ### Overall
 
 - total tracked TODO checklist items: 56
-- complete: 39
+- complete: 40
 - partial: 10
-- open: 7
-- completion ratio: about 70%
+- open: 6
+- completion ratio: about 71%
 
 ### By area
 
 | Layer | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Compiler model, semantics, typing | 6 | 2 | 2 | 10 |
-| Programming surfaces | 9 | 0 | 1 | 10 |
+| Programming surfaces | 10 | 0 | 0 | 10 |
 | Pipeline and solver | 6 | 2 | 1 | 9 |
 | Artifacts, replay, debug | 5 | 2 | 1 | 8 |
 | Backends and extensions | 8 | 2 | 1 | 11 |
@@ -39,7 +39,7 @@ For feature work:
 - `docs/todo/01_compiler_model.md`
   - remaining work: broaden semantic/type/layout/effect breadth beyond the newly landed fused-elementwise semantics and deepen routine semantics
 - `docs/todo/02_programming_surfaces.md`
-  - remaining work: finish the written AST-centric comparison against LittleKernel and use it to drive the next surface pass now that WSP/CSP have decorator-builder surfaces and Arknife is on native `KernelValue` objects
+  - remaining work: no standalone open item; future surface work now rolls into richer semantics and backend depth
 - `docs/todo/03_pipeline_and_solver.md`
   - remaining work: richer search/composition and broader MLIR island breadth
 - `docs/todo/04_artifacts_replay_debug.md`
@@ -58,4 +58,3 @@ For feature work:
 - `docs/todo/05_backends_and_extensions.md`
 - `docs/todo/06_agent_product_and_workflow.md`
 - `docs/todo/reports/retargetable_extensibility_report.md`
-- `docs/todo/reports/littlekernel_ast_comparison.md`

@@ -20,16 +20,16 @@ def pipelined_mainloop_gemm(
 ) -> None:
     """Pipelined GEMM mainloop with double-buffered shared-memory stages."""
 
-    async_copy(A, target="a_stage0", dtype="f32")
-    async_copy(B, target="b_stage0", dtype="f32")
+    a_stage0 = async_copy(A, dtype="f32", memory_space="shared")
+    b_stage0 = async_copy(B, dtype="f32", memory_space="shared")
     barrier()
-    mma("a_stage0", "b_stage0", out="accum0", m=M, n=N, k=K, dtype="f32")
+    mma(a_stage0, b_stage0, out="accum0", m=M, n=N, k=K, dtype="f32")
 
-    async_copy(A, target="a_stage1", dtype="f32")
-    async_copy(B, target="b_stage1", dtype="f32")
+    a_stage1 = async_copy(A, dtype="f32", memory_space="shared")
+    b_stage1 = async_copy(B, dtype="f32", memory_space="shared")
     barrier()
-    mma("a_stage1", "b_stage1", out="accum1", m=M, n=N, k=K, dtype="f32")
-    store(C, "accum1")
+    accum1 = mma(a_stage1, b_stage1, m=M, n=N, k=K, dtype="f32")
+    store(C, accum1)
 
 
 @wsp_program(target="nvgpu-ampere", kernel=pipelined_mainloop_gemm)

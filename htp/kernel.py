@@ -513,18 +513,26 @@ def store(target: str | KernelValue, value: str | KernelValue) -> dict[str, Any]
 def broadcast(
     source: str | KernelValue,
     *,
-    out: str | KernelValue,
+    out: str | KernelValue | None = None,
     shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
     dtype: str,
-) -> dict[str, Any]:
+) -> dict[str, Any] | KernelValue:
+    result = _resolve_result_value(
+        out=out,
+        shape=shape,
+        dtype=dtype,
+        sources=(source,),
+        prefix="broadcast",
+    )
     return _emit_or_return(
         {
             "op": "broadcast",
             "source": _ref(source),
-            "out": _ref(out),
-            "shape": _normalize_dims(shape),
-            "dtype": dtype,
-        }
+            "out": result.name,
+            "shape": list(result.shape),
+            "dtype": result.dtype,
+        },
+        result=result,
     )
 
 
@@ -577,51 +585,118 @@ def relayout(source: str | KernelValue, *, out: str | KernelValue, layout: str, 
 
 
 def reduction_sum(
-    source: str | KernelValue, *, out: str | KernelValue, axis: str | int, dtype: str
-) -> dict[str, Any]:
+    source: str | KernelValue,
+    *,
+    out: str | KernelValue | None = None,
+    axis: str | int,
+    dtype: str,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | None = None,
+) -> dict[str, Any] | KernelValue:
+    resolved_shape = shape
+    if resolved_shape is None and out is None:
+        resolved_shape = _infer_reduction_shape(source, axis)
+    result = _resolve_result_value(
+        out=out,
+        shape=resolved_shape,
+        dtype=dtype,
+        sources=(source,),
+        prefix="reduce_sum",
+    )
     return _emit_or_return(
         {
             "op": "reduction_sum",
             "source": _ref(source),
-            "out": _ref(out),
+            "out": result.name,
             "axis": axis,
-            "dtype": dtype,
-        }
+            "dtype": result.dtype,
+        },
+        result=result,
     )
 
 
-def async_copy(source: str | KernelValue, *, target: str | KernelValue, dtype: str) -> dict[str, Any]:
-    return _emit_or_return(
-        {
-            "op": "async_copy",
-            "source": _ref(source),
-            "target": _ref(target),
-            "dtype": dtype,
-        }
-    )
+def async_copy(
+    source: str | KernelValue,
+    *,
+    target: str | KernelValue | None = None,
+    dtype: str,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | None = None,
+    memory_space: str | None = None,
+) -> dict[str, Any] | KernelValue:
+    source_value = _require_kernel_value(source, op_name="async_copy") if target is None else None
+    if target is None:
+        trace = _TRACE_RECORDER.get()
+        if trace is None:
+            raise ValueError("Implicit async_copy targets require traced @kernel execution.")
+        result = KernelValue(
+            name=_fresh_temp(trace, "copy"),
+            dtype=dtype,
+            shape=_normalize_dims(shape) if shape is not None else source_value.shape,
+            kind=source_value.kind,
+            memory_space=memory_space or "shared",
+            axis_layout=source_value.axis_layout,
+        )
+    else:
+        result = _resolve_result_value(
+            out=target,
+            shape=shape,
+            dtype=dtype,
+            sources=(source,),
+            prefix="copy",
+        )
+        if result.memory_space is None and memory_space is not None:
+            result = KernelValue(
+                name=result.name,
+                dtype=result.dtype,
+                shape=result.shape,
+                kind=result.kind,
+                role=result.role,
+                memory_space=memory_space,
+                axis_layout=result.axis_layout,
+                attrs=None if result.attrs is None else dict(result.attrs),
+            )
+    payload = {
+        "op": "async_copy",
+        "source": _ref(source),
+        "target": result.name,
+        "dtype": result.dtype,
+    }
+    if result.shape:
+        payload["shape"] = list(result.shape)
+    if result.memory_space is not None:
+        payload["target_memory_space"] = result.memory_space
+    return _emit_or_return(payload, result=result)
 
 
 def mma(
     lhs: str | KernelValue,
     rhs: str | KernelValue,
     *,
-    out: str | KernelValue,
-    m: str | KernelValue,
-    n: str | KernelValue,
-    k: str | KernelValue,
+    out: str | KernelValue | None = None,
+    m: str | KernelValue | None = None,
+    n: str | KernelValue | None = None,
+    k: str | KernelValue | None = None,
     dtype: str,
-) -> dict[str, Any]:
+) -> dict[str, Any] | KernelValue:
+    inferred_m, inferred_n, inferred_k, inferred_shape = _infer_matmul_shape(lhs, rhs)
+    result = _resolve_result_value(
+        out=out,
+        shape=inferred_shape,
+        dtype=dtype,
+        sources=(lhs, rhs),
+        prefix="mma",
+    )
     return _emit_or_return(
         {
             "op": "mma",
             "lhs": _ref(lhs),
             "rhs": _ref(rhs),
-            "out": _ref(out),
-            "m": _ref(m),
-            "n": _ref(n),
-            "k": _ref(k),
-            "dtype": dtype,
-        }
+            "out": result.name,
+            "m": _ref(m if m is not None else inferred_m),
+            "n": _ref(n if n is not None else inferred_n),
+            "k": _ref(k if k is not None else inferred_k),
+            "dtype": result.dtype,
+        },
+        result=result,
     )
 
 
@@ -629,14 +704,28 @@ def channel_send(value: str | KernelValue, *, channel: str | KernelValue) -> dic
     return _emit_or_return({"op": "channel_send", "value": _ref(value), "channel": _ref(channel)})
 
 
-def channel_recv(channel: str | KernelValue, *, out: str | KernelValue, dtype: str) -> dict[str, Any]:
+def channel_recv(
+    channel: str | KernelValue,
+    *,
+    out: str | KernelValue | None = None,
+    dtype: str,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | None = None,
+) -> dict[str, Any] | KernelValue:
+    result = _resolve_result_value(
+        out=out,
+        shape=shape or (),
+        dtype=dtype,
+        sources=(),
+        prefix="recv",
+    )
     return _emit_or_return(
         {
             "op": "channel_recv",
             "channel": _ref(channel),
-            "out": _ref(out),
-            "dtype": dtype,
-        }
+            "out": result.name,
+            "dtype": result.dtype,
+        },
+        result=result,
     )
 
 
@@ -792,6 +881,21 @@ def _infer_matmul_shape(
     if lhs_k != rhs_k:
         raise ValueError("Expression-form matmul requires matching contraction dimensions.")
     return lhs_m, rhs_n, lhs_k, (lhs_m, rhs_n)
+
+
+def _infer_reduction_shape(
+    source: str | KernelValue,
+    axis: str | int,
+) -> tuple[str, ...]:
+    source_value = _require_kernel_value(source, op_name="reduction_sum")
+    dims = list(source_value.shape)
+    if not dims:
+        return ()
+    if isinstance(axis, int):
+        if axis < 0 or axis >= len(dims):
+            raise ValueError("Reduction axis is out of bounds for the symbolic source shape.")
+        return tuple(dim for index, dim in enumerate(dims) if index != axis)
+    return tuple(dim for dim in dims if dim != str(axis))
 
 
 def _require_kernel_value(value: str | KernelValue, *, op_name: str) -> KernelValue:

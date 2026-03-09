@@ -17,6 +17,7 @@ from htp.kernel import (
     elementwise_add,
     kernel,
     matmul,
+    mma,
     reduction_sum,
     scalar,
     sigmoid,
@@ -260,6 +261,52 @@ def test_public_kernel_surface_covers_broader_operation_helpers():
         "channel_recv",
         "barrier",
     ]
+
+
+def test_public_kernel_surface_supports_implicit_staging_temporaries():
+    @kernel
+    def staged_gemm(
+        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        a_shared = async_copy(A, dtype="f32", memory_space="shared")
+        b_shared = async_copy(B, dtype="f32", memory_space="shared")
+        accum = mma(a_shared, b_shared, m=M, n=N, k=K, dtype="f32")
+        store(C, accum)
+
+    payload = staged_gemm.to_payload()
+
+    assert payload["ops"][0]["target_memory_space"] == "shared"
+    assert payload["ops"][1]["target_memory_space"] == "shared"
+    assert payload["ops"][2]["op"] == "mma"
+    assert payload["ops"][3]["op"] == "elementwise_unary"
+
+
+def test_public_kernel_surface_supports_implicit_channel_and_reduce_temporaries():
+    @kernel
+    def pipeline_stage(
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        tile_payload = channel_recv("tiles", dtype="f32", shape=("M", "N"))
+        tile_summary = reduction_sum(tile_payload, axis=0, dtype="f32", shape=("N",))
+        merged = channel_recv("partials", dtype="f32", shape=("N",))
+        expanded = broadcast(merged, shape=("M", "N"), dtype="f32")
+        channel_send(tile_summary, channel="partials")
+        store(C, expanded)
+
+    payload = pipeline_stage.to_payload()
+
+    assert payload["ops"][0]["op"] == "channel_recv"
+    assert payload["ops"][1]["op"] == "reduction_sum"
+    assert payload["ops"][2]["op"] == "channel_recv"
+    assert payload["ops"][3]["op"] == "broadcast"
+    assert payload["ops"][4]["op"] == "channel_send"
 
 
 def test_wsp_program_surface_accepts_kernel_specs_and_task_helpers():
