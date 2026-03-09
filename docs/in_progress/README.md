@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `001-docs-process-overhaul.md` — docs tree and agent workflow reorganization
+- none currently

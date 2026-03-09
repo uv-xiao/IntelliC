@@ -21,7 +21,7 @@ Status markers:
 - `[ ]` continue broadening solver composition only when it unblocks deeper backend/runtime work
 
 ### Agent development product
-- `[~]` agent tooling exists, but the repo workflow and docs still need stronger operational discipline
+- `[~]` agent tooling and repo workflow discipline are real, but broader autonomous-development controls remain
 
 ### Semantics and typing
 - `[~]` shared semantic payloads, layout, effects, schedule, WSP, and CSP are real
