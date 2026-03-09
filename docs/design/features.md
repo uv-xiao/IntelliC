@@ -18,6 +18,7 @@ Implemented today:
 - pass contracts, staged analyses, and pass trace emission
 - explicit identity and mapping artifacts
 - solver preflight with `ir/solver_failure.json`
+- structured compiler failures with `ir/compiler_failure.json`
 - registered pass and pipeline surfaces
 - manifest enrichment with `inputs`, `pipeline`, and `capabilities`
 

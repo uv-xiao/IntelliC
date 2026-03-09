@@ -2,6 +2,7 @@
 
 MANIFEST_SCHEMA_ID = "htp.manifest.v1"
 PASS_CONTRACT_SCHEMA_ID = "htp.pass_contract.v1"
+COMPILER_FAILURE_SCHEMA_ID = "htp.compiler_failure.v1"
 REPLAY_STUBS_SCHEMA_ID = "htp.replay.stubs.v1"
 BINDING_LOG_SCHEMA_ID = "htp.binding_log.v1"
 ADAPTER_TRACE_SCHEMA_ID = "htp.adapter_trace.v1"
@@ -27,6 +28,7 @@ __all__ = [
     "ADAPTER_TRACE_SCHEMA_ID",
     "BINDING_LOG_SCHEMA_ID",
     "ENTITY_MAP_SCHEMA_ID",
+    "COMPILER_FAILURE_SCHEMA_ID",
     "IDS_BINDINGS_SCHEMA_ID",
     "IDS_ENTITIES_SCHEMA_ID",
     "ID_SCHEMA_IDS",

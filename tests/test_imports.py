@@ -27,6 +27,7 @@ def test_schema_constants():
 
     assert schemas.MANIFEST_SCHEMA_ID == "htp.manifest.v1"
     assert schemas.PASS_CONTRACT_SCHEMA_ID == "htp.pass_contract.v1"
+    assert schemas.COMPILER_FAILURE_SCHEMA_ID == "htp.compiler_failure.v1"
     assert schemas.REPLAY_STUBS_SCHEMA_ID == "htp.replay.stubs.v1"
     assert schemas.ID_SCHEMA_IDS == {
         "entities": "htp.ids.entities.v1",
