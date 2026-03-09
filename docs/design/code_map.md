@@ -9,13 +9,16 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/runtime/core.py` — replay runtime and kernel/intrinsic dispatch
 - `htp/runtime/errors.py` — structured replay/stub diagnostics with payload and
   fix-hint refs
-- `htp/solver.py` — capability solver and final artifact checks
+- `htp/solver.py` — capability solver, deterministic cost-based template
+  selection, requested-extension enforcement, and manifest-owned final artifact
+  checks
 - `htp_ext/registry.py` — extension registration for solver / pass / template discovery
 - `htp/diagnostics.py` — diagnostic catalog, family-based explanations, and
   fix-hint policies
 - `htp/agent_policy.py` — agent policy loading for verify/promote tooling
 - `htp/perf.py` — perf metric loading and baseline-threshold comparison
-- `htp/bindings/validate.py` — generic manifest/artifact validation, including optional manifest sections and sidecar schema checks
+- `htp/bindings/validate.py` — generic manifest/artifact validation, including
+  `manifest.outputs`, optional manifest sections, and sidecar schema checks
 - `htp/schemas.py` — shared schema ids including binding logs and adapter traces
 - `htp/intrinsics.py` — intrinsic declarations plus lower/emit/sim handler registration
 - `htp_ext/aie/intrinsics.py` — extension-owned backend intrinsic package example
@@ -68,7 +71,8 @@ This file is the bridge between `docs/design/` and the current implementation.
 
 ## Extensions
 
-- `htp_ext/mlir_cse/` — MLIR CSE round-trip extension, including registered export/import passes and identity maps
+- `htp_ext/mlir_cse/` — MLIR CSE round-trip extension, including registered
+  export/import passes, solver-visible eligibility rules, and identity maps
 - `htp_ext/aie/plan.py` — AIE mapping/FIFO planning analyses
 - `htp_ext/aie/emit.py` — AIE artifact emission extension driven by explicit
   mapping/FIFO plans

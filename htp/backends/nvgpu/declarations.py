@@ -20,6 +20,7 @@ def declaration_for(profile: str | None = None) -> BackendSolverDeclaration:
         hardware_profile=arch.hardware_profile,
         target_capabilities=target_capabilities,
         supported_ops=("elementwise_binary", "matmul"),
+        selection_cost=40 if arch.hardware_profile.startswith("nvidia-blackwell") else 30,
         artifact_contract=ArtifactContract(
             outputs=(
                 ("nvgpu_codegen_index", codegen_index),

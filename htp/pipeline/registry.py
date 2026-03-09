@@ -8,13 +8,14 @@ from htp_ext.registry import active_extensions
 
 
 def default_template(*, target: dict[str, str], required_outputs: tuple[str, ...]):
-    from htp.solver import PipelineTemplate
+    from htp.solver import PipelineTemplate, _backend_declaration
 
-    del target
+    declaration = _backend_declaration(target)
     return PipelineTemplate(
         template_id="htp.default.v1",
         passes=tuple(item.contract for item in core_passes()),
         required_outputs=required_outputs,
+        selection_cost=declaration.selection_cost,
     )
 
 
@@ -30,7 +31,11 @@ def extension_templates(
 
 
 def registered_templates(*, program: Mapping[str, object], required_outputs: tuple[str, ...]):
-    return (default_template(target={}, required_outputs=required_outputs),) + extension_templates(
+    target = program.get("target", {})
+    resolved_target = target if isinstance(target, dict) else {}
+    return (
+        default_template(target=resolved_target, required_outputs=required_outputs),
+    ) + extension_templates(
         program=program,
         required_outputs=required_outputs,
     )

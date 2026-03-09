@@ -22,6 +22,7 @@ def declaration_for(variant: str | None = None) -> BackendSolverDeclaration:
         hardware_profile=arch.hardware_profile,
         target_capabilities=target_capabilities,
         supported_ops=("elementwise_binary",),
+        selection_cost=20 if arch.variant == "a2a3sim" else 60,
         artifact_contract=ArtifactContract(
             outputs=(
                 ("kernel_config", (PTO_PROJECT_DIR / "kernel_config.py").as_posix()),

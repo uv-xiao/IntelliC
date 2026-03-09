@@ -143,7 +143,8 @@ The broader rule is:
 
 Validation returns a structured report:
 
-- missing required files (artifact contract violations)
+- missing required files from both `manifest.outputs` and stage-owned contract
+  paths (artifact contract violations)
 - invalid sidecar schemas at generic contract paths (`program.pyast`, semantic
   payloads, ids/maps, replay stubs, analysis index)
 - toolchain/runtime contract mismatches

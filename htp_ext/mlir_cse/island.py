@@ -14,6 +14,7 @@ from htp.passes.program_model import (
     build_semantic_model,
     build_type_layout_effects,
     canonicalize_program,
+    normalize_target,
     scheduled_ops_from_plan,
     stage_payloads_from_program,
 )
@@ -32,7 +33,7 @@ IMPORT_PASS_ID = "htp_ext.mlir_cse::import@1"
 EXPORT_CONTRACT = PassContract.analysis(
     pass_id=EXPORT_PASS_ID,
     owner=EXTENSION_ID,
-    requires=("Semantic.ModelBuilt@1",),
+    requires=("Semantic.ModelBuilt@1", "Extension.MLIRCSEEligible@1"),
     provides=("Extension.MLIRCSEExported@1",),
     outputs=("island.mlir.input", "island.mlir.pipeline", "island.mlir.ledger"),
 )
@@ -188,7 +189,7 @@ def pipeline_templates(*, program: Mapping[str, Any], required_outputs: tuple[st
     from htp.pipeline.registry import default_template
     from htp.solver import PipelineTemplate
 
-    base = default_template(target={}, required_outputs=required_outputs)
+    base = default_template(target=normalize_target(dict(program)), required_outputs=required_outputs)
     insertion_index = next(
         index
         for index, contract in enumerate(base.passes)
@@ -201,6 +202,7 @@ def pipeline_templates(*, program: Mapping[str, Any], required_outputs: tuple[st
             template_id="htp.default+htp_ext.mlir_cse.v1",
             passes=tuple(passes),
             required_outputs=required_outputs,
+            selection_cost=base.selection_cost + 25,
             extension_steps=(EXTENSION_ID,),
         ),
     )
@@ -215,6 +217,8 @@ def extension_solver_result(program: Mapping[str, Any]) -> dict[str, Any]:
             template.template_id for template in pipeline_templates(program=program, required_outputs=())
         ],
         "reasons": list(eligibility["reasons"]),
+        "failed_rules": list(eligibility["failed_rules"]),
+        "satisfied_rules": list(eligibility["satisfied_rules"]),
     }
 
 
