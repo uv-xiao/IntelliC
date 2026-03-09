@@ -21,7 +21,9 @@ def test_pto_emit_supports_fused_elementwise_kernel(tmp_path):
 
     codegen_index = json.loads((package.package_dir / "codegen" / "pto" / "pto_codegen.json").read_text())
     kernel_source = (package.package_dir / "codegen" / "pto" / "kernels" / "aiv" / "swiglu.cpp").read_text()
-    orchestration_source = (package.package_dir / "codegen" / "pto" / "orchestration" / "swiglu_orchestration.cpp").read_text()
+    orchestration_source = (
+        package.package_dir / "codegen" / "pto" / "orchestration" / "swiglu_orchestration.cpp"
+    ).read_text()
 
     assert codegen_index["kernels"][0]["op"] == "fused_elementwise"
     assert [item["op"] for item in codegen_index["kernels"][0]["attrs"]["ops"]] == [
