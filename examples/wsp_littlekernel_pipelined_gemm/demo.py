@@ -17,7 +17,7 @@ from htp.wsp import tile as wsp_tile
 
 
 @kernel
-def gemm_tile(
+def pipelined_gemm(
     A: buffer(dtype="f32", shape=("M", "K"), role="input"),
     B: buffer(dtype="f32", shape=("K", "N"), role="input"),
     C: buffer(dtype="f32", shape=("M", "N"), role="output"),
@@ -25,21 +25,21 @@ def gemm_tile(
     N: scalar(dtype="i32", role="shape"),
     K: scalar(dtype="i32", role="shape"),
 ) -> None:
-    """Warp-scheduled GEMM tile expressed as direct Python math."""
+    """LittleKernel-inspired GEMM kernel body expressed as plain Python."""
 
     store(C, A @ B)
 
 
-WSP_GEMM_PROGRAM: dict[str, Any] = wsp_program(
-    entry="gemm_tile",
+LITTLEKERNEL_GEMM_PROGRAM: dict[str, Any] = wsp_program(
+    entry="pipelined_gemm",
     target="nvgpu-ampere",
-    kernel=gemm_tile,
-    tasks=[wsp_task(gemm_tile, "A", "B", "C", "M", "N", "K", task_id="gemm_main")],
+    kernel=pipelined_gemm,
+    tasks=[wsp_task(pipelined_gemm, "A", "B", "C", "M", "N", "K", task_id="tile_main")],
     schedule=wsp_schedule(
-        tile=wsp_tile(block=(32, 64, 16)),
+        tile=wsp_tile(block=(128, 256, 64)),
         bind=wsp_bind(grid="block", lane="warp"),
-        pipeline=wsp_pipeline(depth=2, buffering="double"),
-        resources=wsp_resources(num_warps=4),
+        pipeline=wsp_pipeline(depth=3, buffering="double"),
+        resources=wsp_resources(num_warps=8),
         specialize=wsp_specialize(operator="matmul"),
     ),
 )
@@ -49,7 +49,7 @@ def compile_example(output_dir: Path | str) -> dict[str, Any]:
     package = compile_program(
         package_dir=Path(output_dir),
         target="nvgpu-ampere",
-        program=dict(WSP_GEMM_PROGRAM),
+        program=dict(LITTLEKERNEL_GEMM_PROGRAM),
     )
     return {
         "package_dir": package.package_dir.as_posix(),
@@ -79,14 +79,14 @@ def run_demo(output_dir: Path | str) -> dict[str, Any]:
     compile_summary = compile_example(output_path)
     replay_summary = replay_latest_stage(output_path)
     return {
-        "example": "wsp_warp_gemm",
+        "example": "wsp_littlekernel_pipelined_gemm",
         "compile": compile_summary,
         "replay": replay_summary,
     }
 
 
 def main() -> None:
-    summary = run_demo(Path("artifacts") / "wsp_warp_gemm")
+    summary = run_demo(Path("artifacts") / "wsp_littlekernel_pipelined_gemm")
     print(json.dumps(summary, indent=2))
 
 

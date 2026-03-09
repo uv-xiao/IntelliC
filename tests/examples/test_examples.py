@@ -15,14 +15,22 @@ from examples.mlir_cse_extension.demo import replay_latest_stage as replay_mlir_
 from examples.nvgpu_arknife_gemm.demo import compile_example as compile_nvgpu_example
 from examples.nvgpu_arknife_gemm.demo import replay_latest_stage as replay_nvgpu_stage
 from examples.nvgpu_arknife_gemm.demo import run_demo as run_nvgpu_demo
+from examples.pto_pypto_gelu.demo import compile_example as compile_pto_gelu_example
+from examples.pto_pypto_gelu.demo import replay_latest_stage as replay_pto_gelu_stage
+from examples.pto_pypto_gelu.demo import run_demo as run_pto_gelu_demo
 from examples.pto_pypto_swiglu.demo import compile_example as compile_pto_swiglu_example
 from examples.pto_pypto_swiglu.demo import replay_latest_stage as replay_pto_swiglu_stage
 from examples.pto_pypto_swiglu.demo import run_demo as run_pto_swiglu_demo
 from examples.pto_pypto_vector_add.demo import compile_example as compile_pto_example
 from examples.pto_pypto_vector_add.demo import replay_latest_stage as replay_pto_stage
 from examples.pto_pypto_vector_add.demo import run_demo as run_pto_demo
+from examples.pto_pypto_vector_dag.demo import compile_example as compile_pto_vector_dag_example
+from examples.pto_pypto_vector_dag.demo import replay_latest_stage as replay_pto_vector_dag_stage
+from examples.pto_pypto_vector_dag.demo import run_demo as run_pto_vector_dag_demo
 from examples.serving_routine.demo import compile_example as compile_serving_example
 from examples.serving_routine.demo import replay_latest_stage as replay_serving_stage
+from examples.wsp_littlekernel_pipelined_gemm.demo import compile_example as compile_littlekernel_example
+from examples.wsp_littlekernel_pipelined_gemm.demo import replay_latest_stage as replay_littlekernel_stage
 from examples.wsp_warp_gemm.demo import compile_example as compile_wsp_example
 from examples.wsp_warp_gemm.demo import replay_latest_stage as replay_wsp_stage
 
@@ -60,6 +68,28 @@ def test_pto_swiglu_example_compiles_and_replays(tmp_path):
     assert replay_summary["stage_id"].startswith("s")
 
 
+def test_pto_gelu_example_compiles_and_replays(tmp_path):
+    package_dir = tmp_path / "pto_gelu_example"
+    compile_summary = compile_pto_gelu_example(package_dir)
+    replay_summary = replay_pto_gelu_stage(package_dir)
+
+    assert compile_summary["target"] == {"backend": "pto", "option": "a2a3sim"}
+    assert (Path(compile_summary["manifest_path"])).is_file()
+    assert replay_summary["ok"] is True
+    assert replay_summary["stage_id"].startswith("s")
+
+
+def test_pto_vector_dag_example_compiles_and_replays(tmp_path):
+    package_dir = tmp_path / "pto_vector_dag_example"
+    compile_summary = compile_pto_vector_dag_example(package_dir)
+    replay_summary = replay_pto_vector_dag_stage(package_dir)
+
+    assert compile_summary["target"] == {"backend": "pto", "option": "a2a3sim"}
+    assert (Path(compile_summary["manifest_path"])).is_file()
+    assert replay_summary["ok"] is True
+    assert replay_summary["stage_id"].startswith("s")
+
+
 def test_wsp_example_compiles_and_replays(tmp_path):
     package_dir = tmp_path / "wsp_example"
     compile_summary = compile_wsp_example(package_dir)
@@ -69,6 +99,17 @@ def test_wsp_example_compiles_and_replays(tmp_path):
     assert replay_summary["ok"] is True
     assert replay_summary["schedule"]["pipeline_depth"] >= 1
     assert replay_summary["schedule"]["launch"]["num_warps"] == 4
+
+
+def test_littlekernel_example_compiles_and_replays(tmp_path):
+    package_dir = tmp_path / "littlekernel_example"
+    compile_summary = compile_littlekernel_example(package_dir)
+    replay_summary = replay_littlekernel_stage(package_dir)
+
+    assert compile_summary["target"] == {"backend": "nvgpu", "option": "ampere"}
+    assert replay_summary["ok"] is True
+    assert replay_summary["schedule"]["pipeline_depth"] >= 3
+    assert replay_summary["schedule"]["launch"]["num_warps"] == 8
 
 
 def test_csp_example_compiles_and_replays(tmp_path):
@@ -197,15 +238,57 @@ def test_pto_swiglu_example_runs_a2a3sim_end_to_end(tmp_path):
     ),
     reason="requires local pto-runtime reference checkout and host C++ toolchain",
 )
+def test_pto_gelu_example_runs_a2a3sim_end_to_end(tmp_path):
+    summary = run_pto_gelu_demo(tmp_path / "pto_gelu_live")
+
+    assert summary["build"]["ok"] is True
+    assert summary["run"] is not None
+    assert summary["run"]["ok"] is True
+    assert summary["run"]["max_abs_error"] < 1e-6
+
+
+@pytest.mark.skipif(
+    shutil.which("g++") is None
+    or (
+        not Path("3rdparty/pto-runtime/python/runtime_builder.py").exists()
+        and not Path("references/pto-runtime/python/runtime_builder.py").exists()
+    ),
+    reason="requires local pto-runtime reference checkout and host C++ toolchain",
+)
+def test_pto_vector_dag_example_runs_a2a3sim_end_to_end(tmp_path):
+    summary = run_pto_vector_dag_demo(tmp_path / "pto_vector_dag_live")
+
+    assert summary["build"]["ok"] is True
+    assert summary["run"] is not None
+    assert summary["run"]["ok"] is True
+    assert summary["run"]["max_abs_error"] < 1e-6
+
+
+@pytest.mark.skipif(
+    shutil.which("g++") is None
+    or (
+        not Path("3rdparty/pto-runtime/python/runtime_builder.py").exists()
+        and not Path("references/pto-runtime/python/runtime_builder.py").exists()
+    ),
+    reason="requires local pto-runtime reference checkout and host C++ toolchain",
+)
 def test_pto_examples_run_sequentially_in_one_process(tmp_path):
     first = run_pto_demo(tmp_path / "pto_vector_add_live")
     second = run_pto_swiglu_demo(tmp_path / "pto_swiglu_live")
+    third = run_pto_gelu_demo(tmp_path / "pto_gelu_live")
+    fourth = run_pto_vector_dag_demo(tmp_path / "pto_vector_dag_live")
 
     assert first["run"] is not None
     assert first["run"]["ok"] is True
     assert second["run"] is not None
     assert second["run"]["ok"] is True
     assert second["run"]["max_abs_error"] < 1e-6
+    assert third["run"] is not None
+    assert third["run"]["ok"] is True
+    assert third["run"]["max_abs_error"] < 1e-6
+    assert fourth["run"] is not None
+    assert fourth["run"]["ok"] is True
+    assert fourth["run"]["max_abs_error"] < 1e-6
 
 
 @pytest.mark.skipif(
