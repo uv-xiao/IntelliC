@@ -3,6 +3,7 @@
 Current code anchors:
 
 - solver-visible declaration: `htp_ext/aie/declarations.py`
+- planning analyses: `htp_ext/aie/plan.py`
 - extension emitter: `htp_ext/aie/emit.py`
 - binding: `htp/bindings/aie.py`
 - binding selection: `htp/bindings/api.py`
@@ -36,9 +37,13 @@ Implemented solver/runtime scope:
   `htp_ext/aie/declarations.py`
 - `htp.compile_program(..., target="aie-<profile>")` emits AIE packages while preserving
   the canonical staged replay graph
+- AIE mapping and FIFO planning are now explicit analyses emitted under
+  `ir/stages/s01/analysis/`
+- emitted `aie.mlir`, `mapping.json`, and `fifos.json` are derived from those
+  explicit plans rather than placeholder-only comments
 
 Current scope:
 
-- extension-owned emission only
+- extension-owned planning + emission
 - replay stays in Python `sim`
 - no device toolchain execution yet

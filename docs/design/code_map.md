@@ -69,7 +69,9 @@ This file is the bridge between `docs/design/` and the current implementation.
 ## Extensions
 
 - `htp_ext/mlir_cse/` — MLIR CSE round-trip extension, including registered export/import passes and identity maps
-- `htp_ext/aie/emit.py` — AIE artifact emission extension
+- `htp_ext/aie/plan.py` — AIE mapping/FIFO planning analyses
+- `htp_ext/aie/emit.py` — AIE artifact emission extension driven by explicit
+  mapping/FIFO plans
 - `htp_ext/aie/declarations.py` — AIE solver-visible capability and artifact declarations
 - `htp/bindings/aie.py` — AIE package validation and replay binding
 
@@ -79,11 +81,14 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `examples/nvgpu_arknife_gemm/demo.py` — Arknife-inspired NV-GPU example
 - `examples/wsp_warp_gemm/demo.py` — WSP frontend example with staged schedule directives
 - `examples/csp_channel_pipeline/demo.py` — CSP frontend example with typed protocol effects
+- `examples/aie_channel_pipeline/demo.py` — AIE extension example with mapping
+  and FIFO plan sidecars
 - `tests/extensions/test_aie_backend.py` — AIE extension validation example
 - `docs/examples/pto_pypto_vector_add.md` — PTO example walkthrough
 - `docs/examples/nvgpu_arknife_gemm.md` — NV-GPU example walkthrough
 - `docs/examples/wsp_warp_gemm.md` — WSP example walkthrough
 - `docs/examples/csp_channel_pipeline.md` — CSP example walkthrough
+- `docs/examples/aie_channel_pipeline.md` — AIE example walkthrough
 
 ## Contract tests
 
