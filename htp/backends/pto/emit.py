@@ -177,6 +177,18 @@ def _toolchain_payload(plan: PTOCodegenPlan) -> dict[str, Any]:
 
 
 def _orchestration_source(plan: PTOCodegenPlan) -> str:
+    kernel = plan.kernels[0]
+    buffer_params = [param for param in kernel.params if param.kind == "buffer"]
+    scalar_params = [param for param in kernel.params if param.kind != "buffer"]
+    expected_count = len(buffer_params) * 2 + len(scalar_params)
+    null_checks = " || ".join(f"!dev_{param.name}" for param in buffer_params)
+    kernel_arg_lines = [
+        f"    kernel_args[{index}] = reinterpret_cast<uint64_t>(dev_{param.name});"
+        for index, param in enumerate(buffer_params)
+    ]
+    for offset, _param in enumerate(scalar_params, start=len(buffer_params)):
+        scalar_index = len(buffer_params) * 2 + offset - len(buffer_params)
+        kernel_arg_lines.append(f"    kernel_args[{offset}] = static_cast<uint64_t>(args[{scalar_index}]);")
     return "\n".join(
         (
             '#include "runtime.h"',
@@ -188,37 +200,41 @@ def _orchestration_source(plan: PTOCodegenPlan) -> str:
             "        std::cerr << \"orchestration received null runtime\" << '\\n';",
             "        return -1;",
             "    }",
-            "    if (arg_count < 7) {",
-            "        std::cerr << \"expected args [lhs, rhs, out, size_lhs, size_rhs, size_out, size]\" << '\\n';",
+            f"    if (arg_count < {expected_count}) {{",
+            f"        std::cerr << \"expected {expected_count} marshaled PTO arguments\" << '\\n';",
             "        return -1;",
             "    }",
-            "    void* host_lhs = reinterpret_cast<void*>(args[0]);",
-            "    void* host_rhs = reinterpret_cast<void*>(args[1]);",
-            "    void* host_out = reinterpret_cast<void*>(args[2]);",
-            "    size_t size_lhs = static_cast<size_t>(args[3]);",
-            "    size_t size_rhs = static_cast<size_t>(args[4]);",
-            "    size_t size_out = static_cast<size_t>(args[5]);",
-            "    int size = static_cast<int>(args[6]);",
+            *[
+                f"    void* host_{param.name} = reinterpret_cast<void*>(args[{index}]);"
+                for index, param in enumerate(buffer_params)
+            ],
+            *[
+                f"    size_t size_{param.name} = static_cast<size_t>(args[{len(buffer_params) + index}]);"
+                for index, param in enumerate(buffer_params)
+            ],
             "",
-            "    void* dev_lhs = runtime->host_api.device_malloc(size_lhs);",
-            "    void* dev_rhs = runtime->host_api.device_malloc(size_rhs);",
-            "    void* dev_out = runtime->host_api.device_malloc(size_out);",
-            "    if (!dev_lhs || !dev_rhs || !dev_out) {",
+            *[
+                f"    void* dev_{param.name} = runtime->host_api.device_malloc(size_{param.name});"
+                for param in buffer_params
+            ],
+            f"    if ({null_checks}) {{",
             "        std::cerr << \"failed to allocate device buffers\" << '\\n';",
             "        return -1;",
             "    }",
-            "    runtime->host_api.copy_to_device(dev_lhs, host_lhs, size_lhs);",
-            "    runtime->host_api.copy_to_device(dev_rhs, host_rhs, size_rhs);",
-            "    runtime->record_tensor_pair(host_out, dev_out, size_out);",
+            *[
+                (
+                    f"    runtime->record_tensor_pair(host_{param.name}, dev_{param.name}, size_{param.name});"
+                    if param.role in {"output", "inout"}
+                    else f"    runtime->host_api.copy_to_device(dev_{param.name}, host_{param.name}, size_{param.name});"
+                )
+                for param in buffer_params
+            ],
             "",
-            "    uint64_t kernel_args[4];",
-            "    kernel_args[0] = reinterpret_cast<uint64_t>(dev_lhs);",
-            "    kernel_args[1] = reinterpret_cast<uint64_t>(dev_rhs);",
-            "    kernel_args[2] = reinterpret_cast<uint64_t>(dev_out);",
-            "    kernel_args[3] = static_cast<uint64_t>(size);",
-            f"    int task0 = runtime->add_task(kernel_args, 4, {plan.kernels[0].func_id}, {_core_type_expr(plan.kernels[0].core_type)});",
+            f"    uint64_t kernel_args[{len(kernel.params)}];",
+            *kernel_arg_lines,
+            f"    int task0 = runtime->add_task(kernel_args, {len(kernel.params)}, {plan.kernels[0].func_id}, {_core_type_expr(plan.kernels[0].core_type)});",
             "    if (task0 < 0) {",
-            "        std::cerr << \"failed to add PTO vector task\" << '\\n';",
+            "        std::cerr << \"failed to add PTO task\" << '\\n';",
             "        return -1;",
             "    }",
             "    return 0;",
@@ -235,6 +251,8 @@ def _kernel_source(kernel: PTOKernelSpec, *, variant: str) -> str:
 
 
 def _sim_kernel_source(kernel: PTOKernelSpec) -> str:
+    if kernel.op == "fused_elementwise":
+        return _fused_elementwise_source(kernel)
     operator = str(kernel.attrs.get("operator", "add"))
     operator_expr = "+" if operator == "add" else "*"
     return "\n".join(
@@ -260,6 +278,8 @@ def _sim_kernel_source(kernel: PTOKernelSpec) -> str:
 
 
 def _device_kernel_source(kernel: PTOKernelSpec) -> str:
+    if kernel.op == "fused_elementwise":
+        return _fused_elementwise_source(kernel)
     operator = str(kernel.attrs.get("operator", "add"))
     math_intrinsic = "TADD" if operator == "add" else "TMUL"
     return "\n".join(
@@ -317,6 +337,73 @@ def _device_kernel_source(kernel: PTOKernelSpec) -> str:
             "",
         )
     )
+
+
+def _fused_elementwise_source(kernel: PTOKernelSpec) -> str:
+    lowered_ops = kernel.attrs.get("ops", [])
+    lines = [
+        "#include <cstdint>",
+        "#include <cmath>",
+        "",
+        "#ifndef __aicore__",
+        "#define __aicore__",
+        "#endif",
+        "",
+        f'extern "C" __aicore__ void {kernel.symbol_name}(int64_t* args) {{',
+    ]
+    env: dict[str, str] = {}
+    for index, param in enumerate(kernel.params):
+        if param.kind == "buffer":
+            lines.append(f"    float* {param.name} = reinterpret_cast<float*>(args[{index}]);")
+            env[param.name] = f"{param.name}[index]"
+        else:
+            lines.append(f"    int {param.name} = static_cast<int>(args[{index}]);")
+    lines.append("    for (int index = 0; index < size; ++index) {")
+    for op in lowered_ops:
+        inputs = [str(name) for name in op.get("inputs", ())]
+        outputs = [str(name) for name in op.get("outputs", ())]
+        attrs = op.get("attrs", {})
+        if not outputs:
+            continue
+        out_name = outputs[0]
+        expr = _cxx_expression(op_name=str(op.get("op")), inputs=inputs, attrs=attrs, env=env)
+        local_name = f"{out_name}_value"
+        lines.append(f"        float {local_name} = {expr};")
+        env[out_name] = local_name
+    for param in kernel.params:
+        if param.kind == "buffer" and param.role in {"output", "inout"} and param.name in env:
+            lines.append(f"        {param.name}[index] = {env[param.name]};")
+    lines.extend(["    }", "}", ""])
+    return "\n".join(lines)
+
+
+def _cxx_expression(
+    *, op_name: str, inputs: list[str], attrs: Mapping[str, Any], env: Mapping[str, str]
+) -> str:
+    if op_name == "elementwise_binary":
+        lhs = env[inputs[0]]
+        rhs = env[inputs[1]]
+        operator = str(attrs.get("operator", "add"))
+        if operator == "add":
+            return f"({lhs} + {rhs})"
+        if operator == "mul":
+            return f"({lhs} * {rhs})"
+        raise ValueError(f"Unsupported PTO elementwise_binary operator {operator!r}.")
+    if op_name == "elementwise_unary":
+        source = env[inputs[0]]
+        operator = str(attrs.get("operator", "identity"))
+        if operator == "identity":
+            return source
+        if operator == "neg":
+            return f"(-{source})"
+        if operator == "recip":
+            return f"(1.0f / {source})"
+        if operator == "exp":
+            return f"std::exp({source})"
+        if operator == "sigmoid":
+            return f"(1.0f / (1.0f + std::exp(-{source})))"
+        raise ValueError(f"Unsupported PTO elementwise_unary operator {operator!r}.")
+    raise ValueError(f"Unsupported PTO fused op {op_name!r}.")
 
 
 def _core_type_expr(core_type: str) -> str:

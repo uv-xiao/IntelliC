@@ -9,5 +9,6 @@ These files explain runnable, code-backed examples in `examples/`.
 - `docs/design/examples/aie_channel_pipeline.md` — AIE planning, emission, build, and host-runtime path
 - `docs/design/examples/mlir_cse_extension.md` — MLIR extension composition
 - `docs/design/examples/serving_routine.md` — workload-level serving routine
+- `docs/design/examples/pto_pypto_swiglu.md` — harder PTO fused-activation path
 
 The corresponding runnable code lives under `examples/`.

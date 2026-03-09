@@ -832,6 +832,43 @@ def _layout_facets(memory_spaces: Mapping[str, str], kernel_ir: Mapping[str, Any
                 hardware=HardwareFacet(scope="thread_block", vector_width=1),
             )
         )
+    for op in kernel_ir.get("ops", ()):
+        outputs = list(op.get("outputs", ()))
+        if not outputs:
+            continue
+        out_name = str(outputs[0])
+        if out_name in buffer_layouts:
+            continue
+        attrs = op.get("attrs", {})
+        shape = [str(dim) for dim in attrs.get("shape", ())]
+        inputs = list(op.get("inputs", ()))
+        lhs = _distribution_from_buffer_layouts(
+            buffer_layouts,
+            str(inputs[0]) if inputs else "",
+            rank=len(shape),
+        )
+        rhs = _distribution_from_buffer_layouts(
+            buffer_layouts,
+            str(inputs[1]) if len(inputs) > 1 else "",
+            rank=len(shape),
+        )
+        if str(op.get("op")) == "elementwise_unary":
+            distribution = lhs
+        elif str(op.get("op")) == "matmul":
+            distribution = _matmul_output_distribution(lhs, rhs) or lhs
+        else:
+            distribution = join_distribution_facets(lhs, rhs) or lhs
+        buffer_layouts[out_name] = layout_to_payload(
+            LayoutFacetProduct(
+                distribution=distribution,
+                memory=MemoryFacet(
+                    space="register",
+                    layout="row_major",
+                    order=tuple(range(len(shape))),
+                ),
+                hardware=HardwareFacet(scope="thread", vector_width=1),
+            )
+        )
     return {"buffers": buffer_layouts}
 
 
@@ -840,6 +877,15 @@ def _distribution_for_buffer(layout: Mapping[str, Any], buffer_name: str) -> Dis
     distribution = payload.get("distribution", {}) if isinstance(payload, Mapping) else {}
     dims = distribution.get("dims", ()) if isinstance(distribution, Mapping) else ()
     return distribution_from_payload(list(dims), rank=len(list(dims)))
+
+
+def _distribution_from_buffer_layouts(
+    buffer_layouts: Mapping[str, Any], buffer_name: str, *, rank: int
+) -> DistributionFacet:
+    payload = buffer_layouts.get(buffer_name, {})
+    distribution = payload.get("distribution", {}) if isinstance(payload, Mapping) else {}
+    dims = distribution.get("dims", ()) if isinstance(distribution, Mapping) else ()
+    return distribution_from_payload(list(dims), rank=rank)
 
 
 def _layout_joins(kernel_ir: Mapping[str, Any], layout: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -1199,15 +1245,15 @@ def _token_effects(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
         intrinsic = str(op.get("intrinsic", ""))
         attrs = op.get("attrs", {})
         if intrinsic == "portable.async_copy":
-            token_name = str(attrs.get("token", f"{op_id}.token"))
+            token_name = str(op.get("token") or attrs.get("token", f"{op_id}.token"))
             event_id = f"{op_id}.event"
             records[token_name] = {
                 "token_id": token_name,
                 "token_kind": "async_copy",
                 "produced_by": op_id,
-                "required_scope": str(attrs.get("scope", "thread_block")),
-                "source": attrs.get("source"),
-                "target": attrs.get("target"),
+                "required_scope": str(op.get("scope") or attrs.get("scope", "thread_block")),
+                "source": op.get("source", attrs.get("source")),
+                "target": op.get("target", attrs.get("target")),
                 "event_id": event_id,
                 "status": "pending",
                 "discharged_by": None,
@@ -1215,7 +1261,9 @@ def _token_effects(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
             }
             pending_order.append(token_name)
         elif intrinsic == "portable.await":
-            token_name = str(attrs.get("token", pending_order[-1] if pending_order else ""))
+            token_name = str(
+                op.get("token") or attrs.get("token", pending_order[-1] if pending_order else "")
+            )
             if token_name and token_name in records:
                 records[token_name]["status"] = "discharged"
                 records[token_name]["discharged_by"] = op_id
@@ -1223,7 +1271,7 @@ def _token_effects(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
                 if token_name in pending_order:
                     pending_order.remove(token_name)
         elif intrinsic == "portable.barrier":
-            scope = str(attrs.get("scope", "thread_block"))
+            scope = str(op.get("scope") or attrs.get("scope", "thread_block"))
             discharged = [
                 token_name
                 for token_name in list(pending_order)

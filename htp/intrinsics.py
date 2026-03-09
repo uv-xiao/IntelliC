@@ -170,6 +170,13 @@ def _bootstrap() -> None:
             "elementwise_binary",
             "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
         ),
+        IntrinsicDecl(
+            "portable.elementwise_unary",
+            1,
+            "portable",
+            "elementwise_unary",
+            "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+        ),
         IntrinsicDecl("portable.matmul", 1, "portable", "matmul", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
         IntrinsicDecl("portable.load", 1, "portable", "load", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
         IntrinsicDecl("portable.store", 1, "portable", "store", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
@@ -253,6 +260,11 @@ def _bootstrap() -> None:
         "portable.elementwise_binary",
         simulate=_simulate_elementwise_binary,
     )
+    register_handlers(
+        "generic",
+        "portable.elementwise_unary",
+        simulate=_simulate_elementwise_unary,
+    )
     for intrinsic in (
         "portable.load",
         "portable.store",
@@ -280,6 +292,13 @@ def _bootstrap() -> None:
     )
     register_handlers(
         "nvgpu",
+        "portable.elementwise_unary",
+        lower=_lower_passthrough,
+        emit=_emit_passthrough,
+        simulate=_simulate_elementwise_unary,
+    )
+    register_handlers(
+        "nvgpu",
         "portable.matmul",
         lower=_lower_passthrough,
         emit=_emit_passthrough,
@@ -291,6 +310,13 @@ def _bootstrap() -> None:
         lower=_lower_passthrough,
         emit=_emit_passthrough,
         simulate=_simulate_elementwise_binary,
+    )
+    register_handlers(
+        "pto",
+        "portable.elementwise_unary",
+        lower=_lower_passthrough,
+        emit=_emit_passthrough,
+        simulate=_simulate_elementwise_unary,
     )
 
 
@@ -315,6 +341,29 @@ def _simulate_elementwise_binary(
     if operator == "mul":
         return lhs * rhs
     raise ValueError(f"Unsupported simulated operator {operator!r}.")
+
+
+def _simulate_elementwise_unary(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del mode, trace
+    operator = str(attrs.get("operator", "identity"))
+    (source,) = args
+    if operator == "identity":
+        return source
+    if operator == "neg":
+        return -source
+    if operator == "recip":
+        return 1.0 / source
+    if operator == "sigmoid":
+        import math
+
+        return 1.0 / (1.0 + math.exp(-float(source)))
+    if operator == "exp":
+        import math
+
+        return math.exp(float(source))
+    raise ValueError(f"Unsupported simulated unary operator {operator!r}.")
 
 
 def _simulate_matmul_placeholder(

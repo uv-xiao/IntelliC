@@ -197,6 +197,26 @@ def elementwise_mul(
     )
 
 
+def elementwise_unary(
+    operator: str,
+    source: str | KernelValue,
+    *,
+    out: str | KernelValue,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
+    dtype: str,
+) -> dict[str, Any]:
+    return _emit_or_return(
+        {
+            "op": "elementwise_unary",
+            "operator": operator,
+            "source": _ref(source),
+            "out": _ref(out),
+            "shape": _normalize_dims(shape),
+            "dtype": dtype,
+        }
+    )
+
+
 def matmul(
     lhs: str | KernelValue,
     rhs: str | KernelValue,
@@ -223,6 +243,36 @@ def matmul(
 
 def cast(source: str | KernelValue, *, out: str | KernelValue, dtype: str) -> dict[str, Any]:
     return _emit_or_return({"op": "cast", "source": _ref(source), "out": _ref(out), "dtype": dtype})
+
+
+def exp(
+    source: str | KernelValue,
+    *,
+    out: str | KernelValue,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
+    dtype: str,
+) -> dict[str, Any]:
+    return elementwise_unary("exp", source, out=out, shape=shape, dtype=dtype)
+
+
+def recip(
+    source: str | KernelValue,
+    *,
+    out: str | KernelValue,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
+    dtype: str,
+) -> dict[str, Any]:
+    return elementwise_unary("recip", source, out=out, shape=shape, dtype=dtype)
+
+
+def sigmoid(
+    source: str | KernelValue,
+    *,
+    out: str | KernelValue,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
+    dtype: str,
+) -> dict[str, Any]:
+    return elementwise_unary("sigmoid", source, out=out, shape=shape, dtype=dtype)
 
 
 def broadcast(
@@ -413,12 +463,16 @@ __all__ = [
     "channel_send",
     "elementwise_add",
     "elementwise_mul",
+    "elementwise_unary",
+    "exp",
     "kernel",
     "matmul",
     "mma",
+    "recip",
     "reduction_sum",
     "relayout",
     "reshape",
     "scalar",
+    "sigmoid",
     "transpose",
 ]
