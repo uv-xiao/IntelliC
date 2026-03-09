@@ -26,6 +26,14 @@ OP_SPECS = {
         reads=("lhs", "rhs"),
         writes=("out",),
     ),
+    "elementwise_unary": OpSpec(
+        name="elementwise_unary",
+        intrinsic="portable.elementwise_unary",
+        phase="compute",
+        latency=1,
+        reads=("source",),
+        writes=("out",),
+    ),
     "matmul": OpSpec(
         name="matmul",
         intrinsic="portable.matmul",

@@ -174,7 +174,7 @@ def _launch_source(plan: NVGPUCodegenPlan) -> str:
 def _kernel_source(kernel: NVGPUKernelSpec) -> str:
     if kernel.op == "matmul":
         return _matmul_kernel_source(kernel)
-    return _elementwise_binary_source(kernel)
+    return _fused_elementwise_source(kernel)
 
 
 def _matmul_kernel_source(kernel: NVGPUKernelSpec) -> str:
@@ -199,23 +199,92 @@ def _matmul_kernel_source(kernel: NVGPUKernelSpec) -> str:
     )
 
 
-def _elementwise_binary_source(kernel: NVGPUKernelSpec) -> str:
-    operator = str(kernel.attrs.get("operator", "add"))
-    expression = "lhs[idx] + rhs[idx]" if operator == "add" else "lhs[idx] * rhs[idx]"
-    return "\n".join(
-        (
-            "#include <cuda_runtime.h>",
-            "",
-            f'extern "C" __global__ void {kernel.func_id}(const float* lhs, const float* rhs, float* out, int size) {{',
-            "  const int idx = blockIdx.x * blockDim.x + threadIdx.x;",
-            "  if (idx >= size) {",
-            "    return;",
-            "  }",
-            f"  out[idx] = {expression};",
-            "}",
-            "",
-        )
-    )
+def _fused_elementwise_source(kernel: NVGPUKernelSpec) -> str:
+    attrs = kernel.attrs
+    lowered_ops = attrs.get("ops", [])
+    if not isinstance(lowered_ops, list) or not lowered_ops:
+        operator = str(attrs.get("operator", "add"))
+        lowered_ops = [
+            {
+                "op": "elementwise_binary",
+                "attrs": {
+                    "operator": operator,
+                },
+                "effects": {},
+                "inputs": ["lhs", "rhs"],
+                "outputs": ["out"],
+            }
+        ]
+
+    statements = [
+        "#include <cuda_runtime.h>",
+        "#include <math.h>",
+        "",
+        f'extern "C" __global__ void {kernel.func_id}({_param_signature(kernel)}) {{',
+        "  const int idx = blockIdx.x * blockDim.x + threadIdx.x;",
+        "  if (idx >= size) {",
+        "    return;",
+        "  }",
+    ]
+    env = {param.name: f"{param.name}[idx]" for param in kernel.params if param.kind == "buffer"}
+    for op in lowered_ops:
+        if not isinstance(op, Mapping):
+            continue
+        inputs = [str(name) for name in op.get("inputs", ())]
+        outputs = [str(name) for name in op.get("outputs", ())]
+        attrs = op.get("attrs", {})
+        if not outputs:
+            continue
+        out_name = outputs[0]
+        expr = _cuda_expression(op_name=str(op.get("op")), inputs=inputs, attrs=attrs, env=env)
+        local_name = f"{out_name}_value"
+        statements.append(f"  float {local_name} = {expr};")
+        env[out_name] = local_name
+    for param in kernel.params:
+        if param.kind == "buffer" and param.role in {"output", "inout"} and param.name in env:
+            statements.append(f"  {param.name}[idx] = {env[param.name]};")
+    statements.extend(["}", ""])
+    return "\n".join(statements)
+
+
+def _param_signature(kernel: NVGPUKernelSpec) -> str:
+    parts: list[str] = []
+    for param in kernel.params:
+        if param.kind == "buffer":
+            qualifier = "const float*" if param.role == "input" else "float*"
+            parts.append(f"{qualifier} {param.name}")
+        else:
+            parts.append(f"int {param.name}")
+    return ", ".join(parts)
+
+
+def _cuda_expression(
+    *, op_name: str, inputs: list[str], attrs: Mapping[str, Any], env: Mapping[str, str]
+) -> str:
+    if op_name == "elementwise_binary":
+        lhs = env[inputs[0]]
+        rhs = env[inputs[1]]
+        operator = str(attrs.get("operator", "add"))
+        if operator == "add":
+            return f"({lhs} + {rhs})"
+        if operator == "mul":
+            return f"({lhs} * {rhs})"
+        raise ValueError(f"Unsupported NV-GPU elementwise_binary operator {operator!r}.")
+    if op_name == "elementwise_unary":
+        source = env[inputs[0]]
+        operator = str(attrs.get("operator", "identity"))
+        if operator == "identity":
+            return source
+        if operator == "neg":
+            return f"(-{source})"
+        if operator == "recip":
+            return f"(1.0f / {source})"
+        if operator == "exp":
+            return f"expf({source})"
+        if operator == "sigmoid":
+            return f"(1.0f / (1.0f + expf(-{source})))"
+        raise ValueError(f"Unsupported NV-GPU elementwise_unary operator {operator!r}.")
+    raise ValueError(f"Unsupported NV-GPU fused op {op_name!r}.")
 
 
 def _project_relative(source_path: str) -> str:

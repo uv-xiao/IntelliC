@@ -4,6 +4,7 @@ import ctypes
 import importlib
 import importlib.util
 import json
+import multiprocessing
 import os
 import shutil
 import sys
@@ -191,6 +192,123 @@ def run_package(
     args: tuple[Any, ...],
     kwargs: Mapping[str, Any] | None,
 ) -> tuple[bool, Any, list[dict[str, Any]], str | None]:
+    return _run_package_isolated(
+        package_dir,
+        manifest,
+        mode=mode,
+        entry=entry,
+        args=args,
+        kwargs=kwargs,
+    )
+
+
+def _run_package_isolated(
+    package_dir: Path,
+    manifest: Mapping[str, Any],
+    *,
+    mode: str,
+    entry: str,
+    args: tuple[Any, ...],
+    kwargs: Mapping[str, Any] | None,
+) -> tuple[bool, Any, list[dict[str, Any]], str | None]:
+    """Execute PTO package runs in a fresh process.
+
+    `pto-runtime` caches orchestration plugins under a fixed `/tmp/orch_so_<pid>.so`
+    path and intentionally leaks the `dlopen` handle. Running each PTO package in a
+    fresh child process avoids cross-package symbol collisions inside one pytest or
+    example session while preserving the existing package contract.
+    """
+
+    ctx = multiprocessing.get_context("fork")
+    parent_conn, child_conn = ctx.Pipe(duplex=False)
+    process = ctx.Process(
+        target=_run_package_worker,
+        args=(child_conn, str(package_dir), dict(manifest), mode, entry, args, dict(kwargs or {})),
+    )
+    process.start()
+    child_conn.close()
+    payload: dict[str, Any] | None = None
+    if parent_conn.poll(300):
+        payload = parent_conn.recv()
+    parent_conn.close()
+    process.join()
+
+    if payload is None:
+        diagnostics = [
+            _diagnostic(
+                "HTP.BINDINGS.PTO_RUN_ERROR",
+                f"PTO child runner exited without a result (exit code {process.exitcode}).",
+                mode=mode,
+            )
+        ]
+        trace_ref = _write_adapter_trace(
+            package_dir,
+            adapter="pto-runtime",
+            action="run",
+            payload={
+                "mode": mode,
+                "entry": entry,
+                "subprocess": True,
+                "exitcode": process.exitcode,
+                "diagnostics": diagnostics,
+            },
+        )
+        return False, None, diagnostics, trace_ref
+
+    diagnostics = [dict(item) for item in payload.get("diagnostics", ())]
+    for update in payload.get("output_updates", ()):
+        index = int(update["index"])
+        if index >= len(args):
+            continue
+        target = args[index]
+        if isinstance(target, np.ndarray):
+            target[...] = np.asarray(update["value"], dtype=target.dtype).reshape(target.shape)
+    return (
+        bool(payload.get("ok", False)),
+        payload.get("result"),
+        diagnostics,
+        str(payload["trace_ref"]) if payload.get("trace_ref") is not None else None,
+    )
+
+
+def _run_package_worker(
+    conn: Any,
+    package_dir: str,
+    manifest: dict[str, Any],
+    mode: str,
+    entry: str,
+    args: tuple[Any, ...],
+    kwargs: Mapping[str, Any],
+) -> None:
+    ok, result, diagnostics, trace_ref, output_updates = _run_package_in_process(
+        Path(package_dir),
+        manifest,
+        mode=mode,
+        entry=entry,
+        args=args,
+        kwargs=kwargs,
+    )
+    conn.send(
+        {
+            "ok": ok,
+            "result": result,
+            "diagnostics": diagnostics,
+            "trace_ref": trace_ref,
+            "output_updates": output_updates,
+        }
+    )
+    conn.close()
+
+
+def _run_package_in_process(
+    package_dir: Path,
+    manifest: Mapping[str, Any],
+    *,
+    mode: str,
+    entry: str,
+    args: tuple[Any, ...],
+    kwargs: Mapping[str, Any] | None,
+) -> tuple[bool, Any, list[dict[str, Any]], str | None, list[dict[str, Any]]]:
     contract = load_contract(package_dir, manifest)
     if kwargs:
         diagnostics = [
@@ -214,6 +332,7 @@ def run_package(
                     "diagnostics": diagnostics,
                 },
             ),
+            [],
         )
     if entry != contract.entrypoint:
         diagnostics = [
@@ -234,13 +353,14 @@ def run_package(
                 action="run",
                 payload={"mode": mode, "entry": entry, "diagnostics": diagnostics},
             ),
+            [],
         )
 
     built_outputs, build_diagnostics, build_trace_ref = build_package(
         package_dir, manifest, mode=mode, force=False
     )
     if build_diagnostics:
-        return False, None, build_diagnostics, build_trace_ref
+        return False, None, build_diagnostics, build_trace_ref, []
 
     try:
         _, bindings_module = _load_reference_modules()
@@ -256,6 +376,7 @@ def run_package(
                 action="run",
                 payload={"mode": mode, "entry": entry, "error": str(exc), "diagnostics": diagnostics},
             ),
+            [],
         )
 
     try:
@@ -296,6 +417,7 @@ def run_package(
                 action="run",
                 payload={"mode": mode, "entry": entry, "error": str(exc), "diagnostics": diagnostics},
             ),
+            [],
         )
 
     trace_ref = _write_adapter_trace(
@@ -310,8 +432,19 @@ def run_package(
             "built_outputs": built_outputs,
             "output_names": list(marshaled.output_names),
             "build_trace_ref": build_trace_ref,
+            "subprocess": True,
         },
     )
+    output_updates = []
+    params = tuple(_primary_kernel(contract).get("params", ()))
+    for index, (param, argument) in enumerate(zip(params, args, strict=True)):
+        if str(param.get("kind", "scalar")) != "buffer":
+            continue
+        if str(param.get("role")) not in {"output", "inout"}:
+            continue
+        if not isinstance(argument, np.ndarray):
+            continue
+        output_updates.append({"index": index, "value": np.asarray(argument).tolist()})
     return (
         True,
         {
@@ -325,6 +458,7 @@ def run_package(
         },
         [],
         trace_ref,
+        output_updates,
     )
 
 

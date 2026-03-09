@@ -113,12 +113,45 @@ def _primary_kernel_op(kernel_ir: Mapping[str, Any]) -> Mapping[str, Any]:
     ops = kernel_ir.get("ops")
     if not isinstance(ops, list) or not ops:
         raise ValueError("PTO codegen requires a non-empty kernel_ir.ops list")
+    if _is_fused_elementwise_kernel(ops):
+        return _lower_fused_elementwise_kernel(ops)
     primary = ops[0]
     if not isinstance(primary, Mapping):
         raise ValueError("PTO kernel_ir.ops entries must be mappings")
     intrinsic = str(primary.get("intrinsic", ""))
     require_handler("pto", intrinsic, role="lower")
     return lower_intrinsic("pto", primary)
+
+
+def _is_fused_elementwise_kernel(ops: list[Any]) -> bool:
+    return len(ops) > 1 and all(
+        isinstance(op, Mapping) and str(op.get("op")) in {"elementwise_binary", "elementwise_unary"}
+        for op in ops
+    )
+
+
+def _lower_fused_elementwise_kernel(ops: list[Any]) -> dict[str, Any]:
+    lowered_ops: list[dict[str, Any]] = []
+    shape: list[str] | None = None
+    dtype: str | None = None
+    for op in ops:
+        intrinsic = str(op.get("intrinsic", ""))
+        require_handler("pto", intrinsic, role="lower")
+        lowered = lower_intrinsic("pto", op)
+        lowered_ops.append(dict(lowered))
+        attrs = lowered.get("attrs", {})
+        if shape is None and isinstance(attrs, Mapping) and isinstance(attrs.get("shape"), list):
+            shape = [str(value) for value in attrs["shape"]]
+        if dtype is None and isinstance(attrs, Mapping) and isinstance(attrs.get("dtype"), str):
+            dtype = str(attrs["dtype"])
+    return {
+        "op": "fused_elementwise",
+        "attrs": {
+            "ops": lowered_ops,
+            "shape": shape or ["size"],
+            "dtype": dtype or "f32",
+        },
+    }
 
 
 __all__ = [

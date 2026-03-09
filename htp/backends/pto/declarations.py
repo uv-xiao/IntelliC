@@ -21,7 +21,7 @@ def declaration_for(variant: str | None = None) -> BackendSolverDeclaration:
         variant=arch.variant,
         hardware_profile=arch.hardware_profile,
         target_capabilities=target_capabilities,
-        supported_ops=("elementwise_binary",),
+        supported_ops=("elementwise_binary", "elementwise_unary"),
         selection_cost=20 if arch.variant == "a2a3sim" else 60,
         artifact_contract=ArtifactContract(
             outputs=(
