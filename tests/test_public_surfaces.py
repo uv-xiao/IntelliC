@@ -21,6 +21,7 @@ from htp.routine import call, fifo_channel, program
 
 def test_compile_program_accepts_public_program_surface(tmp_path):
     package_dir = tmp_path / "surface_pkg"
+
     @kernel
     def vector_add(
         lhs: buffer(dtype="f32", shape=("size",), role="input"),

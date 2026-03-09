@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
 from inspect import signature
-from typing import Any, Callable
+from typing import Any
 
 from htp.compiler import parse_target
 from htp.kernel import KernelArgSpec, KernelSpec, KernelValue
@@ -184,7 +185,9 @@ def _trace_program(function: Callable[..., Any], *, target: dict[str, Any] | str
     finally:
         _PROGRAM_TRACE.reset(token)
     if trace.seen_kernel is None:
-        raise ValueError(f"Traced program {function.__name__!r} did not record any htp.routine.call(...) sites")
+        raise ValueError(
+            f"Traced program {function.__name__!r} did not record any htp.routine.call(...) sites"
+        )
     return ProgramSpec(
         entry=function.__name__,
         kernel=trace.seen_kernel,

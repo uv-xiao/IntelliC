@@ -11,10 +11,11 @@ native traced style via ``@kernel``.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
 from inspect import signature
-from typing import Any, Callable
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -27,7 +28,7 @@ class KernelArgSpec:
     role: str | None = None
     name: str | None = None
 
-    def named(self, name: str) -> "KernelArgSpec":
+    def named(self, name: str) -> KernelArgSpec:
         return KernelArgSpec(
             name=name,
             kind=self.kind,
@@ -73,7 +74,9 @@ class KernelSpec:
         }
 
     def to_program(self) -> dict[str, Any]:
-        shape_args = [argument.name for argument in self.args if argument.role == "shape" and argument.name is not None]
+        shape_args = [
+            argument.name for argument in self.args if argument.role == "shape" and argument.name is not None
+        ]
         runtime_args = [argument.name for argument in self.args if argument.name is not None]
         return {
             "entry": self.name,
@@ -97,7 +100,9 @@ class KernelSpec:
         }
 
 
-_TRACE_RECORDER: ContextVar[list[dict[str, Any]] | None] = ContextVar("htp_kernel_trace_recorder", default=None)
+_TRACE_RECORDER: ContextVar[list[dict[str, Any]] | None] = ContextVar(
+    "htp_kernel_trace_recorder", default=None
+)
 
 
 def buffer(
@@ -123,7 +128,9 @@ def kernel(
     if callable(arg) and args is None and ops is None:
         return _trace_kernel(arg)
     if not isinstance(arg, str) or args is None or ops is None:
-        raise TypeError("kernel(...) expects either a function decorator usage or name=string with args= and ops=")
+        raise TypeError(
+            "kernel(...) expects either a function decorator usage or name=string with args= and ops="
+        )
     return KernelSpec(name=arg, args=tuple(args), ops=tuple(dict(op) for op in ops))
 
 
