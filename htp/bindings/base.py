@@ -33,6 +33,7 @@ class BuildResult:
     mode: str
     built_outputs: list[str] = field(default_factory=list)
     log_paths: list[str] = field(default_factory=list)
+    trace_refs: list[str] = field(default_factory=list)
     diagnostics: list[Diagnostic] = field(default_factory=list)
 
 
@@ -89,6 +90,7 @@ class LoadResult:
             mode=self.mode,
             trace=trace,
         )
+        trace_ref = _primary_trace_ref(diagnostics)
         log_path = self._write_operation_log(
             kind="run",
             mode=self.mode,
@@ -97,12 +99,14 @@ class LoadResult:
             trace=trace,
             ok=ok,
             diagnostics=diagnostics,
+            trace_ref=trace_ref,
         )
         return RunResult(
             ok=ok,
             mode=self.mode,
             entry=entry,
             result=result,
+            trace_ref=trace_ref,
             diagnostics=diagnostics,
             log_path=log_path,
         )
@@ -128,6 +132,7 @@ class LoadResult:
             mode=replay_mode,
             trace=trace,
         )
+        trace_ref = _primary_trace_ref(diagnostics)
         log_path = self._write_operation_log(
             kind="replay",
             mode=replay_mode,
@@ -136,6 +141,7 @@ class LoadResult:
             trace=trace,
             ok=ok,
             diagnostics=diagnostics,
+            trace_ref=trace_ref,
         )
         return ReplayResult(
             ok=ok,
@@ -143,6 +149,7 @@ class LoadResult:
             entry=entry_name,
             stage_id=stage_id,
             result=result,
+            trace_ref=trace_ref,
             diagnostics=diagnostics,
             log_path=log_path,
         )
@@ -165,7 +172,16 @@ class LoadResult:
                 return dict(stage)
         raise KeyError(f"Unknown stage id: {stage_id}")
 
-    def _write_log(self, *, kind: str, stem: str, lines: tuple[str, ...]) -> str:
+    def _write_log(
+        self,
+        *,
+        kind: str,
+        stem: str,
+        lines: tuple[str, ...],
+        refs: Mapping[str, str] | None = None,
+        diagnostics: list[Diagnostic] | None = None,
+        adapter: Mapping[str, Any] | None = None,
+    ) -> str:
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
         relative_path = Path("logs") / f"{stem}_{timestamp}_{uuid4().hex[:8]}.log"
         log_path = self.package_dir / relative_path
@@ -178,6 +194,12 @@ class LoadResult:
         for line in lines:
             key, _, value = line.partition("=")
             payload["fields"][key] = value
+        if refs:
+            payload["refs"] = dict(refs)
+        if diagnostics:
+            payload["diagnostics"] = [dict(item) for item in diagnostics]
+        if adapter:
+            payload["adapter"] = dict(adapter)
         log_path.write_text(json.dumps(payload, indent=2) + "\n")
         return relative_path.as_posix()
 
@@ -353,8 +375,13 @@ class LoadResult:
         trace: str,
         ok: bool,
         diagnostics: list[Diagnostic],
+        trace_ref: str | None = None,
+        adapter: Mapping[str, Any] | None = None,
     ) -> str:
         diagnostic_codes = ",".join(str(diagnostic.get("code", "")) for diagnostic in diagnostics)
+        refs = {}
+        if trace_ref is not None:
+            refs["trace_ref"] = trace_ref
         return self._write_log(
             kind=kind,
             stem=f"{kind}_{stage_id}_{mode}" if kind == "replay" else f"{kind}_{self.backend}_{mode}",
@@ -367,7 +394,19 @@ class LoadResult:
                 f"ok={ok}",
                 f"diagnostic_codes={diagnostic_codes}",
             ),
+            refs=refs or None,
+            diagnostics=diagnostics or None,
+            adapter=adapter,
         )
+
+
+def _primary_trace_ref(diagnostics: list[Diagnostic]) -> str | None:
+    for diagnostic in diagnostics:
+        for key in ("trace_ref", "payload_ref", "artifact_ref"):
+            value = diagnostic.get(key)
+            if isinstance(value, str):
+                return value
+    return None
 
 
 @dataclass(frozen=True)

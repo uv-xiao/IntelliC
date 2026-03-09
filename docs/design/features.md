@@ -123,6 +123,11 @@ Implemented today:
   - `run`
   - `replay`
 - structured binding log payloads with schema `htp.binding_log.v1`
+- structured adapter trace payloads with schema `htp.adapter_trace.v1`
+- replay stub diagnostics that consistently surface `payload_ref`,
+  `artifact_ref`, and `fix_hints_ref`
+- build/run/replay results that surface `trace_ref` / `trace_refs` from replay
+  artifacts or backend adapters
 - shared backend artifact contracts consumed by emitters, solver required outputs, and binding path validation
 
 Main anchors:
@@ -131,6 +136,8 @@ Main anchors:
 - `htp/backends/nvgpu/`
 - `htp/backends/declarations.py`
 - `htp/bindings/`
+- `htp/runtime/errors.py`
+- `htp/schemas.py`
 - `htp_ext/aie/declarations.py`
 - `htp_ext/aie/emit.py`
 

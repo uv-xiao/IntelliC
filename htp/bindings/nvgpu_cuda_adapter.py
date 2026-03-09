@@ -7,10 +7,14 @@ import shutil
 import subprocess
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import numpy as np
+
+from htp.schemas import ADAPTER_TRACE_SCHEMA_ID
 
 
 @dataclass(frozen=True)
@@ -55,17 +59,31 @@ def build_package(
     manifest: Mapping[str, Any],
     *,
     force: bool = False,
-) -> tuple[list[str], list[dict[str, Any]]]:
+) -> tuple[list[str], list[dict[str, Any]], str | None]:
     contract = load_contract(package_dir, manifest)
     nvcc_path = _find_nvcc()
     if nvcc_path is None:
-        return [], [
+        diagnostics = [
             {
                 "code": "HTP.BINDINGS.NVGPU_COMPILER_UNAVAILABLE",
                 "detail": "nvcc was not found in PATH; install the CUDA toolkit or use sim replay.",
                 "expected_compiler": "nvcc",
             }
         ]
+        return (
+            [],
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="nvcc",
+                action="build",
+                payload={
+                    "entry": contract.entrypoint,
+                    "cuda_arch": contract.cuda_arch,
+                    "diagnostics": diagnostics,
+                },
+            ),
+        )
 
     built_outputs = list(contract.derived_outputs)
     if (
@@ -73,7 +91,21 @@ def build_package(
         and all((package_dir / relpath).exists() for relpath in built_outputs)
         and not _requires_rebuild(contract, built_outputs)
     ):
-        return built_outputs, []
+        return (
+            built_outputs,
+            [],
+            _write_adapter_trace(
+                package_dir,
+                adapter="nvcc",
+                action="build",
+                payload={
+                    "entry": contract.entrypoint,
+                    "cuda_arch": contract.cuda_arch,
+                    "built_outputs": built_outputs,
+                    "cached": True,
+                },
+            ),
+        )
 
     try:
         for kernel in contract.kernels:
@@ -84,14 +116,42 @@ def build_package(
             _run_nvcc(nvcc_path, source_path, ptx_path, contract.cuda_arch, target_format="ptx")
             _run_nvcc(nvcc_path, source_path, cubin_path, contract.cuda_arch, target_format="cubin")
     except Exception as exc:
-        return [], [
+        diagnostics = [
             {
                 "code": "HTP.BINDINGS.NVGPU_BUILD_ERROR",
                 "detail": str(exc),
                 "cuda_arch": contract.cuda_arch,
             }
         ]
-    return built_outputs, []
+        return (
+            [],
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="nvcc",
+                action="build",
+                payload={
+                    "entry": contract.entrypoint,
+                    "cuda_arch": contract.cuda_arch,
+                    "diagnostics": diagnostics,
+                },
+            ),
+        )
+    return (
+        built_outputs,
+        [],
+        _write_adapter_trace(
+            package_dir,
+            adapter="nvcc",
+            action="build",
+            payload={
+                "entry": contract.entrypoint,
+                "cuda_arch": contract.cuda_arch,
+                "built_outputs": built_outputs,
+                "cached": False,
+            },
+        ),
+    )
 
 
 def run_package(
@@ -101,67 +161,113 @@ def run_package(
     entry: str,
     args: tuple[Any, ...],
     kwargs: Mapping[str, Any] | None,
-) -> tuple[bool, Any, list[dict[str, Any]]]:
+) -> tuple[bool, Any, list[dict[str, Any]], str | None]:
     contract = load_contract(package_dir, manifest)
     if kwargs:
+        diagnostics = [
+            {
+                "code": "HTP.BINDINGS.NVGPU_UNSUPPORTED_KEYWORD_ARGS",
+                "detail": "NV-GPU device execution only supports positional arguments in v1.",
+            }
+        ]
         return (
             False,
             None,
-            [
-                {
-                    "code": "HTP.BINDINGS.NVGPU_UNSUPPORTED_KEYWORD_ARGS",
-                    "detail": "NV-GPU device execution only supports positional arguments in v1.",
-                }
-            ],
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="cuda-driver",
+                action="run",
+                payload={"entry": entry, "diagnostics": diagnostics},
+            ),
         )
     if entry != contract.entrypoint:
+        diagnostics = [
+            {
+                "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
+                "detail": f"Entrypoint {entry!r} is not defined for the NV-GPU package.",
+                "entry": entry,
+                "available_entries": [contract.entrypoint],
+            }
+        ]
         return (
             False,
             None,
-            [
-                {
-                    "code": "HTP.BINDINGS.MISSING_ENTRYPOINT",
-                    "detail": f"Entrypoint {entry!r} is not defined for the NV-GPU package.",
-                    "entry": entry,
-                    "available_entries": [contract.entrypoint],
-                }
-            ],
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="cuda-driver",
+                action="run",
+                payload={"entry": entry, "diagnostics": diagnostics},
+            ),
         )
 
-    built_outputs, build_diagnostics = build_package(package_dir, manifest, force=False)
+    built_outputs, build_diagnostics, build_trace_ref = build_package(package_dir, manifest, force=False)
     if build_diagnostics:
-        return False, None, build_diagnostics
+        return False, None, build_diagnostics, build_trace_ref
 
     kernel = contract.kernels[0]
     if len(args) != len(kernel.params):
+        diagnostics = [
+            {
+                "code": "HTP.BINDINGS.NVGPU_ARGUMENT_MISMATCH",
+                "detail": f"Expected {len(kernel.params)} positional arguments, received {len(args)}.",
+                "expected": [param.name for param in kernel.params],
+            }
+        ]
         return (
             False,
             None,
-            [
-                {
-                    "code": "HTP.BINDINGS.NVGPU_ARGUMENT_MISMATCH",
-                    "detail": f"Expected {len(kernel.params)} positional arguments, received {len(args)}.",
-                    "expected": [param.name for param in kernel.params],
-                }
-            ],
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="cuda-driver",
+                action="run",
+                payload={"entry": entry, "diagnostics": diagnostics},
+            ),
         )
 
     try:
         result = _run_with_cuda_driver(contract, kernel, args)
     except Exception as exc:
+        diagnostics = [
+            {
+                "code": "HTP.BINDINGS.NVGPU_RUNTIME_UNAVAILABLE",
+                "detail": str(exc),
+                "kernel": kernel.func_id,
+                "cubin": (package_dir / f"build/nvgpu/{Path(kernel.source).stem}.cubin").as_posix(),
+            }
+        ]
         return (
             False,
             None,
-            [
-                {
-                    "code": "HTP.BINDINGS.NVGPU_RUNTIME_UNAVAILABLE",
-                    "detail": str(exc),
+            diagnostics,
+            _write_adapter_trace(
+                package_dir,
+                adapter="cuda-driver",
+                action="run",
+                payload={
+                    "entry": entry,
                     "kernel": kernel.func_id,
                     "cubin": (package_dir / f"build/nvgpu/{Path(kernel.source).stem}.cubin").as_posix(),
-                }
-            ],
+                    "diagnostics": diagnostics,
+                },
+            ),
         )
-    return True, result, []
+    trace_ref = _write_adapter_trace(
+        package_dir,
+        adapter="cuda-driver",
+        action="run",
+        payload={
+            "entry": entry,
+            "kernel": kernel.func_id,
+            "cuda_arch": contract.cuda_arch,
+            "build_trace_ref": build_trace_ref,
+            "built_outputs": built_outputs,
+            "result": result,
+        },
+    )
+    return True, {**result, "trace_ref": trace_ref}, [], trace_ref
 
 
 def load_contract(package_dir: Path, manifest: Mapping[str, Any]) -> NVGPUContract:
@@ -265,6 +371,33 @@ def _requires_rebuild(contract: NVGPUContract, output_paths: list[str]) -> bool:
     )
     oldest_output = min((contract.package_dir / relpath).stat().st_mtime for relpath in output_paths)
     return newest_input > oldest_output
+
+
+def _write_adapter_trace(
+    package_dir: Path,
+    *,
+    adapter: str,
+    action: str,
+    payload: Mapping[str, Any],
+) -> str:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    relative_path = Path("logs") / f"adapter_nvgpu_{action}_{timestamp}_{uuid4().hex[:8]}.json"
+    trace_path = package_dir / relative_path
+    trace_path.parent.mkdir(parents=True, exist_ok=True)
+    trace_path.write_text(
+        json.dumps(
+            {
+                "schema": ADAPTER_TRACE_SCHEMA_ID,
+                "backend": "nvgpu",
+                "adapter": adapter,
+                "action": action,
+                "payload": dict(payload),
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    return relative_path.as_posix()
 
 
 def _run_with_cuda_driver(

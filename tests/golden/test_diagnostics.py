@@ -18,7 +18,7 @@ def test_diagnostic_contains_fix_hints_ref(tmp_path):
             "kind": "kernel",
             "artifact_ref": "ir/stages/s02/replay/stubs.json",
             "payload_ref": "ir/stages/s02/replay/stubs.json",
-            "fix_hints_ref": "docs/design/feats/09_debuggability.md",
+            "fix_hints_ref": "docs/design/impls/01_ir_model.md",
             "fix_hints": [
                 "Replay through the owning extension or binding.",
                 "Inspect the emitted backend artifacts referenced by the stub.",

@@ -27,6 +27,7 @@ _MISSING_KERNEL_FIX_HINTS = (
     "Register a replay kernel handler on the runtime before invoking the stage.",
     "Pass the configured runtime explicitly, or install the handler on htp.runtime.default_runtime().",
 )
+_STUB_FIX_HINTS_REF = "docs/design/impls/01_ir_model.md"
 
 
 class ReplayDiagnosticError(RuntimeError):
@@ -72,8 +73,10 @@ def raise_stub(
         payload["entity_id"] = entity_id
     if artifact_ref is not None:
         payload["artifact_ref"] = artifact_ref
+        payload["payload_ref"] = artifact_ref
     if detail is not None:
         payload["detail"] = detail
+    payload["fix_hints_ref"] = _STUB_FIX_HINTS_REF
     raise ReplayDiagnosticError(code, payload=payload, fix_hints=fix_hints)
 
 

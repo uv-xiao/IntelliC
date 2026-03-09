@@ -66,6 +66,7 @@ def test_nvgpu_build_reports_source_and_derived_outputs(tmp_path):
         "build/nvgpu/gemm_tile.cubin",
     ]
     assert len(result.log_paths) == 1
+    assert result.trace_refs == []
     assert result.diagnostics == []
 
 
@@ -119,7 +120,11 @@ def test_nvgpu_device_build_uses_cuda_adapter(tmp_path, monkeypatch):
     monkeypatch.setattr(
         nvgpu_cuda_adapter,
         "build_package",
-        lambda *args, **kwargs: (["build/nvgpu/gemm_tile.ptx", "build/nvgpu/gemm_tile.cubin"], []),
+        lambda *args, **kwargs: (
+            ["build/nvgpu/gemm_tile.ptx", "build/nvgpu/gemm_tile.cubin"],
+            [],
+            "logs/adapter_nvgpu_build.json",
+        ),
     )
 
     result = bind(package_dir).build(mode="device")
@@ -134,6 +139,7 @@ def test_nvgpu_device_build_uses_cuda_adapter(tmp_path, monkeypatch):
         "build/nvgpu/gemm_tile.ptx",
         "build/nvgpu/gemm_tile.cubin",
     ]
+    assert result.trace_refs == ["logs/adapter_nvgpu_build.json"]
     assert result.diagnostics == []
 
 
@@ -155,8 +161,10 @@ def test_nvgpu_device_run_uses_cuda_adapter(tmp_path, monkeypatch):
                 "thread_block": [16, 16, 1],
                 "grid": [1, 1, 1],
                 "params": ["A", "B", "C", "M", "N", "K"],
+                "trace_ref": "logs/adapter_nvgpu_run.json",
             },
             [],
+            "logs/adapter_nvgpu_run.json",
         ),
     )
 
@@ -176,5 +184,7 @@ def test_nvgpu_device_run_uses_cuda_adapter(tmp_path, monkeypatch):
         "thread_block": [16, 16, 1],
         "grid": [1, 1, 1],
         "params": ["A", "B", "C", "M", "N", "K"],
+        "trace_ref": "logs/adapter_nvgpu_run.json",
     }
+    assert result.trace_ref == "logs/adapter_nvgpu_run.json"
     assert result.diagnostics == []

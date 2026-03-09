@@ -108,7 +108,7 @@ def test_pto_runtime_adapter_builds_expected_outputs(tmp_path, monkeypatch):
         ),
     )
 
-    built_outputs, diagnostics = pto_runtime_adapter.build_package(
+    built_outputs, diagnostics, trace_ref = pto_runtime_adapter.build_package(
         package_dir,
         manifest,
         mode="sim",
@@ -125,6 +125,8 @@ def test_pto_runtime_adapter_builds_expected_outputs(tmp_path, monkeypatch):
     ]
     for relpath in built_outputs:
         assert (package_dir / relpath).is_file()
+    assert trace_ref is not None
+    assert (package_dir / trace_ref).is_file()
 
 
 def test_pto_runtime_adapter_runs_built_package(tmp_path, monkeypatch):
@@ -145,7 +147,7 @@ def test_pto_runtime_adapter_runs_built_package(tmp_path, monkeypatch):
     lhs = np.arange(16, dtype=np.float32)
     rhs = np.arange(16, dtype=np.float32)
     out = np.zeros(16, dtype=np.float32)
-    ok, result, diagnostics = pto_runtime_adapter.run_package(
+    ok, result, diagnostics, trace_ref = pto_runtime_adapter.run_package(
         package_dir,
         manifest,
         mode="sim",
@@ -169,7 +171,10 @@ def test_pto_runtime_adapter_runs_built_package(tmp_path, monkeypatch):
             "build/pto/kernels/0.bin",
         ],
         "output_names": ["out"],
+        "trace_ref": trace_ref,
     }
+    assert trace_ref is not None
+    assert (package_dir / trace_ref).is_file()
 
 
 def test_pto_runtime_adapter_reports_missing_reference_runtime(tmp_path, monkeypatch):
@@ -184,7 +189,7 @@ def test_pto_runtime_adapter_reports_missing_reference_runtime(tmp_path, monkeyp
         lambda: (_ for _ in ()).throw(FileNotFoundError("missing reference runtime")),
     )
 
-    built_outputs, diagnostics = pto_runtime_adapter.build_package(
+    built_outputs, diagnostics, trace_ref = pto_runtime_adapter.build_package(
         package_dir,
         manifest,
         mode="sim",
@@ -198,6 +203,7 @@ def test_pto_runtime_adapter_reports_missing_reference_runtime(tmp_path, monkeyp
             "detail": "missing reference runtime",
         }
     ]
+    assert trace_ref is not None
 
 
 def test_pto_runtime_adapter_rejects_invalid_runtime_args(tmp_path, monkeypatch):
@@ -215,7 +221,7 @@ def test_pto_runtime_adapter_rejects_invalid_runtime_args(tmp_path, monkeypatch)
         ),
     )
 
-    ok, result, diagnostics = pto_runtime_adapter.run_package(
+    ok, result, diagnostics, trace_ref = pto_runtime_adapter.run_package(
         package_dir,
         manifest,
         mode="sim",
@@ -233,6 +239,7 @@ def test_pto_runtime_adapter_rejects_invalid_runtime_args(tmp_path, monkeypatch)
             "mode": "sim",
         }
     ]
+    assert trace_ref is not None
 
 
 def test_pto_runtime_adapter_prefers_available_host_gxx_for_sim(monkeypatch):
@@ -259,7 +266,7 @@ def test_pto_runtime_adapter_rebuilds_when_codegen_sources_change(tmp_path, monk
         ),
     )
 
-    built_outputs, diagnostics = pto_runtime_adapter.build_package(
+    built_outputs, diagnostics, _trace_ref = pto_runtime_adapter.build_package(
         package_dir,
         manifest,
         mode="sim",
@@ -273,7 +280,7 @@ def test_pto_runtime_adapter_rebuilds_when_codegen_sources_change(tmp_path, monk
     kernel_source_path = package_dir / "codegen" / "pto" / "kernels" / "aiv" / "demo_kernel.cpp"
     kernel_source_path.write_text(kernel_source_path.read_text() + "\n// rebuild marker\n")
 
-    rebuilt_outputs, rebuild_diagnostics = pto_runtime_adapter.build_package(
+    rebuilt_outputs, rebuild_diagnostics, _rebuild_trace_ref = pto_runtime_adapter.build_package(
         package_dir,
         manifest,
         mode="sim",

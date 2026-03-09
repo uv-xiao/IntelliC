@@ -39,7 +39,7 @@ class PTOLoadResult(LoadResult):
             return super().run(entry, args=args, kwargs=kwargs, trace=trace)
 
         stage_id = self._resolve_current_stage_id()
-        ok, result, adapter_diagnostics = pto_runtime_adapter.run_package(
+        ok, result, adapter_diagnostics, trace_ref = pto_runtime_adapter.run_package(
             self.package_dir,
             self.manifest,
             mode=self.mode,
@@ -57,12 +57,15 @@ class PTOLoadResult(LoadResult):
             trace=trace,
             ok=ok and not diagnostics,
             diagnostics=diagnostics,
+            trace_ref=trace_ref,
+            adapter={"name": "pto-runtime"} if trace_ref is not None else None,
         )
         return RunResult(
             ok=ok and not diagnostics,
             mode=self.mode,
             entry=entry,
             result=result,
+            trace_ref=trace_ref,
             diagnostics=diagnostics,
             log_path=log_path,
         )
@@ -129,13 +132,15 @@ class PTOBinding(ManifestBinding):
         diagnostics = [*validation.diagnostics, *mode_diagnostics]
         built_outputs: list[str] = []
         if not diagnostics:
-            built_outputs, adapter_diagnostics = pto_runtime_adapter.build_package(
+            built_outputs, adapter_diagnostics, trace_ref = pto_runtime_adapter.build_package(
                 self.package_dir,
                 self.manifest,
                 mode=mode,
                 force=force,
             )
             diagnostics.extend(adapter_diagnostics)
+        else:
+            trace_ref = None
         session = self.load(mode=mode)
         log_path = session._write_log(
             kind="build",
@@ -147,12 +152,16 @@ class PTOBinding(ManifestBinding):
                 f"validated={validation.ok and not mode_diagnostics}",
                 f"built_outputs={tuple(built_outputs)!r}",
             ),
+            refs={"trace_ref": trace_ref} if trace_ref is not None else None,
+            diagnostics=diagnostics or None,
+            adapter={"name": "pto-runtime"} if trace_ref is not None else None,
         )
         return BuildResult(
             ok=not diagnostics,
             mode=mode,
             built_outputs=built_outputs,
             log_paths=[log_path],
+            trace_refs=[trace_ref] if trace_ref is not None else [],
             diagnostics=diagnostics,
         )
 

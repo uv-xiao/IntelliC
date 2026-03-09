@@ -439,7 +439,7 @@ Checklist:
   emitters, solver, and bindings.
 - `[x]` Add structured schema/version validation for more emitted sidecars.
 - `[ ]` Strengthen staged semantic diff support around identities and maps.
-- `[ ]` Make replay/stub metadata richer and easier to diff automatically.
+- `[~]` Make replay/stub metadata richer and easier to diff automatically.
 
 ---
 
@@ -458,13 +458,13 @@ Checklist:
 
 - `[~]` Structured diagnostics exist, but the broader debug contract is not
   complete.
-- `[ ]` Make diagnostics consistently include `node_id`, payload refs, and fix
+- `[~]` Make diagnostics consistently include `node_id`, payload refs, and fix
   hint refs across compiler, bindings, and extensions.
 - `[ ]` Add richer diagnostic families for layout conflicts, protocol
   violations, and solver unsat cores.
 - `[ ]` Add first-class semantic diff tooling across stages and packages using
   identities and maps, not only JSON inequality.
-- `[~]` Add standardized trace/log schemas for backend build/run adapters.
+- `[x]` Add standardized trace/log schemas for backend build/run adapters.
 - `[ ]` Add explicit debug guidance for extension-owned islands and backend
   toolchains.
 
