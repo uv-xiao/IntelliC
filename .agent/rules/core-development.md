@@ -17,6 +17,8 @@
 
 - Public examples and high-level tests must read like native Python programs.
 - Do not use large top-level raw-data program blobs for flagship examples.
+- Prefer decorator-based or traced authoring surfaces over spec-constructor
+  call stacks in public examples.
 - Use raw dict payloads only for low-level contract tests.
 - Flagship examples must be substantial enough to demonstrate a real compiler capability, not only a smoke path.
 

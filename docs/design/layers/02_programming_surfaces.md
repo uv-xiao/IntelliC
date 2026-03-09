@@ -22,6 +22,37 @@ Python authoring
 
 ## Implemented surfaces
 
+### Public kernel / routine surface
+
+The repository now includes explicit public authoring helpers:
+
+- `htp.kernel`
+  - argument annotations such as `buffer(...)` and `scalar(...)`
+  - traced `@kernel` authoring for single-kernel programs
+  - operation helpers such as `elementwise_add(...)`, `matmul(...)`,
+    `reduction_sum(...)`, `async_copy(...)`, `channel_send(...)`, and
+    `channel_recv(...)`
+- `htp.routine`
+  - traced `@program(...)` authoring for workload-level routines
+  - task helpers such as `call(...)`
+  - typed channel helpers such as `fifo_channel(...)`
+
+These helpers deliberately lower into the same canonical program payload used by
+the compiler passes. They exist to keep public code readable without creating a
+second semantic ownership path.
+
+The important implementation decision is that public authoring is now traced
+from ordinary Python functions. A flagship example can therefore read like:
+
+```text
+@kernel
+def gemm_tile(A: buffer(...), B: buffer(...), C: buffer(...), ...):
+    matmul(A, B, out=C, ...)
+```
+
+rather than forcing public examples to assemble a nested `{"kernel": ...,
+"workload": ...}` payload by hand.
+
 ### `htp.compile_program(...)`
 
 The generic compilation entrypoint already supports:
@@ -51,7 +82,21 @@ The current proof points include:
 
 ### Workload-level routines
 
-The repository also includes a workload-level serving routine example, which matters because HTP is not meant to stop at kernels only.
+The repository also includes a workload-level serving routine example, which
+matters because HTP is not meant to stop at kernels only. The public routine
+surface now covers:
+
+- named workload tasks
+- explicit dependency edges
+- typed FIFO channels
+- target selection on the routine object itself
+
+That means public examples no longer need to express routine structure as
+anonymous nested dicts just to reach the workload semantic model.
+
+This is intentionally closer to the public feel of the `references/pypto/` and
+`references/arknife/` authoring examples, while still lowering into the shared
+HTP semantic substrate.
 
 ## Implemented feature inventory
 
@@ -79,6 +124,8 @@ That separation is what allows one frontend surface to target multiple backends 
 
 If you are working in this layer, start here:
 - `htp/compiler.py` — generic program compilation entrypoint
+- `htp/kernel.py` — public kernel authoring helpers
+- `htp/routine.py` — public routine/workload authoring helpers
 - `htp/wsp/__init__.py` — WSP authoring helpers
 - `htp/csp/__init__.py` — CSP authoring helpers
 - `examples/` — runnable proof surface

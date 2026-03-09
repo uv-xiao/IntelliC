@@ -23,6 +23,12 @@ This layer tracks the remaining gap between today’s disciplined workflow/tooli
 - [~] Continue refining example/test/doc quality rules so human readability and agent reliability improve together.
 - [ ] Build fuller agent-native development controls beyond the current workflow and policy scaffolding.
 
+Recent progress in this area includes the public `htp.kernel` / `htp.routine`
+surface, traced decorator-style flagship authoring, and the replacement of raw
+top-level program blobs in flagship examples.
+The remaining gap is stronger automation around those quality rules, not the
+absence of any rule set at all.
+
 ## Why these tasks remain
 
 This layer improved substantially with the docs/process work, but the full target still includes stronger autonomous loops and richer machine-guided development behavior than the repository currently provides.

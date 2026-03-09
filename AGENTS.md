@@ -118,11 +118,16 @@ Rules:
 - Examples and high-level tests must look like human-written Python programs.
 - Do not build flagship examples around giant top-level dict constants such as `FOO_PROGRAM = {...}`.
 - Prefer:
-  - native Python helper functions,
-  - ordinary Python control flow,
-  - frontend authoring surfaces such as `htp.wsp` and `htp.csp`,
-  - or small local program builders inside the test/example.
+  - decorator-based or traced Python authoring surfaces,
+  - ordinary Python functions and control flow,
+  - frontend authoring surfaces such as `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp`,
+  - or small local builders only when testing a low-level contract directly.
 - Raw dict payloads are acceptable only for low-level contract tests that intentionally exercise emitted/package data shapes.
+- Avoid public authoring styles that feel like constructor soup. If a flagship
+  example requires stacking many explicit spec constructors just to say
+  something simple, the surface is not good enough yet.
+- Calibrate the flagship authoring experience against `references/pypto/` and
+  `references/arknife/`. HTP should be at least as readable as those examples.
 
 Difficulty rules:
 
@@ -135,6 +140,9 @@ Difficulty rules:
   - or multi-stage artifact evidence.
 - Keep trivial smoke cases in tests, not as the main public examples.
 - When choosing example scope, consult `references/` and existing real systems before settling for an overly easy case.
+- Use `references/pypto/examples/language/{beginner,intermediate,llm_models}/`
+  and `references/arknife/tests/python/` as the minimum bar for flagship
+  example ambition.
 
 ## 8. Code readability and documentation rules
 

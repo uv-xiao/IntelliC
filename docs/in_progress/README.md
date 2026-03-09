@@ -11,6 +11,4 @@ Rules:
 
 ## Active tasks
 
-## Active tasks
-
 - `005-python-native-surfaces.md` — public authoring surfaces and harder flagship examples
