@@ -57,9 +57,13 @@ This file is the bridge between `docs/design/` and the current implementation.
 
 - `examples/pto_pypto_vector_add/demo.py` — PyPTO-inspired PTO example
 - `examples/nvgpu_arknife_gemm/demo.py` — Arknife-inspired NV-GPU example
+- `examples/wsp_warp_gemm/demo.py` — WSP frontend example with staged schedule directives
+- `examples/csp_channel_pipeline/demo.py` — CSP frontend example with typed protocol effects
 - `tests/extensions/test_aie_backend.py` — AIE extension validation example
 - `docs/examples/pto_pypto_vector_add.md` — PTO example walkthrough
 - `docs/examples/nvgpu_arknife_gemm.md` — NV-GPU example walkthrough
+- `docs/examples/wsp_warp_gemm.md` — WSP example walkthrough
+- `docs/examples/csp_channel_pipeline.md` — CSP example walkthrough
 
 ## Contract tests
 
