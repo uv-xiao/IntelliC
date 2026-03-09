@@ -431,9 +431,9 @@ Checklist:
 
 - `[~]` Manifest and stage graphs exist, but the future docs still describe a
   richer closure than current code implements.
-- `[ ]` Add manifest-level inputs/pipeline/capabilities recording beyond the
+- `[x]` Add manifest-level inputs/pipeline/capabilities recording beyond the
   current minimal shape.
-- `[ ]` Validate more than stage graph paths at the generic validation layer
+- `[~]` Validate more than stage graph paths at the generic validation layer
   where appropriate.
 - `[ ]` Make artifact ownership and validation rules fully shared between
   emitters, solver, and bindings.
@@ -464,7 +464,7 @@ Checklist:
   violations, and solver unsat cores.
 - `[ ]` Add first-class semantic diff tooling across stages and packages using
   identities and maps, not only JSON inequality.
-- `[ ]` Add standardized trace/log schemas for backend build/run adapters.
+- `[~]` Add standardized trace/log schemas for backend build/run adapters.
 - `[ ]` Add explicit debug guidance for extension-owned islands and backend
   toolchains.
 

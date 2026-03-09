@@ -19,6 +19,7 @@ Implemented today:
 - explicit identity and mapping artifacts
 - solver preflight with `ir/solver_failure.json`
 - registered pass and pipeline surfaces
+- manifest enrichment with `inputs`, `pipeline`, and `capabilities`
 
 Main anchors:
 
@@ -115,6 +116,7 @@ Implemented today:
   - `load`
   - `run`
   - `replay`
+- structured binding log payloads with schema `htp.binding_log.v1`
 
 Main anchors:
 

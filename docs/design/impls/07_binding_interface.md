@@ -160,7 +160,7 @@ diagnostics rather than raw runtime exceptions.
 
 ## 5) Logs and run records
 
-Bindings should write into the package:
+Bindings now write structured log payloads into the package:
 
 ```
 logs/
@@ -168,6 +168,9 @@ logs/
   run_<backend>_<mode>_<ts>.log
   trace_<backend>_<ts>.jsonl          # optional structured runtime trace
 ```
+
+Each `.log` file is now a JSON payload with schema `htp.binding_log.v1` and
+normalized `kind` / `fields` content, rather than ad-hoc text lines.
 
 and record the paths in `manifest.outputs` or `manifest.extensions.<backend>`.
 
@@ -179,6 +182,14 @@ logs/
 ```
 
 and surface the corresponding path in the replay result record.
+
+The current implementation also keeps:
+
+- `ReplayResult.log_path`
+- `RunResult.log_path`
+- `BuildResult.log_paths`
+
+as the stable API surface for these files.
 
 For real external execution, bindings should also surface enough information to reconstruct the adapter path that was
 used, for example:
