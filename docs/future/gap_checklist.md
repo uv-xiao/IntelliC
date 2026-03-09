@@ -54,7 +54,7 @@ Checklist:
   hard-coded default template.
 - `[x]` Move backend capability facts out of local solver tables and into
   backend-owned declarations (`ArchModel`-style source of truth).
-- `[ ]` Make extension-provided passes and extension-provided pipelines
+- `[~]` Make extension-provided passes and extension-provided pipelines
   first-class solver inputs rather than ad-hoc extension-specific checks.
 - `[x]` Use `PassContract.requires_layout_invariants` and
   `PassContract.requires_effect_invariants` as real satisfiability checks rather
@@ -64,16 +64,16 @@ Checklist:
   beyond simple accumulation.
 - `[x]` Record solver satisfaction details into `ir/pass_trace.jsonl`
   (`requires_satisfied`) instead of leaving them empty.
-- `[ ]` Emit solver-visible candidate providers from actual registered passes and
+- `[~]` Emit solver-visible candidate providers from actual registered passes and
   extensions rather than best-effort local hints.
-- `[ ]` Add bounded alternative choice support (OR nodes) for pipeline
+- `[~]` Add bounded alternative choice support (OR nodes) for pipeline
   selection.
 - `[ ]` Add cost-model-based selection only after satisfiability is complete.
 - `[~]` Unify final artifact requirements with backend/extension contracts so
   the solver does not maintain a second independent list.
-- `[ ]` Make solver-visible resumption work from existing artifact packages, not
+- `[x]` Make solver-visible resumption work from existing artifact packages, not
   only from fresh in-memory compilation inputs.
-- `[ ]` Add tests for mixed core+extension pipeline selection rather than only
+- `[x]` Add tests for mixed core+extension pipeline selection rather than only
   default-pipeline satisfiability.
 
 ---
