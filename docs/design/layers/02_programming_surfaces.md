@@ -117,6 +117,7 @@ The surface is intentionally close to the reference classes in
 - `ark.spatial(...)`
 - `ark.temporal(...)`
 - `ark.pipeline(...)`
+- `ark.attach(...)`
 - instruction-level steps such as:
   - `ark.cp_async(...)`
   - `ark.ldmatrix(...)`
@@ -125,9 +126,18 @@ The surface is intentionally close to the reference classes in
   - `ark.wgmma(...)`
   - `ark.tma_store(...)`
 
-The important design decision is that this does **not** bypass HTP’s canonical
-program model. `htp.ark` lowers into the same `to_program()` payload shape as
-the rest of the compiler, while adding an `ark` sidecar with:
+The important design decision is that this does **not** introduce a second
+tensor model. `htp.ark` is built on native `htp.kernel.KernelValue` objects:
+
+- `ark.tensor(...)` is thin sugar that creates a native kernel value and
+  attaches Arknife memory/layout metadata to it,
+- `ark.attach(...)` lets a mixed-surface program attach the same Arknife
+  metadata to an already-existing HTP value,
+- instruction helpers such as `ark.cp_async(...)` and `ark.wgmma(...)` consume
+  those native values directly.
+
+`htp.ark` then lowers into the same `to_program()` payload shape as the rest of
+the compiler, while adding an `ark` sidecar with:
 
 - hardware profile metadata,
 - channel declarations,
@@ -141,7 +151,9 @@ That means:
 - and the NV-GPU backend still consumes the normal HTP package boundary.
 
 In other words, Arknife’s *technique* is integrated; Arknife itself does not
-become a second compiler inside the repository.
+become a second compiler inside the repository. This reuse boundary is the
+implemented rule for future frontend extensions as well: enrich native HTP
+values and routines instead of inventing parallel semantic roots.
 
 ### CSP
 
@@ -218,9 +230,8 @@ Recent concrete proof points:
 - `examples/pto_pypto_gelu/demo.py` and
   `examples/pto_pypto_vector_dag/demo.py` show that literal-bearing arithmetic
   DAGs now survive replay and PTO `a2a3sim`.
-- `examples/nvgpu_arknife_gemm/demo.py` now uses expression-form `A @ B` plus
-  an explicit Arknife-style mainloop surface for block/warp/pipeline structure
-  and instruction steps.
+- `examples/nvgpu_arknife_gemm/demo.py` uses the Arknife-style mainloop surface
+  over native HTP values carrying memory-space and axis-layout metadata.
 - `examples/nvgpu_arknife_blackwell/demo.py` proves that the same HTP
   programming model can author cluster/TMA/WGMMA plans for the Blackwell
   profile without creating a second compiler path.
@@ -238,8 +249,9 @@ New public surfaces must follow the same discipline:
 1. authoring stays Python-native,
 2. the surface lowers into `to_program()` rather than inventing a separate
    compiler entry,
-3. backend- or extension-specific metadata lives in a namespaced sidecar
-   (`ark`, `wsp`, `csp`, extension package payload), and
+3. backend- or extension-specific metadata lives either as attached attributes
+   on native HTP values or in a namespaced sidecar (`ark`, `wsp`, `csp`,
+   extension package payload), and
 4. the result still flows through the normal HTP pass, replay, artifact, and
    binding contracts.
 
