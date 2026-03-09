@@ -38,6 +38,10 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/ir/types.py` — structured dtype / index / shape / value-kind payloads
 - `htp/ir/semantics.py` — staged kernel/workload semantic dataclasses
 - `htp/passes/program_model.py` — canonicalization, semantic model, type/layout/effect synthesis
+- `htp/passes/analyze_warp_specialization.py` — staged warp-role planning analysis
+- `htp/passes/apply_warp_specialization.py` — applied warp-role schedule transform
+- `htp/passes/analyze_software_pipeline.py` — staged software-pipeline analysis
+- `htp/passes/apply_software_pipeline.py` — applied software-pipeline schedule transform
 - `htp/ir/op_specs.py` — centralized op semantics for effects / phase / latency
 - `htp/passes/manager.py` — stage emission, analyses, islands
 - `htp/passes/trace.py` — normalized pass-trace events including `requires_satisfied`

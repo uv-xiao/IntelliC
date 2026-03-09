@@ -281,9 +281,9 @@ Checklist:
 - `[ ]` Add pipeline template registration beyond the current default template.
 - `[ ]` Add extension-owned passes that consume and produce the same staged
   contract surfaces as core passes.
-- `[ ]` Add richer transform examples such as warp specialization and software
+- `[x]` Add richer transform examples such as warp specialization and software
   pipelining as real passes, not only design docs.
-- `[ ]` Add staged analysis payloads for warp-role plans, pipeline plans, loop
+- `[~]` Add staged analysis payloads for warp-role plans, pipeline plans, loop
   dependencies, and async/resource checks.
 - `[ ]` Add preservation/invalidation tracking beyond simple capability removal.
 - `[ ]` Thread solver satisfaction and pass trace together so the trace shows
@@ -469,9 +469,9 @@ Source intent:
 
 Checklist:
 
-- `[ ]` Turn warp specialization into a real staged pass sequence with tests and
+- `[x]` Turn warp specialization into a real staged pass sequence with tests and
   artifact examples.
-- `[ ]` Turn software pipelining into a real staged pass sequence with tests and
+- `[x]` Turn software pipelining into a real staged pass sequence with tests and
   artifact examples.
 - `[x]` Add CSP/process/channel example programs that exercise protocol typing.
 - `[ ]` Add serving-routine examples above the current kernel-level examples.

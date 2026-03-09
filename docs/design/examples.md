@@ -49,10 +49,11 @@ Flow:
 
 1. compile an NV-GPU package from the `htp.wsp` authoring surface
 2. replay the latest staged Python program in `sim`
-3. inspect the staged `schedule.json` emitted from the shared pass spine
+3. inspect the staged `schedule.json`, `analysis/warp_role_plan.json`, and
+   `analysis/pipeline_plan.json` emitted from the shared pass spine
 
 This example proves that WSP schedule directives are implemented frontend
-surfaces, not only design notes.
+surfaces, and that warp/pipeline planning is implemented as staged passes.
 
 ## CSP example
 

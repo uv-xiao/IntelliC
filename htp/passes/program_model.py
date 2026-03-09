@@ -255,6 +255,124 @@ def build_schedule_plan(
     }
 
 
+def build_warp_role_plan(
+    *,
+    entry: str,
+    kernel_ir: Mapping[str, Any],
+    target: Mapping[str, str],
+    schedule_directives: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    directives = _normalize_schedule_directives(schedule_directives or {})
+    num_warps = int(directives.get("resources", {}).get("num_warps", 1) or 1)
+    subgroup_kind = "warp" if target.get("backend") == "nvgpu" else "group"
+    operator = str(directives.get("specialize", {}).get("operator", "generic"))
+    compute_responsibility = "mma" if operator == "matmul" else operator
+    if num_warps <= 1:
+        roles = [{"name": "compute", "count": 1, "responsibilities": ["compute"]}]
+        handoffs: list[dict[str, Any]] = []
+    else:
+        producer_count = min(2, max(1, num_warps // 2))
+        consumer_count = max(1, num_warps - producer_count)
+        roles = [
+            {"name": "producer", "count": producer_count, "responsibilities": ["async_copy", "handoff"]},
+            {
+                "name": "consumer",
+                "count": consumer_count,
+                "responsibilities": [compute_responsibility, "accumulate"],
+            },
+        ]
+        handoffs = [
+            {
+                "from": "producer",
+                "to": "consumer",
+                "buffer": "shared",
+                "protocol": "barriered_pingpong",
+            }
+        ]
+    return {
+        "schema": "htp.analysis.warp_role_plan.v1",
+        "entry": entry,
+        "target": dict(target),
+        "subgroup_kind": subgroup_kind,
+        "roles": roles,
+        "handoffs": handoffs,
+        "anchors": {
+            "op_ids": [str(op["op_id"]) for op in kernel_ir.get("ops", ())],
+        },
+    }
+
+
+def apply_warp_role_plan(
+    schedule: Mapping[str, Any],
+    *,
+    warp_role_plan: Mapping[str, Any],
+) -> dict[str, Any]:
+    next_schedule = dict(schedule)
+    roles = [dict(role) for role in warp_role_plan.get("roles", ())]
+    next_schedule["specialization"] = {
+        "applied": True,
+        "kind": "warp" if len(roles) > 1 else "single_role",
+        "roles": roles,
+        "handoff": dict(warp_role_plan.get("handoffs", [{}])[0]) if warp_role_plan.get("handoffs") else None,
+    }
+    next_schedule["warp_role_plan"] = {
+        "kind": next_schedule["specialization"]["kind"],
+        "roles": [str(role["name"]) for role in roles],
+    }
+    return next_schedule
+
+
+def build_software_pipeline_plan(
+    *,
+    entry: str,
+    schedule_plan: Mapping[str, Any],
+    warp_role_plan: Mapping[str, Any],
+    kernel_ir: Mapping[str, Any],
+) -> dict[str, Any]:
+    del warp_role_plan
+    depth = int(schedule_plan.get("pipeline_depth", 1) or 1)
+    buffering = str(schedule_plan.get("buffering_strategy", "single"))
+    slots = [0] if depth <= 1 or buffering == "single" else [0, 1]
+    return {
+        "schema": "htp.analysis.pipeline_plan.v1",
+        "entry": entry,
+        "depth": depth,
+        "buffering": buffering,
+        "stages": ["prefetch", "compute", "drain"] if depth > 1 else ["compute"],
+        "steady_state_slots": slots,
+        "op_ids": [str(op["op_id"]) for op in kernel_ir.get("ops", ())],
+    }
+
+
+def apply_software_pipeline_plan(
+    schedule: Mapping[str, Any],
+    scheduled_ops: Sequence[Mapping[str, Any]],
+    *,
+    pipeline_plan: Mapping[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    slots = list(pipeline_plan.get("steady_state_slots", (0,))) or [0]
+    stage_order = list(pipeline_plan.get("stages", ("compute",)))
+    next_schedule = dict(schedule)
+    next_schedule["software_pipeline"] = {
+        "applied": True,
+        "depth": int(pipeline_plan.get("depth", 1) or 1),
+        "buffering": str(pipeline_plan.get("buffering", "single")),
+        "steady_state_slots": slots,
+        "stage_order": stage_order,
+    }
+    next_schedule["buffering_strategy"] = str(pipeline_plan.get("buffering", "single"))
+    next_scheduled_ops: list[dict[str, Any]] = []
+    for index, op in enumerate(scheduled_ops):
+        next_op = dict(op)
+        next_op["slot"] = slots[index % len(slots)]
+        op_phase = str(next_op.get("phase", "compute"))
+        next_op["pipeline_stage"] = (
+            op_phase if op_phase in stage_order else stage_order[min(index, len(stage_order) - 1)]
+        )
+        next_scheduled_ops.append(next_op)
+    return next_schedule, next_scheduled_ops
+
+
 def scheduled_ops_from_plan(schedule_plan: Mapping[str, Any]) -> list[dict[str, Any]]:
     scheduled_ops: list[dict[str, Any]] = []
     for tick in schedule_plan.get("ticks", ()):
@@ -864,9 +982,13 @@ def _default_bindings_payload() -> dict[str, Any]:
 
 
 __all__ = [
+    "apply_software_pipeline_plan",
+    "apply_warp_role_plan",
     "build_semantic_model",
     "build_schedule_plan",
+    "build_software_pipeline_plan",
     "build_type_layout_effects",
+    "build_warp_role_plan",
     "canonicalize_program",
     "normalize_target",
     "scheduled_ops_from_plan",

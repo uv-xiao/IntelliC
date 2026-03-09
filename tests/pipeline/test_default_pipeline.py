@@ -55,12 +55,12 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
     result = run_default_pipeline(package_dir=package_dir, program=_gemm_program())
 
     assert result.pass_ids == list(MANDATORY_PASS_IDS)
-    assert result.current_stage == "s06"
+    assert result.current_stage == f"s{len(MANDATORY_PASS_IDS):02d}"
 
     manifest = json.loads((package_dir / "manifest.json").read_text())
     stage_graph = manifest["stages"]["graph"]
 
-    assert manifest["stages"]["current"] == "s06"
+    assert manifest["stages"]["current"] == result.current_stage
     assert [stage["pass"] for stage in stage_graph] == [None, *MANDATORY_PASS_IDS]
     assert len(stage_graph) == len(MANDATORY_PASS_IDS) + 1
 
@@ -125,13 +125,13 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
             {
                 "analysis_id": "htp::SchedulePlan@1",
                 "schema": "htp.analysis.schedule_plan.v1",
-                "path": "ir/stages/s04/analysis/schedule_plan.json",
+                "path": f"ir/stages/{analyze_stage['id']}/analysis/schedule_plan.json",
             }
         ],
     }
 
     schedule_plan = json.loads(
-        (package_dir / "ir" / "stages" / "s04" / "analysis" / "schedule_plan.json").read_text()
+        (package_dir / analyze_stage["dir"] / "analysis" / "schedule_plan.json").read_text()
     )
     assert schedule_plan == {
         "schema": "htp.analysis.schedule_plan.v1",
@@ -188,7 +188,7 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
     assert result.program["package"]["emitted"] is True
     assert result.program["package"]["scheduled_tick_count"] == 1
     assert result.program["package"]["kernel_entry"] == "gemm_tile"
-    replay = bind(package_dir).load(mode="sim").replay("s06")
+    replay = bind(package_dir).load(mode="sim").replay(result.current_stage)
     assert replay.ok is True
     assert replay.result["package"]["emitted"] is True
     assert replay.result["entry"] == "gemm_tile"

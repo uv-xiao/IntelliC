@@ -49,7 +49,11 @@ The default pipeline today is:
 3. `typecheck_layout_effects`
 4. `analyze_schedule`
 5. `apply_schedule`
-6. `emit_package`
+6. `analyze_warp_specialization`
+7. `apply_warp_specialization`
+8. `analyze_software_pipeline`
+9. `apply_software_pipeline`
+10. `emit_package`
 
 These passes live in `htp/passes/` and emit:
 
@@ -76,6 +80,9 @@ Within that pass spine, the current semantic substrate now includes:
 - facet-product buffer layout payloads (`distribution ⊗ memory ⊗ hardware`) in `layout.json`
 - typed protocol obligations, token effects, and collective placeholders in `effects.json`
 - schedule directives, legality, launch structure, and warp-role plan in `analysis/schedule_plan.json` and `schedule.json`
+- staged warp-role plans in `analysis/warp_role_plan.json`
+- staged software-pipeline plans in `analysis/pipeline_plan.json`
+- applied specialization / software-pipeline state in final `schedule.json`
 
 The implemented authoring surfaces now also include:
 
