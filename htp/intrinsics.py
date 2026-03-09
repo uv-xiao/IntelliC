@@ -29,10 +29,20 @@ class HandlerDecl:
 
 _INTRINSICS: dict[str, IntrinsicDecl] = {}
 _HANDLERS: dict[tuple[str, str], HandlerDecl] = {}
+_PACKAGES: dict[str, tuple[str, ...]] = {}
 
 
 def register_intrinsic(decl: IntrinsicDecl) -> None:
     _INTRINSICS[decl.name] = decl
+
+
+def register_intrinsic_package(
+    package_id: str, decls: tuple[IntrinsicDecl, ...] | list[IntrinsicDecl]
+) -> None:
+    decl_tuple = tuple(decls)
+    for decl in decl_tuple:
+        register_intrinsic(decl)
+    _PACKAGES[package_id] = tuple(decl.name for decl in decl_tuple)
 
 
 def register_handlers(
@@ -89,6 +99,18 @@ def lower_intrinsic(target: str, op: Mapping[str, Any]) -> dict[str, Any]:
     return dict(lowered)
 
 
+def emit_intrinsic(target: str, op: Mapping[str, Any]) -> dict[str, Any]:
+    intrinsic = str(op.get("intrinsic", ""))
+    handler = resolve_handler(target, intrinsic, role="emit")
+    if handler is None:
+        require_handler(target, intrinsic, role="emit")
+        raise AssertionError("unreachable")
+    emitted = handler(op=dict(op), target=target)
+    if not isinstance(emitted, Mapping):
+        raise TypeError(f"Intrinsic emit handler for {intrinsic!r} must return a mapping.")
+    return dict(emitted)
+
+
 def simulate_intrinsic(
     intrinsic: str,
     *,
@@ -107,6 +129,28 @@ def simulate_intrinsic(
 
 def get_stub_diagnostic_code(intrinsic: str) -> str:
     return get_intrinsic_decl(intrinsic).stub_diagnostic
+
+
+def portable_intrinsics() -> tuple[IntrinsicDecl, ...]:
+    return tuple(
+        sorted(
+            (decl for decl in _INTRINSICS.values() if decl.portability == "portable"),
+            key=lambda item: item.name,
+        )
+    )
+
+
+def backend_intrinsics() -> tuple[IntrinsicDecl, ...]:
+    return tuple(
+        sorted(
+            (decl for decl in _INTRINSICS.values() if decl.portability != "portable"),
+            key=lambda item: item.name,
+        )
+    )
+
+
+def registered_intrinsic_packages() -> dict[str, tuple[str, ...]]:
+    return dict(_PACKAGES)
 
 
 def _normalize_handler(value: Callable[..., object] | bool) -> Callable[..., object] | None:
@@ -147,17 +191,24 @@ def _bootstrap() -> None:
             "portable",
             "async_copy",
             "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
-            produces_effects=("async_copy",),
+            produces_effects=("token.async_copy", "memory.pending_copy"),
         ),
-        IntrinsicDecl("portable.barrier", 1, "portable", "barrier", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
+        IntrinsicDecl(
+            "portable.barrier",
+            1,
+            "portable",
+            "barrier",
+            "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+            discharges_effects=("memory.pending_copy", "sync.barrier"),
+        ),
         IntrinsicDecl(
             "portable.await",
             1,
             "portable",
             "await",
             "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
-            requires_effects=("async_copy",),
-            discharges_effects=("async_copy",),
+            requires_effects=("token.async_copy",),
+            discharges_effects=("token.async_copy", "memory.pending_copy"),
         ),
         IntrinsicDecl("portable.mma", 1, "portable", "mma", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
         IntrinsicDecl(
@@ -167,11 +218,16 @@ def _bootstrap() -> None:
             "portable.channel_recv", 1, "portable", "channel_recv", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"
         ),
         IntrinsicDecl(
-            "portable.allreduce", 1, "portable", "allreduce", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"
+            "portable.allreduce",
+            1,
+            "portable",
+            "allreduce",
+            "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+            produces_effects=("collective.allreduce",),
+            discharges_effects=("collective.allreduce",),
         ),
     )
-    for decl in declarations:
-        register_intrinsic(decl)
+    register_intrinsic_package("htp.core.portable", declarations)
 
     register_handlers(
         "generic",
@@ -261,12 +317,17 @@ _bootstrap()
 __all__ = [
     "HandlerDecl",
     "IntrinsicDecl",
+    "backend_intrinsics",
+    "emit_intrinsic",
     "get_intrinsic_decl",
     "get_stub_diagnostic_code",
     "has_handler",
     "lower_intrinsic",
+    "portable_intrinsics",
     "register_handlers",
     "register_intrinsic",
+    "register_intrinsic_package",
+    "registered_intrinsic_packages",
     "require_handler",
     "resolve_handler",
     "simulate_intrinsic",
