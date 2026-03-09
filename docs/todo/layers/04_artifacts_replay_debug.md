@@ -1,22 +1,39 @@
 # TODO Layer 4 — Artifacts, Replay, and Debugging
 
-This layer tracks remaining package-contract and debug work.
+This layer tracks the remaining gap between the current package/debug surface and the final artifact-first framework contract.
 
-## Remaining gaps
+## Completion snapshot
 
-- add deeper generic validation across more backend and extension sidecars
-- improve binding and extension consistency checks where contracts still rely on narrow assumptions
-- broaden semantic diff and debug guidance beyond the current implemented evidence set
-- deepen replay/reference semantics so fewer boundaries require explicit stubs
-- keep documentation and package contracts synchronized as broader feature work lands
+- total checklist items: 8
+- complete: 5
+- partial: 2
+- open: 1
 
-## Visual target
+## Detailed checklist
 
-```text
-compile -> package -> replay / verify / diff / explain
-                    \-> richer contract validation
-```
+### Package and validation surface
+- [x] Emit normalized package artifacts, manifests, stage graphs, logs, and sidecars.
+- [x] Validate malformed package state through structured diagnostics.
+- [~] Broaden generic validation across more backend/extension sidecars and stronger consistency checks.
+- [ ] Finish the remaining contract/debug uniformity work so every backend and extension path feels equally inspectable.
 
-## Why it still matters
+### Replay and debug surface
+- [x] Keep replay distinct from backend package execution.
+- [x] Surface replay stubs through structured diagnostics with fix-hint references.
+- [~] Broaden replay/reference semantics so fewer boundaries require explicit stubs.
+- [x] Keep semantic diff and diagnostic explanation tied to emitted sidecars, ids, maps, and traces.
 
-Retargetability and agent-friendliness depend on artifact discipline. The current substrate is strong, but the future framework still needs a broader and more uniform contract/debug surface.
+## Why these tasks remain
+
+This layer is already one of the strongest parts of the repository. The remaining work is mostly consistency and breadth: making all backend and extension paths live up to the same artifact/debug standard.
+
+## Coding pointers
+
+Relevant anchors:
+- `htp/artifacts/`
+- `htp/runtime/`
+- `htp/bindings/validate.py`
+- `htp/tools.py`
+- `htp/diagnostics.py`
+- `tests/golden/`
+- `tests/tools/`
