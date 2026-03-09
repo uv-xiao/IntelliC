@@ -266,7 +266,9 @@ def channel(name: str, *, scope: str, memory: str, kind: str = "barrier", slots:
     return ret
 
 
-def build(*, target: str, hardware: HardwareProfile) -> Callable[[Callable[..., Iterable[Tensor] | None]], ProgramSpec]:
+def build(
+    *, target: str, hardware: HardwareProfile
+) -> Callable[[Callable[..., Iterable[Tensor] | None]], ProgramSpec]:
     target_spec = parse_target(target)
     normalized_target = {"backend": target_spec.backend}
     if target_spec.option is not None:
@@ -279,14 +281,19 @@ def build(*, target: str, hardware: HardwareProfile) -> Callable[[Callable[..., 
             returned = function()
         finally:
             _TRACE.reset(token)
-        if normalized_target.get("backend") != hardware.backend or normalized_target.get("option") != hardware.option:
+        if (
+            normalized_target.get("backend") != hardware.backend
+            or normalized_target.get("option") != hardware.option
+        ):
             raise ValueError(
                 f"Arknife surface target {normalized_target!r} must match hardware profile "
                 f"{hardware.backend}-{hardware.option!s}."
             )
         args = _normalize_returned_tensors(trace, returned)
-        channels = tuple(trace.channels.values()) if trace.channels else tuple(
-            Channel(**item) for item in hardware.default_channels
+        channels = (
+            tuple(trace.channels.values())
+            if trace.channels
+            else tuple(Channel(**item) for item in hardware.default_channels)
         )
         return ProgramSpec(
             entry=function.__name__,
@@ -484,9 +491,7 @@ def _instruction_catalog(ops: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     return seen
 
 
-def _normalize_returned_tensors(
-    trace: _ArkTrace, returned: Iterable[Tensor] | None
-) -> tuple[Tensor, ...]:
+def _normalize_returned_tensors(trace: _ArkTrace, returned: Iterable[Tensor] | None) -> tuple[Tensor, ...]:
     if returned is None:
         args = tuple(item for item in trace.tensors.values() if item.role is not None)
     else:
