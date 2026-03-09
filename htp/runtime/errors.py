@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any, NoReturn
 
+from htp.diagnostics import fix_hints_ref_for
+
 _STUB_REASON_BY_CODE = {
     "HTP.REPLAY.STUB_HIT": "intentionally_unimplemented",
     "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC": "missing_simulator",
@@ -27,7 +29,7 @@ _MISSING_KERNEL_FIX_HINTS = (
     "Register a replay kernel handler on the runtime before invoking the stage.",
     "Pass the configured runtime explicitly, or install the handler on htp.runtime.default_runtime().",
 )
-_STUB_FIX_HINTS_REF = "docs/design/impls/01_ir_model.md"
+_STUB_FIX_HINTS_REF = fix_hints_ref_for("HTP.REPLAY.STUB_HIT")
 
 
 class ReplayDiagnosticError(RuntimeError):

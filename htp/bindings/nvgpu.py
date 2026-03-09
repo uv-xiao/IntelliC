@@ -202,7 +202,6 @@ class NVGPULoadResult(LoadResult):
             result = None
         else:
             ok = not diagnostics
-
         log_path = self._write_operation_log(
             kind="run",
             mode=self.mode,

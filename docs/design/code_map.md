@@ -11,7 +11,8 @@ This file is the bridge between `docs/design/` and the current implementation.
   fix-hint refs
 - `htp/solver.py` — capability solver and final artifact checks
 - `htp_ext/registry.py` — extension registration for solver / pass / template discovery
-- `htp/diagnostics.py` — diagnostic catalog and fix-hint policies
+- `htp/diagnostics.py` — diagnostic catalog, family-based explanations, and
+  fix-hint policies
 - `htp/agent_policy.py` — agent policy loading for verify/promote tooling
 - `htp/perf.py` — perf metric loading and baseline-threshold comparison
 - `htp/bindings/validate.py` — generic manifest/artifact validation, including optional manifest sections and sidecar schema checks
@@ -19,7 +20,9 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/intrinsics.py` — intrinsic declarations plus lower/emit/sim handler registration
 - `htp_ext/aie/intrinsics.py` — extension-owned backend intrinsic package example
 - `htp/pipeline/defaults.py` — default pipeline execution over solver-validated pass contracts
-- `htp/tools.py` / `htp/__main__.py` — replay / verify / promote-plan / semantic diff / explain
+- `htp/tools.py` / `htp/__main__.py` — replay / verify / promote-plan /
+  semantic diff / explain, including semantic-sidecar and identity-map refs in
+  diffs
 
 ## PTO path
 
