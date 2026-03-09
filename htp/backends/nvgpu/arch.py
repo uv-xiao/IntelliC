@@ -36,13 +36,14 @@ def arch_for(profile: str | None = None) -> NVGPUArch:
             profile=resolved,
             hardware_profile="nvidia:ampere:sm80",
             cuda_arches=("sm80",),
-            capabilities=("cp.async", "mma.sync"),
+            capabilities=("cp.async", "ldmatrix", "mma.sync"),
         )
     return NVGPUArch(
         backend=BACKEND,
         variant=DEFAULT_VARIANT,
         profile=resolved,
         hardware_profile="nvidia:blackwell:sm100",
+        memory_spaces=("global", "shared", "tensor", "register"),
         cuda_arches=("sm100",),
         capabilities=("cp.async.bulk", "tma", "wgmma"),
     )

@@ -12,8 +12,8 @@ def test_ampere_and_blackwell_are_profiles_of_one_backend():
     assert ampere.hardware_profile == "nvidia:ampere:sm80"
     assert blackwell.hardware_profile == "nvidia:blackwell:sm100"
     assert ampere.memory_spaces == ("global", "shared", "register")
-    assert blackwell.memory_spaces == ("global", "shared", "register")
+    assert blackwell.memory_spaces == ("global", "shared", "tensor", "register")
     assert ampere.cuda_arches == ("sm80",)
     assert blackwell.cuda_arches == ("sm100",)
-    assert ampere.capabilities == ("cp.async", "mma.sync")
+    assert ampere.capabilities == ("cp.async", "ldmatrix", "mma.sync")
     assert blackwell.capabilities == ("cp.async.bulk", "tma", "wgmma")

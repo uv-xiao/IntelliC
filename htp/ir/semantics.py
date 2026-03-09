@@ -10,6 +10,7 @@ class KernelArg:
     kind: str
     dtype: str
     shape: tuple[str, ...] = ()
+    memory_space: str | None = None
     role: str | None = None
     alias_of: str | None = None
     source: str | None = None

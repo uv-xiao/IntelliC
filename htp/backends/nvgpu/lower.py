@@ -57,6 +57,7 @@ class NVGPUCodegenPlan:
     entrypoint: str
     kernels: tuple[NVGPUKernelSpec, ...]
     launch: NVGPULaunchSpec
+    arknife: dict[str, Any] | None = None
 
 
 def lower_program(program: Mapping[str, Any], *, profile: str | None = None) -> NVGPUCodegenPlan:
@@ -66,7 +67,12 @@ def lower_program(program: Mapping[str, Any], *, profile: str | None = None) -> 
 
     arch = arch_for(normalize_profile(profile))
     kernel_ir = _kernel_ir_for_program(program)
-    kernel_op = _primary_kernel_op(kernel_ir)
+    arknife = _arknife_payload_for_program(program)
+    if arknife is not None:
+        _validate_arknife_payload(arknife, arch=arch)
+        kernel_op = _lower_arknife_kernel(kernel_ir, arknife=arknife)
+    else:
+        kernel_op = _primary_kernel_op(kernel_ir)
     threading = (
         program.get("layout", {}).get("threading", {}) if isinstance(program.get("layout"), Mapping) else {}
     )
@@ -109,6 +115,7 @@ def lower_program(program: Mapping[str, Any], *, profile: str | None = None) -> 
         entrypoint=entrypoint,
         kernels=(kernel,),
         launch=launch,
+        arknife=arknife,
     )
 
 
@@ -135,8 +142,18 @@ def _primary_kernel_op(kernel_ir: Mapping[str, Any]) -> Mapping[str, Any]:
     return lower_intrinsic("nvgpu", primary)
 
 
+def _arknife_payload_for_program(program: Mapping[str, Any]) -> dict[str, Any] | None:
+    canonical = program.get("canonical_ast")
+    if isinstance(canonical, Mapping) and isinstance(canonical.get("ark"), Mapping):
+        return dict(canonical["ark"])
+    arknife = program.get("ark")
+    if isinstance(arknife, Mapping):
+        return dict(arknife)
+    return None
+
+
 def _launch_geometry_for_op(op: Mapping[str, Any]) -> NVGPULaunchGeometry:
-    if str(op.get("op")) == "matmul":
+    if str(op.get("op")) in {"matmul", "arknife_mainloop"}:
         attrs = op.get("attrs", {})
         return NVGPULaunchGeometry(kind="grid_2d", extents=(str(attrs["m"]), str(attrs["n"])))
     attrs = op.get("attrs", {})
@@ -172,6 +189,67 @@ def _lower_fused_elementwise_kernel(ops: list[Any]) -> dict[str, Any]:
             "ops": lowered_ops,
             "shape": shape or ["size"],
             "dtype": dtype or "f32",
+        },
+    }
+
+
+def _validate_arknife_payload(arknife: Mapping[str, Any], *, arch: Any) -> None:
+    hardware = arknife.get("hardware")
+    if not isinstance(hardware, Mapping):
+        raise ValueError("Arknife programs require ark.hardware metadata.")
+    if hardware.get("profile") != arch.profile:
+        raise ValueError(
+            f"Arknife hardware profile {hardware.get('profile')!r} does not match NV-GPU target profile {arch.profile!r}."
+        )
+    if hardware.get("backend") != arch.backend:
+        raise ValueError(
+            f"Arknife hardware backend {hardware.get('backend')!r} does not match NV-GPU backend {arch.backend!r}."
+        )
+    available = set(arch.capabilities)
+    for op in arknife.get("instructions", ()):
+        if not isinstance(op, Mapping):
+            continue
+        capability = op.get("capability")
+        if capability is None:
+            continue
+        if capability not in available:
+            raise ValueError(
+                f"NV-GPU profile {arch.profile!r} does not support Arknife instruction "
+                f"{op.get('instruction')!r} requiring capability {capability!r}."
+            )
+
+
+def _lower_arknife_kernel(kernel_ir: Mapping[str, Any], *, arknife: Mapping[str, Any]) -> Mapping[str, Any]:
+    ops = list(kernel_ir.get("ops", ()))
+    if not ops:
+        raise ValueError("Arknife NV-GPU lowering requires a non-empty kernel_ir.ops list.")
+    public_buffers = {
+        str(argument["name"]): argument
+        for argument in kernel_ir.get("args", ())
+        if argument.get("kind") == "buffer"
+    }
+    output_buffer = next((arg for arg in public_buffers.values() if arg.get("role") == "output"), None)
+    if output_buffer is None:
+        raise ValueError("Arknife NV-GPU lowering requires an output buffer argument.")
+    output_shape = [str(dim) for dim in output_buffer.get("shape", ())] or ["M", "N"]
+    instruction_plan = [
+        {
+            "instruction": str(op.get("op")),
+            **({"capability": str(op["capability"])} if op.get("capability") is not None else {}),
+            "attrs": dict(op.get("attrs", {})),
+        }
+        for op in ops
+    ]
+    return {
+        "op": "arknife_mainloop",
+        "attrs": {
+            "dtype": str(output_buffer.get("dtype", "f32")),
+            "m": output_shape[0] if output_shape else "M",
+            "n": output_shape[1] if len(output_shape) > 1 else "N",
+            "k": "K",
+            "instruction_plan": instruction_plan,
+            "hardware": dict(arknife.get("hardware", {})),
+            "channels": [dict(item) for item in arknife.get("channels", ())],
         },
     }
 

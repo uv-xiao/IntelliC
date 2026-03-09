@@ -252,6 +252,13 @@ def _bootstrap() -> None:
             produces_effects=("collective.allreduce",),
             discharges_effects=("collective.pending_allreduce", "collective.allreduce"),
         ),
+        IntrinsicDecl("nvgpu.cp_async", 1, "backend", "cp_async", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
+        IntrinsicDecl("nvgpu.ldmatrix", 1, "backend", "ldmatrix", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
+        IntrinsicDecl("nvgpu.mma_sync", 1, "backend", "mma_sync", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
+        IntrinsicDecl("nvgpu.wgmma", 1, "backend", "wgmma", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
+        IntrinsicDecl("nvgpu.tma_load", 1, "backend", "tma_load", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
+        IntrinsicDecl("nvgpu.tma_store", 1, "backend", "tma_store", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
+        IntrinsicDecl("nvgpu.commit", 1, "backend", "commit", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
     )
     register_intrinsic_package("htp.core.portable", declarations)
 
@@ -304,6 +311,18 @@ def _bootstrap() -> None:
         emit=_emit_passthrough,
         simulate=_simulate_matmul_placeholder,
     )
+    for intrinsic in (
+        "nvgpu.cp_async",
+        "nvgpu.ldmatrix",
+        "nvgpu.mma_sync",
+        "nvgpu.wgmma",
+        "nvgpu.tma_load",
+        "nvgpu.tma_store",
+        "nvgpu.commit",
+    ):
+        register_handlers(
+            "nvgpu", intrinsic, lower=_lower_passthrough, emit=_emit_passthrough, simulate=_stub_simulate
+        )
     register_handlers(
         "pto",
         "portable.elementwise_binary",

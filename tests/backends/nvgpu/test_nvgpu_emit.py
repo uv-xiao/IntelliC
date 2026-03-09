@@ -1,5 +1,6 @@
 import json
 
+from htp import ark, compile_program
 from htp.backends.nvgpu.emit import emit_package
 from htp.bindings.api import bind
 
@@ -68,7 +69,7 @@ def test_nvgpu_emit_prefers_cu_source_artifacts(tmp_path):
                 "source": "codegen/nvgpu/kernels/demo_kernel.cu",
                 "thread_block": [16, 16, 1],
                 "shared_memory_bytes": 0,
-                "capabilities": ["cp.async", "mma.sync"],
+                "capabilities": ["cp.async", "ldmatrix", "mma.sync"],
                 "params": [
                     {"name": "A", "kind": "buffer", "dtype": "f32", "role": "input", "shape": ["M", "K"]},
                     {"name": "B", "kind": "buffer", "dtype": "f32", "role": "input", "shape": ["K", "N"]},
@@ -108,6 +109,53 @@ def test_nvgpu_emit_prefers_cu_source_artifacts(tmp_path):
     assert report.variant == "cuda"
     assert report.missing_files == []
     assert report.diagnostics == []
+
+
+def test_nvgpu_codegen_records_arknife_hardware_and_instruction_plan(tmp_path):
+    @ark.build(target="nvgpu-blackwell", hardware=ark.blackwell())
+    def blackwell_mainloop():
+        A = ark.tensor("A", dtype="bf16", shape=("M", "K"), role="input", memory="global")
+        B = ark.tensor("B", dtype="bf16", shape=("K", "N"), role="input", memory="global")
+        C = ark.tensor("C", dtype="f32", shape=("M", "N"), role="output", memory="global")
+        AS = ark.tensor("AS", dtype="bf16", shape=("BM", "BK"), memory="shared")
+        BS = ark.tensor("BS", dtype="bf16", shape=("BK", "BN"), memory="shared")
+        TC = ark.tensor("TC", dtype="f32", shape=("BM", "BN"), memory="tensor")
+        with ark.spatial("cluster", ark.axis("cluster_m", 2), ark.axis("cluster_n", 1)):
+            with ark.pipeline(ark.axis("k_outer", 2), stages=2):
+                ark.tma_load(AS, A, channel="cluster_pipe")
+                ark.tma_load(BS, B, channel="cluster_pipe")
+                ark.wgmma(TC, AS, BS, accum=TC, shape=(64, 128, 16), channel="cluster_pipe")
+            ark.tma_store(C, TC, channel="store_pipe")
+        return A, B, C
+
+    compiled = compile_program(
+        package_dir=tmp_path / "blackwell_ark",
+        target="nvgpu-blackwell",
+        program=blackwell_mainloop,
+    )
+
+    codegen = json.loads((compiled.package_dir / "codegen" / "nvgpu" / "nvgpu_codegen.json").read_text())
+    kernel = codegen["kernels"][0]
+    assert codegen["hardware_profile"] == "nvidia:blackwell:sm100"
+    assert codegen["arknife"]["hardware"]["parallelism_levels"] == [
+        "lane",
+        "warp",
+        "warpgroup",
+        "block",
+        "cluster",
+        "grid",
+    ]
+    assert codegen["arknife"]["channels"][0]["name"] == "cluster_pipe"
+    assert [item["instruction"] for item in kernel["instruction_plan"]] == [
+        "tma_load",
+        "tma_load",
+        "wgmma",
+        "tma_store",
+    ]
+    assert (
+        "wgmma"
+        in (compiled.package_dir / "codegen" / "nvgpu" / "kernels" / "blackwell_mainloop.cu").read_text()
+    )
 
 
 def test_nvgpu_emit_preserves_existing_manifest_target_metadata(tmp_path):

@@ -207,7 +207,7 @@ def test_explain_diagnostic_uses_family_catalog_for_protocol_codes():
     assert explanation["known"] is True
     assert explanation["matched_by"] == "family"
     assert explanation["fix_hint_policy"] == "repair_protocol_obligations"
-    assert "docs/design/examples/csp_channel_pipeline.md" in explanation["docs"]
+    assert "examples/csp_channel_pipeline/README.md" in explanation["docs"]
 
 
 def test_explain_diagnostic_uses_replay_family_catalog():
