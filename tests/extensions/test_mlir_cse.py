@@ -66,8 +66,24 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
         }
     ]
     assert import_summary["result"] == "out"
-    assert import_summary["entity_counts"] == {"preserved": 2, "introduced": 0, "rewritten": 1}
-    assert import_summary["binding_counts"] == {"preserved": 3, "rewritten": 1}
+    assert import_summary["entity_counts"] == {"preserved": 2, "rebound": 1, "introduced": 0}
+    assert import_summary["binding_counts"] == {"preserved": 3, "rebound": 1, "introduced": 0}
+    assert import_summary["identity_policy"] == {
+        "entity": {
+            "preserve": ["demo_kernel:E0", "demo_kernel:E2"],
+            "rebind": ["demo_kernel:E1"],
+            "introduced": [],
+        },
+        "binding": {
+            "preserve": [
+                "demo_kernel:B:lhs",
+                "demo_kernel:B:rhs",
+                "demo_kernel:B:scale",
+            ],
+            "rebind": ["demo_kernel:B:sum1"],
+            "introduced": [],
+        },
+    }
     input_text = (package_dir / "extensions" / "mlir_cse" / "input.mlir").read_text()
     output_text = (package_dir / "extensions" / "mlir_cse" / "output.mlir").read_text()
     assert "func.func @demo_kernel(%lhs: i32, %rhs: i32, %scale: i32) -> i32" in input_text

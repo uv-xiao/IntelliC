@@ -73,6 +73,16 @@ def test_pass_trace_emits_normalized_event(tmp_path):
         "cap_delta": {
             "provides": ["Analysis.WarpRolePlan@1"],
             "invalidates": [],
+            "preserved_capabilities": [],
+            "added_analyses": [],
+            "removed_analyses": [],
+            "preserved_analyses": [],
+            "added_layout_invariants": [],
+            "removed_layout_invariants": [],
+            "preserved_layout_invariants": [],
+            "added_effect_invariants": [],
+            "removed_effect_invariants": [],
+            "preserved_effect_invariants": [],
         },
         "analysis": {
             "requires": [],
@@ -110,6 +120,51 @@ def test_pass_trace_emits_normalized_event(tmp_path):
         "maps": {},
         "diagnostics": [],
     }
+
+
+def test_pass_manager_normalizes_stage_maps(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    initial_stage = write_stage(
+        package_dir,
+        StageSpec(
+            stage_id="s00",
+            pass_id=None,
+            runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+        ),
+    )
+    manager = PassManager(package_dir=package_dir, stages=[initial_stage], current_stage="s00")
+    contract = PassContract(
+        pass_id="pkg::mlir_import@1",
+        owner="pkg",
+        kind="transform",
+        ast_effect="mutates",
+    )
+
+    stage_record = manager.run(
+        contract,
+        lambda stage_before: PassResult(
+            runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
+            entity_map_payload={
+                "schema": "htp.entity_map.v1",
+                "entities": [{"before": "demo:E1", "after": ["demo:E0"], "reason": "rebind"}],
+            },
+            binding_map_payload={
+                "schema": "htp.binding_map.v1",
+                "bindings": [{"before": "demo:S0:B1", "after": ["demo:S0:B0"], "reason": "rebind"}],
+            },
+        ),
+    )
+
+    entity_map = json.loads((package_dir / stage_record["maps"]["entity_map"]).read_text())
+    binding_map = json.loads((package_dir / stage_record["maps"]["binding_map"]).read_text())
+
+    assert entity_map["pass_id"] == "pkg::mlir_import@1"
+    assert entity_map["stage_before"] == "s00"
+    assert entity_map["stage_after"] == "s01"
+    assert binding_map["pass_id"] == "pkg::mlir_import@1"
+    assert binding_map["stage_before"] == "s00"
+    assert binding_map["stage_after"] == "s01"
 
 
 def test_pass_manager_requires_declared_analysis_result(tmp_path):

@@ -293,7 +293,7 @@ Checklist:
   pipelining as real passes, not only design docs.
 - `[x]` Add staged analysis payloads for warp-role plans, pipeline plans, loop
   dependencies, and async/resource checks.
-- `[ ]` Add preservation/invalidation tracking beyond simple capability removal.
+- `[x]` Add preservation/invalidation tracking beyond simple capability removal.
 - `[x]` Thread solver satisfaction and pass trace together so the trace shows
   why each pass was legal.
 
@@ -329,7 +329,7 @@ Checklist:
   structure, not only scalar elementwise kernel normalization.
 - `[x]` Add `entity_map.json` and `binding_map.json` emission for non-trivial
   rewrites.
-- `[~]` Preserve or rebind identities according to the import policy described
+- `[x]` Preserve or rebind identities according to the import policy described
   in the future docs.
 - `[x]` Add malformed-island validation and round-trip correctness tests.
 - `[~]` Make solver-visible extension composition cover MLIR island entry/exit
@@ -442,7 +442,7 @@ Checklist:
   final-artifact source for both solver checks and binding validation, but some
   richer extension-owned ownership rules are still future work.
 - `[x]` Add structured schema/version validation for more emitted sidecars.
-- `[~]` Strengthen staged semantic diff support around identities and maps.
+- `[x]` Strengthen staged semantic diff support around identities and maps.
 - `[x]` Make replay/stub metadata richer and easier to diff automatically.
 
 ---
@@ -466,10 +466,8 @@ Checklist:
   hint refs across compiler, bindings, and extensions.
 - `[x]` Add richer diagnostic families for layout conflicts, protocol
   violations, and solver unsat cores.
-- `[~]` Add first-class semantic diff tooling across stages and packages using
-  identities and maps, not only JSON inequality. Semantic diffs now include
-  identity maps, replay stubs, and pass-trace refs; node-aware blame remains
-  future work.
+- `[x]` Add first-class semantic diff tooling across stages and packages using
+  identities and maps, not only JSON inequality.
 - `[x]` Add standardized trace/log schemas for backend build/run adapters.
 - `[x]` Add explicit debug guidance for extension-owned islands and backend
   toolchains.

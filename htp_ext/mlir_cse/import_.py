@@ -4,6 +4,8 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
+from htp.schemas import BINDING_MAP_SCHEMA_ID, ENTITY_MAP_SCHEMA_ID
+
 
 def import_program(program: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     exprs = program["exprs"]
@@ -124,39 +126,88 @@ def import_program_from_module(
         "inputs": args,
         "result": result_symbol,
     }
+    preserved_entities = [
+        {
+            "entity_id": str(item["entity_id"]),
+            "target": str(item["target"]),
+            "mlir_result": str(item["mlir_result"]),
+            "policy": "preserve",
+        }
+        for item in ledger.get("ops", ())
+        if isinstance(item, Mapping) and str(item.get("mlir_result")) in surviving_targets
+    ]
+    rebound_entities = [
+        {
+            "entity_id": str(item["entity_id"]),
+            "target": str(item["target"]),
+            "reused_target": reused_target,
+            "policy": "rebind",
+        }
+        for item in ledger.get("ops", ())
+        if isinstance(item, Mapping)
+        and str(item.get("mlir_result")) not in surviving_targets
+        and (reused_target := surviving_signatures.get((str(item["op"]), str(item["lhs"]), str(item["rhs"]))))
+        is not None
+    ]
+    preserved_bindings = [
+        {
+            "binding_id": str(item["binding_id"]),
+            "name": str(item["name"]),
+            "mlir_values": list(item.get("mlir_values", ())),
+            "policy": "preserve",
+        }
+        for item in ledger.get("binding_links", ())
+        if isinstance(item, Mapping)
+    ]
+    rebound_bindings = [
+        {
+            "before": f"{parsed['entry']}:B:{item['eliminated_target']}",
+            "after": [f"{parsed['entry']}:B:{item['reused_target']}"],
+            "reason": "mlir_cse_rebind",
+        }
+        for item in rewrites
+    ]
     entity_map = {
-        "schema": "htp.map.entity.v1",
-        "kind": "mlir_import",
-        "preserved": [
+        "schema": ENTITY_MAP_SCHEMA_ID,
+        "entities": [
             {
-                "entity_id": str(item["entity_id"]),
-                "target": str(item["target"]),
-                "mlir_result": str(item["mlir_result"]),
+                "before": item["entity_id"],
+                "after": [
+                    next(
+                        preserved["entity_id"]
+                        for preserved in preserved_entities
+                        if preserved["target"] == item["reused_target"]
+                    )
+                ],
+                "reason": "mlir_cse_rebind",
             }
-            for item in ledger.get("ops", ())
-            if isinstance(item, Mapping) and str(item.get("mlir_result")) in surviving_targets
+            for item in rebound_entities
         ],
-        "rewrites": rewrites,
+        "import_policy": {
+            "preserve": preserved_entities,
+            "rebind": rebound_entities,
+            "introduced": [],
+        },
     }
     binding_map = {
-        "schema": "htp.map.binding.v1",
-        "kind": "mlir_import",
-        "preserved": [
-            {
-                "binding_id": str(item["binding_id"]),
-                "name": str(item["name"]),
-                "mlir_values": list(item.get("mlir_values", ())),
-            }
-            for item in ledger.get("binding_links", ())
-            if isinstance(item, Mapping)
-        ],
-        "rewrites": [
-            {
-                "eliminated_binding": f"{parsed['entry']}:B:{item['eliminated_target']}",
-                "reused_binding": f"{parsed['entry']}:B:{item['reused_target']}",
-            }
-            for item in rewrites
-        ],
+        "schema": BINDING_MAP_SCHEMA_ID,
+        "bindings": rebound_bindings,
+        "import_policy": {
+            "preserve": preserved_bindings,
+            "rebind": [
+                {
+                    "name": item["eliminated_target"],
+                    "reused_name": item["reused_target"],
+                    "policy": "rebind",
+                }
+                for item in rewrites
+            ],
+            "introduced": [],
+        },
+    }
+    map_refs = {
+        "entity_map": "maps/entity_map.json",
+        "binding_map": "maps/binding_map.json",
     }
     return (
         imported_program,
@@ -166,14 +217,28 @@ def import_program_from_module(
             "rewrites": rewrites,
             "result": result_symbol,
             "entity_counts": {
-                "preserved": len(entity_map["preserved"]),
+                "preserved": len(preserved_entities),
+                "rebound": len(rebound_entities),
                 "introduced": 0,
-                "rewritten": len(rewrites),
             },
             "binding_counts": {
-                "preserved": len(binding_map["preserved"]),
-                "rewritten": len(binding_map["rewrites"]),
+                "preserved": len(preserved_bindings),
+                "rebound": len(rebound_bindings),
+                "introduced": 0,
             },
+            "identity_policy": {
+                "entity": {
+                    "preserve": [item["entity_id"] for item in preserved_entities],
+                    "rebind": [item["entity_id"] for item in rebound_entities],
+                    "introduced": [],
+                },
+                "binding": {
+                    "preserve": [item["binding_id"] for item in preserved_bindings],
+                    "rebind": [item["before"] for item in rebound_bindings],
+                    "introduced": [],
+                },
+            },
+            "map_refs": map_refs,
         },
         entity_map,
         binding_map,

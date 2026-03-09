@@ -147,8 +147,20 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
                 "extension": EXTENSION_ID,
                 "rewrites": import_summary["rewrites"],
             },
-            entity_map_payload=entity_map,
-            binding_map_payload=binding_map,
+            entity_map_payload=_normalize_stage_map_payload(
+                entity_map,
+                pass_id=IMPORT_PASS_ID,
+                stage_before="s01",
+                stage_after="s02",
+                field_name="entities",
+            ),
+            binding_map_payload=_normalize_stage_map_payload(
+                binding_map,
+                pass_id=IMPORT_PASS_ID,
+                stage_before="s01",
+                stage_after="s02",
+                field_name="bindings",
+            ),
         ),
     )
     manifest = write_manifest(package_path, current_stage="s02", stages=[stage_export, stage_import])
@@ -287,8 +299,8 @@ def run_import_pass(
             StageFile(path="islands/mlir_cse/output.mlir", text=output_mlir),
             StageFile(path="islands/mlir_cse/import_summary.json", payload=dict(import_summary)),
         ),
-        entity_map_payload=entity_map,
-        binding_map_payload=binding_map,
+        entity_map_payload=dict(entity_map),
+        binding_map_payload=dict(binding_map),
         summary_payload={
             "extension": EXTENSION_ID,
             "pass": IMPORT_PASS_ID,
@@ -313,6 +325,22 @@ def _replay_handler(*, payload: Mapping[str, object], mode: str, trace: object |
         "rewrites": summary["rewrites"],
         "entry": program["entry"],
     }
+
+
+def _normalize_stage_map_payload(
+    payload: Mapping[str, Any],
+    *,
+    pass_id: str,
+    stage_before: str,
+    stage_after: str,
+    field_name: str,
+) -> dict[str, Any]:
+    normalized = dict(payload)
+    normalized.setdefault(field_name, [])
+    normalized["pass_id"] = pass_id
+    normalized["stage_before"] = stage_before
+    normalized["stage_after"] = stage_after
+    return normalized
 
 
 def _write_extension_artifacts(

@@ -8,6 +8,20 @@ from typing import Any
 from htp.passes.contracts import PassContract
 
 PASS_TRACE_EVENT_SCHEMA_ID = "htp.pass_trace_event.v1"
+_EMPTY_STATE_DELTA = {
+    "provides": [],
+    "invalidates": [],
+    "preserved_capabilities": [],
+    "added_analyses": [],
+    "removed_analyses": [],
+    "preserved_analyses": [],
+    "added_layout_invariants": [],
+    "removed_layout_invariants": [],
+    "preserved_layout_invariants": [],
+    "added_effect_invariants": [],
+    "removed_effect_invariants": [],
+    "preserved_effect_invariants": [],
+}
 
 
 @dataclass(frozen=True)
@@ -41,6 +55,16 @@ class PassTraceEvent:
             "cap_delta": {
                 "provides": list(self.cap_delta.get("provides", [])),
                 "invalidates": list(self.cap_delta.get("invalidates", [])),
+                "preserved_capabilities": list(self.cap_delta.get("preserved_capabilities", [])),
+                "added_analyses": list(self.cap_delta.get("added_analyses", [])),
+                "removed_analyses": list(self.cap_delta.get("removed_analyses", [])),
+                "preserved_analyses": list(self.cap_delta.get("preserved_analyses", [])),
+                "added_layout_invariants": list(self.cap_delta.get("added_layout_invariants", [])),
+                "removed_layout_invariants": list(self.cap_delta.get("removed_layout_invariants", [])),
+                "preserved_layout_invariants": list(self.cap_delta.get("preserved_layout_invariants", [])),
+                "added_effect_invariants": list(self.cap_delta.get("added_effect_invariants", [])),
+                "removed_effect_invariants": list(self.cap_delta.get("removed_effect_invariants", [])),
+                "preserved_effect_invariants": list(self.cap_delta.get("preserved_effect_invariants", [])),
             },
             "analysis": {
                 "requires": list(self.analysis.get("requires", [])),
@@ -69,6 +93,7 @@ def build_pass_trace_event(
     analysis_outputs: tuple[dict[str, str], ...],
     diagnostics: tuple[dict[str, Any], ...] = (),
     requires_satisfied: dict[str, Any] | None = None,
+    state_delta: dict[str, list[str]] | None = None,
 ) -> PassTraceEvent:
     maps_payload = {
         key: value
@@ -88,8 +113,13 @@ def build_pass_trace_event(
         requires=contract.requires,
         requires_satisfied=requires_satisfied or {},
         cap_delta={
-            "provides": list(contract.provides),
-            "invalidates": list(contract.invalidates),
+            "provides": list((state_delta or {}).get("provides", contract.provides)),
+            "invalidates": list((state_delta or {}).get("invalidates", contract.invalidates)),
+            **{
+                key: list((state_delta or _EMPTY_STATE_DELTA).get(key, default))
+                for key, default in _EMPTY_STATE_DELTA.items()
+                if key not in {"provides", "invalidates"}
+            },
         },
         analysis={
             "requires": list(contract.analysis_requires),

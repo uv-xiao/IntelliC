@@ -110,15 +110,36 @@ def test_mlir_extension_imports_transformed_output_mlir(tmp_path: Path):
     result = run_default_pipeline(package_dir=package_dir, program=_eligible_kernel_program())
     manifest = json.loads((package_dir / "manifest.json").read_text())
 
+    export_stage = _stage_by_pass(manifest, "htp_ext.mlir_cse::export@1")
     import_stage = _stage_by_pass(manifest, "htp_ext.mlir_cse::import@1")
     kernel_ir = json.loads((package_dir / import_stage["semantic"]["kernel_ir"]).read_text())
     import_summary = json.loads(
         (package_dir / import_stage["islands"][0]["dir"] / "import_summary.json").read_text()
     )
+    entity_map = json.loads((package_dir / import_stage["maps"]["entity_map"]).read_text())
+    binding_map = json.loads((package_dir / import_stage["maps"]["binding_map"]).read_text())
 
     assert len(kernel_ir["ops"]) == 2
     assert len(import_summary["rewrites"]) == 1
     assert import_summary["rewrites"][0]["reused_target"] == "sum0"
+    assert import_summary["identity_policy"]["entity"]["preserve"] == [
+        "dup_expr_kernel:E0",
+        "dup_expr_kernel:E2",
+    ]
+    assert import_summary["identity_policy"]["entity"]["rebind"] == ["dup_expr_kernel:E1"]
+    assert import_summary["map_refs"] == {
+        "entity_map": "maps/entity_map.json",
+        "binding_map": "maps/binding_map.json",
+    }
+    assert entity_map["schema"] == "htp.entity_map.v1"
+    assert entity_map["pass_id"] == "htp_ext.mlir_cse::import@1"
+    assert entity_map["stage_before"] == export_stage["id"]
+    assert entity_map["stage_after"] == import_stage["id"]
+    assert entity_map["import_policy"]["rebind"][0]["entity_id"] == "dup_expr_kernel:E1"
+    assert binding_map["schema"] == "htp.binding_map.v1"
+    assert binding_map["pass_id"] == "htp_ext.mlir_cse::import@1"
+    assert binding_map["stage_before"] == export_stage["id"]
+    assert binding_map["stage_after"] == import_stage["id"]
     assert import_stage["id"] in {stage["id"] for stage in result.stages}
 
 

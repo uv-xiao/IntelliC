@@ -153,6 +153,8 @@ def test_semantic_diff_reports_manifest_and_semantic_changes(tmp_path):
     assert diff["details"]["current_stage.identity"]["details"]["refs"]["left"]["entities"].endswith(
         "/ids/entities.json"
     )
+    assert diff["details"]["current_stage.identity"]["details"]["entity_blame"]["right_added"]
+    assert diff["details"]["current_stage.identity"]["details"]["entity_blame"]["right_added"][0]["node_ids"]
 
 
 def test_semantic_diff_reports_pass_trace_refs(tmp_path):

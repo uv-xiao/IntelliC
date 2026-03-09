@@ -427,6 +427,14 @@ def _identity_aware_stage_diff(
                 if isinstance(item, dict) and "binding_id" in item
             ],
         ),
+        "entity_blame": {
+            "left_removed": _entity_blame(left_entities, "removed", left_entities, right_entities),
+            "right_added": _entity_blame(right_entities, "added", left_entities, right_entities),
+        },
+        "binding_blame": {
+            "left_removed": _binding_blame(left_bindings, "removed", left_bindings, right_bindings),
+            "right_added": _binding_blame(right_bindings, "added", left_bindings, right_bindings),
+        },
         "entity_map": _summarize_difference(left_entity_map, right_entity_map),
         "binding_map": _summarize_difference(left_binding_map, right_binding_map),
         "refs": {
@@ -450,6 +458,7 @@ def _identity_aware_stage_diff(
             {},
             {"kind": "mapping", "added_keys": [], "removed_keys": [], "changed_keys": []},
             {"added": [], "removed": []},
+            {"left_removed": [], "right_added": []},
         )
         for key, item in details.items()
         if key != "refs"
@@ -508,6 +517,88 @@ def _id_delta(left_ids: list[str], right_ids: list[str]) -> dict[str, Any]:
         "added": sorted(right_set - left_set),
         "removed": sorted(left_set - right_set),
     }
+
+
+def _entity_blame(
+    payload: dict[str, Any],
+    direction: str,
+    left_entities: dict[str, Any],
+    right_entities: dict[str, Any],
+) -> list[dict[str, Any]]:
+    delta = _id_delta(
+        [
+            item["entity_id"]
+            for item in left_entities.get("entities", ())
+            if isinstance(item, dict) and "entity_id" in item
+        ],
+        [
+            item["entity_id"]
+            for item in right_entities.get("entities", ())
+            if isinstance(item, dict) and "entity_id" in item
+        ],
+    )
+    entity_ids = delta["removed"] if direction == "removed" else delta["added"]
+    node_links = {}
+    for item in payload.get("node_to_entity", ()):
+        if isinstance(item, dict) and "entity_id" in item and "node_id" in item:
+            node_links.setdefault(str(item["entity_id"]), []).append(str(item["node_id"]))
+    entity_kinds = {
+        str(item["entity_id"]): {
+            "kind": str(item.get("kind", "")),
+            "role": item.get("role"),
+        }
+        for item in payload.get("entities", ())
+        if isinstance(item, dict) and "entity_id" in item
+    }
+    return [
+        {
+            "entity_id": entity_id,
+            "node_ids": sorted(node_links.get(entity_id, ())),
+            **entity_kinds.get(entity_id, {}),
+        }
+        for entity_id in entity_ids
+    ]
+
+
+def _binding_blame(
+    payload: dict[str, Any],
+    direction: str,
+    left_bindings: dict[str, Any],
+    right_bindings: dict[str, Any],
+) -> list[dict[str, Any]]:
+    delta = _id_delta(
+        [
+            item["binding_id"]
+            for item in left_bindings.get("bindings", ())
+            if isinstance(item, dict) and "binding_id" in item
+        ],
+        [
+            item["binding_id"]
+            for item in right_bindings.get("bindings", ())
+            if isinstance(item, dict) and "binding_id" in item
+        ],
+    )
+    binding_ids = delta["removed"] if direction == "removed" else delta["added"]
+    uses_by_binding = {}
+    for item in payload.get("name_uses", ()):
+        if isinstance(item, dict) and "binding_id" in item and "node_id" in item:
+            uses_by_binding.setdefault(str(item["binding_id"]), []).append(str(item["node_id"]))
+    records = {
+        str(item["binding_id"]): {
+            "name": str(item.get("name", "")),
+            "site_entity_id": item.get("site_entity_id"),
+        }
+        for item in payload.get("bindings", ())
+        if isinstance(item, dict) and "binding_id" in item
+    }
+    return [
+        {
+            "binding_id": binding_id,
+            "name_uses": sorted(uses_by_binding.get(binding_id, ())),
+            **records.get(binding_id, {}),
+        }
+        for binding_id in binding_ids
+    ]
 
 
 def _load_stage_json(root: Path, relpath: Any) -> dict[str, Any]:
