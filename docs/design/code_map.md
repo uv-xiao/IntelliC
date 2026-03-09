@@ -42,6 +42,8 @@ This file is the bridge between `docs/design/` and the current implementation.
 - `htp/passes/apply_warp_specialization.py` — applied warp-role schedule transform
 - `htp/passes/analyze_software_pipeline.py` — staged software-pipeline analysis
 - `htp/passes/apply_software_pipeline.py` — applied software-pipeline schedule transform
+- `htp/passes/registry.py` — registered core and extension pass surface
+- `htp/pipeline/registry.py` — registered pipeline template surface
 - `htp/ir/op_specs.py` — centralized op semantics for effects / phase / latency
 - `htp/passes/manager.py` — stage emission, analyses, islands
 - `htp/passes/trace.py` — normalized pass-trace events including `requires_satisfied`
@@ -53,7 +55,7 @@ This file is the bridge between `docs/design/` and the current implementation.
 
 ## Extensions
 
-- `htp_ext/mlir_cse/` — MLIR CSE round-trip extension
+- `htp_ext/mlir_cse/` — MLIR CSE round-trip extension, including registered export/import passes
 - `htp_ext/aie/emit.py` — AIE artifact emission extension
 - `htp/bindings/aie.py` — AIE package validation and replay binding
 

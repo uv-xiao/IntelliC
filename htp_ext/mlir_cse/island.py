@@ -7,6 +7,8 @@ from typing import Any
 
 from htp.artifacts.manifest import write_manifest
 from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
+from htp.passes.contracts import PassContract
+from htp.passes.manager import PassResult, StageFile
 from htp.passes.program_model import (
     build_schedule_plan,
     build_semantic_model,
@@ -18,12 +20,31 @@ from htp.passes.program_model import (
 from htp.runtime import Runtime, extensions
 
 from .export import analyze_program, eligibility_for, export_program, normalize_expr_program
-from .import_ import import_program
+from .import_ import _parse_module, import_program_from_module
 
 EXTENSION_ID = "htp_ext.mlir_cse"
 EXTENSION_DIR = Path("extensions") / "mlir_cse"
 EXPORT_STAGE_DIR = Path("ir") / "stages" / "s01" / "islands" / "mlir_cse"
 IMPORT_STAGE_DIR = Path("ir") / "stages" / "s02" / "islands" / "mlir_cse"
+EXPORT_PASS_ID = "htp_ext.mlir_cse::export@1"
+IMPORT_PASS_ID = "htp_ext.mlir_cse::import@1"
+
+EXPORT_CONTRACT = PassContract.analysis(
+    pass_id=EXPORT_PASS_ID,
+    owner=EXTENSION_ID,
+    requires=("Semantic.ModelBuilt@1",),
+    provides=("Extension.MLIRCSEExported@1",),
+    outputs=("island.mlir.input", "island.mlir.pipeline", "island.mlir.ledger"),
+)
+IMPORT_CONTRACT = PassContract(
+    pass_id=IMPORT_PASS_ID,
+    owner=EXTENSION_ID,
+    kind="transform",
+    ast_effect="mutates",
+    requires=("Extension.MLIRCSEExported@1",),
+    provides=("Extension.MLIRCSEImported@1", "Semantic.ModelBuilt@1"),
+    outputs=("ir.ast", "ir.kernel", "ir.workload", "island.mlir.output", "island.mlir.import"),
+)
 
 
 def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict[str, Any]:
@@ -35,19 +56,22 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
         raise ValueError(f"Program is not eligible for MLIR CSE island: {eligibility['reasons']}")
 
     normalized_program = normalize_expr_program(program)
-    module_text, ledger = export_program(normalized_program)
-    imported_program, import_summary = import_program(normalized_program)
+    input_mlir, ledger = export_program(normalized_program)
+    output_mlir, _transform = _run_mlir_cse_pipeline(input_mlir)
+    imported_program, import_summary = import_program_from_module(output_mlir, ledger)
     analysis = analyze_program(normalized_program)
     _write_extension_artifacts(
         package_path,
-        module_text=module_text,
+        input_mlir=input_mlir,
+        output_mlir=output_mlir,
         eligibility=eligibility,
         ledger=ledger,
         import_summary=import_summary,
     )
     _write_stage_island_artifacts(
         package_path,
-        module_text=module_text,
+        input_mlir=input_mlir,
+        output_mlir=output_mlir,
         eligibility=eligibility,
         ledger=ledger,
         import_summary=import_summary,
@@ -63,8 +87,8 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
         package_path,
         StageSpec(
             stage_id="s01",
-            pass_id="htp_ext.mlir_cse::export@1",
-            islands=(({"island_id": "mlir_cse", "dir": EXPORT_STAGE_DIR.as_posix()}),),
+            pass_id=EXPORT_PASS_ID,
+            islands=({"island_id": "mlir_cse", "dir": EXPORT_STAGE_DIR.as_posix()},),
             runnable_py=RunnablePySpec(
                 status="preserves",
                 modes=("sim",),
@@ -81,7 +105,7 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
             bindings_payload=export_payloads["bindings_payload"],
             summary_payload={
                 "stage_id": "s01",
-                "pass": "htp_ext.mlir_cse::export@1",
+                "pass": EXPORT_PASS_ID,
                 "runnable_py": "preserves",
                 "modes": ["sim"],
                 "extension": EXTENSION_ID,
@@ -92,8 +116,8 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
         package_path,
         StageSpec(
             stage_id="s02",
-            pass_id="htp_ext.mlir_cse::import@1",
-            islands=(({"island_id": "mlir_cse", "dir": IMPORT_STAGE_DIR.as_posix()}),),
+            pass_id=IMPORT_PASS_ID,
+            islands=({"island_id": "mlir_cse", "dir": IMPORT_STAGE_DIR.as_posix()},),
             runnable_py=RunnablePySpec(
                 status="preserves",
                 modes=("sim",),
@@ -110,7 +134,7 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
             bindings_payload=import_payloads["bindings_payload"],
             summary_payload={
                 "stage_id": "s02",
-                "pass": "htp_ext.mlir_cse::import@1",
+                "pass": IMPORT_PASS_ID,
                 "runnable_py": "preserves",
                 "modes": ["sim"],
                 "extension": EXTENSION_ID,
@@ -122,7 +146,9 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
     manifest["target"] = {"backend": "ext-demo", "variant": "sim"}
     manifest["extensions"] = {
         "mlir_cse": {
-            "module": (EXTENSION_DIR / "module.mlir").as_posix(),
+            "input": (EXTENSION_DIR / "input.mlir").as_posix(),
+            "output": (EXTENSION_DIR / "output.mlir").as_posix(),
+            "pipeline": (EXTENSION_DIR / "pipeline.txt").as_posix(),
             "ledger": (EXTENSION_DIR / "ledger.json").as_posix(),
             "eligibility": (EXTENSION_DIR / "eligibility.json").as_posix(),
             "import_summary": (EXTENSION_DIR / "import_summary.json").as_posix(),
@@ -135,6 +161,123 @@ def emit_package(package_dir: Path | str, *, program: Mapping[str, Any]) -> dict
 
 def register_replay_handler(*, runtime: Runtime | None = None) -> None:
     extensions.register(EXTENSION_ID, "replay_cse", _replay_handler, runtime=runtime)
+
+
+def registered_passes():
+    from htp.passes.registry import RegisteredPass
+
+    return (
+        RegisteredPass(contract=EXPORT_CONTRACT, run=run_export_pass),
+        RegisteredPass(contract=IMPORT_CONTRACT, run=run_import_pass),
+    )
+
+
+def pipeline_templates(*, program: Mapping[str, Any], required_outputs: tuple[str, ...]):
+    if not eligibility_for(program)["ok"]:
+        return ()
+    from htp.pipeline.registry import default_template
+    from htp.solver import PipelineTemplate
+
+    base = default_template(target={}, required_outputs=required_outputs)
+    insertion_index = next(
+        index
+        for index, contract in enumerate(base.passes)
+        if contract.pass_id == "htp::typecheck_layout_effects@1"
+    )
+    passes = list(base.passes)
+    passes[insertion_index:insertion_index] = [EXPORT_CONTRACT, IMPORT_CONTRACT]
+    return (
+        PipelineTemplate(
+            template_id="htp.default+htp_ext.mlir_cse.v1",
+            passes=tuple(passes),
+            required_outputs=required_outputs,
+            extension_steps=(EXTENSION_ID,),
+        ),
+    )
+
+
+def extension_solver_result(program: Mapping[str, Any]) -> dict[str, Any]:
+    eligibility = eligibility_for(program)
+    return {
+        "eligible": bool(eligibility["ok"]),
+        "provides": ["Extension.MLIRCSEEligible@1"] if eligibility["ok"] else [],
+        "pipeline_templates": [
+            template.template_id for template in pipeline_templates(program=program, required_outputs=())
+        ],
+        "reasons": list(eligibility["reasons"]),
+    }
+
+
+def run_export_pass(
+    program: Mapping[str, Any], *, stage_before: Mapping[str, object]
+) -> tuple[dict[str, Any], PassResult]:
+    del stage_before
+    eligibility = eligibility_for(program)
+    if not eligibility["ok"]:
+        raise ValueError(f"Program is not eligible for MLIR CSE island: {eligibility['reasons']}")
+    normalized_program = normalize_expr_program(program)
+    input_mlir, ledger = export_program(normalized_program)
+    stage_payloads = stage_payloads_from_program(program)
+    return dict(program), PassResult(
+        runnable_py=RunnablePySpec(status="preserves", modes=("sim",), program_text=_export_stage_program()),
+        islands=({"island_id": "mlir_cse", "dir": "islands/mlir_cse"},),
+        program_ast_payload=stage_payloads["program_ast_payload"],
+        kernel_ir_payload=stage_payloads["kernel_ir_payload"],
+        workload_ir_payload=stage_payloads["workload_ir_payload"],
+        types_payload=stage_payloads["types_payload"],
+        layout_payload=stage_payloads["layout_payload"],
+        effects_payload=stage_payloads["effects_payload"],
+        schedule_payload=stage_payloads["schedule_payload"],
+        entities_payload=stage_payloads["entities_payload"],
+        bindings_payload=stage_payloads["bindings_payload"],
+        stage_files=(
+            StageFile(path="islands/mlir_cse/input.mlir", text=input_mlir),
+            StageFile(path="islands/mlir_cse/pipeline.txt", text="canonicalize\ncse\n"),
+            StageFile(path="islands/mlir_cse/eligibility.json", payload=dict(eligibility)),
+            StageFile(path="islands/mlir_cse/ledger.json", payload=dict(ledger)),
+        ),
+        summary_payload={"extension": EXTENSION_ID, "pass": EXPORT_PASS_ID, "eligible": True},
+        time_ms=0.3,
+    )
+
+
+def run_import_pass(
+    program: Mapping[str, Any], *, stage_before: Mapping[str, object]
+) -> tuple[dict[str, Any], PassResult]:
+    del stage_before
+    normalized_program = normalize_expr_program(program)
+    input_mlir, ledger = export_program(normalized_program)
+    output_mlir, _transform = _run_mlir_cse_pipeline(input_mlir)
+    imported_program, import_summary = import_program_from_module(output_mlir, ledger)
+    next_program = _program_state_from_expr_program(imported_program, template_program=program)
+    stage_payloads = stage_payloads_from_program(next_program)
+    return next_program, PassResult(
+        runnable_py=RunnablePySpec(
+            status="preserves",
+            modes=("sim",),
+            program_text=_import_stage_program(imported_program, import_summary, imported_program["inputs"]),
+        ),
+        islands=({"island_id": "mlir_cse", "dir": "islands/mlir_cse"},),
+        program_ast_payload=stage_payloads["program_ast_payload"],
+        kernel_ir_payload=stage_payloads["kernel_ir_payload"],
+        workload_ir_payload=stage_payloads["workload_ir_payload"],
+        types_payload=stage_payloads["types_payload"],
+        layout_payload=stage_payloads["layout_payload"],
+        effects_payload=stage_payloads["effects_payload"],
+        schedule_payload=stage_payloads["schedule_payload"],
+        entities_payload=stage_payloads["entities_payload"],
+        bindings_payload=stage_payloads["bindings_payload"],
+        stage_files=(
+            StageFile(path="islands/mlir_cse/output.mlir", text=output_mlir),
+            StageFile(path="islands/mlir_cse/import_summary.json", payload=dict(import_summary)),
+        ),
+        summary_payload={
+            "extension": EXTENSION_ID,
+            "pass": IMPORT_PASS_ID,
+            "rewrites": import_summary["rewrites"],
+        },
+        time_ms=0.4,
+    )
 
 
 def _replay_handler(*, payload: Mapping[str, object], mode: str, trace: object | None = None) -> object:
@@ -157,14 +300,17 @@ def _replay_handler(*, payload: Mapping[str, object], mode: str, trace: object |
 def _write_extension_artifacts(
     package_path: Path,
     *,
-    module_text: str,
+    input_mlir: str,
+    output_mlir: str,
     eligibility: Mapping[str, Any],
     ledger: Mapping[str, Any],
     import_summary: Mapping[str, Any],
 ) -> None:
     extension_dir = package_path / EXTENSION_DIR
     extension_dir.mkdir(parents=True, exist_ok=True)
-    (extension_dir / "module.mlir").write_text(module_text)
+    (extension_dir / "input.mlir").write_text(input_mlir)
+    (extension_dir / "output.mlir").write_text(output_mlir)
+    (extension_dir / "pipeline.txt").write_text("canonicalize\ncse\n")
     (extension_dir / "eligibility.json").write_text(json.dumps(dict(eligibility), indent=2) + "\n")
     (extension_dir / "ledger.json").write_text(json.dumps(dict(ledger), indent=2) + "\n")
     (extension_dir / "import_summary.json").write_text(json.dumps(dict(import_summary), indent=2) + "\n")
@@ -173,7 +319,8 @@ def _write_extension_artifacts(
 def _write_stage_island_artifacts(
     package_path: Path,
     *,
-    module_text: str,
+    input_mlir: str,
+    output_mlir: str,
     eligibility: Mapping[str, Any],
     ledger: Mapping[str, Any],
     import_summary: Mapping[str, Any],
@@ -182,10 +329,45 @@ def _write_stage_island_artifacts(
     import_dir = package_path / IMPORT_STAGE_DIR
     export_dir.mkdir(parents=True, exist_ok=True)
     import_dir.mkdir(parents=True, exist_ok=True)
-    (export_dir / "module.mlir").write_text(module_text)
+    (export_dir / "input.mlir").write_text(input_mlir)
+    (export_dir / "pipeline.txt").write_text("canonicalize\ncse\n")
     (export_dir / "eligibility.json").write_text(json.dumps(dict(eligibility), indent=2) + "\n")
     (export_dir / "ledger.json").write_text(json.dumps(dict(ledger), indent=2) + "\n")
+    (import_dir / "output.mlir").write_text(output_mlir)
     (import_dir / "import_summary.json").write_text(json.dumps(dict(import_summary), indent=2) + "\n")
+
+
+def _run_mlir_cse_pipeline(module_text: str) -> tuple[str, dict[str, Any]]:
+    parsed = _parse_module(module_text)
+    aliases: dict[str, str] = {}
+    seen: dict[tuple[str, str, str], str] = {}
+    kept_ops: list[dict[str, str]] = []
+    for op in parsed["ops"]:
+        lhs = aliases.get(op["lhs"], op["lhs"])
+        rhs = aliases.get(op["rhs"], op["rhs"])
+        signature = (op["op"], lhs, rhs)
+        existing = seen.get(signature)
+        if existing is not None:
+            aliases[op["result"]] = existing
+            continue
+        kept_ops.append({**op, "lhs": lhs, "rhs": rhs})
+        seen[signature] = op["result"]
+    return_value = aliases.get(parsed["return"], parsed["return"])
+    return _render_mlir_module(parsed["entry"], parsed["args"], kept_ops, return_value), {"aliases": aliases}
+
+
+def _render_mlir_module(
+    entry: str, args: tuple[str, ...], ops: list[dict[str, str]], return_value: str
+) -> str:
+    arguments = ", ".join(f"%{name}: i32" for name in args)
+    lines = ["module {", f"  func.func @{entry}({arguments}) -> i32 {{"]
+    for op in ops:
+        op_name = "arith.addi" if op["op"] == "add" else "arith.muli"
+        lines.append(f"    {op['result']} = {op_name} {op['lhs']}, {op['rhs']} : i32")
+    lines.append(f"    return {return_value} : i32")
+    lines.append("  }")
+    lines.append("}")
+    return "\n".join(lines) + "\n"
 
 
 def _semanticize_expr_program(expr_program: Mapping[str, Any]) -> dict[str, Any]:
@@ -259,6 +441,77 @@ def _semanticize_expr_program(expr_program: Mapping[str, Any]) -> dict[str, Any]
     return state
 
 
+def _program_state_from_expr_program(
+    expr_program: Mapping[str, Any], *, template_program: Mapping[str, Any]
+) -> dict[str, Any]:
+    original_kernel = template_program.get("kernel", {})
+    original_arg_map = {
+        str(argument["name"]): dict(argument)
+        for argument in original_kernel.get("args", ())
+        if isinstance(argument, Mapping) and isinstance(argument.get("name"), str)
+    }
+    inputs = tuple(str(name) for name in expr_program.get("inputs", ()))
+    kernel = {
+        "name": str(expr_program["entry"]),
+        "args": [
+            {
+                "name": name,
+                "kind": str(original_arg_map.get(name, {}).get("kind", "scalar")),
+                "dtype": str(original_arg_map.get(name, {}).get("dtype", "i32")),
+                "shape": list(original_arg_map.get(name, {}).get("shape", ())),
+                "role": str(original_arg_map.get(name, {}).get("role", "input")),
+            }
+            for name in inputs
+        ],
+        "ops": [
+            {
+                "op": "elementwise_binary",
+                "operator": str(expr["op"]),
+                "lhs": str(expr["lhs"]),
+                "rhs": str(expr["rhs"]),
+                "out": str(expr["target"]),
+                "shape": [],
+                "dtype": "i32",
+            }
+            for expr in expr_program["exprs"]
+        ],
+    }
+    workload = {
+        "entry": str(expr_program["entry"]),
+        "tasks": [
+            {
+                "task_id": "task0",
+                "kind": "kernel_call",
+                "kernel": str(expr_program["entry"]),
+                "args": list(inputs),
+            }
+        ],
+        "channels": [],
+        "dependencies": [],
+    }
+    state = dict(template_program)
+    state.update(
+        {
+            "entry": str(expr_program["entry"]),
+            "kernel": kernel,
+            "workload": workload,
+            "analysis": dict(template_program.get("analysis", {})),
+            "package": dict(template_program.get("package", {"emitted": False})),
+        }
+    )
+    state["canonical_ast"] = canonicalize_program(state)
+    kernel_ir, workload_ir, entities_payload, bindings_payload = build_semantic_model(state["canonical_ast"])
+    state["kernel_ir"] = kernel_ir
+    state["workload_ir"] = workload_ir
+    state["entities_payload"] = entities_payload
+    state["bindings_payload"] = bindings_payload
+    state.pop("types", None)
+    state.pop("layout", None)
+    state.pop("effects", None)
+    state.pop("schedule", None)
+    return state
+
+
 def _export_stage_program() -> str:
     return "\n".join(
         (
@@ -304,4 +557,18 @@ def _import_stage_program(
     )
 
 
-__all__ = ["EXTENSION_DIR", "EXTENSION_ID", "emit_package", "register_replay_handler"]
+__all__ = [
+    "EXTENSION_DIR",
+    "EXTENSION_ID",
+    "EXPORT_CONTRACT",
+    "EXPORT_PASS_ID",
+    "IMPORT_CONTRACT",
+    "IMPORT_PASS_ID",
+    "emit_package",
+    "extension_solver_result",
+    "pipeline_templates",
+    "register_replay_handler",
+    "registered_passes",
+    "run_export_pass",
+    "run_import_pass",
+]

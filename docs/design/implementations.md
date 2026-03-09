@@ -84,6 +84,13 @@ Within that pass spine, the current semantic substrate now includes:
 - staged software-pipeline plans in `analysis/pipeline_plan.json`
 - applied specialization / software-pipeline state in final `schedule.json`
 
+The execution path is no longer limited to hard-coded pass tuples:
+
+- `htp/passes/registry.py` owns the registered pass surface
+- `htp/pipeline/registry.py` owns the registered template surface
+- extension-selected templates can splice extension passes into the same pass
+  manager / pass-trace flow
+
 The implemented authoring surfaces now also include:
 
 - `htp.wsp` for explicit workload/schedule construction
@@ -166,7 +173,8 @@ The only extension package in tree today is:
 
 Implemented extension-owned seams now include:
 
-- MLIR CSE round-trip package emission with solver-visible eligibility
+- MLIR CSE round-trip package emission plus registered export/import pipeline
+  passes
 - AIE artifact emission with binding validation
 
 Anything not backed by code in `htp/` or `htp_ext/` remains future work.
