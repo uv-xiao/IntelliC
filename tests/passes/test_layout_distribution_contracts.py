@@ -98,6 +98,7 @@ def test_distribution_join_is_recorded_and_requires_explicit_relayout():
     assert layout["joins"] == [
         {
             "op_id": "op0",
+            "rule": "elementwise_binary",
             "lhs": "lhs",
             "rhs": "rhs",
             "out": "out",
@@ -187,7 +188,7 @@ def test_sharded_output_requires_collective_discharge():
                         "distribution": [{"kind": "shard", "axis": "x"}],
                     },
                 ],
-                "ops": [{"op": "reshape", "source": "src", "out": "out"}],
+                "ops": [{"op": "reduction_sum", "source": "src", "out": "out", "axis": 0}],
             },
             "workload": _workload("collective_kernel", ["src", "out"]),
         }
@@ -222,7 +223,7 @@ def test_sharded_output_requires_collective_discharge():
                     },
                 ],
                 "ops": [
-                    {"op": "reshape", "source": "src", "out": "out"},
+                    {"op": "reduction_sum", "source": "src", "out": "out", "axis": 0},
                     {"op": "allreduce", "source": "out", "out": "out"},
                 ],
             },

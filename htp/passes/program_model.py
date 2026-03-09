@@ -855,10 +855,14 @@ def _layout_joins(kernel_ir: Mapping[str, Any], layout: Mapping[str, Any]) -> li
             continue
         lhs = _distribution_for_buffer(layout, lhs_name)
         rhs = _distribution_for_buffer(layout, rhs_name)
-        joined = join_distribution_facets(lhs, rhs)
+        if op_name == "matmul":
+            joined = _matmul_output_distribution(lhs, rhs)
+        else:
+            joined = join_distribution_facets(lhs, rhs)
         joins.append(
             {
                 "op_id": str(op["op_id"]),
+                "rule": op_name,
                 "lhs": lhs_name,
                 "rhs": rhs_name,
                 "out": out_name,
@@ -886,6 +890,12 @@ def _layout_relayouts(kernel_ir: Mapping[str, Any], layout: Mapping[str, Any]) -
             }
         )
     return relayouts
+
+
+def _matmul_output_distribution(lhs: DistributionFacet, rhs: DistributionFacet) -> DistributionFacet | None:
+    if len(lhs.dims) < 2 or len(rhs.dims) < 2:
+        return None
+    return DistributionFacet((lhs.dims[0], rhs.dims[1]))
 
 
 def _threading_for_backend(backend: str, kernel_ir: Mapping[str, Any]) -> dict[str, Any]:
@@ -1205,16 +1215,7 @@ def _token_effects(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def _collective_effects(kernel_ir: Mapping[str, Any], *, layout: Mapping[str, Any]) -> list[dict[str, Any]]:
-    output_buffers = {
-        str(argument["name"])
-        for argument in kernel_ir.get("args", ())
-        if str(argument.get("kind")) == "buffer" and str(argument.get("role")) == "output"
-    }
-    shard_outputs = {
-        buffer_name
-        for buffer_name, payload in layout.get("facets", {}).get("buffers", {}).items()
-        if _is_sharded_layout(payload) and buffer_name in output_buffers
-    }
+    required_outputs = _collective_requirements(kernel_ir, layout)
     records: list[dict[str, Any]] = []
     for op in kernel_ir.get("ops", ()):
         if str(op.get("intrinsic", "")) != "portable.allreduce":
@@ -1222,7 +1223,7 @@ def _collective_effects(kernel_ir: Mapping[str, Any], *, layout: Mapping[str, An
         op_id = str(op["op_id"])
         outputs = [str(name) for name in op.get("outputs", ())]
         collective_id = f"{op_id}.collective"
-        discharged = any(name in shard_outputs for name in outputs)
+        discharged = any(name in required_outputs for name in outputs)
         records.append(
             {
                 "collective_id": collective_id,
@@ -1231,11 +1232,11 @@ def _collective_effects(kernel_ir: Mapping[str, Any], *, layout: Mapping[str, An
                 "outputs": outputs,
                 "status": "discharged" if discharged else "redundant",
                 "discharged_by": op_id if discharged else None,
-                "required_by": sorted(name for name in outputs if name in shard_outputs),
+                "required_by": sorted(name for name in outputs if name in required_outputs),
                 "discharge_rule": "allreduce_over_sharded_output" if discharged else "no_pending_obligation",
             }
         )
-    for buffer_name in sorted(shard_outputs):
+    for buffer_name in sorted(required_outputs):
         if any(buffer_name in record["required_by"] for record in records):
             continue
         records.append(
@@ -1251,6 +1252,29 @@ def _collective_effects(kernel_ir: Mapping[str, Any], *, layout: Mapping[str, An
             }
         )
     return records
+
+
+def _collective_requirements(kernel_ir: Mapping[str, Any], layout: Mapping[str, Any]) -> set[str]:
+    requirements: set[str] = set()
+    for op in kernel_ir.get("ops", ()):
+        op_name = str(op.get("op"))
+        outputs = [str(name) for name in op.get("outputs", ())]
+        if op_name == "matmul":
+            lhs_name = str(op.get("inputs", [None])[0] or "")
+            rhs_name = str(op.get("inputs", [None, None])[1] or "")
+            lhs = _distribution_for_buffer(layout, lhs_name)
+            rhs = _distribution_for_buffer(layout, rhs_name)
+            if len(lhs.dims) >= 2 and str(lhs.dims[1].kind) == "shard":
+                requirements.update(outputs)
+            if len(rhs.dims) >= 1 and str(rhs.dims[0].kind) == "shard":
+                requirements.update(outputs)
+        elif op_name == "reduction_sum":
+            source_name = str(op.get("inputs", [None])[0] or "")
+            axis = int(op.get("attrs", {}).get("axis", 0) or 0)
+            source = _distribution_for_buffer(layout, source_name)
+            if len(source.dims) > axis and str(source.dims[axis].kind) == "shard":
+                requirements.update(outputs)
+    return requirements
 
 
 def _intrinsic_effect_contracts(kernel_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
