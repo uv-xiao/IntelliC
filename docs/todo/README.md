@@ -17,18 +17,18 @@ For feature work:
 
 ### Overall
 
-- total tracked TODO checklist items: 53
-- complete: 34
-- partial: 13
-- open: 6
-- completion ratio: about 64%
+- total tracked TODO checklist items: 54
+- complete: 36
+- partial: 11
+- open: 7
+- completion ratio: about 67%
 
 ### By layer
 
 | Layer | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Compiler model, semantics, typing | 6 | 2 | 2 | 10 |
-| Programming surfaces | 6 | 2 | 0 | 8 |
+| Programming surfaces | 8 | 0 | 1 | 9 |
 | Pipeline and solver | 6 | 2 | 1 | 9 |
 | Artifacts, replay, debug | 5 | 2 | 1 | 8 |
 | Backends and extensions | 6 | 3 | 1 | 10 |
@@ -39,7 +39,7 @@ For feature work:
 - `docs/todo/layers/01_compiler_model.md`
   - remaining work: broaden semantic/type/layout/effect breadth beyond the newly landed fused-elementwise semantics and deepen routine semantics
 - `docs/todo/layers/02_programming_surfaces.md`
-  - remaining work: continue replacing compact proof cases with broader, reference-calibrated flagship examples beyond the new expression-first PTO/NV-GPU rewrites
+  - remaining work: finish the written AST-centric comparison against LittleKernel and use it to drive the next surface pass
 - `docs/todo/layers/03_pipeline_and_solver.md`
   - remaining work: richer search/composition and broader MLIR island breadth
 - `docs/todo/layers/04_artifacts_replay_debug.md`
@@ -58,3 +58,4 @@ For feature work:
 - `docs/todo/layers/05_backends_and_extensions.md`
 - `docs/todo/layers/06_agent_product_and_workflow.md`
 - `docs/todo/reports/retargetable_extensibility_report.md`
+- `docs/todo/reports/littlekernel_ast_comparison.md`

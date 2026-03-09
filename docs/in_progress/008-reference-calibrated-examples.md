@@ -2,7 +2,7 @@
 
 - ID: `008-reference-calibrated-examples`
 - Branch: `htp/feat-reference-calibrated-examples`
-- PR: `TBD`
+- PR: `https://github.com/uv-xiao/htp/pull/43`
 - Status: `in_progress`
 - Owner: `Codex`
 
@@ -18,12 +18,12 @@ Broaden HTP’s public example suite so the flagship examples are calibrated aga
 
 ## Scope Checklist
 
-- [ ] add the minimum surface changes needed for more natural reference-calibrated examples
-- [ ] add harder public examples calibrated against PyPTO, LittleKernel, and Arknife
-- [ ] rewrite remaining dict-heavy public examples/tests where a human-facing surface should exist
-- [ ] add the LittleKernel AST-centric comparison as tracked future work/documentation
-- [ ] tighten agent guidance so reviews explicitly judge human friendliness and syntax prettiness
-- [ ] update `docs/design/` and narrow the corresponding TODOs
+- [x] add the minimum surface changes needed for more natural reference-calibrated examples
+- [x] add harder public examples calibrated against PyPTO, LittleKernel, and Arknife
+- [x] rewrite remaining dict-heavy public examples/tests where a human-facing surface should exist
+- [x] add the LittleKernel AST-centric comparison as tracked future work/documentation
+- [x] tighten agent guidance so reviews explicitly judge human friendliness and syntax prettiness
+- [x] update `docs/design/` and narrow the corresponding TODOs
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Code Surfaces
@@ -36,18 +36,18 @@ Broaden HTP’s public example suite so the flagship examples are calibrated aga
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test for each newly added public example family
-- [ ] one malformed-input / contract-violation test for any new frontend surface rule
-- [ ] one regression test proving the new surface removes an awkward old pattern
-- [ ] human-friendly flagship examples updated or added
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test for each newly added public example family
+- [x] one malformed-input / contract-violation test for any new frontend surface rule
+- [x] one regression test proving the new surface removes an awkward old pattern
+- [x] human-friendly flagship examples updated or added
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for implemented behavior and the expanded example suite
-- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] update `docs/design/` for implemented behavior and the expanded example suite
+- [x] update `docs/todo/` to remove or narrow the gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan
