@@ -25,4 +25,5 @@
 ## Replay and stages
 
 - Every stage should remain runnable in `sim` or fail with a structured replay diagnostic.
+- `ir/stages/<id>/program.py` should be readable runnable Python, not only a serialized payload blob.
 - Stage identity, maps, analyses, and summaries are part of the observable contract.

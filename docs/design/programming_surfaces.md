@@ -56,6 +56,12 @@ def gemm_tile(A: buffer(...), B: buffer(...), C: buffer(...), ...):
 rather than forcing public examples to assemble a nested `{"kernel": ...,
 "workload": ...}` payload by hand.
 
+That human-first rule now also applies to staged compiler artifacts. The
+generated `ir/stages/<id>/program.py` files are pretty-printed runnable Python
+modules with readable top-level bindings, not only a serialized payload blob.
+That keeps the canonical Python-space story honest during debugging and replay,
+not only at the frontend authoring boundary.
+
 Recent frontend work also makes elementwise programs read like ordinary Python
 expressions instead of builder calls. Public kernels can now use symbolic
 temporaries and operator-style composition such as:

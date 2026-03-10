@@ -58,6 +58,13 @@ The pass system now records:
 
 This is why replay and semantic diff can reason about “what changed where” instead of only comparing end states.
 
+That same pass discipline now also governs staged Python rendering. The
+pipeline-owned `ir/stages/<id>/program.py` artifacts are emitted as readable
+runnable Python modules with top-level bindings instead of only a dumped payload
+literal. That matters because pass boundaries are where HTP claims Python-space
+canonicality; the boundary artifact should therefore remain both executable and
+inspectable.
+
 ### Extension participation
 
 The solver and pipeline system can now see extension-provided passes and templates. MLIR CSE is the current concrete proof. It enters as an extension-owned round-trip path, yet still emits staged evidence and participates in the same pass-trace discipline.

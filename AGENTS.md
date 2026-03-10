@@ -65,6 +65,7 @@ Do not leave stale duplicates across `design`, `todo`, and `in_progress`.
 
 - Python-space is the canonical compiler form.
 - Stage programs must remain runnable in `sim`, or fail with a structured replay diagnostic.
+- Staged `program.py` artifacts must be pretty-printed readable runnable Python, not only opaque payload dumps.
 - Emitted artifacts are part of the public contract.
 - Bindings must report malformed package state through structured diagnostics, not crashes.
 - MLIR is an extension mechanism, not a native semantic owner of the core compiler.
