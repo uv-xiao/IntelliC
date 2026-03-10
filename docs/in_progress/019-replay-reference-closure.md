@@ -2,8 +2,8 @@
 
 - ID: `019-replay-reference-closure`
 - Branch: `htp/feat-replay-reference-closure`
-- PR: `TBD`
-- Status: `planned`
+- PR: `#54`
+- Status: `in_review`
 - Owner: `Codex`
 
 ## Goal
@@ -18,10 +18,10 @@ Close the remaining replay/reference breadth gap in `docs/todo/artifacts_replay_
 
 ## Scope Checklist
 
-- [ ] add replay/reference semantics for the main portable intrinsic set used by current examples and tests
-- [ ] add runtime-aware protocol semantics for channel intrinsics and single-process collective fallback
-- [ ] add NV-GPU reference semantics for the implemented instruction-plan intrinsics where a reasonable Python-space meaning exists
-- [ ] update tests and docs to mark the replay/debug topic closed
+- [x] add replay/reference semantics for the main portable intrinsic set used by current examples and tests
+- [x] add runtime-aware protocol semantics for channel intrinsics and single-process collective fallback
+- [x] add NV-GPU reference semantics for the implemented instruction-plan intrinsics where a reasonable Python-space meaning exists
+- [x] update tests and docs to mark the replay/debug topic closed
 
 ## Code Surfaces
 
@@ -33,18 +33,18 @@ Close the remaining replay/reference breadth gap in `docs/todo/artifacts_replay_
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for the motivating bug or gap
-- [ ] human-friendly example updated or added
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating bug or gap
+- [x] human-friendly example updated or added
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for implemented behavior
-- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] update `docs/design/` for implemented behavior
+- [x] update `docs/todo/` to remove or narrow the gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan

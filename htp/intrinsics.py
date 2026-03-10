@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from inspect import Parameter, signature
 from typing import Any
+
+from htp.runtime.errors import raise_stub
 
 
 @dataclass(frozen=True)
@@ -119,12 +122,21 @@ def simulate_intrinsic(
     mode: str,
     trace: object | None = None,
     target: str = "generic",
+    runtime: object | None = None,
 ) -> object:
     handler = resolve_handler(target, intrinsic, role="simulate")
     if handler is None:
         require_handler(target, intrinsic, role="simulate")
         raise AssertionError("unreachable")
-    return handler(args=args, attrs=dict(attrs or {}), mode=mode, trace=trace)
+    handler_kwargs = {
+        "args": args,
+        "attrs": dict(attrs or {}),
+        "mode": mode,
+        "trace": trace,
+    }
+    if _accepts_keyword(handler, "runtime"):
+        handler_kwargs["runtime"] = runtime
+    return handler(**handler_kwargs)
 
 
 def get_stub_diagnostic_code(intrinsic: str) -> str:
@@ -272,6 +284,11 @@ def _bootstrap() -> None:
         "portable.elementwise_unary",
         simulate=_simulate_elementwise_unary,
     )
+    register_handlers(
+        "generic",
+        "portable.matmul",
+        simulate=_simulate_matmul,
+    )
     for intrinsic in (
         "portable.load",
         "portable.store",
@@ -289,7 +306,7 @@ def _bootstrap() -> None:
         "portable.channel_recv",
         "portable.allreduce",
     ):
-        register_handlers("generic", intrinsic, simulate=_stub_simulate)
+        register_handlers("generic", intrinsic, simulate=_portable_simulator_for(intrinsic))
     register_handlers(
         "nvgpu",
         "portable.elementwise_binary",
@@ -309,7 +326,7 @@ def _bootstrap() -> None:
         "portable.matmul",
         lower=_lower_passthrough,
         emit=_emit_passthrough,
-        simulate=_simulate_matmul_placeholder,
+        simulate=_simulate_matmul,
     )
     for intrinsic in (
         "portable.async_copy",
@@ -326,7 +343,7 @@ def _bootstrap() -> None:
             intrinsic,
             lower=_lower_passthrough,
             emit=_emit_passthrough,
-            simulate=_stub_simulate,
+            simulate=_portable_simulator_for(intrinsic),
         )
     for intrinsic in (
         "nvgpu.cp_async",
@@ -338,7 +355,11 @@ def _bootstrap() -> None:
         "nvgpu.commit",
     ):
         register_handlers(
-            "nvgpu", intrinsic, lower=_lower_passthrough, emit=_emit_passthrough, simulate=_stub_simulate
+            "nvgpu",
+            intrinsic,
+            lower=_lower_passthrough,
+            emit=_emit_passthrough,
+            simulate=_nvgpu_simulator_for(intrinsic),
         )
     register_handlers(
         "pto",
@@ -353,6 +374,11 @@ def _bootstrap() -> None:
         lower=_lower_passthrough,
         emit=_emit_passthrough,
         simulate=_simulate_elementwise_unary,
+    )
+    register_handlers(
+        "pto",
+        "portable.matmul",
+        simulate=_simulate_matmul,
     )
 
 
@@ -413,11 +439,252 @@ def _simulate_elementwise_unary(
     raise ValueError(f"Unsupported simulated unary operator {operator!r}.")
 
 
-def _simulate_matmul_placeholder(
+def _simulate_matmul(
     *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
 ) -> object:
-    del args, attrs, mode, trace
-    return "matmul-sim"
+    del attrs, mode, trace
+    import numpy as np
+
+    lhs, rhs = args[:2]
+    return np.matmul(lhs, rhs)
+
+
+def _simulate_load(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del attrs, mode, trace
+    return args[0]
+
+
+def _simulate_store(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del attrs, mode, trace
+    target, value = args[:2]
+    try:
+        target[...] = value
+    except Exception:
+        return value
+    return target
+
+
+def _simulate_cast(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del mode, trace
+    source = args[0]
+    dtype = str(attrs.get("dtype", ""))
+    if hasattr(source, "astype") and dtype:
+        return source.astype(dtype)
+    return source
+
+
+def _simulate_broadcast(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del mode, trace
+    import numpy as np
+
+    return np.broadcast_to(args[0], tuple(attrs.get("shape", ())))
+
+
+def _simulate_transpose(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del mode, trace
+    import numpy as np
+
+    return np.transpose(args[0], axes=tuple(attrs.get("axes", ())))
+
+
+def _simulate_view_like(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del mode, trace
+    source = args[0]
+    shape = tuple(attrs.get("shape", ()))
+    if not shape:
+        return source
+    if hasattr(source, "reshape"):
+        return source.reshape(shape)
+    return source
+
+
+def _simulate_reduction_sum(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del mode, trace
+    import numpy as np
+
+    axis = attrs.get("axis")
+    return np.sum(args[0], axis=axis)
+
+
+def _simulate_async_copy(
+    *,
+    args: tuple[object, ...],
+    attrs: Mapping[str, object],
+    mode: str,
+    trace: object | None = None,
+    runtime: object | None = None,
+) -> object:
+    del attrs, mode, trace, runtime
+    import numpy as np
+
+    return np.array(args[0], copy=True)
+
+
+def _simulate_barrier(
+    *,
+    args: tuple[object, ...],
+    attrs: Mapping[str, object],
+    mode: str,
+    trace: object | None = None,
+    runtime: object | None = None,
+) -> object:
+    del args, attrs, mode, trace, runtime
+    return None
+
+
+def _simulate_await(
+    *,
+    args: tuple[object, ...],
+    attrs: Mapping[str, object],
+    mode: str,
+    trace: object | None = None,
+    runtime: object | None = None,
+) -> object:
+    del attrs, mode, trace, runtime
+    return args[0]
+
+
+def _simulate_mma(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del attrs, mode, trace
+    import numpy as np
+
+    lhs, rhs = args[:2]
+    accum = args[2] if len(args) > 2 else 0
+    return np.matmul(lhs, rhs) + accum
+
+
+def _simulate_channel_send(
+    *,
+    args: tuple[object, ...],
+    attrs: Mapping[str, object],
+    mode: str,
+    trace: object | None = None,
+    runtime: object | None = None,
+) -> object:
+    del mode, trace
+    channel = str(attrs.get("channel", "default"))
+    if runtime is None:
+        raise_stub(
+            "HTP.REPLAY.STUB_HIT",
+            node_id=f"intrinsic::portable.channel_send::{channel}",
+            entity_id=channel,
+            kind="intrinsic",
+            detail="channel send needs a runtime to hold replay queue state",
+        )
+    queues = getattr(runtime, "channel_queues", None)
+    if queues is None:
+        queues = {}
+        setattr(runtime, "channel_queues", queues)
+    queues.setdefault(channel, []).append(args[0] if args else None)
+    return args[0] if args else None
+
+
+def _simulate_channel_recv(
+    *,
+    args: tuple[object, ...],
+    attrs: Mapping[str, object],
+    mode: str,
+    trace: object | None = None,
+    runtime: object | None = None,
+) -> object:
+    del args, mode, trace
+    channel = str(attrs.get("channel", "default"))
+    if runtime is None:
+        raise_stub(
+            "HTP.REPLAY.STUB_HIT",
+            node_id=f"intrinsic::portable.channel_recv::{channel}",
+            entity_id=channel,
+            kind="intrinsic",
+            detail="channel recv needs a runtime to hold replay queue state",
+        )
+    queues = getattr(runtime, "channel_queues", None)
+    if not isinstance(queues, dict) or not queues.get(channel):
+        raise_stub(
+            "HTP.REPLAY.STUB_HIT",
+            node_id=f"intrinsic::portable.channel_recv::{channel}",
+            entity_id=channel,
+            kind="intrinsic",
+            detail=f"channel '{channel}' is empty in sim replay",
+        )
+    return queues[channel].pop(0)
+
+
+def _simulate_allreduce(
+    *,
+    args: tuple[object, ...],
+    attrs: Mapping[str, object],
+    mode: str,
+    trace: object | None = None,
+    runtime: object | None = None,
+) -> object:
+    del attrs, mode, trace, runtime
+    return args[0]
+
+
+def _simulate_nvgpu_identity(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del attrs, mode, trace
+    return args[0] if args else None
+
+
+def _portable_simulator_for(intrinsic: str) -> Callable[..., object]:
+    mapping = {
+        "portable.load": _simulate_load,
+        "portable.store": _simulate_store,
+        "portable.cast": _simulate_cast,
+        "portable.broadcast": _simulate_broadcast,
+        "portable.transpose": _simulate_transpose,
+        "portable.view": _simulate_view_like,
+        "portable.reshape": _simulate_view_like,
+        "portable.relayout": _simulate_view_like,
+        "portable.reduction_sum": _simulate_reduction_sum,
+        "portable.async_copy": _simulate_async_copy,
+        "portable.barrier": _simulate_barrier,
+        "portable.await": _simulate_await,
+        "portable.channel_send": _simulate_channel_send,
+        "portable.channel_recv": _simulate_channel_recv,
+        "portable.allreduce": _simulate_allreduce,
+        "portable.mma": _simulate_mma,
+    }
+    return mapping[intrinsic]
+
+
+def _nvgpu_simulator_for(intrinsic: str) -> Callable[..., object]:
+    mapping = {
+        "nvgpu.cp_async": _simulate_async_copy,
+        "nvgpu.ldmatrix": _simulate_nvgpu_identity,
+        "nvgpu.mma_sync": _simulate_mma,
+        "nvgpu.wgmma": _simulate_mma,
+        "nvgpu.tma_load": _simulate_async_copy,
+        "nvgpu.tma_store": _simulate_store,
+        "nvgpu.commit": _simulate_nvgpu_identity,
+    }
+    return mapping[intrinsic]
+
+
+def _accepts_keyword(handler: Callable[..., object], name: str) -> bool:
+    try:
+        params = signature(handler).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(parameter.kind == Parameter.VAR_KEYWORD or parameter.name == name for parameter in params)
 
 
 def _stub_simulate(
