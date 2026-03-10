@@ -2,7 +2,7 @@
 
 - ID: `024-stronger-flagship-tests`
 - Branch: `htp/feat-stronger-flagship-tests`
-- PR: `TBD`
+- PR: `#59`
 - Status: `in_progress`
 - Owner: `Codex`
 
