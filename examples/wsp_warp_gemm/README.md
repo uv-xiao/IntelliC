@@ -5,11 +5,14 @@ pipeline.
 
 It proves three implemented contracts:
 
-- WSP schedule directives are part of a decorator/builder user-facing program surface.
-- the kernel body can describe staged copies, barriers, and MMA intent with typed temporaries instead of raw string scratch names,
-- The default pipeline preserves those directives into staged
-  `schedule.json`.
-- The final package remains replayable in `sim`.
+- WSP task graphs can now express producer, consumer, and epilogue roles as
+  named workload tasks.
+- each task can carry explicit stage-plan evidence such as `prologue`,
+  `steady`, and `epilogue`.
+- the kernel body still uses typed temporaries instead of raw scratch-string
+  plumbing.
+- the default pipeline preserves those directives into staged `schedule.json`
+  and `workload_ir.json`.
 
 Run:
 

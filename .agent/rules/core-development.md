@@ -24,6 +24,9 @@
 - Review programming surfaces and public examples for human friendliness and
   syntax prettiness explicitly; technically correct but awkward authoring does
   not clear the quality bar.
+- WSP examples must show real task roles / dependencies / stage plans, and CSP
+  examples must show real process roles / protocol-local steps. If the example
+  is only one shallow kernel wrapped in nicer syntax, keep iterating.
 
 ## Code readability
 

@@ -121,10 +121,34 @@ The current proof points include:
 - software-pipeline planning
 - shared lowering through the same pass manager and artifact model
 - decorator/builder authoring through `@wsp.program(...)`
-- fluent schedule helpers such as `.launch(...)`, `.tile(...)`, `.bind(...)`,
-  `.pipeline(...)`, `.resources(...)`, and `.specialize(...)`
-- flagship examples that now show staged copies, barrier handoff, and MMA
-  intent instead of collapsing to a single `store(C, A @ B)` body
+- task-oriented builders such as `.launch(...)`, `.mainloop(...)`, and `.after(...)`
+- per-task role and stage-plan helpers such as `.role(...)`, `.prologue(...)`,
+  `.steady(...)`, and `.epilogue(...)`
+- schedule helpers such as `.tile(...)`, `.bind(...)`, `.pipeline(...)`,
+  `.resources(...)`, and `.specialize(...)`
+- workload evidence that now carries task-level `attrs.role`,
+  `attrs.schedule`, and `attrs.stages` into `workload_ir.json`
+
+The important change is that WSP is no longer only a global schedule wrapper.
+Public examples can now express a producer/mainloop/epilogue task graph in
+native Python while still lowering through the same canonical HTP payload:
+
+```text
+load_tiles = (
+    w.launch(...)
+    .role("producer")
+    .prologue("cp_async(A->shared)", "cp_async(B->shared)")
+)
+mma_tiles = (
+    w.mainloop(...)
+    .after(load_tiles)
+    .role("consumer")
+    .steady("barrier", "mma_sync", "accumulate")
+)
+```
+
+That structure survives into the staged workload artifacts instead of being
+only a comment in the example.
 
 ### Arknife-style explicit hardware surface
 
@@ -187,9 +211,24 @@ values and routines instead of inventing parallel semantic roots.
 - deadlock/progress evidence
 - lowering into shared workload/effect state
 - decorator/builder authoring through `@csp.program(...)`
-- fluent process builders such as `.process(...).get(...).put(...)`
-- public examples that now describe named dispatch/combine/writeback stages
-  instead of assembling process dicts by hand
+- fluent process builders such as `.process(...).role(...).compute(...).get(...).put(...)`
+- process-local step traces that survive into `workload_ir.json`
+- public examples that now describe named dispatch/combine/writeback roles and
+  protocol-local steps instead of assembling process dicts by hand
+
+The public surface now supports protocol narratives like:
+
+```text
+p.process("combine_tiles", ...)
+ .role("router")
+ .get(tiles)
+ .compute("reduce_partials", channel="tiles")
+ .put(partials)
+```
+
+Those `compute(...)` steps are not a second compiler substrate. They are
+process-level evidence attached to the shared workload model so replay,
+legality, and diagnostics can all point at the same structure.
 
 ### Workload-level routines
 
@@ -254,14 +293,20 @@ The latest surface pass was taken directly from that comparison: HTP now lets
 data-movement and channel-style ops yield typed temporaries instead of forcing
 raw string outputs in the flagship examples.
 
+The current WSP/CSP pass extends that lesson one step further: task graphs and
+protocol pipelines should read like named programs, not like schedule blobs.
+That is why task roles, stage plans, process roles, and process-local compute
+steps now appear explicitly in both the public examples and the staged
+workload artifacts.
+
 ## Coding pointers
 
 If you are working in this layer, start here:
 - `htp/compiler.py` — generic program compilation entrypoint
-- `htp/kernel.py` — public kernel authoring helpers
+- `htp/kernel.py` — public kernel authoring helpers and temporary/value flow
 - `htp/routine.py` — public routine/workload authoring helpers
-- `htp/wsp/__init__.py` — WSP builder/decorator surface plus legacy helper functions
-- `htp/csp/__init__.py` — CSP builder/decorator surface plus legacy helper functions
+- `htp/wsp/__init__.py` — WSP task builders, dependencies, role/stage-plan helpers
+- `htp/csp/__init__.py` — CSP process builders, role/compute-step helpers
 - `htp/ark/__init__.py` — Arknife-style hardware and instruction authoring surface
 - `docs/design/littlekernel_ast_comparison.md` — completed reference-backed comparison and extracted design rules
 - `examples/` — runnable proof surface
@@ -278,14 +323,15 @@ Recent concrete proof points:
 - `examples/nvgpu_arknife_blackwell/demo.py` proves that the same HTP
   programming model can author cluster/TMA/WGMMA plans for the Blackwell
   profile without creating a second compiler path.
-- `examples/wsp_warp_gemm/demo.py` now shows a fluent WSP builder plus an
-  op-rich staged kernel body with implicit shared-memory temporaries.
+- `examples/wsp_warp_gemm/demo.py` now shows a fluent WSP task graph with
+  producer/mainloop/epilogue roles plus an op-rich staged kernel body.
 - `examples/wsp_littlekernel_pipelined_gemm/demo.py` calibrates WSP schedule
   readability against LittleKernel-style pipelined GEMM code without giving up
-  HTP's shared artifact model.
+  HTP's shared artifact model, and now stages explicit prefetch/steady/writeback
+  task plans into workload evidence.
 - `examples/csp_channel_pipeline/demo.py` now shows a multi-channel
   dispatch/combine/writeback protocol authored through the CSP builder surface
-  and typed receive/broadcast temporaries.
+  with explicit process roles and named protocol-local compute steps.
 - `tests/examples/test_examples.py` now defends sequential PTO example
   execution in one process so public examples remain reliable instead of being
   “one-shot” demos.
@@ -309,6 +355,11 @@ compiler core.
 
 If the work changes what “good” public authoring looks like, update both the
 code examples and the example-local docs.
+
+In practice, this means a future frontend extension should behave more like
+`htp.ark.attach(...)` or the WSP/CSP role metadata than like a parallel tensor
+class hierarchy. Extend native HTP values and workload records; do not fork the
+semantic root.
 
 ## Current limits
 

@@ -150,6 +150,10 @@ Difficulty rules:
   friendliness and syntax prettiness explicitly. If the surface reads like
   constructor soup, nested raw payload assembly, or non-native Python, the PR
   is not done yet even if the tests pass.
+- WSP flagship examples must show meaningful task roles, dependency edges, and
+  stage plans; CSP flagship examples must show meaningful process roles and
+  protocol-local steps. A prettier wrapper around a shallow single-task example
+  does not clear review.
 
 ## 8. Code readability and documentation rules
 
