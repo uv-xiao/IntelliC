@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import htp
 from htp.backends.nvgpu.declarations import declaration_for as nvgpu_declaration_for
 from htp.backends.pto.declarations import declaration_for as pto_declaration_for
 from htp.passes.contracts import PassContract
@@ -12,6 +13,7 @@ from htp.solver import (
     available_pipeline_templates,
     default_pipeline_template,
     solve_default_pipeline,
+    solve_existing_package,
     solve_pipeline,
     validate_final_artifacts,
 )
@@ -111,6 +113,46 @@ def test_solver_accepts_default_pipeline_and_tracks_capabilities():
     assert result.pass_ids == list(MANDATORY_PASS_IDS)
     assert "Package.Emitted@1" in result.capabilities
     assert result.extension_results == {}
+
+
+def test_solver_prefers_resume_template_for_matching_existing_package(tmp_path):
+    package_dir = tmp_path / "compiled_pkg"
+    compiled = htp.compile_program(
+        package_dir=package_dir,
+        target="pto-a2a3sim",
+        program=_vector_add_program(),
+    )
+
+    result = solve_default_pipeline(
+        program=_vector_add_program(),
+        existing_package_dir=compiled.package_dir,
+    )
+
+    assert result.ok is True
+    assert result.template_id == "htp.resume.v1"
+    assert result.pass_ids == []
+    assert "Package.Emitted@1" in result.capabilities
+    assert result.selection_trace["resume_bonus"] == -200
+    assert result.selection_trace["total"] < result.selection_trace["base_cost"]
+    assert result.required_outputs == solve_existing_package(compiled.package_dir).required_outputs
+
+
+def test_solver_ignores_resume_package_when_target_mismatches(tmp_path):
+    package_dir = tmp_path / "compiled_pkg"
+    compiled = htp.compile_program(
+        package_dir=package_dir,
+        target="pto-a2a3sim",
+        program=_vector_add_program(),
+    )
+
+    result = solve_default_pipeline(
+        program=_matmul_program(),
+        existing_package_dir=compiled.package_dir,
+    )
+
+    assert result.ok is True
+    assert result.template_id == "htp.default.v1"
+    assert result.pass_ids == list(MANDATORY_PASS_IDS)
 
 
 def test_default_pipeline_uses_backend_required_outputs():

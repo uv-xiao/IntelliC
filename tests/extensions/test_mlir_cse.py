@@ -233,3 +233,63 @@ def test_mlir_cse_extension_accepts_canonical_kernel_subset(tmp_path):
             "signature": "add(lhs, rhs)",
         }
     ]
+
+
+def test_mlir_cse_extension_accepts_broader_scalar_elementwise_subset(tmp_path):
+    package_dir = tmp_path / "mlir_cse_expr_pkg"
+    package_dir.mkdir()
+
+    manifest = emit_package(
+        package_dir,
+        program={
+            "entry": "mixed_expr_kernel",
+            "exprs": [
+                {"target": "sum0", "op": "add", "lhs": "lhs", "rhs": "rhs"},
+                {"target": "sum1", "op": "sub", "lhs": "lhs", "rhs": "rhs"},
+                {"target": "out", "op": "mul", "lhs": "sum0", "rhs": "sum1"},
+            ],
+            "result": "out",
+        },
+    )
+
+    input_text = (package_dir / "extensions" / "mlir_cse" / "input.mlir").read_text()
+    output_text = (package_dir / "extensions" / "mlir_cse" / "output.mlir").read_text()
+    assert manifest["stages"]["current"] == "s02"
+    assert "arith.addi" in input_text
+    assert "arith.subi" in input_text
+    assert "arith.muli" in input_text
+    assert "arith.subi" in output_text
+
+    runtime = Runtime()
+    register_replay_handler(runtime=runtime)
+    replay = (
+        htp.bind(package_dir)
+        .load(mode="sim")
+        .replay(
+            "s02",
+            kwargs={"lhs": 7, "rhs": 4, "runtime": runtime},
+        )
+    )
+    assert replay.ok is True
+    assert replay.result == {"entry": "mixed_expr_kernel", "result": 33, "rewrites": []}
+
+
+def test_mlir_cse_extension_rejects_unsupported_expr_operator(tmp_path):
+    package_dir = tmp_path / "mlir_cse_bad_expr_pkg"
+    package_dir.mkdir()
+
+    try:
+        emit_package(
+            package_dir,
+            program={
+                "entry": "bad_expr_kernel",
+                "exprs": [
+                    {"target": "out", "op": "max", "lhs": "lhs", "rhs": "rhs"},
+                ],
+                "result": "out",
+            },
+        )
+    except ValueError as exc:
+        assert "add/sub/mul/div" in str(exc)
+    else:
+        raise AssertionError("emit_package should reject unsupported expr operators")

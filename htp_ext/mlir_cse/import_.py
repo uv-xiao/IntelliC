@@ -247,10 +247,16 @@ def import_program_from_module(
 
 _FUNC_RE = re.compile(r"func\.func\s+@(?P<entry>[A-Za-z_][\w]*)\((?P<args>[^)]*)\)\s*->\s*i32\s*\{")
 _OP_RE = re.compile(
-    r"(?P<result>%[A-Za-z_][\w]*)\s*=\s*(?P<op>arith\.(?:addi|muli))\s+"
+    r"(?P<result>%[A-Za-z_][\w]*)\s*=\s*(?P<op>arith\.(?:addi|subi|muli|divsi))\s+"
     r"(?P<lhs>%[A-Za-z_][\w]*),\s*(?P<rhs>%[A-Za-z_][\w]*)\s*:\s*i32"
 )
 _RETURN_RE = re.compile(r"return\s+(?P<value>%[A-Za-z_][\w]*)\s*:\s*i32")
+_IMPORT_OP_FOR = {
+    "arith.addi": "add",
+    "arith.subi": "sub",
+    "arith.muli": "mul",
+    "arith.divsi": "div",
+}
 
 
 def _parse_module(module_text: str) -> dict[str, Any]:
@@ -283,7 +289,7 @@ def _parse_module(module_text: str) -> dict[str, Any]:
             ops.append(
                 {
                     "result": result_name,
-                    "op": "add" if op_match.group("op") == "arith.addi" else "mul",
+                    "op": _IMPORT_OP_FOR[op_match.group("op")],
                     "lhs": lhs,
                     "rhs": rhs,
                 }

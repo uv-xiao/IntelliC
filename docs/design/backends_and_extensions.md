@@ -88,6 +88,17 @@ This is important because it proves that extension-owned backends can still part
 
 The MLIR CSE extension proves that HTP can run an extension-owned round-trip path while preserving stage discipline, artifact evidence, and identity/mapping behavior.
 
+What is implemented today:
+
+- extension-owned export/import passes participate in the normal solver and pass-trace flow
+- the extension can now round-trip the broader scalar integer elementwise subset:
+  - `add`
+  - `sub`
+  - `mul`
+  - `div`
+- replay uses the imported expression program rather than a hidden extension-only state model
+- identity maps and import summaries remain staged artifacts under both `extensions/mlir_cse/` and `ir/stages/*/islands/mlir_cse/`
+
 ### AIE package extension
 
 The AIE extension proves that external toolchain-oriented backends can remain extension-owned without breaking the core compiler model.

@@ -9,45 +9,27 @@ from htp.solver import solve_default_pipeline
 from htp_ext.mlir_cse import emit_package
 from htp_ext.mlir_cse.island import register_replay_handler
 
-MLIR_CSE_PROGRAM: dict[str, Any] = {
-    "entry": "expr_demo",
-    "target": {"backend": "nvgpu", "option": "ampere"},
-    "kernel": {
-        "name": "expr_demo",
-        "args": [
-            {"name": "x", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
-            {"name": "y", "kind": "scalar", "dtype": "i32", "shape": [], "role": "input"},
-            {"name": "out", "kind": "scalar", "dtype": "i32", "shape": [], "role": "output"},
-        ],
-        "ops": [
-            {
-                "op": "elementwise_binary",
-                "operator": "add",
-                "lhs": "x",
-                "rhs": "y",
-                "out": "out",
-                "shape": [],
-                "dtype": "i32",
-            }
-        ],
-    },
-    "workload": {
+
+def build_demo_program() -> dict[str, object]:
+    return {
         "entry": "expr_demo",
-        "tasks": [
-            {"task_id": "task0", "kind": "kernel_call", "kernel": "expr_demo", "args": ["x", "y", "out"]}
+        "target": {"backend": "nvgpu", "option": "ampere"},
+        "exprs": [
+            {"target": "sum0", "op": "add", "lhs": "x", "rhs": "y"},
+            {"target": "delta0", "op": "sub", "lhs": "x", "rhs": "y"},
+            {"target": "out", "op": "mul", "lhs": "sum0", "rhs": "delta0"},
         ],
-        "channels": [],
-        "dependencies": [],
-    },
-    "extensions": {"requested": ["htp_ext.mlir_cse"]},
-}
+        "result": "out",
+        "extensions": {"requested": ["htp_ext.mlir_cse"]},
+    }
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    solver_result = solve_default_pipeline(program=dict(MLIR_CSE_PROGRAM))
-    manifest = emit_package(output_path, program=dict(MLIR_CSE_PROGRAM))
+    program = build_demo_program()
+    solver_result = solve_default_pipeline(program=program)
+    manifest = emit_package(output_path, program=program)
     return {
         "package_dir": output_path.as_posix(),
         "solver": {
@@ -65,7 +47,7 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
     register_replay_handler()
     session = bind(package_dir).load(mode="sim")
     stage_id = session.manifest["stages"]["current"]
-    replay = session.replay(stage_id, trace="basic", kwargs={"x": 3, "y": 4, "out": 0})
+    replay = session.replay(stage_id, trace="basic", kwargs={"x": 7, "y": 4, "out": 0})
     manifest = json.loads((package_dir / "manifest.json").read_text())
     return {
         "ok": replay.ok,

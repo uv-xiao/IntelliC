@@ -18,10 +18,10 @@ For feature work:
 ### Overall
 
 - total tracked TODO checklist items: 56
-- complete: 42
-- partial: 9
-- open: 5
-- completion ratio: about 75%
+- complete: 45
+- partial: 6
+- open: 4
+- completion ratio: about 80%
 
 ### By topic
 
@@ -29,7 +29,7 @@ For feature work:
 | --- | ---: | ---: | ---: | ---: |
 | Compiler model, semantics, typing | 6 | 2 | 2 | 10 |
 | Programming surfaces | 10 | 0 | 0 | 10 |
-| Pipeline and solver | 6 | 2 | 1 | 9 |
+| Pipeline and solver | 9 | 0 | 0 | 9 |
 | Artifacts, replay, debug | 7 | 1 | 0 | 8 |
 | Backends and extensions | 8 | 2 | 1 | 11 |
 | Agent product and workflow | 5 | 2 | 1 | 8 |
@@ -41,7 +41,7 @@ For feature work:
 - `docs/todo/programming_surfaces.md`
   - remaining work: no standalone open item; the latest pass landed richer WSP task roles/stage plans and CSP process roles/compute steps, so future surface work now rolls into richer semantics and backend depth
 - `docs/todo/pipeline_and_solver.md`
-  - remaining work: richer search/composition and broader MLIR island breadth
+  - remaining work: no standalone open item; future work now rolls into semantics, backends, and agent workflow rather than a separate solver-architecture gap
 - `docs/todo/artifacts_replay_debug.md`
   - remaining work: deeper replay/reference coverage; the package/debug contract itself is now broadly uniform
 - `docs/todo/backends_and_extensions.md`
