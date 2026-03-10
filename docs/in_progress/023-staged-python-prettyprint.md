@@ -2,7 +2,7 @@
 
 - ID: `023-staged-python-prettyprint`
 - Branch: `htp/feat-staged-python-prettyprint`
-- PR: `TBD`
+- PR: `#58`
 - Status: `in_progress`
 - Owner: `Codex`
 
@@ -18,11 +18,11 @@ Improve staged Python artifacts so `ir/stages/<id>/program.py` is pretty-printed
 
 ## Scope Checklist
 
-- [ ] add readable staged Python rendering for stage programs
-- [ ] preserve exact replay semantics for staged programs
-- [ ] add focused tests for staged program readability and replay
-- [ ] reopen `docs/todo/` with detailed programming-surface TODOs derived from the LittleKernel comparison
-- [ ] sync design docs to describe the staged Python contract clearly
+- [x] add readable staged Python rendering for stage programs
+- [x] preserve exact replay semantics for staged programs
+- [x] add focused tests for staged program readability and replay
+- [x] reopen `docs/todo/` with detailed programming-surface TODOs derived from the LittleKernel comparison
+- [x] sync design docs to describe the staged Python contract clearly
 
 ## Code Surfaces
 
@@ -34,17 +34,17 @@ Improve staged Python artifacts so `ir/stages/<id>/program.py` is pretty-printed
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for the motivating gap
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating gap
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must protect a concrete staged-program or TODO-tracking contract.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for implemented staged Python behavior
-- [ ] update `docs/todo/` to add the reopened programming-surface gap
+- [x] update `docs/design/` for implemented staged Python behavior
+- [x] update `docs/todo/` to add the reopened programming-surface gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan

@@ -45,6 +45,13 @@ The manifest and stage graph are validated; they are not free-form dumps.
 
 Replay executes `ir/stages/<id>/program.py` through the runtime surface. This is distinct from backend package execution. If a stage reaches a boundary without simulator/reference semantics, it fails through a structured replay diagnostic rather than becoming silently non-executable.
 
+The staged `program.py` surface is intentionally readable now. The compiler
+does not emit a single opaque payload blob anymore; it emits pretty-printed
+top-level bindings such as `ENTRY`, `KERNEL`, `WORKLOAD`, and `TARGET`, then
+reassembles `PROGRAM_STATE` from those bindings. The result is still fully
+runnable Python, but it is also a practical debugging artifact a human can
+read, diff, and execute directly.
+
 The implemented replay/runtime path now covers more than elementwise stubs:
 - portable tensor reference ops such as `matmul`, `load`, `store`, `cast`,
   `broadcast`, `transpose`, `view`, `reshape`, `relayout`, and

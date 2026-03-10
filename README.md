@@ -20,14 +20,14 @@ Implemented today:
 - machine-enforced edit-corridor and PR policy checks
 
 Current TODO status:
-- `docs/todo/README.md` is fully closed at the moment
-- new future work should be reintroduced there only when it is concrete enough to justify a feature PR
+- `docs/todo/README.md` is authoritative for future work
+- the currently reopened topic is `docs/todo/programming_surfaces.md`
 
 ## Documentation layout
 
 - `docs/story.md` — final intended framework story
 - `docs/design/` — implemented feature documents and code-backed architecture
-- `docs/todo/README.md` — current future-work summary, currently closed
+- `docs/todo/README.md` — current future-work summary
 - `docs/in_progress/` — active feature-sized PR tasks
 - `docs/reference/` — references
 - `docs/research/` — research notes and supporting reports

@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `023-staged-python-prettyprint.md` — PR `TBD`
+- `023-staged-python-prettyprint.md` — PR `#58`

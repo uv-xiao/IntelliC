@@ -149,14 +149,17 @@ This comparison yields concrete rules for future surface work:
 
 ## Remaining surface work after this comparison
 
-This comparison closes the old TODO item, but it also sharpens the next
-frontier:
+This comparison is no longer just a narrative conclusion. Its extracted future
+work is now tracked directly in `docs/todo/programming_surfaces.md`.
+
+The concrete remaining frontier is:
 
 - richer loop / region authoring that still preserves replayable Python stages
 - more explicit scratch / memory-scope declarations when the temporary-returning
   path is not sufficient
 - deeper workload/dataflow authoring patterns that remain as readable as the
   best LittleKernel and PyPTO examples
+- continued flagship-example calibration against the reference repositories
 
 ## Coding pointers
 

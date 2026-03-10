@@ -4,27 +4,28 @@
 
 ## Current state
 
-There are currently no open TODO feature documents in this repository.
+There is currently one reopened broad-topic TODO document in this repository:
+`docs/todo/programming_surfaces.md`.
 
-The previously tracked broad-topic gaps are now implemented and documented under `docs/design/`.
-New future work should re-enter this tree only when it is specific enough to justify a new feature-sized task and PR.
+The rest of the previously tracked broad-topic gaps remain implemented and
+documented under `docs/design/`.
 
 ## Completion statistics
 
 ### Overall
 
-- total tracked TODO checklist items: 56
+- total tracked TODO checklist items: 60
 - complete: 56
 - partial: 0
-- open: 0
-- completion ratio: 100%
+- open: 4
+- completion ratio: about 93%
 
 ### By topic
 
 | Topic | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Compiler model, semantics, typing | 10 | 0 | 0 | 10 |
-| Programming surfaces | 10 | 0 | 0 | 10 |
+| Programming surfaces | 10 | 0 | 4 | 14 |
 | Pipeline and solver | 9 | 0 | 0 | 9 |
 | Artifacts, replay, debug | 8 | 0 | 0 | 8 |
 | Backends and extensions | 11 | 0 | 0 | 11 |
@@ -41,3 +42,7 @@ New future work should re-enter this tree only when it is specific enough to jus
 ## Supporting analysis
 
 - `docs/research/retargetable_extensibility_report.md`
+
+## Active TODO files
+
+- `docs/todo/programming_surfaces.md`
