@@ -17,96 +17,12 @@ from htp.tools import (
     workflow_state,
 )
 from tests.conftest import copy_golden_fixture
-
-
-def _vector_add_program() -> dict[str, object]:
-    return {
-        "entry": "vector_add",
-        "kernel": {
-            "name": "vector_add",
-            "args": [
-                {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-                {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-                {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
-                {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
-            ],
-            "ops": [
-                {
-                    "op": "elementwise_binary",
-                    "operator": "add",
-                    "lhs": "lhs",
-                    "rhs": "rhs",
-                    "out": "out",
-                    "shape": ["size"],
-                    "dtype": "f32",
-                }
-            ],
-        },
-        "workload": {
-            "entry": "vector_add",
-            "tasks": [
-                {
-                    "task_id": "task0",
-                    "kind": "kernel_call",
-                    "kernel": "vector_add",
-                    "args": ["lhs", "rhs", "out", "size"],
-                }
-            ],
-            "channels": [],
-            "dependencies": [],
-        },
-        "analysis": {},
-        "package": {"emitted": False},
-    }
-
-
-def _matmul_program() -> dict[str, object]:
-    return {
-        "entry": "gemm_tile",
-        "kernel": {
-            "name": "gemm_tile",
-            "args": [
-                {"name": "A", "kind": "buffer", "dtype": "f32", "shape": ["M", "K"], "role": "input"},
-                {"name": "B", "kind": "buffer", "dtype": "f32", "shape": ["K", "N"], "role": "input"},
-                {"name": "C", "kind": "buffer", "dtype": "f32", "shape": ["M", "N"], "role": "output"},
-                {"name": "M", "kind": "scalar", "dtype": "i32", "role": "shape"},
-                {"name": "N", "kind": "scalar", "dtype": "i32", "role": "shape"},
-                {"name": "K", "kind": "scalar", "dtype": "i32", "role": "shape"},
-            ],
-            "ops": [
-                {
-                    "op": "matmul",
-                    "lhs": "A",
-                    "rhs": "B",
-                    "out": "C",
-                    "m": "M",
-                    "n": "N",
-                    "k": "K",
-                    "dtype": "f32",
-                }
-            ],
-        },
-        "workload": {
-            "entry": "gemm_tile",
-            "tasks": [
-                {
-                    "task_id": "task0",
-                    "kind": "kernel_call",
-                    "kernel": "gemm_tile",
-                    "args": ["A", "B", "C", "M", "N", "K"],
-                }
-            ],
-            "channels": [],
-            "dependencies": [],
-        },
-        "analysis": {},
-        "package": {"emitted": False},
-    }
+from tests.programs import nvgpu_serving_program, pto_vector_dag_program
 
 
 def test_replay_package_replays_current_stage(tmp_path):
     package_dir = tmp_path / "pto_pkg"
-    compile_program(package_dir=package_dir, target="pto-a2a3sim", program=_vector_add_program())
+    compile_program(package_dir=package_dir, target="pto-a2a3sim", program=pto_vector_dag_program())
 
     replay = replay_package(package_dir)
 
@@ -117,7 +33,7 @@ def test_replay_package_replays_current_stage(tmp_path):
 
 def test_verify_package_records_agent_provenance(tmp_path):
     package_dir = tmp_path / "pto_pkg"
-    compile_program(package_dir=package_dir, target="pto-a2a3sim", program=_vector_add_program())
+    compile_program(package_dir=package_dir, target="pto-a2a3sim", program=pto_vector_dag_program())
 
     report = verify_package(package_dir, goal="regression-check")
 
@@ -145,8 +61,8 @@ def test_verify_package_records_agent_provenance(tmp_path):
 def test_semantic_diff_reports_manifest_and_semantic_changes(tmp_path):
     left_dir = tmp_path / "pto_pkg"
     right_dir = tmp_path / "nvgpu_pkg"
-    compile_program(package_dir=left_dir, target="pto-a2a3sim", program=_vector_add_program())
-    compile_program(package_dir=right_dir, target="nvgpu-ampere", program=_matmul_program())
+    compile_program(package_dir=left_dir, target="pto-a2a3sim", program=pto_vector_dag_program())
+    compile_program(package_dir=right_dir, target="nvgpu-ampere", program=nvgpu_serving_program())
 
     diff = semantic_diff(left_dir, right_dir)
 
@@ -170,8 +86,8 @@ def test_semantic_diff_reports_manifest_and_semantic_changes(tmp_path):
 def test_semantic_diff_reports_pass_trace_refs(tmp_path):
     left_dir = tmp_path / "left_pkg"
     right_dir = tmp_path / "right_pkg"
-    compile_program(package_dir=left_dir, target="pto-a2a3sim", program=_vector_add_program())
-    compile_program(package_dir=right_dir, target="pto-a2a3sim", program=_vector_add_program())
+    compile_program(package_dir=left_dir, target="pto-a2a3sim", program=pto_vector_dag_program())
+    compile_program(package_dir=right_dir, target="pto-a2a3sim", program=pto_vector_dag_program())
     trace_path = right_dir / "ir" / "pass_trace.jsonl"
     trace_path.write_text(trace_path.read_text() + json.dumps({"schema": "htp.pass_trace_event.v1"}) + "\n")
 
@@ -387,8 +303,8 @@ def test_workflow_state_reports_branch_task_and_policy(tmp_path, monkeypatch):
 def test_bisect_stages_reports_first_divergent_stage(tmp_path):
     left_dir = tmp_path / "left_pkg"
     right_dir = tmp_path / "right_pkg"
-    compile_program(package_dir=left_dir, target="nvgpu-ampere", program=_vector_add_program())
-    compile_program(package_dir=right_dir, target="nvgpu-ampere", program=_vector_add_program())
+    compile_program(package_dir=left_dir, target="nvgpu-ampere", program=pto_vector_dag_program())
+    compile_program(package_dir=right_dir, target="nvgpu-ampere", program=pto_vector_dag_program())
     manifest = json.loads((right_dir / "manifest.json").read_text())
     current_stage = manifest["stages"]["current"]
     kernel_ir_path = (
@@ -411,7 +327,7 @@ def test_bisect_stages_reports_first_divergent_stage(tmp_path):
 
 def test_minimize_package_keeps_prefix_through_selected_stage(tmp_path):
     package_dir = tmp_path / "nvgpu_pkg"
-    compile_program(package_dir=package_dir, target="nvgpu-ampere", program=_matmul_program())
+    compile_program(package_dir=package_dir, target="nvgpu-ampere", program=nvgpu_serving_program())
 
     minimized_dir = tmp_path / "minimized"
     result = minimize_package(package_dir, minimized_dir, stage_id="s03")

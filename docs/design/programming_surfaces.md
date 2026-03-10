@@ -255,6 +255,33 @@ This is intentionally closer to the public feel of the `references/pypto/`,
 `references/arknife/`, and LittleKernel authoring examples, while still
 lowering into the shared HTP semantic substrate.
 
+## Implemented testing baseline
+
+The repository now applies the same human-first standard to the high-level test
+suite, not only to example code. Shared authored programs live in
+`tests/programs.py` and intentionally reuse public surfaces from
+`examples/`:
+
+- `examples/pto_pypto_vector_dag/demo.py`
+- `examples/serving_routine/demo.py`
+- `examples/wsp_littlekernel_pipelined_gemm/demo.py`
+- `examples/csp_channel_pipeline/demo.py`
+
+High-level compiler, solver, CLI, and tool tests now consume those authored
+programs instead of rebuilding tiny vector-add or one-op matmul payload dicts
+in each file. That matters for two reasons:
+
+1. the tests now defend the real public programming experience rather than only
+   proving that minimal payload plumbing still works
+2. the readability bar from `references/pypto/`, `references/arknife/`, and
+   LittleKernel is enforced continuously by regression coverage, not only by
+   occasional manual example review
+
+Raw payload dicts are still allowed in low-level backend or malformed-contract
+tests when the raw artifact shape is the actual subject under test. The rule is
+that public/high-level tests should default to authored Python surfaces, while
+payload dicts stay reserved for contract-directed edge cases.
+
 ## Implemented feature inventory
 
 Code-backed example families currently include:

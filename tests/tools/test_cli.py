@@ -5,47 +5,7 @@ import json
 from htp.__main__ import main
 from htp.compiler import compile_program
 from htp.pipeline.defaults import MANDATORY_PASS_IDS
-
-
-def _vector_add_program() -> dict[str, object]:
-    return {
-        "entry": "vector_add",
-        "kernel": {
-            "name": "vector_add",
-            "args": [
-                {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-                {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-                {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
-                {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
-            ],
-            "ops": [
-                {
-                    "op": "elementwise_binary",
-                    "operator": "add",
-                    "lhs": "lhs",
-                    "rhs": "rhs",
-                    "out": "out",
-                    "shape": ["size"],
-                    "dtype": "f32",
-                }
-            ],
-        },
-        "workload": {
-            "entry": "vector_add",
-            "tasks": [
-                {
-                    "task_id": "task0",
-                    "kind": "kernel_call",
-                    "kernel": "vector_add",
-                    "args": ["lhs", "rhs", "out", "size"],
-                }
-            ],
-            "channels": [],
-            "dependencies": [],
-        },
-        "analysis": {},
-        "package": {"emitted": False},
-    }
+from tests.programs import pto_vector_dag_program
 
 
 def test_cli_explain_emits_json(capsys):
@@ -60,7 +20,7 @@ def test_cli_explain_emits_json(capsys):
 
 def test_cli_verify_emits_json_report(tmp_path, capsys):
     package_dir = tmp_path / "pto_pkg"
-    compile_program(package_dir=package_dir, target="pto-a2a3sim", program=_vector_add_program())
+    compile_program(package_dir=package_dir, target="pto-a2a3sim", program=pto_vector_dag_program())
 
     exit_code = main(["verify", str(package_dir), "--goal", "cli-check"])
 
@@ -73,8 +33,8 @@ def test_cli_verify_emits_json_report(tmp_path, capsys):
 def test_cli_bisect_emits_json(tmp_path, capsys):
     left_dir = tmp_path / "left_pkg"
     right_dir = tmp_path / "right_pkg"
-    compile_program(package_dir=left_dir, target="nvgpu-ampere", program=_vector_add_program())
-    compile_program(package_dir=right_dir, target="nvgpu-ampere", program=_vector_add_program())
+    compile_program(package_dir=left_dir, target="nvgpu-ampere", program=pto_vector_dag_program())
+    compile_program(package_dir=right_dir, target="nvgpu-ampere", program=pto_vector_dag_program())
     manifest = json.loads((right_dir / "manifest.json").read_text())
     current_stage = manifest["stages"]["current"]
     kernel_ir_path = (
@@ -98,7 +58,7 @@ def test_cli_bisect_emits_json(tmp_path, capsys):
 
 def test_cli_minimize_emits_json(tmp_path, capsys):
     package_dir = tmp_path / "pto_pkg"
-    compile_program(package_dir=package_dir, target="pto-a2a3sim", program=_vector_add_program())
+    compile_program(package_dir=package_dir, target="pto-a2a3sim", program=pto_vector_dag_program())
     output_dir = tmp_path / "minimized"
 
     exit_code = main(["minimize", str(package_dir), str(output_dir), "--stage", "s03"])
@@ -111,7 +71,7 @@ def test_cli_minimize_emits_json(tmp_path, capsys):
 
 def test_cli_promote_plan_emits_json(tmp_path, capsys):
     package_dir = tmp_path / "pto_pkg"
-    compile_program(package_dir=package_dir, target="pto-a2a3sim", program=_vector_add_program())
+    compile_program(package_dir=package_dir, target="pto-a2a3sim", program=pto_vector_dag_program())
 
     exit_code = main(["promote-plan", str(package_dir)])
 
