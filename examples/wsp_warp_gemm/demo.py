@@ -23,19 +23,42 @@ def warp_mainloop_tile(
     a_shared = async_copy(A, dtype="f32", memory_space="shared")
     b_shared = async_copy(B, dtype="f32", memory_space="shared")
     barrier()
-    accum = mma(a_shared, b_shared, m=M, n=N, k=K, dtype="f32")
-    store(C, accum)
+    accum0 = mma(a_shared, b_shared, m=M, n=N, k=K, dtype="f32")
+    accum1 = mma(a_shared, b_shared, m=M, n=N, k=K, dtype="f32")
+    store(C, accum0 + accum1)
 
 
 @wsp_program(target="nvgpu-ampere", kernel=warp_mainloop_tile)
 def warp_gemm(w) -> None:
-    (
-        w.launch(warp_mainloop_tile, "A", "B", "C", "M", "N", "K", task_id="gemm_main")
+    load_tiles = (
+        w.launch(warp_mainloop_tile, "A", "B", "C", "M", "N", "K", task_id="load_tiles")
+        .role("producer")
         .tile(block=(64, 128, 32))
         .bind(grid="block", lane="warp")
         .pipeline(depth=3, buffering="double")
         .resources(num_warps=4)
-        .specialize(operator="tensor_core_mainloop", stage_plan="async_copy->mma->store")
+        .prologue("cp_async(A->shared)", "cp_async(B->shared)")
+    )
+    mma_tiles = (
+        w.mainloop(warp_mainloop_tile, "A", "B", "C", "M", "N", "K", task_id="mma_tiles")
+        .after(load_tiles)
+        .tile(block=(64, 128, 32))
+        .bind(grid="block", lane="warp")
+        .pipeline(depth=3, buffering="double")
+        .resources(num_warps=4)
+        .role("consumer")
+        .steady("barrier", "mma_sync", "accumulate")
+    )
+    (
+        w.launch(warp_mainloop_tile, "A", "B", "C", "M", "N", "K", task_id="store_tiles")
+        .after(mma_tiles)
+        .tile(block=(64, 128, 32))
+        .bind(grid="block", lane="warp")
+        .pipeline(depth=3, buffering="double")
+        .resources(num_warps=4)
+        .role("epilogue")
+        .epilogue("store(C)")
+        .specialize(operator="tensor_core_mainloop", stage_plan="load_tiles->mma_tiles->store_tiles")
     )
 
 
@@ -58,12 +81,14 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
     stage_id = session.manifest["stages"]["current"]
     result = session.replay(stage_id, trace="basic")
     schedule = json.loads((package_dir / "ir" / "stages" / stage_id / "schedule.json").read_text())
+    workload_ir = json.loads((package_dir / "ir" / "stages" / stage_id / "workload_ir.json").read_text())
     return {
         "ok": result.ok,
         "stage_id": stage_id,
         "entry": result.entry,
         "diagnostics": result.diagnostics,
         "schedule": schedule,
+        "workload_ir": workload_ir,
     }
 
 

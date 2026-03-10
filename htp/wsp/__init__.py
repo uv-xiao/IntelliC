@@ -34,25 +34,33 @@ def task(
     *args: str | KernelValue,
     task_id: str | None = None,
     kind: str = "kernel_call",
+    attrs: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kernel_name = kernel.name if isinstance(kernel, KernelSpec) else str(kernel)
     resolved_task_id = task_id or f"{kernel_name}_0"
-    return {
+    payload = {
         "task_id": resolved_task_id,
         "kind": kind,
         "kernel": kernel_name,
         "args": [_ref(arg) for arg in args],
     }
+    if attrs:
+        payload["attrs"] = dict(attrs)
+    return payload
 
 
 def workload(
-    *, entry: str, tasks: Sequence[Mapping[str, Any]], channels: Sequence[Mapping[str, Any]] = ()
+    *,
+    entry: str,
+    tasks: Sequence[Mapping[str, Any]],
+    channels: Sequence[Mapping[str, Any]] = (),
+    dependencies: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     return {
         "entry": entry,
         "tasks": [dict(item) for item in tasks],
         "channels": [dict(item) for item in channels],
-        "dependencies": [],
+        "dependencies": [dict(item) for item in dependencies],
     }
 
 
@@ -154,9 +162,18 @@ class WSPBuilder:
         *args: str | KernelValue,
         task_id: str | None = None,
         kind: str = "kernel_call",
-    ) -> WSPBuilder:
-        self.tasks.append(task(kernel, *args, task_id=task_id, kind=kind))
-        return self
+    ) -> WSPTaskBuilder:
+        spec = task(kernel, *args, task_id=task_id, kind=kind)
+        self.tasks.append(spec)
+        return WSPTaskBuilder(owner=self, spec=spec)
+
+    def mainloop(
+        self,
+        kernel: KernelSpec | str,
+        *args: str | KernelValue,
+        task_id: str | None = None,
+    ) -> WSPTaskBuilder:
+        return self.launch(kernel, *args, task_id=task_id, kind="wsp_mainloop").role("mainloop")
 
     def task(
         self,
@@ -164,7 +181,7 @@ class WSPBuilder:
         *args: str | KernelValue,
         task_id: str | None = None,
         kind: str = "kernel_call",
-    ) -> WSPBuilder:
+    ) -> WSPTaskBuilder:
         return self.launch(kernel, *args, task_id=task_id, kind=kind)
 
     def tile(self, *, block: tuple[int, int, int] | list[int]) -> WSPBuilder:
@@ -192,9 +209,97 @@ class WSPBuilder:
             entry=self.entry,
             target=self.target,
             kernel=self.kernel_spec.to_payload(),
-            workload=workload(entry=self.entry, tasks=self.tasks, channels=self.channels),
+            workload=workload(
+                entry=self.entry,
+                tasks=self.tasks,
+                channels=self.channels,
+                dependencies=self.dependencies,
+            ),
             schedule=self.schedule_state,
         ).to_program()
+
+
+@dataclass
+class WSPTaskBuilder:
+    """Fluent task handle for WSP programs.
+
+    The task handle keeps HTP on a single shared program model while letting
+    public WSP examples express producer/consumer roles, stage plans, and
+    dependencies in a more meaningful way.
+    """
+
+    owner: WSPBuilder
+    spec: dict[str, Any]
+
+    @property
+    def task_id(self) -> str:
+        return str(self.spec["task_id"])
+
+    def tile(self, *, block: tuple[int, int, int] | list[int]) -> WSPTaskBuilder:
+        tile_payload = tile(block=block)
+        self.owner.schedule_state["tile"] = tile_payload
+        self._task_schedule()["tile"] = dict(tile_payload)
+        return self
+
+    def bind(self, *, grid: str | None = None, lane: str | None = None) -> WSPTaskBuilder:
+        bind_payload = bind(grid=grid, lane=lane)
+        self.owner.schedule_state["bind"] = bind_payload
+        self._task_schedule()["bind"] = dict(bind_payload)
+        return self
+
+    def pipeline(self, *, depth: int, buffering: str = "double") -> WSPTaskBuilder:
+        pipeline_payload = pipeline(depth=depth, buffering=buffering)
+        self.owner.schedule_state["pipeline"] = pipeline_payload
+        self._task_schedule()["pipeline"] = dict(pipeline_payload)
+        return self
+
+    def resources(self, *, num_warps: int) -> WSPTaskBuilder:
+        resource_payload = resources(num_warps=num_warps)
+        self.owner.schedule_state["resources"] = resource_payload
+        self._task_schedule()["resources"] = dict(resource_payload)
+        return self
+
+    def specialize(self, *, operator: str, **attrs: Any) -> WSPTaskBuilder:
+        specialize_payload = specialize(operator=operator, **attrs)
+        self.owner.schedule_state["specialize"] = specialize_payload
+        self._task_schedule()["specialize"] = dict(specialize_payload)
+        return self
+
+    def role(self, name: str) -> WSPTaskBuilder:
+        self._attrs()["role"] = str(name)
+        return self
+
+    def after(self, other: str | WSPTaskBuilder) -> WSPTaskBuilder:
+        src = other if isinstance(other, str) else other.task_id
+        dependency = {"src": str(src), "dst": self.task_id}
+        if dependency not in self.owner.dependencies:
+            self.owner.dependencies.append(dependency)
+        return self
+
+    def stage(self, name: str, *steps: str) -> WSPTaskBuilder:
+        self._attrs().setdefault("stages", []).append(
+            {"name": str(name), "steps": [str(step) for step in steps]}
+        )
+        return self
+
+    def prologue(self, *steps: str) -> WSPTaskBuilder:
+        return self.stage("prologue", *steps)
+
+    def steady(self, *steps: str) -> WSPTaskBuilder:
+        return self.stage("steady", *steps)
+
+    def epilogue(self, *steps: str) -> WSPTaskBuilder:
+        return self.stage("epilogue", *steps)
+
+    def _attrs(self) -> dict[str, Any]:
+        attrs = self.spec.setdefault("attrs", {})
+        if not isinstance(attrs, dict):
+            attrs = {}
+            self.spec["attrs"] = attrs
+        return attrs
+
+    def _task_schedule(self) -> dict[str, Any]:
+        return self._attrs().setdefault("schedule", {})
 
 
 def program(
@@ -288,6 +393,7 @@ def _ref(value: str | KernelValue) -> str:
 
 __all__ = [
     "WSPBuilder",
+    "WSPTaskBuilder",
     "WSPProgramSpec",
     "bind",
     "pipeline",

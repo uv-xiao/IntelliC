@@ -44,24 +44,40 @@ def token_pipeline(p) -> None:
     tiles = p.fifo("tiles", dtype="f32", capacity=2)
     partials = p.fifo("partials", dtype="f32", capacity=1)
 
-    p.process(
-        "dispatch_tiles",
-        task_id="dispatch_tiles",
-        kernel=channel_stage,
-        args=("A", "B", "C", "M", "N", "K"),
-    ).put(tiles)
-    p.process(
-        "combine_tiles",
-        task_id="combine_tiles",
-        kernel=channel_stage,
-        args=("A", "B", "C", "M", "N", "K"),
-    ).get(tiles).put(partials)
-    p.process(
-        "writeback_tiles",
-        task_id="writeback_tiles",
-        kernel=channel_stage,
-        args=("A", "B", "C", "M", "N", "K"),
-    ).get(partials)
+    (
+        p.process(
+            "dispatch_tiles",
+            task_id="dispatch_tiles",
+            kernel=channel_stage,
+            args=("A", "B", "C", "M", "N", "K"),
+        )
+        .role("producer")
+        .put(tiles)
+        .compute("pack_tile", source="A")
+    )
+    (
+        p.process(
+            "combine_tiles",
+            task_id="combine_tiles",
+            kernel=channel_stage,
+            args=("A", "B", "C", "M", "N", "K"),
+        )
+        .role("router")
+        .get(tiles)
+        .compute("reduce_partials", channel="tiles")
+        .put(partials)
+    )
+    (
+        p.process(
+            "writeback_tiles",
+            task_id="writeback_tiles",
+            kernel=channel_stage,
+            args=("A", "B", "C", "M", "N", "K"),
+        )
+        .role("consumer")
+        .get(partials)
+        .compute("write_output", target="C")
+    )
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
@@ -83,12 +99,14 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
     stage_id = session.manifest["stages"]["current"]
     result = session.replay(stage_id, trace="basic")
     effects = json.loads((package_dir / "ir" / "stages" / stage_id / "effects.json").read_text())
+    workload_ir = json.loads((package_dir / "ir" / "stages" / stage_id / "workload_ir.json").read_text())
     return {
         "ok": result.ok,
         "stage_id": stage_id,
         "entry": result.entry,
         "diagnostics": result.diagnostics,
         "effects": effects,
+        "workload_ir": workload_ir,
     }
 
 

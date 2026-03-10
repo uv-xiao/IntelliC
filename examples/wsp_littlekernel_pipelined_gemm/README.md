@@ -2,12 +2,13 @@
 
 This example calibrates HTP's WSP schedule authoring against the
 LittleKernel-style pipelined GEMM story while keeping the kernel body and the
-schedule readable as plain Python.
+workload readable as plain Python.
 
 The example uses the fluent `@wsp.program(...)` builder and a double-buffered
-mainloop body with implicit staged temporaries so the public surface shows
-pipeline intent directly instead of hiding it behind raw payload assembly or
-string-named scratch buffers.
+mainloop body with implicit staged temporaries, but the more important change
+is above the kernel body: the example now expresses prefetch, steady-state, and
+writeback as separate workload tasks with explicit stage plans and dependency
+edges.
 
 Run:
 

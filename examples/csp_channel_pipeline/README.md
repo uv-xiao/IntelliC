@@ -6,9 +6,11 @@ pipeline.
 It proves three implemented contracts:
 
 - CSP process/channel metadata lowers into typed workload and effect state through a decorator/builder surface instead of direct dict assembly.
-- the example can express a multi-channel dispatch/combine/writeback protocol with named processes, capacities, and typed receive/broadcast temporaries,
-- Balanced channel obligations are recorded in staged `effects.json`.
-- The final package remains replayable in `sim`.
+- the example now carries explicit `producer`, `router`, and `consumer`
+  process roles plus named protocol-local compute steps.
+- balanced channel obligations and deadlock-safety evidence are recorded in
+  staged `effects.json`.
+- process-local protocol steps remain visible in staged `workload_ir.json`.
 
 Run:
 

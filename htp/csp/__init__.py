@@ -57,6 +57,7 @@ def process(
     puts: Sequence[Mapping[str, Any]] = (),
     gets: Sequence[Mapping[str, Any]] = (),
     steps: Sequence[Mapping[str, Any]] = (),
+    role: str | None = None,
 ) -> dict[str, Any]:
     normalized_steps = [dict(item) for item in steps]
     if normalized_steps:
@@ -65,7 +66,7 @@ def process(
     else:
         derived_puts = [dict(item) for item in puts]
         derived_gets = [dict(item) for item in gets]
-    return {
+    payload = {
         "name": str(name),
         "task_id": str(task_id),
         "kernel": kernel.name if isinstance(kernel, KernelSpec) else str(kernel),
@@ -74,6 +75,9 @@ def process(
         "gets": derived_gets,
         **({"steps": normalized_steps} if normalized_steps else {}),
     }
+    if role is not None:
+        payload["role"] = str(role)
+    return payload
 
 
 @dataclass(frozen=True)
@@ -100,6 +104,10 @@ class CSPProgramSpec:
 class CSPProcessBuilder:
     spec: dict[str, Any]
 
+    def role(self, name: str) -> CSPProcessBuilder:
+        self.spec["role"] = str(name)
+        return self
+
     def put(self, channel: str | ChannelRef, *, count: int = 1) -> CSPProcessBuilder:
         self.spec.setdefault("steps", []).append(put(channel, count=count))
         self.spec["puts"] = [dict(item) for item in self.spec["steps"] if str(item.get("kind")) == "put"]
@@ -108,6 +116,16 @@ class CSPProcessBuilder:
     def get(self, channel: str | ChannelRef, *, count: int = 1) -> CSPProcessBuilder:
         self.spec.setdefault("steps", []).append(get(channel, count=count))
         self.spec["gets"] = [dict(item) for item in self.spec["steps"] if str(item.get("kind")) == "get"]
+        return self
+
+    def compute(self, name: str, **attrs: Any) -> CSPProcessBuilder:
+        self.spec.setdefault("steps", []).append(
+            {
+                "kind": "compute",
+                "name": str(name),
+                **{key: value for key, value in attrs.items()},
+            }
+        )
         return self
 
 

@@ -34,13 +34,12 @@ This document tracks the remaining gap between today’s authoring surfaces and 
 
 This topic is currently closed as a standalone surface gap. The public surface
 and examples are materially stronger: PTO examples cover vector add, SwiGLU,
-GELU, and a broader arithmetic DAG; WSP/CSP public examples use
-decorator/builder authoring instead of direct dict assembly; the
-LittleKernel-calibrated WSP and CSP examples carry richer staged intent than a
-single `store(C, A @ B)` body; and the completed LittleKernel comparison has
-already driven one more surface pass by making staged data-movement and
-protocol-style ops return typed temporaries instead of forcing string scratch
-names.
+GELU, and a broader arithmetic DAG; WSP public examples now carry explicit
+producer/mainloop/epilogue task roles plus stage plans; CSP public examples now
+carry explicit process roles and named protocol-local compute steps; and the
+completed LittleKernel comparison has already driven multiple surface passes by
+removing string scratch naming and by turning task/process structure into
+staged workload evidence.
 
 Future surface work now belongs to the adjacent semantic and backend layers,
 not to a standalone programming-surface comparison gap.

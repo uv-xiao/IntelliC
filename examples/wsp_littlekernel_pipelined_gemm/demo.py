@@ -23,24 +23,47 @@ def pipelined_mainloop_gemm(
     a_stage0 = async_copy(A, dtype="f32", memory_space="shared")
     b_stage0 = async_copy(B, dtype="f32", memory_space="shared")
     barrier()
-    mma(a_stage0, b_stage0, out="accum0", m=M, n=N, k=K, dtype="f32")
+    accum0 = mma(a_stage0, b_stage0, m=M, n=N, k=K, dtype="f32")
 
     a_stage1 = async_copy(A, dtype="f32", memory_space="shared")
     b_stage1 = async_copy(B, dtype="f32", memory_space="shared")
     barrier()
     accum1 = mma(a_stage1, b_stage1, m=M, n=N, k=K, dtype="f32")
-    store(C, accum1)
+    store(C, accum0 + accum1)
 
 
 @wsp_program(target="nvgpu-ampere", kernel=pipelined_mainloop_gemm)
 def littlekernel_pipelined_gemm(w) -> None:
-    (
-        w.launch(pipelined_mainloop_gemm, "A", "B", "C", "M", "N", "K", task_id="tile_main")
+    prefetch_tiles = (
+        w.launch(pipelined_mainloop_gemm, "A", "B", "C", "M", "N", "K", task_id="prefetch_tiles")
+        .role("producer")
         .tile(block=(128, 256, 64))
         .bind(grid="block", lane="warp")
         .pipeline(depth=3, buffering="double")
         .resources(num_warps=8)
-        .specialize(operator="pipelined_mainloop", stage_plan="load0->mma0->load1->mma1")
+        .prologue("cp_async(stage0:A)", "cp_async(stage0:B)", "cp_async(stage1:A)", "cp_async(stage1:B)")
+    )
+    steady_tiles = (
+        w.mainloop(pipelined_mainloop_gemm, "A", "B", "C", "M", "N", "K", task_id="steady_tiles")
+        .after(prefetch_tiles)
+        .tile(block=(128, 256, 64))
+        .bind(grid="block", lane="warp")
+        .pipeline(depth=3, buffering="double")
+        .resources(num_warps=8)
+        .role("consumer")
+        .prologue("ldmatrix(stage0)", "ldmatrix(stage1)")
+        .steady("mma_sync(stage0)", "mma_sync(stage1)", "advance_pipeline")
+    )
+    (
+        w.launch(pipelined_mainloop_gemm, "A", "B", "C", "M", "N", "K", task_id="writeback_tiles")
+        .after(steady_tiles)
+        .tile(block=(128, 256, 64))
+        .bind(grid="block", lane="warp")
+        .pipeline(depth=3, buffering="double")
+        .resources(num_warps=8)
+        .role("epilogue")
+        .epilogue("store(C)")
+        .specialize(operator="pipelined_mainloop", stage_plan="prefetch_tiles->steady_tiles->writeback_tiles")
     )
 
 
@@ -63,12 +86,14 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
     stage_id = session.manifest["stages"]["current"]
     result = session.replay(stage_id, trace="basic")
     schedule = json.loads((package_dir / "ir" / "stages" / stage_id / "schedule.json").read_text())
+    workload_ir = json.loads((package_dir / "ir" / "stages" / stage_id / "workload_ir.json").read_text())
     return {
         "ok": result.ok,
         "stage_id": stage_id,
         "entry": result.entry,
         "diagnostics": result.diagnostics,
         "schedule": schedule,
+        "workload_ir": workload_ir,
     }
 
 
