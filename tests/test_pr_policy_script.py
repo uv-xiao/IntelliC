@@ -28,3 +28,32 @@ def test_does_not_require_todo_sync_for_unrelated_changes():
     assert module._requires_todo_sync(["README.md"]) is False
     assert module._requires_todo_sync(["docs/todo/README.md"]) is False
     assert module._requires_todo_sync(["docs/todo/compiler_model.md"]) is False
+
+
+def test_agent_policy_requires_corridor_docs_and_tests():
+    module = _load_module()
+
+    report = module.evaluate_edit_policy(["htp/agent_policy.py"])
+
+    assert report["ok"] is False
+    assert "tests/tools" in report["missing_required_tests"]
+    assert "docs/design/agent_product_and_workflow.md" in report["missing_required_docs"]
+
+
+def test_agent_policy_passes_when_workflow_corridor_is_satisfied():
+    module = _load_module()
+
+    report = module.evaluate_edit_policy(
+        [
+            "htp/agent_policy.py",
+            "htp/tools.py",
+            "tests/tools/test_tools.py",
+            "tests/test_pr_policy_script.py",
+            "docs/design/agent_product_and_workflow.md",
+            "docs/todo/README.md",
+            "AGENTS.md",
+        ]
+    )
+
+    assert report["ok"] is True
+    assert [template["name"] for template in report["active_templates"]] == ["agent_workflow"]

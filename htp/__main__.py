@@ -1,3 +1,5 @@
+"""CLI entrypoints for HTP package and workflow tooling."""
+
 from __future__ import annotations
 
 import argparse
@@ -8,10 +10,12 @@ from htp.tools import (
     bisect_stages,
     explain_diagnostic,
     minimize_package,
+    policy_check,
     promotion_plan,
     replay_package,
     semantic_diff,
     verify_package,
+    workflow_state,
 )
 
 
@@ -59,6 +63,14 @@ def build_parser() -> argparse.ArgumentParser:
     promote_parser.add_argument("--golden")
     promote_parser.add_argument("--perf-baseline")
     promote_parser.add_argument("--policy")
+
+    policy_parser = subparsers.add_parser("policy-check")
+    policy_parser.add_argument("changed_files", nargs="*")
+    policy_parser.add_argument("--policy")
+
+    workflow_parser = subparsers.add_parser("workflow-state")
+    workflow_parser.add_argument("--repo-root", default=".")
+    workflow_parser.add_argument("--policy")
     return parser
 
 
@@ -120,6 +132,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(json.dumps(result, indent=2))
         return 0 if result["allowed"] else 1
+    if args.command == "policy-check":
+        result = policy_check(args.changed_files, policy_path=args.policy)
+        print(json.dumps(result, indent=2))
+        return 0 if result["ok"] else 1
+    if args.command == "workflow-state":
+        result = workflow_state(args.repo_root, policy_path=args.policy)
+        print(json.dumps(result, indent=2))
+        return 0 if result["policy_check"]["ok"] else 1
     parser.error(f"Unhandled command: {args.command}")
     return 2
 
