@@ -44,13 +44,4 @@ def test_design_tree_has_only_supported_top_level_entries():
 def test_todo_tree_has_only_supported_top_level_entries():
     todo_root = Path("docs/todo")
     entries = {path.name for path in todo_root.iterdir()}
-    assert entries == {
-        "README.md",
-        "agent_product_and_workflow.md",
-        "artifacts_replay_debug.md",
-        "backends_and_extensions.md",
-        "compiler_model.md",
-        "pipeline_and_solver.md",
-        "programming_surfaces.md",
-        "retargetable_extensibility_report.md",
-    }
+    assert entries == {"README.md"}

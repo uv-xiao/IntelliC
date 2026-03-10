@@ -58,6 +58,6 @@ co-located with the code it explains.
 
 ## Out of scope for this tree
 
-- unimplemented or partial future work → `docs/todo/`
 - active feature tasks → `docs/in_progress/`
+- future work staging area → `docs/todo/README.md`
 - references and research corpora → `docs/reference/`, `docs/research/`

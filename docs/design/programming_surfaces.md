@@ -363,9 +363,8 @@ semantic root.
 
 ## Current limits
 
-The remaining surface work is no longer about basic readability. It is about
-broader loop / region authoring, richer scratch-memory declarations, and
-continuing to raise flagship examples toward the best reference examples. The
-next gaps live in `docs/todo/compiler_model.md` and
-`docs/todo/backends_and_extensions.md`, not in a separate programming-surface
-comparison TODO anymore.
+The basic programming-surface gap is closed. Further surface work, if reopened,
+should be driven by a concrete new feature rather than by a standing repository
+TODO. Any such work should first be reintroduced through `docs/todo/README.md`
+and then implemented on top of the same native Python authoring rules described
+here.

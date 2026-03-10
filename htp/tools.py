@@ -1,12 +1,15 @@
+"""User-facing package and workflow tools for replay, verification, and policy checks."""
+
 from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from htp.agent_policy import load_agent_policy
+from htp.agent_policy import evaluate_edit_policy, load_agent_policy
 from htp.bindings import bind
 from htp.bindings.base import ReplayResult
 from htp.bindings.validate import load_manifest
@@ -87,7 +90,10 @@ def verify_package(
         },
         "policy": policy,
     }
+    report["promotion_bundle"] = _promotion_bundle(report)
     report["promotion"] = promotion_plan_from_report(report)
+    workflow_report_path = _write_workflow_report(package_path, report)
+    report["evidence"]["workflow_report"] = workflow_report_path
     _record_agent_provenance(package_path, goal=goal, report=report)
     return report
 
@@ -191,6 +197,49 @@ def promotion_plan(
         policy_path=policy_path,
     )
     return report["promotion"]
+
+
+def policy_check(
+    changed_files: list[str] | tuple[str, ...],
+    *,
+    policy_path: Path | str | None = None,
+) -> dict[str, Any]:
+    """Evaluate a changed-file set against the configured agent workflow policy."""
+    policy = load_agent_policy(policy_path)
+    evaluation = evaluate_edit_policy(changed_files, policy)
+    return {
+        "ok": evaluation["ok"],
+        "policy": policy,
+        "evaluation": evaluation,
+    }
+
+
+def workflow_state(
+    repo_root: Path | str = ".",
+    *,
+    policy_path: Path | str | None = None,
+) -> dict[str, Any]:
+    """Summarize the local repository workflow state and active policy obligations."""
+    root = Path(repo_root)
+    resolved_policy_path = Path(policy_path) if policy_path is not None else root / "agent_policy.toml"
+    policy = load_agent_policy(resolved_policy_path)
+    branch = _git_output(["git", "branch", "--show-current"], cwd=root).strip()
+    changed_files = _git_lines(["git", "status", "--short"], cwd=root)
+    changed_paths = [line.split(maxsplit=1)[1] for line in changed_files if len(line.split(maxsplit=1)) == 2]
+    task_files = sorted(
+        path.name
+        for path in (root / "docs" / "in_progress").glob("*.md")
+        if path.name != "README.md" and path.name != "TEMPLATE.md"
+    )
+    base_changed = _git_lines(["git", "diff", "--name-only", "origin/htp/dev...HEAD"], cwd=root)
+    policy_evaluation = evaluate_edit_policy(base_changed, policy)
+    return {
+        "branch": branch,
+        "dirty_files": changed_paths,
+        "active_task_files": task_files,
+        "todo_sync_required": _todo_sync_required(base_changed),
+        "policy_check": policy_evaluation,
+    }
 
 
 def bisect_stages(
@@ -307,6 +356,7 @@ def _record_agent_provenance(package_dir: Path, *, goal: str, report: dict[str, 
             "decision_trace": report.get("decision_trace", []),
             "attempted_candidates": report.get("attempted_candidates", []),
             "rejected_candidates": report.get("rejected_candidates", []),
+            "promotion_bundle": dict(report.get("promotion_bundle", {})),
             "promotion": dict(report.get("promotion", {})),
         }
     )
@@ -369,12 +419,10 @@ def _summarize_difference(left: Any, right: Any) -> dict[str, Any]:
 
 
 def promotion_plan_from_report(report: dict[str, Any]) -> dict[str, Any]:
-    policy = report.get("policy", {})
-    agent_policy = policy.get("agent", {}) if isinstance(policy, dict) else {}
-    required_gates = tuple(agent_policy.get("required_gates", ()))
-    failed_required = [gate for gate in required_gates if not bool(report.get("gates", {}).get(gate))]
-    mode = str(agent_policy.get("promotion_mode", "pr"))
-    allowed = not failed_required and bool(report.get("ok"))
+    bundle = report.get("promotion_bundle", {})
+    failed_required = list(bundle.get("failed_required_gates", ()))
+    mode = str(bundle.get("mode", report.get("policy", {}).get("agent", {}).get("promotion_mode", "pr")))
+    allowed = bool(bundle.get("allowed", False))
     return {
         "mode": mode,
         "allowed": allowed,
@@ -382,6 +430,54 @@ def promotion_plan_from_report(report: dict[str, Any]) -> dict[str, Any]:
         "next_action": mode if allowed else "hold",
         "reason": "all_required_gates_passed" if allowed else "required_gates_failed",
     }
+
+
+def _promotion_bundle(report: dict[str, Any]) -> dict[str, Any]:
+    policy = report.get("policy", {})
+    agent_policy = policy.get("agent", {}) if isinstance(policy, dict) else {}
+    required_gates = tuple(str(item) for item in agent_policy.get("required_gates", ()))
+    gates = report.get("gates", {})
+    failed_required = [gate for gate in required_gates if not bool(gates.get(gate))]
+    return {
+        "mode": str(agent_policy.get("promotion_mode", "pr")),
+        "required_gates": list(required_gates),
+        "passed_required_gates": [gate for gate in required_gates if gate not in failed_required],
+        "failed_required_gates": failed_required,
+        "optional_gates": sorted(key for key in gates if key not in required_gates),
+        "allowed": not failed_required and bool(report.get("ok")),
+    }
+
+
+def _write_workflow_report(package_dir: Path, report: dict[str, Any]) -> str:
+    agent_dir = package_dir / "agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    relpath = "agent/workflow_report.json"
+    payload = {
+        "schema": "htp.agent.workflow_report.v1",
+        "gates": dict(report.get("gates", {})),
+        "promotion_bundle": dict(report.get("promotion_bundle", {})),
+        "promotion": dict(report.get("promotion", {})),
+    }
+    (package_dir / relpath).write_text(json.dumps(payload, indent=2) + "\n")
+    return relpath
+
+
+def _git_output(cmd: list[str], *, cwd: Path) -> str:
+    completed = subprocess.run(cmd, cwd=cwd, check=True, capture_output=True, text=True)
+    return completed.stdout
+
+
+def _git_lines(cmd: list[str], *, cwd: Path) -> list[str]:
+    try:
+        output = _git_output(cmd, cwd=cwd)
+    except subprocess.CalledProcessError:
+        return []
+    return [line.strip() for line in output.splitlines() if line.strip()]
+
+
+def _todo_sync_required(changed_files: list[str]) -> bool:
+    prefixes = ("htp/", "htp_ext/", "examples/", "docs/design/")
+    return any(path.startswith(prefix) for path in changed_files for prefix in prefixes)
 
 
 def _identity_aware_stage_diff(

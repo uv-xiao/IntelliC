@@ -9,10 +9,12 @@ from htp.tools import (
     bisect_stages,
     explain_diagnostic,
     minimize_package,
+    policy_check,
     promotion_plan,
     replay_package,
     semantic_diff,
     verify_package,
+    workflow_state,
 )
 from tests.conftest import copy_golden_fixture
 
@@ -129,7 +131,15 @@ def test_verify_package_records_agent_provenance(tmp_path):
         "target_suite": True,
     }
     assert manifest["extensions"]["agent"]["evidence"]["replay_log"] == report["evidence"]["replay_log"]
+    assert (
+        manifest["extensions"]["agent"]["evidence"]["workflow_report"]
+        == report["evidence"]["workflow_report"]
+    )
+    assert manifest["extensions"]["agent"]["promotion_bundle"]["required_gates"] == ["validate", "replay"]
     assert manifest["extensions"]["agent"]["promotion"]["allowed"] is True
+    workflow_report = json.loads((package_dir / report["evidence"]["workflow_report"]).read_text())
+    assert workflow_report["schema"] == "htp.agent.workflow_report.v1"
+    assert workflow_report["promotion_bundle"]["allowed"] is True
 
 
 def test_semantic_diff_reports_manifest_and_semantic_changes(tmp_path):
@@ -327,6 +337,51 @@ def test_promotion_plan_holds_when_required_gate_fails(tmp_path):
     assert plan["allowed"] is False
     assert plan["next_action"] == "hold"
     assert plan["failed_required_gates"] == ["golden_diff"]
+
+
+def test_policy_check_reports_missing_corridor_docs_and_tests():
+    result = policy_check(["htp/agent_policy.py"])
+
+    assert result["ok"] is False
+    assert "tests/tools" in result["evaluation"]["missing_required_tests"]
+    assert "docs/design/agent_product_and_workflow.md" in result["evaluation"]["missing_required_docs"]
+
+
+def test_workflow_state_reports_branch_task_and_policy(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "docs" / "in_progress").mkdir(parents=True)
+    (repo / "docs" / "in_progress" / "README.md").write_text("# in progress\n")
+    (repo / "docs" / "in_progress" / "TEMPLATE.md").write_text("# template\n")
+    (repo / "docs" / "in_progress" / "022-agent-workflow-closure.md").write_text("# task\n")
+
+    def _fake_output(cmd, *, cwd):
+        assert cwd == repo
+        if cmd == ["git", "branch", "--show-current"]:
+            return "htp/feat-agent-workflow-closure\n"
+        if cmd == ["git", "status", "--short"]:
+            return " M htp/tools.py\n?? docs/in_progress/022-agent-workflow-closure.md\n"
+        if cmd == ["git", "diff", "--name-only", "origin/htp/dev...HEAD"]:
+            return "\n".join(
+                [
+                    "htp/agent_policy.py",
+                    "tests/tools/test_tools.py",
+                    "tests/test_pr_policy_script.py",
+                    "docs/design/agent_product_and_workflow.md",
+                    "docs/todo/README.md",
+                    "AGENTS.md",
+                ]
+            )
+        raise AssertionError(cmd)
+
+    monkeypatch.setattr("htp.tools._git_output", _fake_output)
+
+    result = workflow_state(repo)
+
+    assert result["branch"] == "htp/feat-agent-workflow-closure"
+    assert result["active_task_files"] == ["022-agent-workflow-closure.md"]
+    assert result["todo_sync_required"] is True
+    assert result["policy_check"]["ok"] is True
 
 
 def test_bisect_stages_reports_first_divergent_stage(tmp_path):

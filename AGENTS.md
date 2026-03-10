@@ -9,7 +9,7 @@ This file is the operating contract for agents and contributors working in this 
 For every feature-sized change:
 
 1. start from `htp/dev`
-2. choose a feature-sized gap from `docs/todo/README.md` and the detailed broad topic docs under `docs/todo/`
+2. choose a feature-sized gap from `docs/todo/README.md`
 3. create a branch named `htp/feat-<topic>`
 4. create a task file under `docs/in_progress/` using `docs/in_progress/TEMPLATE.md`
 5. make that task-file creation its own first commit
@@ -17,7 +17,7 @@ For every feature-sized change:
 7. land implementation as additional commits on that PR
 8. before merge:
    - update `docs/design/` for what is now implemented
-   - update `docs/todo/README.md` and the affected `docs/todo/*.md`
+   - update `docs/todo/README.md` and any active `docs/todo/` feature file if one exists
    - remove the corresponding file from `docs/in_progress/`
    - rebase on current `htp/dev`
    - verify locally and wait for green CI
@@ -50,7 +50,7 @@ The `docs/` tree is strict.
 - `docs/todo/`
   - unimplemented or partial features only
   - `README.md` is the summary checklist for remaining feature work
-  - future layer documents live under `docs/todo/`
+  - detailed feature files appear here only while a concrete future gap is still open
 - `docs/in_progress/`
   - active feature-branch task files only
   - one file per feature PR

@@ -5,31 +5,32 @@ HTP is a Python-AST-centric compiler framework for heterogeneous tile programs, 
 The repository has three active responsibilities:
 - implement the current framework in `htp/` and `htp_ext/`
 - document landed behavior in `docs/design/`
-- track remaining and active feature work through `docs/todo/` and `docs/in_progress/`
+- track active feature work through `docs/in_progress/` and reopen `docs/todo/` only when new concrete gaps appear
 
 ## Repository status
 
 Implemented today:
 - staged replayable compilation artifacts under `ir/stages/`
 - shared semantic payloads for kernel/workload/types/layout/effects/schedule
-- registry-driven passes, pipeline templates, and solver preflight
-- WSP and CSP authoring surfaces
+- registry-driven passes, pipeline templates, solver preflight, and machine-visible pass traces
+- human-first programming surfaces for kernels, WSP, CSP, and Arknife-style NV-GPU annotation
 - MLIR CSE and AIE extension participation
 - PTO `a2a3sim` and `a2a3` contracts, NV-GPU CUDA profiling/Blackwell profile plans, AIE reference toolchain paths, and a CPU reference backend
-- agent-facing replay, verify, diff, explain, bisect, minimize, and promote-plan tooling
+- agent-facing replay, verify, diff, explain, bisect, minimize, promote-plan, policy-check, and workflow-state tooling
+- machine-enforced edit-corridor and PR policy checks
 
-Not finished yet:
-- broader semantic breadth, richer programming surfaces, deeper solver behavior, broader backend coverage, and fuller agent loops
-- the authoritative remaining work lives in `docs/todo/`
+Current TODO status:
+- `docs/todo/README.md` is fully closed at the moment
+- new future work should be reintroduced there only when it is concrete enough to justify a feature PR
 
 ## Documentation layout
 
 - `docs/story.md` — final intended framework story
-- `docs/design/` — implemented feature documents, examples, and code-backed architecture
-- `docs/todo/` — remaining feature documents and future work
+- `docs/design/` — implemented feature documents and code-backed architecture
+- `docs/todo/README.md` — current future-work summary, currently closed
 - `docs/in_progress/` — active feature-sized PR tasks
 - `docs/reference/` — references
-- `docs/research/` — research notes
+- `docs/research/` — research notes and supporting reports
 
 ## How to read the docs
 
@@ -43,10 +44,8 @@ Implemented architecture:
 - `docs/design/agent_product_and_workflow.md`
 - example-local walkthroughs under `examples/**/README.md`
 
-Remaining work:
-- `docs/todo/README.md`
-- `docs/todo/`
-- `docs/todo/retargetable_extensibility_report.md`
+Supporting analysis:
+- `docs/research/retargetable_extensibility_report.md`
 
 ## Usage
 
@@ -61,6 +60,8 @@ CLI surface:
 - `python -m htp explain <diagnostic-code>`
 - `python -m htp bisect <left> <right>`
 - `python -m htp minimize <package> <output-dir>`
+- `python -m htp policy-check <changed-file> ...`
+- `python -m htp workflow-state`
 
 ## Development environment
 
@@ -80,11 +81,11 @@ Fallback when Pixi is unavailable:
 `htp/dev` is the stable branch.
 
 Feature work must follow this loop:
-1. choose a feature-sized gap from `docs/todo/`
+1. if there is open future work, choose it from `docs/todo/README.md`
 2. create `htp/feat-<topic>`
 3. create a task file in `docs/in_progress/` as the first commit
 4. open a PR to `htp/dev`
 5. implement through more commits
-6. before merge, update `docs/design/`, update `docs/todo/`, and remove the task file from `docs/in_progress/`
+6. before merge, update `docs/design/`, update `docs/todo/README.md` if future-work state changed, and remove the task file from `docs/in_progress/`
 
 Repo-level operating rules live in `AGENTS.md`.

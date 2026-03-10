@@ -1,7 +1,15 @@
+"""Enforce repository PR workflow policy on pull_request events."""
+
 from __future__ import annotations
 
 import os
 import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from htp.agent_policy import evaluate_edit_policy, load_agent_policy
 
 REQUIRED_BASE = "htp/dev"
 REQUIRED_PREFIX = "htp/feat-"
@@ -28,6 +36,21 @@ def main() -> int:
     if _requires_todo_sync(changed_files):
         if SUMMARY_PATH not in changed_files:
             errors.append(f"Changes touching {', '.join(SYNC_PREFIXES)} must also update '{SUMMARY_PATH}'.")
+    policy_report = evaluate_edit_policy(changed_files, load_agent_policy())
+    for path in policy_report["root_violations"]:
+        errors.append(f"Changed path '{path}' is outside the allowed agent edit roots.")
+    if policy_report["missing_required_tests"]:
+        errors.append(
+            "Active edit corridors are missing required tests: "
+            + ", ".join(policy_report["missing_required_tests"])
+            + "."
+        )
+    if policy_report["missing_required_docs"]:
+        errors.append(
+            "Active edit corridors are missing required docs: "
+            + ", ".join(policy_report["missing_required_docs"])
+            + "."
+        )
 
     if errors:
         for error in errors:
