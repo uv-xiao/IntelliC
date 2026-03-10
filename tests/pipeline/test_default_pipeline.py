@@ -72,6 +72,13 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
         for relpath in stage["semantic"].values():
             assert (package_dir / relpath).exists(), relpath
 
+    current_stage = next(stage for stage in stage_graph if stage["id"] == result.current_stage)
+    program_text = (package_dir / current_stage["runnable_py"]["program_py"]).read_text()
+    assert '"""Readable staged Python snapshot for HTP replay and debugging."""' in program_text
+    assert "ENTRY = " in program_text
+    assert "KERNEL = (" in program_text
+    assert "PROGRAM_STATE = {" in program_text
+
     trace_lines = (package_dir / "ir" / "pass_trace.jsonl").read_text().strip().splitlines()
     trace_events = [json.loads(line) for line in trace_lines]
     assert [event["pass_id"] for event in trace_events] == list(MANDATORY_PASS_IDS)
