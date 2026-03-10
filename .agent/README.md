@@ -11,7 +11,7 @@ Read in this order:
 The repo-wide default contract lives in `AGENTS.md`.
 
 Operational intent:
-- choose work from `docs/todo/README.md` and `docs/todo/`
+- choose work from `docs/todo/README.md`
 - track active feature branches in `docs/in_progress/`
 - document landed behavior in `docs/design/`
 - keep Python AST canonical and replayable in `sim`

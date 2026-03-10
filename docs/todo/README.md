@@ -1,27 +1,23 @@
 # HTP TODO
 
-`docs/todo/` tracks the part of HTP that is not finished yet.
+`docs/todo/` tracks feature work that is still open.
 
-This tree is organized as direct TODO feature documents. `README.md` gives the summary and completion statistics; the detailed remaining work lives in `docs/todo/` as a small number of broad topic files plus one research-backed report.
+## Current state
 
-## How to use this tree
+There are currently no open TODO feature documents in this repository.
 
-For feature work:
-1. choose one feature-sized gap from the summaries below
-2. read the relevant detailed TODO file under `docs/todo/`
-3. create a task file under `docs/in_progress/`
-4. open a feature PR from `htp/feat-*`
-5. move landed behavior into `docs/design/` before merge
+The previously tracked broad-topic gaps are now implemented and documented under `docs/design/`.
+New future work should re-enter this tree only when it is specific enough to justify a new feature-sized task and PR.
 
 ## Completion statistics
 
 ### Overall
 
 - total tracked TODO checklist items: 56
-- complete: 53
-- partial: 2
-- open: 1
-- completion ratio: about 95%
+- complete: 56
+- partial: 0
+- open: 0
+- completion ratio: 100%
 
 ### By topic
 
@@ -32,29 +28,16 @@ For feature work:
 | Pipeline and solver | 9 | 0 | 0 | 9 |
 | Artifacts, replay, debug | 8 | 0 | 0 | 8 |
 | Backends and extensions | 11 | 0 | 0 | 11 |
-| Agent product and workflow | 5 | 2 | 1 | 8 |
+| Agent product and workflow | 8 | 0 | 0 | 8 |
 
-## Feature summaries
+## How to use this tree when new work appears
 
-- `docs/todo/compiler_model.md`
-  - remaining work: no standalone open item; future semantic work now rolls into backend depth and agent workflow rather than a missing compiler-model substrate
-- `docs/todo/programming_surfaces.md`
-  - remaining work: no standalone open item; the latest pass landed richer WSP task roles/stage plans and CSP process roles/compute steps, so future surface work now rolls into richer semantics and backend depth
-- `docs/todo/pipeline_and_solver.md`
-  - remaining work: no standalone open item; future work now rolls into semantics, backends, and agent workflow rather than a separate solver-architecture gap
-- `docs/todo/artifacts_replay_debug.md`
-  - remaining work: no standalone open item; future replay work now rolls into compiler-model and backend-depth topics rather than a separate package/debug gap
-- `docs/todo/backends_and_extensions.md`
-  - remaining work: no standalone open item; backend depth now rolls into future semantic breadth and agent workflow rather than a missing backend substrate
-- `docs/todo/agent_product_and_workflow.md`
-  - remaining work: stronger autonomous loops and continued quality-discipline tightening
+1. add the new gap to this README
+2. if the work is broad enough, add a matching detailed TODO file under `docs/todo/`
+3. create a task file under `docs/in_progress/`
+4. implement the feature on `htp/feat-<topic>`
+5. move the landed behavior into `docs/design/` and clear the TODO entry before merge
 
-## Detailed remaining TODO files
+## Supporting analysis
 
-- `docs/todo/compiler_model.md`
-- `docs/todo/programming_surfaces.md`
-- `docs/todo/pipeline_and_solver.md`
-- `docs/todo/artifacts_replay_debug.md`
-- `docs/todo/backends_and_extensions.md`
-- `docs/todo/agent_product_and_workflow.md`
-- `docs/todo/retargetable_extensibility_report.md`
+- `docs/research/retargetable_extensibility_report.md`
