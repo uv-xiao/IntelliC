@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- none
+- `022-agent-workflow-closure.md` — PR `TBD`
