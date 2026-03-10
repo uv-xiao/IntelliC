@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any
 
 
@@ -44,6 +44,7 @@ class WorkloadTask:
     kernel: str
     args: tuple[str, ...]
     entity_id: str
+    attrs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

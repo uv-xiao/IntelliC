@@ -138,6 +138,7 @@ def build_semantic_model(
             kernel=str(task["kernel"]),
             args=tuple(str(name) for name in task.get("args", ())),
             entity_id=f"{entry}:E{len(args) + len(ops) + index}",
+            attrs=dict(task.get("attrs", {})) if isinstance(task.get("attrs"), Mapping) else {},
         )
         for index, task in enumerate(workload.get("tasks", ()))
     )
@@ -148,9 +149,13 @@ def build_semantic_model(
         dependencies=tuple(dict(dep) for dep in workload.get("dependencies", ())),
         processes=tuple(dict(item) for item in workload.get("processes", ())),
     )
+    workload_payload = {"schema": WORKLOAD_IR_SCHEMA_ID, **to_payload(workload_ir)}
+    for task in workload_payload.get("tasks", ()):
+        if isinstance(task, dict) and task.get("attrs") == {}:
+            task.pop("attrs", None)
     return (
         {"schema": KERNEL_IR_SCHEMA_ID, **to_payload(kernel_ir)},
-        {"schema": WORKLOAD_IR_SCHEMA_ID, **to_payload(workload_ir)},
+        workload_payload,
         _entities_payload(entry, args, ops, tasks),
         _bindings_payload(entry, args, ops, tasks),
     )
@@ -610,6 +615,7 @@ def _normalize_workload_surface(
                 "kind": str(task["kind"]),
                 "kernel": str(task["kernel"]),
                 "args": [str(name) for name in task.get("args", ())],
+                **({"attrs": dict(task.get("attrs", {}))} if isinstance(task.get("attrs"), Mapping) else {}),
             }
             for task in workload.get("tasks", ())
         ],
@@ -645,6 +651,20 @@ def _lower_csp_surface(entry: str, csp: Mapping[str, Any], kernel: object) -> di
             "kind": "process",
             "kernel": str(item.get("kernel", kernel_name)),
             "args": [str(arg) for arg in item.get("args", ())],
+            **(
+                {
+                    "attrs": {
+                        **({"role": str(item["role"])} if item.get("role") is not None else {}),
+                        **(
+                            {"steps": [dict(step) for step in item.get("steps", ())]}
+                            if item.get("steps")
+                            else {}
+                        ),
+                    }
+                }
+                if item.get("role") is not None or item.get("steps")
+                else {}
+            ),
         }
         for item in processes
     ]
@@ -1234,13 +1254,18 @@ def _next_protocol_states(
         step = process_steps[process_index][pointer]
         ready_steps.append((process_index, step))
         channel_name = str(step.get("channel", ""))
+        kind = str(step.get("kind", ""))
+        if kind not in {"get", "put"} or channel_name not in index_by_channel:
+            next_pointers = list(pointers)
+            next_pointers[process_index] += 1
+            next_states.append((tuple(next_pointers), used_slots))
+            continue
         if channel_name not in index_by_channel:
             continue
         channel_index = index_by_channel[channel_name]
         count = int(step.get("count", 1) or 1)
         used = used_slots[channel_index]
         capacity = int(capacities[channel_name])
-        kind = str(step.get("kind", ""))
         executable = False
         next_used = list(used_slots)
         if kind == "put" and used + count <= capacity:

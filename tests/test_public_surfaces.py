@@ -339,6 +339,55 @@ def test_wsp_program_surface_accepts_kernel_specs_and_task_helpers():
     assert payload["wsp"]["schedule"]["pipeline"]["depth"] == 2
 
 
+def test_wsp_mainloop_surface_carries_roles_dependencies_and_stage_plan():
+    @kernel
+    def gemm_tile(
+        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        tile_a = async_copy(A, dtype="f32", memory_space="shared")
+        tile_b = async_copy(B, dtype="f32", memory_space="shared")
+        barrier()
+        store(C, mma(tile_a, tile_b, m=M, n=N, k=K, dtype="f32"))
+
+    @wsp_program(target="nvgpu-ampere", kernel=gemm_tile)
+    def gemm_workload(w) -> None:
+        load = (
+            w.launch(gemm_tile, "A", "B", "C", "M", "N", "K", task_id="load_tiles")
+            .role("producer")
+            .prologue("cp_async(A->shared)", "cp_async(B->shared)")
+        )
+        (
+            w.mainloop(gemm_tile, "A", "B", "C", "M", "N", "K", task_id="mma_tiles")
+            .after(load)
+            .tile(block=(64, 128, 32))
+            .bind(grid="block", lane="warp")
+            .pipeline(depth=3, buffering="double")
+            .resources(num_warps=4)
+            .role("consumer")
+            .steady("ldmatrix", "mma_sync", "advance")
+            .epilogue("store(C)")
+        )
+
+    payload = gemm_workload.to_program()
+
+    tasks = payload["wsp"]["workload"]["tasks"]
+    assert [task["task_id"] for task in tasks] == ["load_tiles", "mma_tiles"]
+    assert tasks[0]["attrs"]["role"] == "producer"
+    assert tasks[0]["attrs"]["stages"][0] == {
+        "name": "prologue",
+        "steps": ["cp_async(A->shared)", "cp_async(B->shared)"],
+    }
+    assert tasks[1]["kind"] == "wsp_mainloop"
+    assert tasks[1]["attrs"]["role"] == "consumer"
+    assert tasks[1]["attrs"]["stages"][1] == {"name": "epilogue", "steps": ["store(C)"]}
+    assert payload["wsp"]["workload"]["dependencies"] == [{"src": "load_tiles", "dst": "mma_tiles"}]
+
+
 def test_csp_program_surface_accepts_kernel_specs_and_step_helpers():
     @kernel
     def gemm_tile(
@@ -373,6 +422,52 @@ def test_csp_program_surface_accepts_kernel_specs_and_step_helpers():
     assert payload["csp"]["channels"][0]["name"] == "tiles"
     assert payload["csp"]["processes"][0]["steps"][0]["kind"] == "put"
     assert payload["csp"]["processes"][1]["steps"][0]["kind"] == "get"
+
+
+def test_csp_process_surface_carries_role_and_compute_steps():
+    @kernel
+    def pipeline_stage(
+        X: buffer(dtype="f32", shape=("M", "N"), role="input"),
+        Y: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        tile_payload = channel_recv("tiles", dtype="f32", shape=("M", "N"))
+        summary = reduction_sum(tile_payload, axis=0, dtype="f32", shape=("N",))
+        channel_send(summary, channel="partials")
+        store(Y, broadcast(summary, shape=("M", "N"), dtype="f32"))
+
+    @csp_program(target="nvgpu-ampere", kernel=pipeline_stage)
+    def pipeline_demo(p) -> None:
+        tiles = p.fifo("tiles", dtype="f32", capacity=2)
+        partials = p.fifo("partials", dtype="f32", capacity=1)
+        (
+            p.process("dispatch", task_id="dispatch", kernel=pipeline_stage, args=("X", "Y", "M", "N"))
+            .role("producer")
+            .compute("pack_tile", source="X")
+            .put(tiles)
+        )
+        (
+            p.process("combine", task_id="combine", kernel=pipeline_stage, args=("X", "Y", "M", "N"))
+            .role("router")
+            .get(tiles)
+            .compute("reduce_partials", channel="tiles")
+            .put(partials)
+        )
+
+    payload = pipeline_demo.to_program()
+
+    assert payload["csp"]["processes"][0]["role"] == "producer"
+    assert payload["csp"]["processes"][0]["steps"][0] == {
+        "kind": "compute",
+        "name": "pack_tile",
+        "source": "X",
+    }
+    assert payload["csp"]["processes"][1]["steps"][1] == {
+        "kind": "compute",
+        "name": "reduce_partials",
+        "channel": "tiles",
+    }
 
 
 def test_wsp_decorator_surface_rejects_non_kernel_spec():

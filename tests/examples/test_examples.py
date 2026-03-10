@@ -126,6 +126,17 @@ def test_wsp_example_compiles_and_replays(tmp_path):
     assert replay_summary["ok"] is True
     assert replay_summary["schedule"]["pipeline_depth"] >= 1
     assert replay_summary["schedule"]["launch"]["num_warps"] == 4
+    assert [task["task_id"] for task in replay_summary["workload_ir"]["tasks"]] == [
+        "load_tiles",
+        "mma_tiles",
+        "store_tiles",
+    ]
+    assert replay_summary["workload_ir"]["tasks"][0]["attrs"]["role"] == "producer"
+    assert replay_summary["workload_ir"]["tasks"][1]["attrs"]["role"] == "consumer"
+    assert replay_summary["workload_ir"]["dependencies"] == [
+        {"src": "load_tiles", "dst": "mma_tiles"},
+        {"src": "mma_tiles", "dst": "store_tiles"},
+    ]
 
 
 def test_littlekernel_example_compiles_and_replays(tmp_path):
@@ -137,6 +148,8 @@ def test_littlekernel_example_compiles_and_replays(tmp_path):
     assert replay_summary["ok"] is True
     assert replay_summary["schedule"]["pipeline_depth"] >= 3
     assert replay_summary["schedule"]["launch"]["num_warps"] == 8
+    assert replay_summary["workload_ir"]["tasks"][1]["attrs"]["stages"][0]["name"] == "prologue"
+    assert replay_summary["workload_ir"]["tasks"][1]["attrs"]["stages"][1]["name"] == "steady"
 
 
 def test_csp_example_compiles_and_replays(tmp_path):
@@ -146,6 +159,13 @@ def test_csp_example_compiles_and_replays(tmp_path):
 
     assert compile_summary["target"] == {"backend": "nvgpu", "option": "ampere"}
     assert replay_summary["ok"] is True
+    assert [process["name"] for process in replay_summary["workload_ir"]["processes"]] == [
+        "dispatch_tiles",
+        "combine_tiles",
+        "writeback_tiles",
+    ]
+    assert replay_summary["workload_ir"]["processes"][0]["role"] == "producer"
+    assert replay_summary["workload_ir"]["processes"][1]["steps"][1]["kind"] == "compute"
     assert replay_summary["effects"]["protocols"] == [
         {
             "channel": "tiles",
