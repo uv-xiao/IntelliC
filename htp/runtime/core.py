@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 
 from htp.intrinsics import get_stub_diagnostic_code, simulate_intrinsic
 
-from .errors import raise_missing_kernel, raise_stub
+from .errors import ReplayDiagnosticError, raise_missing_kernel, raise_stub
 
 KernelHandler = Callable[..., object]
 IntrinsicHandler = Callable[..., object]
@@ -22,6 +22,7 @@ class Runtime:
         self.kernel_handlers = dict(kernels or {})
         self.intrinsic_handlers = dict(intrinsics or {})
         self.extension_handlers = dict(extensions or {})
+        self.channel_queues: dict[str, list[object]] = {}
 
     def register_kernel(self, kernel_id: str, handler: KernelHandler) -> None:
         self.kernel_handlers[kernel_id] = handler
@@ -62,7 +63,16 @@ class Runtime:
         handler = self.intrinsic_handlers.get(name)
         if handler is None:
             try:
-                return simulate_intrinsic(name, args=args, attrs=attrs, mode=mode, trace=trace)
+                return simulate_intrinsic(
+                    name,
+                    args=args,
+                    attrs=attrs,
+                    mode=mode,
+                    trace=trace,
+                    runtime=self,
+                )
+            except ReplayDiagnosticError:
+                raise
             except Exception:
                 raise_stub(
                     get_stub_diagnostic_code(name),

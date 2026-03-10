@@ -5,8 +5,8 @@ This document tracks the remaining gap between the current package/debug surface
 ## Completion snapshot
 
 - total checklist items: 8
-- complete: 7
-- partial: 1
+- complete: 8
+- partial: 0
 - open: 0
 
 ## Detailed checklist
@@ -20,16 +20,16 @@ This document tracks the remaining gap between the current package/debug surface
 ### Replay and debug surface
 - [x] Keep replay distinct from backend package execution.
 - [x] Surface replay stubs through structured diagnostics with fix-hint references.
-- [~] Broaden replay/reference semantics so fewer boundaries require explicit stubs.
+- [x] Broaden replay/reference semantics so fewer boundaries require explicit stubs.
 - [x] Keep semantic diff and diagnostic explanation tied to emitted sidecars, ids, maps, and traces.
 
 ## Why these tasks remain
 
-This topic is now mostly closed on the package/debug-contract side. PTO,
-NV-GPU, and AIE all participate in the same generic sidecar-schema checks, and
-invalid sidecars now point back to explicit `artifact_ref` evidence. The only
-meaningful remaining gap is replay/reference breadth: reducing how often
-backend/extension boundaries still need explicit stubs.
+This topic is now closed. PTO, NV-GPU, and AIE all participate in the same
+generic sidecar-schema checks, invalid sidecars point back to explicit
+`artifact_ref` evidence, and replay now carries reference semantics for the
+common compiler-owned portable and NV-GPU operations instead of falling back to
+generic unsupported-intrinsic stubs.
 
 ## Coding pointers
 

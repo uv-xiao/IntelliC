@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from htp.intrinsics import (
@@ -103,3 +104,86 @@ def test_intrinsic_packages_split_portable_and_backend_owned_sets():
     assert "htp_ext.demo.intrinsics" in registered_intrinsic_packages()
     assert any(item.name == "portable.matmul" for item in portable_intrinsics())
     assert any(item.name == "demo.backend_scale" for item in backend_intrinsics())
+
+
+def test_portable_intrinsic_simulation_covers_tensor_reference_ops():
+    lhs = np.arange(6, dtype=np.float32).reshape(2, 3)
+    rhs = np.arange(12, dtype=np.float32).reshape(3, 4)
+    matrix = np.arange(6, dtype=np.float32).reshape(2, 3)
+
+    matmul = simulate_intrinsic("portable.matmul", args=(lhs, rhs), attrs={}, mode="sim", target="nvgpu")
+    broadcast = simulate_intrinsic(
+        "portable.broadcast",
+        args=(np.array([1.0, 2.0], dtype=np.float32),),
+        attrs={"shape": (2, 2)},
+        mode="sim",
+        target="nvgpu",
+    )
+    transpose = simulate_intrinsic(
+        "portable.transpose",
+        args=(matrix,),
+        attrs={"axes": (1, 0)},
+        mode="sim",
+        target="nvgpu",
+    )
+    reshaped = simulate_intrinsic(
+        "portable.reshape",
+        args=(matrix,),
+        attrs={"shape": (3, 2)},
+        mode="sim",
+        target="nvgpu",
+    )
+    reduced = simulate_intrinsic(
+        "portable.reduction_sum",
+        args=(matrix,),
+        attrs={"axis": 0},
+        mode="sim",
+        target="nvgpu",
+    )
+
+    assert np.array_equal(matmul, lhs @ rhs)
+    assert np.array_equal(broadcast, np.broadcast_to(np.array([1.0, 2.0], dtype=np.float32), (2, 2)))
+    assert np.array_equal(transpose, matrix.T)
+    assert np.array_equal(reshaped, matrix.reshape(3, 2))
+    assert np.array_equal(reduced, matrix.sum(axis=0))
+
+
+def test_portable_intrinsic_simulation_covers_async_and_mma_reference_ops():
+    lhs = np.arange(6, dtype=np.float32).reshape(2, 3)
+    rhs = np.arange(6, dtype=np.float32).reshape(3, 2)
+    accum = np.ones((2, 2), dtype=np.float32)
+
+    copied = simulate_intrinsic(
+        "portable.async_copy",
+        args=(lhs,),
+        attrs={"memory_space": "shared"},
+        mode="sim",
+        target="nvgpu",
+    )
+    waited = simulate_intrinsic(
+        "portable.await",
+        args=(copied,),
+        attrs={},
+        mode="sim",
+        target="nvgpu",
+    )
+    mma = simulate_intrinsic(
+        "portable.mma",
+        args=(lhs, rhs, accum),
+        attrs={},
+        mode="sim",
+        target="nvgpu",
+    )
+    allreduce = simulate_intrinsic(
+        "portable.allreduce",
+        args=(accum,),
+        attrs={"participants": 1},
+        mode="sim",
+        target="nvgpu",
+    )
+
+    assert np.array_equal(copied, lhs)
+    assert copied is not lhs
+    assert np.array_equal(waited, lhs)
+    assert np.array_equal(mma, lhs @ rhs + accum)
+    assert np.array_equal(allreduce, accum)

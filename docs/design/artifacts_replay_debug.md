@@ -45,6 +45,18 @@ The manifest and stage graph are validated; they are not free-form dumps.
 
 Replay executes `ir/stages/<id>/program.py` through the runtime surface. This is distinct from backend package execution. If a stage reaches a boundary without simulator/reference semantics, it fails through a structured replay diagnostic rather than becoming silently non-executable.
 
+The implemented replay/runtime path now covers more than elementwise stubs:
+- portable tensor reference ops such as `matmul`, `load`, `store`, `cast`,
+  `broadcast`, `transpose`, `view`, `reshape`, `relayout`, and
+  `reduction_sum`
+- portable async/protocol ops such as `async_copy`, `barrier`, `await`,
+  `channel_send`, `channel_recv`, and single-process `allreduce`
+- NV-GPU-flavored replay for `cp_async`, `ldmatrix`, `mma_sync`, `wgmma`,
+  `tma_load`, `tma_store`, and `commit`
+
+That means replay now uses reference semantics for common compiler-owned ops
+and reserves explicit stub diagnostics mainly for genuine external boundaries.
+
 ### Diagnostics and traces
 
 The current implementation already has:
@@ -95,7 +107,8 @@ Tests worth reading together with this layer:
 
 ## Current limits
 
-The artifact and debugging layer is now uniform enough that backend and
-extension sidecars are validated through the same package-first evidence model.
-The main remaining gap is broader replay/reference coverage, not a missing
-package/debug contract.
+The artifact and debugging layer is now uniform on the package/debug-contract
+side, and replay/reference coverage is broad for compiler-owned portable and
+NV-GPU operations. The remaining limits are intentional external boundaries:
+device-only toolchains, extension-owned semantics without a sim model, and
+backend-specific behaviors that are not meaningfully reproducible in Python.

@@ -25,6 +25,9 @@ The example writes outputs under `artifacts/nvgpu_arknife_gemm/`.
 Notes:
 
 - the `sim` path is deterministic and does not need CUDA;
+- replay now uses reference semantics for the staged `cp_async`, `ldmatrix`,
+  `mma_sync`, and `commit` intrinsic flow instead of falling back to
+  unsupported-intrinsic stubs;
 - the emitted `.cu` source preserves the Arknife instruction plan as annotated
   metadata and comments, while using a numerically-correct fallback kernel body;
 - the device path needs `nvcc`, a CUDA driver, and a GPU visible to the
