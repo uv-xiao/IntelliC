@@ -19,10 +19,16 @@ from htp.kernel import (
     matmul,
     mma,
     reduction_sum,
+    region,
+    registers,
     scalar,
+    scratch_array,
+    serial,
+    shared_array,
     sigmoid,
     store,
     transpose,
+    unroll,
     value,
 )
 from htp.routine import call, fifo_channel, program
@@ -400,6 +406,69 @@ def test_public_kernel_surface_supports_implicit_channel_and_reduce_temporaries(
     assert payload["ops"][2]["op"] == "channel_recv"
     assert payload["ops"][3]["op"] == "broadcast"
     assert payload["ops"][4]["op"] == "channel_send"
+
+
+def test_public_kernel_surface_supports_explicit_scratch_arrays_and_memory_scopes():
+    @kernel
+    def staged_gemm(
+        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        a_tiles = shared_array("a_tile", count=2, dtype="f32", shape=("M", "K"))
+        b_tiles = shared_array("b_tile", count=2, dtype="f32", shape=("K", "N"))
+        acc = registers("acc", dtype="f32", shape=("M", "N"))
+        for stage in unroll(range(2), name="stage"):
+            async_copy(A, target=a_tiles[stage], dtype="f32")
+            async_copy(B, target=b_tiles[stage], dtype="f32")
+            barrier()
+            tile_acc = mma(a_tiles[stage], b_tiles[stage], m=M, n=N, k=K, dtype="f32")
+            acc = tile_acc if stage == 0 else acc + tile_acc
+        store(C, acc)
+
+    payload = staged_gemm.to_payload()
+
+    assert payload["ops"][0]["target"] == "a_tile_0"
+    assert payload["ops"][0]["target_memory_space"] == "shared"
+    assert payload["ops"][1]["target"] == "b_tile_0"
+    assert payload["ops"][3]["attrs"]["regions"][0] == {
+        "kind": "loop",
+        "modifier": "unroll",
+        "iteration": 0,
+        "var": "stage",
+        "value": 0,
+    }
+    assert payload["ops"][7]["attrs"]["regions"][0]["iteration"] == 1
+
+
+def test_public_kernel_surface_supports_region_annotations_inside_loops():
+    @kernel
+    def staged_epilogue(
+        A: buffer(dtype="f32", shape=("M", "N"), role="input"),
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+    ) -> None:
+        tiles = scratch_array("tiles", count=2, dtype="f32", shape=("M", "N"), memory_space="shared")
+        for stage in serial(range(2), name="stage"):
+            with region("pipeline_stage", phase="steady"):
+                async_copy(A, target=tiles[stage], dtype="f32")
+                barrier()
+        store(C, tiles[0])
+
+    payload = staged_epilogue.to_payload()
+
+    assert payload["ops"][0]["attrs"]["regions"] == [
+        {"kind": "loop", "modifier": "serial", "iteration": 0, "var": "stage", "value": 0},
+        {"kind": "pipeline_stage", "phase": "steady"},
+    ]
+    assert payload["ops"][3]["attrs"]["regions"][0]["iteration"] == 1
+
+
+def test_scratch_array_requires_positive_count():
+    with pytest.raises(ValueError, match="count > 0"):
+        scratch_array("tiles", count=0, dtype="f32", shape=("M", "N"), memory_space="shared")
 
 
 def test_wsp_program_surface_accepts_kernel_specs_and_task_helpers():

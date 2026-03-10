@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `025-loop-scratch-surfaces.md` — PR `TBD`
+- `025-loop-scratch-surfaces.md` — PR `#60`

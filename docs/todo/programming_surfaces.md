@@ -12,7 +12,7 @@ The remaining gap is no longer “can HTP avoid raw payload dicts?” It is more
 - can workload/dataflow programs read like authored programs instead of metadata builders?
 - can example quality reach the semantic richness of the best PyPTO, LittleKernel, and Arknife references?
 
-The latest review under `docs/in_progress/026-programming-surface-conciseness-review.md` makes those gaps concrete.
+The latest surface review distilled those complaints into the checklist below. The review task itself has already been closed and removed from `docs/in_progress/`, so this file is now the source of truth for the remaining frontend work.
 
 ## Completion snapshot
 
@@ -45,6 +45,9 @@ The latest review under `docs/in_progress/026-programming-surface-conciseness-re
 - high-level compiler / solver / CLI / tool tests now reuse shared authored programs from `tests/programs.py` instead of repeating toy payload dicts
 - expression-first kernel authoring landed for arithmetic, temporaries, and staged value flow
 - readable staged `program.py` artifacts now remain runnable Python instead of opaque payload dumps
+- `htp.kernel` now supports explicit scratch declarations (`scratch(...)`, `scratch_array(...)`, `shared(...)`, `shared_array(...)`, `registers(...)`, `register_array(...)`)
+- traced loop/region helpers (`unroll(...)`, `serial(...)`, and `region(...)`) now annotate emitted ops while staying on ordinary Python `for` loops
+- the WSP GEMM examples now use explicit scratch arrays and loop/region annotations instead of manually repeated staging code
 
 This keeps the topic *partially* closed at the repository level: the frontend is real and testable, but the remaining surface work is now about semantic directness and reference-level readability rather than basic AST tracing.
 

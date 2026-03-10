@@ -5,7 +5,19 @@ from pathlib import Path
 from typing import Any
 
 from htp import bind, compile_program
-from htp.kernel import async_copy, barrier, buffer, kernel, mma, scalar, store
+from htp.kernel import (
+    async_copy,
+    barrier,
+    buffer,
+    kernel,
+    mma,
+    region,
+    registers,
+    scalar,
+    shared_array,
+    store,
+    unroll,
+)
 from htp.wsp import program as wsp_program
 
 
@@ -20,16 +32,20 @@ def pipelined_mainloop_gemm(
 ) -> None:
     """Pipelined GEMM mainloop with double-buffered shared-memory stages."""
 
-    a_stage0 = async_copy(A, dtype="f32", memory_space="shared")
-    b_stage0 = async_copy(B, dtype="f32", memory_space="shared")
-    barrier()
-    accum0 = mma(a_stage0, b_stage0, m=M, n=N, k=K, dtype="f32")
+    a_stages = shared_array("a_stage", count=2, dtype="f32", shape=("M", "K"))
+    b_stages = shared_array("b_stage", count=2, dtype="f32", shape=("K", "N"))
+    partials = []
+    accum = registers("acc", dtype="f32", shape=("M", "N"))
 
-    a_stage1 = async_copy(A, dtype="f32", memory_space="shared")
-    b_stage1 = async_copy(B, dtype="f32", memory_space="shared")
-    barrier()
-    accum1 = mma(a_stage1, b_stage1, m=M, n=N, k=K, dtype="f32")
-    store(C, accum0 + accum1)
+    for stage in unroll(range(2), name="stage"):
+        with region("mainloop_stage", phase="steady"):
+            async_copy(A, target=a_stages[stage], dtype="f32")
+            async_copy(B, target=b_stages[stage], dtype="f32")
+            barrier()
+            partial = mma(a_stages[stage], b_stages[stage], m=M, n=N, k=K, dtype="f32")
+            partials.append(partial)
+    accum = partials[0] + partials[1]
+    store(C, accum)
 
 
 @wsp_program(target="nvgpu-ampere", kernel=pipelined_mainloop_gemm)
@@ -85,6 +101,7 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
     session = bind(package_dir).load(mode="sim")
     stage_id = session.manifest["stages"]["current"]
     result = session.replay(stage_id, trace="basic")
+    kernel_ir = json.loads((package_dir / "ir" / "stages" / stage_id / "kernel_ir.json").read_text())
     schedule = json.loads((package_dir / "ir" / "stages" / stage_id / "schedule.json").read_text())
     workload_ir = json.loads((package_dir / "ir" / "stages" / stage_id / "workload_ir.json").read_text())
     return {
@@ -92,6 +109,7 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
         "stage_id": stage_id,
         "entry": result.entry,
         "diagnostics": result.diagnostics,
+        "kernel_ir": kernel_ir,
         "schedule": schedule,
         "workload_ir": workload_ir,
     }

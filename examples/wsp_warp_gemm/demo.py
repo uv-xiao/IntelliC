@@ -5,7 +5,18 @@ from pathlib import Path
 from typing import Any
 
 from htp import bind, compile_program
-from htp.kernel import async_copy, barrier, buffer, kernel, mma, scalar, store
+from htp.kernel import (
+    async_copy,
+    barrier,
+    buffer,
+    kernel,
+    mma,
+    region,
+    scalar,
+    shared_array,
+    store,
+    unroll,
+)
 from htp.wsp import program as wsp_program
 
 
@@ -20,12 +31,16 @@ def warp_mainloop_tile(
 ) -> None:
     """Warp-level GEMM mainloop with staged copies and tensor-core math."""
 
-    a_shared = async_copy(A, dtype="f32", memory_space="shared")
-    b_shared = async_copy(B, dtype="f32", memory_space="shared")
-    barrier()
-    accum0 = mma(a_shared, b_shared, m=M, n=N, k=K, dtype="f32")
-    accum1 = mma(a_shared, b_shared, m=M, n=N, k=K, dtype="f32")
-    store(C, accum0 + accum1)
+    a_tiles = shared_array("a_tile", count=2, dtype="f32", shape=("M", "K"))
+    b_tiles = shared_array("b_tile", count=2, dtype="f32", shape=("K", "N"))
+    partials = []
+    for stage in unroll(range(2), name="warp_stage"):
+        with region("warp_tile", phase="steady"):
+            async_copy(A, target=a_tiles[stage], dtype="f32")
+            async_copy(B, target=b_tiles[stage], dtype="f32")
+            barrier()
+            partials.append(mma(a_tiles[stage], b_tiles[stage], m=M, n=N, k=K, dtype="f32"))
+    store(C, partials[0] + partials[1])
 
 
 @wsp_program(target="nvgpu-ampere", kernel=warp_mainloop_tile)
@@ -80,6 +95,7 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
     session = bind(package_dir).load(mode="sim")
     stage_id = session.manifest["stages"]["current"]
     result = session.replay(stage_id, trace="basic")
+    kernel_ir = json.loads((package_dir / "ir" / "stages" / stage_id / "kernel_ir.json").read_text())
     schedule = json.loads((package_dir / "ir" / "stages" / stage_id / "schedule.json").read_text())
     workload_ir = json.loads((package_dir / "ir" / "stages" / stage_id / "workload_ir.json").read_text())
     return {
@@ -87,6 +103,7 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
         "stage_id": stage_id,
         "entry": result.entry,
         "diagnostics": result.diagnostics,
+        "kernel_ir": kernel_ir,
         "schedule": schedule,
         "workload_ir": workload_ir,
     }

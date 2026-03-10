@@ -2,7 +2,7 @@
 
 - ID: `025-loop-scratch-surfaces`
 - Branch: `htp/feat-loop-scratch-surfaces`
-- PR: `TBD`
+- PR: `#60`
 - Status: `in_progress`
 - Owner: `Codex`
 
@@ -18,10 +18,10 @@ Add native loop/region authoring and explicit scratch/memory-scope declarations 
 
 ## Scope Checklist
 
-- [ ] add explicit scratch-buffer / scratch-array helpers on native kernel values
-- [ ] add traced loop / region helpers that annotate repeated kernel ops without leaving Python-space
-- [ ] rewrite at least one flagship WSP-style example and its tests onto the new surface
-- [ ] sync `docs/design/` and narrow `docs/todo/programming_surfaces.md`
+- [x] add explicit scratch-buffer / scratch-array helpers on native kernel values
+- [x] add traced loop / region helpers that annotate repeated kernel ops without leaving Python-space
+- [x] rewrite at least one flagship WSP-style example and its tests onto the new surface
+- [x] sync `docs/design/` and narrow `docs/todo/programming_surfaces.md`
 
 ## Code Surfaces
 
@@ -33,19 +33,28 @@ Add native loop/region authoring and explicit scratch/memory-scope declarations 
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for the motivating bug or gap
-- [ ] human-friendly example updated or added
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating bug or gap
+- [x] human-friendly example updated or added
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for implemented behavior
-- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] update `docs/design/` for implemented behavior
+- [x] update `docs/todo/` to remove or narrow the gap
 - [ ] remove this file from `docs/in_progress/` before merge
+
+## Progress Notes
+
+- added native scratch declarations on `htp.kernel` values so shared/register
+  staging can be written directly instead of hidden in string slots
+- added traced `unroll(...)`, `serial(...)`, and `region(...)` helpers so
+  ordinary Python loops carry loop/region evidence into emitted ops
+- rewrote the WSP GEMM examples and the public/example regression tests to use
+  the new surface
 
 ## Commit Plan
 
@@ -58,3 +67,10 @@ Do not add low-signal tests. Each added test must defend a concrete contract, fa
 ## Review Notes
 
 Reviewers should check whether the new surface genuinely improves authored readability and whether loop/scratch metadata stays on the shared HTP surface instead of creating a sidecar semantic path.
+
+## Verification Evidence
+
+- local fallback verification used because `pixi` is not installed in this shell
+- targeted: `pytest -q tests/test_public_surfaces.py tests/examples/test_examples.py`
+- full: `pytest -q`
+- formatting/hooks: `pre-commit run --all-files`

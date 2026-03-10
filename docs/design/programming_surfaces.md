@@ -103,10 +103,46 @@ expanded = broadcast(tile_summary, shape=("M", "N"), dtype="f32")
 store(C, expanded)
 ```
 
-instead of spelling those intermediate values as string slots in every call.
+instead of spelling those intermediate values as string slots in every call or
+dropping into raw payload fields in example code.
 
-without dropping into raw payload fields or explicit constant nodes in the
-example code.
+The repository now also supports explicit scratch declarations when implicit
+temporaries stop being readable enough. Public kernels can declare storage on
+native HTP values instead of inventing ad-hoc string slots:
+
+```text
+a_stages = shared_array("a_stage", count=2, dtype="f32", shape=("M", "K"))
+b_stages = shared_array("b_stage", count=2, dtype="f32", shape=("K", "N"))
+acc = registers("acc", dtype="f32", shape=("M", "N"))
+```
+
+Those declarations stay on the native `KernelValue` surface and preserve the
+same metadata path as ordinary buffers:
+
+- `memory_space`
+- `axis_layout`
+- `attrs`
+
+This matters for retargetability. Scratch and staging are no longer special
+backend-only frontends; they are now part of the shared kernel surface that can
+be consumed by the normal semantic model and backend lowering.
+
+The current surface also now supports lightweight loop/region annotation in
+plain Python:
+
+```text
+for stage in unroll(range(2), name="stage"):
+    with region("mainloop_stage", phase="steady"):
+        async_copy(A, target=a_stages[stage], dtype="f32")
+        async_copy(B, target=b_stages[stage], dtype="f32")
+        barrier()
+        partial = mma(a_stages[stage], b_stages[stage], m=M, n=N, k=K, dtype="f32")
+```
+
+This is not a second loop IR. It is a traced annotation layer over ordinary
+Python `for` loops. Emitted ops carry `attrs.regions` so replay, semantic
+payloads, and backend debugging can all point at the same loop/region evidence
+without leaving Python-space.
 
 ### `htp.compile_program(...)`
 
@@ -401,3 +437,11 @@ should be driven by a concrete new feature rather than by a standing repository
 TODO. Any such work should first be reintroduced through `docs/todo/README.md`
 and then implemented on top of the same native Python authoring rules described
 here.
+
+## Code pointers
+
+- `htp/kernel.py`
+- `examples/wsp_warp_gemm/demo.py`
+- `examples/wsp_littlekernel_pipelined_gemm/demo.py`
+- `tests/test_public_surfaces.py`
+- `tests/examples/test_examples.py`

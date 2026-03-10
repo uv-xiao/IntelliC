@@ -12,6 +12,7 @@ native traced style via ``@kernel``.
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from inspect import getclosurevars, signature
@@ -151,6 +152,12 @@ class _KernelTrace:
 
 
 @dataclass(frozen=True)
+class _RegionFrame:
+    kind: str
+    attrs: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class KernelSpec:
     """Public kernel surface that can lower into the canonical program payload."""
 
@@ -193,6 +200,7 @@ class KernelSpec:
 
 
 _TRACE_RECORDER: ContextVar[_KernelTrace | None] = ContextVar("htp_kernel_trace_recorder", default=None)
+_REGION_STACK: ContextVar[tuple[_RegionFrame, ...]] = ContextVar("htp_kernel_region_stack", default=())
 
 
 def buffer(
@@ -281,6 +289,208 @@ def value(
         distribution=distribution_value,
         attrs=None if attrs is None else dict(attrs),
     )
+
+
+def scratch(
+    name: str | None = None,
+    *,
+    dtype: str | DType,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
+    memory_space: str,
+    role: str = "temp",
+    axis_layout: tuple[str, ...] | list[str] = (),
+    attrs: dict[str, Any] | None = None,
+) -> KernelValue:
+    """Declare explicit scratch storage on the native kernel-value surface."""
+
+    trace = _TRACE_RECORDER.get()
+    resolved_name = name
+    if resolved_name is None:
+        if trace is None:
+            raise ValueError("Implicit scratch names require traced @kernel execution.")
+        resolved_name = _fresh_temp(trace, f"{memory_space}_scratch")
+    return KernelValue(
+        name=resolved_name,
+        dtype=dtype_name(dtype),
+        shape=_normalize_dims(shape),
+        kind="buffer",
+        role=role,
+        memory_space=memory_space,
+        axis_layout=tuple(str(item) for item in axis_layout),
+        attrs=None if attrs is None else dict(attrs),
+    )
+
+
+def scratch_array(
+    prefix: str,
+    *,
+    count: int,
+    dtype: str | DType,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
+    memory_space: str,
+    role: str = "temp",
+    axis_layout: tuple[str, ...] | list[str] = (),
+    attrs: dict[str, Any] | None = None,
+) -> tuple[KernelValue, ...]:
+    """Declare a fixed-size array of explicit scratch buffers."""
+
+    if count <= 0:
+        raise ValueError("scratch_array(...) requires count > 0.")
+    return tuple(
+        scratch(
+            f"{prefix}_{index}",
+            dtype=dtype,
+            shape=shape,
+            memory_space=memory_space,
+            role=role,
+            axis_layout=axis_layout,
+            attrs=attrs,
+        )
+        for index in range(count)
+    )
+
+
+def shared(
+    name: str | None = None,
+    *,
+    dtype: str | DType,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
+    role: str = "temp",
+    axis_layout: tuple[str, ...] | list[str] = (),
+    attrs: dict[str, Any] | None = None,
+) -> KernelValue:
+    """Declare one shared-memory scratch buffer."""
+
+    return scratch(
+        name,
+        dtype=dtype,
+        shape=shape,
+        memory_space="shared",
+        role=role,
+        axis_layout=axis_layout,
+        attrs=attrs,
+    )
+
+
+def shared_array(
+    prefix: str,
+    *,
+    count: int,
+    dtype: str | DType,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
+    role: str = "temp",
+    axis_layout: tuple[str, ...] | list[str] = (),
+    attrs: dict[str, Any] | None = None,
+) -> tuple[KernelValue, ...]:
+    """Declare a fixed-size array of shared-memory scratch buffers."""
+
+    return scratch_array(
+        prefix,
+        count=count,
+        dtype=dtype,
+        shape=shape,
+        memory_space="shared",
+        role=role,
+        axis_layout=axis_layout,
+        attrs=attrs,
+    )
+
+
+def registers(
+    name: str | None = None,
+    *,
+    dtype: str | DType,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
+    role: str = "temp",
+    axis_layout: tuple[str, ...] | list[str] = (),
+    attrs: dict[str, Any] | None = None,
+) -> KernelValue:
+    """Declare one register-backed scratch buffer."""
+
+    return scratch(
+        name,
+        dtype=dtype,
+        shape=shape,
+        memory_space="register",
+        role=role,
+        axis_layout=axis_layout,
+        attrs=attrs,
+    )
+
+
+def register_array(
+    prefix: str,
+    *,
+    count: int,
+    dtype: str | DType,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
+    role: str = "temp",
+    axis_layout: tuple[str, ...] | list[str] = (),
+    attrs: dict[str, Any] | None = None,
+) -> tuple[KernelValue, ...]:
+    """Declare a fixed-size array of register-backed scratch buffers."""
+
+    return scratch_array(
+        prefix,
+        count=count,
+        dtype=dtype,
+        shape=shape,
+        memory_space="register",
+        role=role,
+        axis_layout=axis_layout,
+        attrs=attrs,
+    )
+
+
+@contextmanager
+def region(kind: str, **attrs: Any):
+    """Annotate subsequent traced ops with a named region frame."""
+
+    current = _REGION_STACK.get()
+    token = _REGION_STACK.set((*current, _RegionFrame(kind=str(kind), attrs=dict(attrs))))
+    try:
+        yield
+    finally:
+        _REGION_STACK.reset(token)
+
+
+class _LoopIterable:
+    """Iterable that annotates traced ops emitted inside Python `for` loops."""
+
+    def __init__(self, iterable, *, modifier: str, name: str | None):
+        self._iterable = iterable
+        self._modifier = modifier
+        self._name = name
+
+    def __iter__(self):
+        base_stack = _REGION_STACK.get()
+        active_token = None
+        try:
+            for index, item in enumerate(self._iterable):
+                if active_token is not None:
+                    _REGION_STACK.reset(active_token)
+                frame_attrs = {"modifier": self._modifier, "iteration": index}
+                if self._name is not None:
+                    frame_attrs["var"] = self._name
+                if isinstance(item, (int, float, str)):
+                    frame_attrs["value"] = item
+                active_token = _REGION_STACK.set((*base_stack, _RegionFrame(kind="loop", attrs=frame_attrs)))
+                yield item
+        finally:
+            if active_token is not None:
+                _REGION_STACK.reset(active_token)
+
+
+def unroll(iterable, *, name: str | None = None):
+    """Annotate a Python `for` loop as an unrolled kernel loop."""
+
+    return _LoopIterable(iterable, modifier="unroll", name=name)
+
+
+def serial(iterable, *, name: str | None = None):
+    """Annotate a Python `for` loop as a serial kernel loop."""
+
+    return _LoopIterable(iterable, modifier="serial", name=name)
 
 
 def kernel(
@@ -871,6 +1081,11 @@ def await_token(token: str | KernelValue) -> dict[str, Any]:
 
 
 def _emit_or_return(op: dict[str, Any], *, result: KernelValue | None = None) -> dict[str, Any] | KernelValue:
+    region_payload = _active_regions_payload()
+    if region_payload:
+        attrs = dict(op.get("attrs", {})) if isinstance(op.get("attrs"), dict) else {}
+        attrs["regions"] = region_payload
+        op = {**op, "attrs": attrs}
     recorder = _TRACE_RECORDER.get()
     if recorder is not None:
         recorder.ops.append(op)
@@ -971,6 +1186,11 @@ def _fresh_temp(trace: _KernelTrace, prefix: str) -> str:
     name = f"{prefix}_{trace.temp_index}"
     trace.temp_index += 1
     return name
+
+
+def _active_regions_payload() -> list[dict[str, Any]]:
+    stack = _REGION_STACK.get()
+    return [{"kind": item.kind, **dict(item.attrs)} for item in stack]
 
 
 def _as_named_value(value: str | KernelValue, *, fallback: KernelValue | None = None) -> KernelValue:
@@ -1110,12 +1330,21 @@ __all__ = [
     "recip",
     "reduce_scatter",
     "reduction_sum",
+    "region",
     "relayout",
+    "register_array",
+    "registers",
     "reshape",
     "scalar",
+    "scratch",
+    "scratch_array",
+    "serial",
+    "shared",
+    "shared_array",
     "sigmoid",
     "slice_tensor",
     "store",
     "transpose",
+    "unroll",
     "value",
 ]
