@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `024-stronger-flagship-tests.md` — PR `#59`
+- none
