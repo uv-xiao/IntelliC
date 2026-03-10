@@ -32,7 +32,14 @@ def _vector_add_program() -> dict[str, object]:
         },
         "workload": {
             "entry": "vector_add",
-            "tasks": [{"task_id": "task0", "kind": "kernel_call", "kernel": "vector_add", "args": ["lhs", "rhs", "out", "size"]}],
+            "tasks": [
+                {
+                    "task_id": "task0",
+                    "kind": "kernel_call",
+                    "kernel": "vector_add",
+                    "args": ["lhs", "rhs", "out", "size"],
+                }
+            ],
             "channels": [],
             "dependencies": [],
         },

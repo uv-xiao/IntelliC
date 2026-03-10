@@ -32,7 +32,9 @@ def build_reference_runtime(package_dir: Path | str, manifest: dict[str, Any] | 
         "schema": "htp.cpu_ref.runtime.v1",
         "entry": package_manifest.get("inputs", {}).get("entry", ""),
         "target": dict(package_manifest.get("target", {})),
-        "launch_entry": dict(package_manifest.get("extensions", {}).get("cpu_ref", {}).get("launch_entry", {})),
+        "launch_entry": dict(
+            package_manifest.get("extensions", {}).get("cpu_ref", {}).get("launch_entry", {})
+        ),
     }
     (build_dir / "runtime.json").write_text(json.dumps(payload, indent=2) + "\n")
     return ["build/cpu_ref/runtime.json"]
@@ -97,7 +99,9 @@ class CPURefLoadResult(LoadResult):
                 diagnostics=diagnostics,
             )
             return RunResult(False, self.mode, entry, diagnostics=diagnostics, log_path=log_path)
-        module = _load_python_module(self.package_dir / str(launch_entry["source"]), module_name=f"htp_cpu_ref_{stage_id}")
+        module = _load_python_module(
+            self.package_dir / str(launch_entry["source"]), module_name=f"htp_cpu_ref_{stage_id}"
+        )
         function_name = str(launch_entry["function_name"])
         result = getattr(module, function_name)(*args, mode=self.mode, trace=trace, runtime=None)
         metrics_path = _write_perf(
@@ -140,7 +144,8 @@ class CPURefBinding(ManifestBinding):
         diagnostics = [
             diagnostic
             for diagnostic in base.diagnostics
-            if diagnostic.get("code") not in {"HTP.BINDINGS.MISSING_BACKEND", "HTP.BINDINGS.MISSING_CONTRACT_FILE"}
+            if diagnostic.get("code")
+            not in {"HTP.BINDINGS.MISSING_BACKEND", "HTP.BINDINGS.MISSING_CONTRACT_FILE"}
         ]
         missing_files = list(base.missing_files)
         diagnostics.extend(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any
 
 from htp.artifacts.manifest import write_manifest
@@ -181,7 +181,7 @@ def _render_reference_module(state: Mapping[str, Any]) -> str:
         "        return 1.0 / (1.0 + np.exp(-value))",
         '    if op == "exp":',
         "        return np.exp(value)",
-        '    raise ValueError(f\"unsupported unary op: {op}\")',
+        '    raise ValueError(f"unsupported unary op: {op}")',
         "",
         "def _binary(op, lhs, rhs):",
         '    if op == "add":',
@@ -192,7 +192,7 @@ def _render_reference_module(state: Mapping[str, Any]) -> str:
         "        return lhs * rhs",
         '    if op == "div":',
         "        return lhs / rhs",
-        '    raise ValueError(f\"unsupported binary op: {op}\")',
+        '    raise ValueError(f"unsupported binary op: {op}")',
         "",
         f"def launch_{entry}(*args, mode='sim', trace='off', runtime=None):",
         "    del mode, trace, runtime",
@@ -222,43 +222,71 @@ def _render_op(op: Mapping[str, Any], *, args: list[dict[str, Any]]) -> list[str
     op_name = str(op.get("op", ""))
     attrs = op.get("attrs", {}) if isinstance(op.get("attrs"), Mapping) else {}
     outputs = op.get("outputs", attrs.get("outputs", ()))
-    output_name = str(op.get("out", attrs.get("out", outputs[0] if isinstance(outputs, list) and outputs else "")))
+    output_name = str(
+        op.get("out", attrs.get("out", outputs[0] if isinstance(outputs, list) and outputs else ""))
+    )
     if op_name == "elementwise_binary":
         inputs = op.get("inputs", attrs.get("inputs", ()))
-        lhs = str(op.get("lhs", attrs.get("lhs", inputs[0] if isinstance(inputs, list) and len(inputs) > 0 else "lhs")))
-        rhs = str(op.get("rhs", attrs.get("rhs", inputs[1] if isinstance(inputs, list) and len(inputs) > 1 else "rhs")))
+        lhs = str(
+            op.get(
+                "lhs", attrs.get("lhs", inputs[0] if isinstance(inputs, list) and len(inputs) > 0 else "lhs")
+            )
+        )
+        rhs = str(
+            op.get(
+                "rhs", attrs.get("rhs", inputs[1] if isinstance(inputs, list) and len(inputs) > 1 else "rhs")
+            )
+        )
         operator = str(op.get("operator", attrs.get("operator", "add")))
         return _assign_result(output_name, f"_binary({operator!r}, env[{lhs!r}], env[{rhs!r}])", args=args)
     if op_name == "elementwise_unary":
         inputs = op.get("inputs", attrs.get("inputs", ()))
-        src = str(op.get("src", attrs.get("src", inputs[0] if isinstance(inputs, list) and inputs else "src")))
+        src = str(
+            op.get("src", attrs.get("src", inputs[0] if isinstance(inputs, list) and inputs else "src"))
+        )
         operator = str(op.get("operator", attrs.get("operator", "neg")))
         return _assign_result(output_name, f"_unary({operator!r}, env[{src!r}])", args=args)
     if op_name == "matmul":
         inputs = op.get("inputs", attrs.get("inputs", ()))
-        lhs = str(op.get("lhs", attrs.get("lhs", inputs[0] if isinstance(inputs, list) and len(inputs) > 0 else "A")))
-        rhs = str(op.get("rhs", attrs.get("rhs", inputs[1] if isinstance(inputs, list) and len(inputs) > 1 else "B")))
+        lhs = str(
+            op.get(
+                "lhs", attrs.get("lhs", inputs[0] if isinstance(inputs, list) and len(inputs) > 0 else "A")
+            )
+        )
+        rhs = str(
+            op.get(
+                "rhs", attrs.get("rhs", inputs[1] if isinstance(inputs, list) and len(inputs) > 1 else "B")
+            )
+        )
         return _assign_result(output_name, f"np.matmul(env[{lhs!r}], env[{rhs!r}])", args=args)
     if op_name == "reduction_sum":
         inputs = op.get("inputs", attrs.get("inputs", ()))
-        src = str(op.get("src", attrs.get("src", inputs[0] if isinstance(inputs, list) and inputs else "src")))
+        src = str(
+            op.get("src", attrs.get("src", inputs[0] if isinstance(inputs, list) and inputs else "src"))
+        )
         axis = op.get("axis", attrs.get("axis"))
         axis_expr = "None" if axis is None else repr(axis)
         return _assign_result(output_name, f"np.sum(env[{src!r}], axis={axis_expr})", args=args)
     if op_name == "broadcast":
         inputs = op.get("inputs", attrs.get("inputs", ()))
-        src = str(op.get("src", attrs.get("src", inputs[0] if isinstance(inputs, list) and inputs else "src")))
+        src = str(
+            op.get("src", attrs.get("src", inputs[0] if isinstance(inputs, list) and inputs else "src"))
+        )
         shape = list(op.get("shape", attrs.get("shape", [])))
         return _assign_result(output_name, f"np.broadcast_to(env[{src!r}], {shape!r})", args=args)
     if op_name == "transpose":
         inputs = op.get("inputs", attrs.get("inputs", ()))
-        src = str(op.get("src", attrs.get("src", inputs[0] if isinstance(inputs, list) and inputs else "src")))
+        src = str(
+            op.get("src", attrs.get("src", inputs[0] if isinstance(inputs, list) and inputs else "src"))
+        )
         axes = op.get("axes", attrs.get("axes"))
         axes_expr = "None" if axes is None else repr(tuple(axes))
         return _assign_result(output_name, f"np.transpose(env[{src!r}], axes={axes_expr})", args=args)
     if op_name == "cast":
         inputs = op.get("inputs", attrs.get("inputs", ()))
-        src = str(op.get("src", attrs.get("src", inputs[0] if isinstance(inputs, list) and inputs else "src")))
+        src = str(
+            op.get("src", attrs.get("src", inputs[0] if isinstance(inputs, list) and inputs else "src"))
+        )
         dtype = str(op.get("dtype", attrs.get("dtype", "float32")))
         numpy_dtype = {"f32": "np.float32", "f64": "np.float64", "i32": "np.int32", "i64": "np.int64"}.get(
             dtype, "np.float32"
