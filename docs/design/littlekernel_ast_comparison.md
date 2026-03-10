@@ -1,4 +1,4 @@
-# HTP vs LittleKernel AST-Centric Comparison
+# LittleKernel AST-Centric Comparison
 
 This document closes the old programming-surface TODO about comparing HTP's
 Python-AST-first compiler model with

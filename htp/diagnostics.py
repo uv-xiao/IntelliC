@@ -51,8 +51,8 @@ _CATALOG = {
         title="Missing contract artifact",
         summary="A required emitted artifact is absent from the package directory.",
         docs=(
-            "docs/design/04_artifacts_replay_debug.md",
-            "docs/design/04_artifacts_replay_debug.md",
+            "docs/design/artifacts_replay_debug.md",
+            "docs/design/artifacts_replay_debug.md",
         ),
         fix_hints=(
             "Rebuild the package and check the backend emitter wrote every path recorded in manifest.json.",
@@ -65,7 +65,7 @@ _CATALOG = {
         title="Missing backend target",
         summary="Binding selection requires manifest.target.backend.",
         docs=(
-            "docs/design/04_artifacts_replay_debug.md",
+            "docs/design/artifacts_replay_debug.md",
             "docs/design/README.md",
         ),
         fix_hints=(
@@ -79,9 +79,9 @@ _CATALOG = {
         title="Replay hit a stubbed region",
         summary="The stage is runnable in sim, but execution reached an explicitly stubbed region.",
         docs=(
-            "docs/design/04_artifacts_replay_debug.md",
-            "docs/design/01_compiler_model.md",
-            "docs/design/04_artifacts_replay_debug.md",
+            "docs/design/artifacts_replay_debug.md",
+            "docs/design/compiler_model.md",
+            "docs/design/artifacts_replay_debug.md",
         ),
         fix_hints=(
             "Add sim/reference semantics for the intrinsic or keep the stub as an intentional boundary.",
@@ -98,9 +98,9 @@ _FAMILY_CATALOG = (
             title="PTO package or runtime contract issue",
             summary="The PTO binding found an artifact, metadata, build, or runtime mismatch.",
             docs=(
-                "docs/design/04_artifacts_replay_debug.md",
-                "docs/design/05_backends_and_extensions.md",
-                "docs/design/04_artifacts_replay_debug.md",
+                "docs/design/artifacts_replay_debug.md",
+                "docs/design/backends_and_extensions.md",
+                "docs/design/artifacts_replay_debug.md",
             ),
             fix_hints=(
                 "Check PTO manifest metadata, codegen indices, and emitted toolchain paths together.",
@@ -116,9 +116,9 @@ _FAMILY_CATALOG = (
             title="NV-GPU package or runtime contract issue",
             summary="The NV-GPU binding found an artifact, metadata, build, or runtime mismatch.",
             docs=(
-                "docs/design/04_artifacts_replay_debug.md",
-                "docs/design/05_backends_and_extensions.md",
-                "docs/design/04_artifacts_replay_debug.md",
+                "docs/design/artifacts_replay_debug.md",
+                "docs/design/backends_and_extensions.md",
+                "docs/design/artifacts_replay_debug.md",
             ),
             fix_hints=(
                 "Check the canonical .cu package artifacts, launch metadata, and codegen index together.",
@@ -134,9 +134,9 @@ _FAMILY_CATALOG = (
             title="AIE package contract issue",
             summary="The AIE binding found a metadata, artifact, or extension-package mismatch.",
             docs=(
-                "docs/design/04_artifacts_replay_debug.md",
-                "docs/design/05_backends_and_extensions.md",
-                "docs/design/04_artifacts_replay_debug.md",
+                "docs/design/artifacts_replay_debug.md",
+                "docs/design/backends_and_extensions.md",
+                "docs/design/artifacts_replay_debug.md",
             ),
             fix_hints=("Check the emitted MLIR-AIE package metadata and declared artifact paths together.",),
             fix_hint_policy="repair_aie_artifact_contract",
@@ -149,8 +149,8 @@ _FAMILY_CATALOG = (
             title="Replay or simulator contract issue",
             summary="Stage replay or simulator dispatch hit a stubbed or unsupported execution boundary.",
             docs=(
-                "docs/design/04_artifacts_replay_debug.md",
-                "docs/design/01_compiler_model.md",
+                "docs/design/artifacts_replay_debug.md",
+                "docs/design/compiler_model.md",
             ),
             fix_hints=(
                 "Inspect the stage replay log, replay stubs sidecar, and referenced artifact/toolchain boundary together.",
@@ -165,8 +165,8 @@ _FAMILY_CATALOG = (
             title="Binding contract issue",
             summary="The binding layer found an artifact, schema, entrypoint, or runtime contract problem.",
             docs=(
-                "docs/design/04_artifacts_replay_debug.md",
-                "docs/design/04_artifacts_replay_debug.md",
+                "docs/design/artifacts_replay_debug.md",
+                "docs/design/artifacts_replay_debug.md",
             ),
             fix_hints=("Check manifest.json, staged artifacts, and binding validation together.",),
             fix_hint_policy="repair_binding_contract",
@@ -179,8 +179,8 @@ _FAMILY_CATALOG = (
             title="Layout legality violation",
             summary="The program’s emitted layout facts conflict with required memory, distribution, or hardware placement rules.",
             docs=(
-                "docs/design/04_artifacts_replay_debug.md",
-                "docs/design/01_compiler_model.md",
+                "docs/design/artifacts_replay_debug.md",
+                "docs/design/compiler_model.md",
             ),
             fix_hints=(
                 "Inspect the staged layout payload and re-check the pass that introduced the conflicting placement or tiling rule.",
@@ -195,8 +195,8 @@ _FAMILY_CATALOG = (
             title="Effect or synchronization legality violation",
             summary="The program’s effect model has an undischarged async, barrier, or protocol obligation.",
             docs=(
-                "docs/design/04_artifacts_replay_debug.md",
-                "docs/design/01_compiler_model.md",
+                "docs/design/artifacts_replay_debug.md",
+                "docs/design/compiler_model.md",
             ),
             fix_hints=(
                 "Inspect the staged effects payload, pass trace, and protocol checks to find the undischarged obligation.",
@@ -211,8 +211,8 @@ _FAMILY_CATALOG = (
             title="Type or alias legality violation",
             summary="The typed semantic layer found a dtype, aliasing, or shape legality violation.",
             docs=(
-                "docs/design/04_artifacts_replay_debug.md",
-                "docs/design/01_compiler_model.md",
+                "docs/design/artifacts_replay_debug.md",
+                "docs/design/compiler_model.md",
             ),
             fix_hints=("Repair the program’s buffer/view/type contract before backend lowering.",),
             fix_hint_policy="repair_semantic_type_contract",
@@ -225,7 +225,7 @@ _FAMILY_CATALOG = (
             title="Channel or protocol legality violation",
             summary="The workload/process protocol is unbalanced or otherwise illegal.",
             docs=(
-                "docs/design/01_compiler_model.md",
+                "docs/design/compiler_model.md",
                 "examples/csp_channel_pipeline/README.md",
             ),
             fix_hints=("Balance channel puts/gets and re-check process protocol obligations.",),
@@ -239,9 +239,9 @@ _FAMILY_CATALOG = (
             title="Solver satisfiability failure",
             summary="Pipeline or capability solving could not find a legal composition.",
             docs=(
-                "docs/design/04_artifacts_replay_debug.md",
-                "docs/design/03_pipeline_and_solver.md",
-                "docs/design/04_artifacts_replay_debug.md",
+                "docs/design/artifacts_replay_debug.md",
+                "docs/design/pipeline_and_solver.md",
+                "docs/design/artifacts_replay_debug.md",
             ),
             fix_hints=(
                 "Inspect ir/solver_failure.json and align required outputs, invariants, and providers.",
@@ -274,7 +274,7 @@ def explain(code: str) -> dict[str, object]:
         "matched_by": "unknown",
         "title": "Unknown diagnostic code",
         "summary": "No explicit explanation is registered for this diagnostic code yet.",
-        "docs": ["docs/design/04_artifacts_replay_debug.md"],
+        "docs": ["docs/design/artifacts_replay_debug.md"],
         "fix_hints": ["Inspect the diagnostic payload and package artifacts directly."],
         "fix_hint_policy": "inspect_diagnostic_payload",
     }
@@ -284,7 +284,7 @@ def fix_hints_ref_for(code: str) -> str:
     entry, _matched_by = lookup(code)
     if entry is not None and entry.docs:
         return entry.docs[0]
-    return "docs/design/04_artifacts_replay_debug.md"
+    return "docs/design/artifacts_replay_debug.md"
 
 
 def augment_diagnostic(

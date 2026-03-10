@@ -1,6 +1,6 @@
-# TODO Layer 3 — Pipeline and Solver
+# TODO — Pipeline and Solver
 
-This layer tracks the remaining gap between the current registered pipeline discipline and the final extensibility/composition story.
+This document tracks the remaining gap between the current registered pipeline discipline and the final extensibility/composition story.
 
 ## Completion snapshot
 

@@ -1,6 +1,6 @@
-# TODO Layer 5 — Backends and Extensions
+# TODO — Backends and Extensions
 
-This layer tracks the remaining backend depth and extension breadth.
+This document tracks the remaining backend depth and extension breadth.
 
 ## Completion snapshot
 

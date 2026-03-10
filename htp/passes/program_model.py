@@ -801,7 +801,7 @@ def _value_type_payload(argument: Mapping[str, Any], *, entry: str, index: int) 
                 node_id=f"{entry}:Arg:{index}" if entry else None,
                 entity_id=f"{entry}:E{index}" if entry else None,
                 payload_ref_hint="semantic.types",
-                fix_hints_ref="docs/design/01_compiler_model.md",
+                fix_hints_ref="docs/design/compiler_model.md",
             )
         return type_to_payload(ViewType(dtype=dtype, shape=shape, source=str(source), alias_of=str(alias_of)))
     if kind == "tensor":
@@ -1126,7 +1126,7 @@ def _protocol_effects(workload_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
                 f"channel {channel_name!r} has puts={puts} and gets={gets}.",
                 node_id=f"{entry}:Channel:{index}" if entry else None,
                 payload_ref_hint="semantic.workload_ir",
-                fix_hints_ref="docs/design/04_artifacts_replay_debug.md",
+                fix_hints_ref="docs/design/artifacts_replay_debug.md",
                 channel=channel_name,
                 puts=puts,
                 gets=gets,
@@ -1141,7 +1141,7 @@ def _protocol_effects(workload_ir: Mapping[str, Any]) -> list[dict[str, Any]]:
                 f"channel {channel_name!r} has a potential deadlock hazard: {first_hazard['detail']}",
                 node_id=f"{entry}:Channel:{index}" if entry else None,
                 payload_ref_hint="semantic.workload_ir",
-                fix_hints_ref="docs/design/04_artifacts_replay_debug.md",
+                fix_hints_ref="docs/design/artifacts_replay_debug.md",
                 channel=channel_name,
                 hazard=first_hazard,
             )
@@ -1424,7 +1424,7 @@ def _validate_dtype_contracts(kernel_ir: Mapping[str, Any], *, target: Mapping[s
                 node_id=f"{entry}:Arg:{index}" if entry else None,
                 entity_id=f"{entry}:E{index}" if entry else None,
                 payload_ref_hint="semantic.kernel_ir",
-                fix_hints_ref="docs/design/01_compiler_model.md",
+                fix_hints_ref="docs/design/compiler_model.md",
                 backend=backend,
                 manifest_value=dtype,
             )
@@ -1450,7 +1450,7 @@ def _validate_alias_contracts(kernel_ir: Mapping[str, Any]) -> None:
                 node_id=f"{entry}:Arg:{index}" if entry else None,
                 entity_id=f"{entry}:E{index}" if entry else None,
                 payload_ref_hint="semantic.kernel_ir",
-                fix_hints_ref="docs/design/01_compiler_model.md",
+                fix_hints_ref="docs/design/compiler_model.md",
                 alias_of=alias_name,
             )
         role = str(argument.get("role") or "")
@@ -1469,7 +1469,7 @@ def _validate_alias_contracts(kernel_ir: Mapping[str, Any]) -> None:
                 node_id=f"{entry}:Arg:{first_index}" if entry else None,
                 entity_id=f"{entry}:E{first_index}" if entry else None,
                 payload_ref_hint="semantic.kernel_ir",
-                fix_hints_ref="docs/design/01_compiler_model.md",
+                fix_hints_ref="docs/design/compiler_model.md",
                 alias_of=alias_name,
                 mutable_aliases=users,
             )
@@ -1488,7 +1488,7 @@ def _validate_layout_contracts(
                 ),
                 node_id=f"{entry}:{join.get('op_id')}" if entry else None,
                 payload_ref_hint="semantic.layout",
-                fix_hints_ref="docs/design/01_compiler_model.md",
+                fix_hints_ref="docs/design/compiler_model.md",
                 op_id=join.get("op_id"),
             )
         expected = join_distribution_facets(
@@ -1508,7 +1508,7 @@ def _validate_layout_contracts(
                     (f"op {join.get('op_id')!r} requires explicit relayout for output {join.get('out')!r}."),
                     node_id=f"{entry}:{join.get('op_id')}" if entry else None,
                     payload_ref_hint="semantic.layout",
-                    fix_hints_ref="docs/design/01_compiler_model.md",
+                    fix_hints_ref="docs/design/compiler_model.md",
                     op_id=join.get("op_id"),
                     output=join.get("out"),
                 )
@@ -1535,7 +1535,7 @@ def _validate_layout_contracts(
                 f"relayout op {relayout.get('op_id')!r} does not change distribution.",
                 node_id=f"{entry}:{relayout.get('op_id')}" if entry else None,
                 payload_ref_hint="semantic.layout",
-                fix_hints_ref="docs/design/01_compiler_model.md",
+                fix_hints_ref="docs/design/compiler_model.md",
                 op_id=relayout.get("op_id"),
             )
 
@@ -1560,7 +1560,7 @@ def _validate_effect_contracts(
             f"token {first.get('token_id')!r} is not discharged by await or barrier.",
             node_id=str(first.get("produced_by", "")) or None,
             payload_ref_hint="semantic.effects",
-            fix_hints_ref="docs/design/04_artifacts_replay_debug.md",
+            fix_hints_ref="docs/design/artifacts_replay_debug.md",
             token=first.get("token_id"),
         )
     pending_collectives = [
@@ -1575,7 +1575,7 @@ def _validate_effect_contracts(
             f"collective obligation for {first.get('required_by')} is still pending.",
             node_id=str(first.get("op_id", "")) or None,
             payload_ref_hint="semantic.effects",
-            fix_hints_ref="docs/design/01_compiler_model.md",
+            fix_hints_ref="docs/design/compiler_model.md",
             collective=first.get("collective_id"),
         )
 

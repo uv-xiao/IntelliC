@@ -311,7 +311,7 @@ def test_compile_program_writes_compiler_failure_for_layout_typecheck(tmp_path):
             "stage_id": "s02",
             "pass_id": "htp::typecheck_layout_effects@1",
             "payload_ref": "ir/stages/s02/kernel_ir.json",
-            "fix_hints_ref": "docs/design/01_compiler_model.md",
+            "fix_hints_ref": "docs/design/compiler_model.md",
             "backend": "nvgpu",
             "manifest_value": "bf16",
         },

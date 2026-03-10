@@ -23,9 +23,9 @@ AIE_CODEGEN_SCHEMA_ID = "htp.aie.codegen.v1"
 AIE_TOOLCHAIN_SCHEMA_ID = "htp.aie.toolchain.v1"
 
 CONTRACT_REFS = (
-    "docs/design/04_artifacts_replay_debug.md",
-    "docs/design/05_backends_and_extensions.md",
-    "docs/design/04_artifacts_replay_debug.md",
+    "docs/design/artifacts_replay_debug.md",
+    "docs/design/backends_and_extensions.md",
+    "docs/design/artifacts_replay_debug.md",
 )
 
 

@@ -1,6 +1,6 @@
-# TODO Layer 6 — Agent Product and Workflow
+# TODO — Agent Product and Workflow
 
-This layer tracks the remaining gap between today’s disciplined workflow/tooling and the final agent-native framework product.
+This document tracks the remaining gap between today’s disciplined workflow/tooling and the final agent-native framework product.
 
 ## Completion snapshot
 
@@ -31,7 +31,7 @@ absence of any rule set at all.
 
 ## Why these tasks remain
 
-This layer improved substantially with the docs/process work, but the full target still includes stronger autonomous loops and richer machine-guided development behavior than the repository currently provides.
+This topic improved substantially with the docs/process work, but the full target still includes stronger autonomous loops and richer machine-guided development behavior than the repository currently provides.
 
 ## Coding pointers
 

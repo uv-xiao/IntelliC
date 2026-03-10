@@ -30,7 +30,7 @@ def test_raise_stub_produces_structured_diagnostic():
             "Register a simulator for the intrinsic in the replay runtime.",
             "Route replay through an owning extension if simulation is toolchain-specific.",
         ],
-        "fix_hints_ref": "docs/design/04_artifacts_replay_debug.md",
+        "fix_hints_ref": "docs/design/artifacts_replay_debug.md",
     }
     assert error.fix_hints == (
         "Register a simulator for the intrinsic in the replay runtime.",

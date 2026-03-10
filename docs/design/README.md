@@ -2,7 +2,7 @@
 
 `docs/design/` is the normative description of what is implemented in this repository.
 
-This tree is intentionally organized as direct feature documents. Each feature file combines:
+This tree is intentionally organized as broad implemented-topic documents. Each file combines:
 - the implemented contract,
 - the main code anchors,
 - and a small visual model so readers can orient themselves quickly.
@@ -32,23 +32,23 @@ Agent Product + Workflow
 
 - `docs/story.md` — final intended framework story
 - `docs/design/README.md` — implemented architecture index
-- `docs/design/01_compiler_model.md`
-- `docs/design/02_programming_surfaces.md`
-- `docs/design/03_pipeline_and_solver.md`
-- `docs/design/04_artifacts_replay_debug.md`
-- `docs/design/05_backends_and_extensions.md`
-- `docs/design/06_agent_product_and_workflow.md`
-- `docs/design/07_littlekernel_ast_comparison.md`
+- `docs/design/compiler_model.md`
+- `docs/design/programming_surfaces.md`
+- `docs/design/pipeline_and_solver.md`
+- `docs/design/artifacts_replay_debug.md`
+- `docs/design/backends_and_extensions.md`
+- `docs/design/agent_product_and_workflow.md`
+- `docs/design/littlekernel_ast_comparison.md`
 
 ## Implemented feature documents
 
-- `docs/design/01_compiler_model.md` — canonical Python-space compiler model, semantics, typing, layout, effects
-- `docs/design/02_programming_surfaces.md` — kernel, WSP, CSP, and workload authoring surfaces
-- `docs/design/03_pipeline_and_solver.md` — pass spine, capability solver, staged transformations, MLIR round-trip participation
-- `docs/design/04_artifacts_replay_debug.md` — manifest, staged artifacts, replay, diagnostics, and verification surface
-- `docs/design/05_backends_and_extensions.md` — PTO, NV-GPU, AIE, extension integration, and Arknife-style NV-GPU support
-- `docs/design/06_agent_product_and_workflow.md` — agent-facing tooling and repository workflow
-- `docs/design/07_littlekernel_ast_comparison.md` — completed LittleKernel comparison and the surface rules extracted from it
+- `docs/design/compiler_model.md` — canonical Python-space compiler model, semantics, typing, layout, effects
+- `docs/design/programming_surfaces.md` — kernel, WSP, CSP, and workload authoring surfaces
+- `docs/design/pipeline_and_solver.md` — pass spine, capability solver, staged transformations, MLIR round-trip participation
+- `docs/design/artifacts_replay_debug.md` — manifest, staged artifacts, replay, diagnostics, and verification surface
+- `docs/design/backends_and_extensions.md` — PTO, NV-GPU, AIE, extension integration, and Arknife-style NV-GPU support
+- `docs/design/agent_product_and_workflow.md` — agent-facing tooling and repository workflow
+- `docs/design/littlekernel_ast_comparison.md` — completed LittleKernel comparison and the surface rules extracted from it
 
 ## Examples
 

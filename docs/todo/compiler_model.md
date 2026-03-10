@@ -1,6 +1,6 @@
-# TODO Layer 1 — Compiler Model, Semantics, and Typing
+# TODO — Compiler Model, Semantics, and Typing
 
-This layer tracks the remaining gap between the current semantic substrate and the final intended compiler model.
+This document tracks the remaining gap between the current semantic substrate and the final intended compiler model.
 
 ## Completion snapshot
 

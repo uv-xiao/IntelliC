@@ -23,9 +23,9 @@ For feature work:
 - open: 5
 - completion ratio: about 75%
 
-### By area
+### By topic
 
-| Layer | Complete | Partial | Open | Total |
+| Topic | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Compiler model, semantics, typing | 6 | 2 | 2 | 10 |
 | Programming surfaces | 10 | 0 | 0 | 10 |
@@ -36,25 +36,25 @@ For feature work:
 
 ## Feature summaries
 
-- `docs/todo/01_compiler_model.md`
+- `docs/todo/compiler_model.md`
   - remaining work: broaden semantic/type/layout/effect breadth beyond the newly landed fused-elementwise semantics and deepen routine semantics
-- `docs/todo/02_programming_surfaces.md`
+- `docs/todo/programming_surfaces.md`
   - remaining work: no standalone open item; future surface work now rolls into richer semantics and backend depth
-- `docs/todo/03_pipeline_and_solver.md`
+- `docs/todo/pipeline_and_solver.md`
   - remaining work: richer search/composition and broader MLIR island breadth
-- `docs/todo/04_artifacts_replay_debug.md`
+- `docs/todo/artifacts_replay_debug.md`
   - remaining work: deeper replay/reference coverage; the package/debug contract itself is now broadly uniform
-- `docs/todo/05_backends_and_extensions.md`
+- `docs/todo/backends_and_extensions.md`
   - remaining work: deepen PTO, NV-GPU, and AIE rather than changing the architecture; the remaining gap is backend depth, not the Arknife reuse boundary
-- `docs/todo/06_agent_product_and_workflow.md`
+- `docs/todo/agent_product_and_workflow.md`
   - remaining work: stronger autonomous loops and continued quality-discipline tightening
 
 ## Detailed remaining TODO files
 
-- `docs/todo/01_compiler_model.md`
-- `docs/todo/02_programming_surfaces.md`
-- `docs/todo/03_pipeline_and_solver.md`
-- `docs/todo/04_artifacts_replay_debug.md`
-- `docs/todo/05_backends_and_extensions.md`
-- `docs/todo/06_agent_product_and_workflow.md`
+- `docs/todo/compiler_model.md`
+- `docs/todo/programming_surfaces.md`
+- `docs/todo/pipeline_and_solver.md`
+- `docs/todo/artifacts_replay_debug.md`
+- `docs/todo/backends_and_extensions.md`
+- `docs/todo/agent_product_and_workflow.md`
 - `docs/todo/reports/retargetable_extensibility_report.md`
