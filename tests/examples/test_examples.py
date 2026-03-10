@@ -224,7 +224,7 @@ def test_mlir_cse_extension_example_compiles_and_replays(tmp_path):
     assert compile_summary["solver"]["template_id"] == "htp.default+htp_ext.mlir_cse.v1"
     assert compile_summary["solver"]["extension_results"]["htp_ext.mlir_cse"]["eligible"] is True
     assert replay_summary["ok"] is True
-    assert replay_summary["result"] == {"entry": "expr_demo", "result": 7, "rewrites": []}
+    assert replay_summary["result"] == {"entry": "expr_demo", "result": 33, "rewrites": []}
     assert "mlir_cse" in replay_summary["extensions"]
 
 

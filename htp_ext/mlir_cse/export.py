@@ -5,6 +5,14 @@ from typing import Any
 
 from htp.passes.program_model import build_semantic_model, canonicalize_program
 
+_SUPPORTED_EXPR_OPS = ("add", "sub", "mul", "div")
+_MLIR_OP_FOR = {
+    "add": "arith.addi",
+    "sub": "arith.subi",
+    "mul": "arith.muli",
+    "div": "arith.divsi",
+}
+
 
 def eligibility_for(program: Mapping[str, Any]) -> dict[str, Any]:
     has_direct_exprs = isinstance(program.get("exprs"), list)
@@ -61,14 +69,14 @@ def eligibility_for(program: Mapping[str, Any]) -> dict[str, Any]:
 
     if not all(
         isinstance(expr, Mapping)
-        and expr.get("op") in {"add", "mul"}
+        and expr.get("op") in _SUPPORTED_EXPR_OPS
         and isinstance(expr.get("target"), str)
         and isinstance(expr.get("lhs"), str)
         and isinstance(expr.get("rhs"), str)
         for expr in exprs
     ):
         ok = False
-        reasons.append("exprs must be mappings with add/mul ops and string target/lhs/rhs")
+        reasons.append("exprs must be mappings with add/sub/mul/div ops and string target/lhs/rhs")
         failed_rules.append("typed.elementwise_scalar_ops")
     else:
         satisfied_rules.append("typed.elementwise_scalar_ops")
@@ -103,7 +111,7 @@ def export_program(program: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
     value_names = {name: f"%{name}" for name in analysis["inputs"]}
     ledger_ops = []
     for index, expr in enumerate(exprs):
-        op_name = "arith.addi" if expr["op"] == "add" else "arith.muli"
+        op_name = _MLIR_OP_FOR[str(expr["op"])]
         result_name = f"%v{index}"
         lhs = value_names[expr["lhs"]]
         rhs = value_names[expr["rhs"]]
@@ -179,7 +187,7 @@ def normalize_expr_program(program: Mapping[str, Any]) -> dict[str, Any]:
     for op in kernel.get("ops", ()):
         if str(op.get("op")) != "elementwise_binary" or str(op.get("dtype")) != "i32":
             return dict(program)
-        if str(op.get("operator")) not in {"add", "mul"}:
+        if str(op.get("operator")) not in _SUPPORTED_EXPR_OPS:
             return dict(program)
         if op.get("shape") not in ([], ()):
             return dict(program)

@@ -29,6 +29,12 @@ EXPORT_STAGE_DIR = Path("ir") / "stages" / "s01" / "islands" / "mlir_cse"
 IMPORT_STAGE_DIR = Path("ir") / "stages" / "s02" / "islands" / "mlir_cse"
 EXPORT_PASS_ID = "htp_ext.mlir_cse::export@1"
 IMPORT_PASS_ID = "htp_ext.mlir_cse::import@1"
+_MLIR_OP_FOR = {
+    "add": "arith.addi",
+    "sub": "arith.subi",
+    "mul": "arith.muli",
+    "div": "arith.divsi",
+}
 
 EXPORT_CONTRACT = PassContract.analysis(
     pass_id=EXPORT_PASS_ID,
@@ -319,7 +325,16 @@ def _replay_handler(*, payload: Mapping[str, object], mode: str, trace: object |
     for expr in program["exprs"]:
         lhs = env[expr["lhs"]]
         rhs = env[expr["rhs"]]
-        env[expr["target"]] = lhs + rhs if expr["op"] == "add" else lhs * rhs
+        if expr["op"] == "add":
+            env[expr["target"]] = lhs + rhs
+        elif expr["op"] == "sub":
+            env[expr["target"]] = lhs - rhs
+        elif expr["op"] == "mul":
+            env[expr["target"]] = lhs * rhs
+        elif expr["op"] == "div":
+            env[expr["target"]] = lhs // rhs
+        else:
+            raise ValueError(f"unsupported replay operator: {expr['op']}")
     return {
         "result": env[program["result"]],
         "rewrites": summary["rewrites"],
@@ -416,7 +431,7 @@ def _render_mlir_module(
     arguments = ", ".join(f"%{name}: i32" for name in args)
     lines = ["module {", f"  func.func @{entry}({arguments}) -> i32 {{"]
     for op in ops:
-        op_name = "arith.addi" if op["op"] == "add" else "arith.muli"
+        op_name = _MLIR_OP_FOR[str(op["op"])]
         lines.append(f"    {op['result']} = {op_name} {op['lhs']}, {op['rhs']} : i32")
     lines.append(f"    return {return_value} : i32")
     lines.append("  }")

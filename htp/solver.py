@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -91,6 +91,7 @@ class SolverResult:
     state: CapabilityState
     required_outputs: tuple[str, ...]
     extension_results: dict[str, dict[str, Any]]
+    selection_trace: dict[str, int] = field(default_factory=dict)
     failure: SolverFailure | None = None
 
 
@@ -118,14 +119,25 @@ def available_pipeline_templates(*, program: dict[str, Any]) -> tuple[PipelineTe
     return tuple(expanded)
 
 
-def solve_default_pipeline(*, program: dict[str, Any]) -> SolverResult:
+def solve_default_pipeline(
+    *,
+    program: dict[str, Any],
+    existing_package_dir: Path | str | None = None,
+) -> SolverResult:
     extension_results = _collect_extension_results(program)
     requested_extensions = tuple(requested_extension_ids(program))
     templates = list(available_pipeline_templates(program=program))
     attempts: list[SolverResult] = []
+    resume_attempt = _resume_attempt(
+        program=program,
+        existing_package_dir=existing_package_dir,
+        requested_extensions=requested_extensions,
+    )
+    if resume_attempt is not None:
+        attempts.append(_decorate_selection_trace(resume_attempt, requested_extensions=requested_extensions))
     for template in templates:
         result = solve_pipeline(program=program, template=template)
-        attempts.append(result)
+        attempts.append(_decorate_selection_trace(result, requested_extensions=requested_extensions))
     matching_attempts = [
         result
         for result in attempts
@@ -249,6 +261,44 @@ def validate_final_artifacts(package_dir: Path | str, result: SolverResult) -> S
         required_outputs=result.required_outputs,
         extension_results=result.extension_results,
         failure=failure,
+    )
+
+
+def _resume_attempt(
+    *,
+    program: dict[str, Any],
+    existing_package_dir: Path | str | None,
+    requested_extensions: tuple[str, ...],
+) -> SolverResult | None:
+    if existing_package_dir is None:
+        return None
+    package_path = Path(existing_package_dir)
+    if not package_path.exists():
+        return None
+    manifest = load_manifest(package_path)
+    manifest_target = _manifest_target(manifest)
+    requested_target = normalize_target(program)
+    if manifest_target != requested_target:
+        return None
+    manifest_inputs = manifest.get("inputs", {})
+    if isinstance(manifest_inputs, dict):
+        current_inputs = _program_identity(program)
+        if any(
+            manifest_inputs.get(key) not in (None, current_inputs[key])
+            for key in ("entry", "kernel_name", "workload_entry")
+        ):
+            return None
+        existing_requested = tuple(manifest_inputs.get("requested_extensions", ()))
+        if requested_extensions and tuple(existing_requested) != requested_extensions:
+            return None
+    resume_result = solve_existing_package(package_path)
+    expected_outputs = set(_backend_declaration(requested_target).required_outputs)
+    if not expected_outputs.issubset(set(resume_result.required_outputs)):
+        return None
+    return replace(
+        resume_result,
+        pass_ids=[],
+        passes=(),
     )
 
 
@@ -457,8 +507,9 @@ def _resolve_required_outputs(
 
 
 def _result_selection_key(result: SolverResult) -> tuple[int, int, int, str]:
+    total_cost = result.selection_trace.get("total", result.selection_cost)
     return (
-        result.selection_cost,
+        total_cost,
         sum(contract.deterministic is False for contract in result.passes) * 1000
         + sum(getattr(contract, "owner", "") != "htp" for contract in result.passes) * 100
         + len(result.passes) * 10
@@ -477,6 +528,8 @@ def _template_satisfies_requested_extensions(
 ) -> bool:
     if not requested_extensions:
         return True
+    if result.template_id == RESUME_TEMPLATE_ID:
+        return set(requested_extensions).issubset(set(result.extension_results))
     return set(requested_extensions).issubset(
         set(_template_extensions(result.template_id, result.extension_results))
     )
@@ -489,6 +542,30 @@ def _template_extensions(template_id: str, extension_results: dict[str, dict[str
         if isinstance(templates, list | tuple) and template_id in templates:
             extensions.append(str(extension_id))
     return tuple(extensions)
+
+
+def _decorate_selection_trace(
+    result: SolverResult,
+    *,
+    requested_extensions: tuple[str, ...],
+) -> SolverResult:
+    matched_extensions = len(
+        set(requested_extensions).intersection(
+            set(_template_extensions(result.template_id, result.extension_results))
+        )
+    )
+    if result.template_id == RESUME_TEMPLATE_ID:
+        matched_extensions = len(set(requested_extensions).intersection(set(result.extension_results)))
+    trace = {
+        "base_cost": result.selection_cost,
+        "pass_cost": len(result.passes) * 10,
+        "extension_cost": len(_template_extensions(result.template_id, result.extension_results)) * 5,
+        "output_cost": len(result.required_outputs),
+        "resume_bonus": -200 if result.template_id == RESUME_TEMPLATE_ID else 0,
+        "requested_extension_bonus": -(matched_extensions * 25),
+    }
+    trace["total"] = sum(trace.values())
+    return replace(result, selection_trace=trace)
 
 
 def _requested_extension_failure(
@@ -604,7 +681,33 @@ def solve_existing_package(package_dir: Path | str) -> SolverResult:
             str(value) for value in manifest.get("outputs", {}).values() if isinstance(value, str)
         ),
         extension_results=dict(manifest.get("extensions", {})),
+        selection_trace={
+            "base_cost": 0,
+            "pass_cost": 0,
+            "extension_cost": 0,
+            "output_cost": len(
+                tuple(str(value) for value in manifest.get("outputs", {}).values() if isinstance(value, str))
+            ),
+            "resume_bonus": -200,
+            "requested_extension_bonus": 0,
+            "total": len(
+                tuple(str(value) for value in manifest.get("outputs", {}).values() if isinstance(value, str))
+            )
+            - 200,
+        },
     )
+
+
+def _program_identity(program: dict[str, Any]) -> dict[str, Any]:
+    kernel = program.get("kernel")
+    workload = program.get("workload")
+    extensions = program.get("extensions")
+    return {
+        "entry": str(program.get("entry", "")),
+        "kernel_name": str(kernel.get("name", "")) if isinstance(kernel, dict) else "",
+        "workload_entry": str(workload.get("entry", "")) if isinstance(workload, dict) else "",
+        "requested_extensions": list(extensions.get("requested", ())) if isinstance(extensions, dict) else [],
+    }
 
 
 def _manifest_target(manifest: dict[str, Any]) -> dict[str, str]:
