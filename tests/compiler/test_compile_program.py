@@ -2,47 +2,7 @@ import json
 
 import htp
 from htp.pipeline.defaults import MANDATORY_PASS_IDS
-
-
-def _vector_add_program() -> dict[str, object]:
-    return {
-        "entry": "vector_add",
-        "kernel": {
-            "name": "vector_add",
-            "args": [
-                {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-                {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-                {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
-                {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
-            ],
-            "ops": [
-                {
-                    "op": "elementwise_binary",
-                    "operator": "add",
-                    "lhs": "lhs",
-                    "rhs": "rhs",
-                    "out": "out",
-                    "shape": ["size"],
-                    "dtype": "f32",
-                }
-            ],
-        },
-        "workload": {
-            "entry": "vector_add",
-            "tasks": [
-                {
-                    "task_id": "task0",
-                    "kind": "kernel_call",
-                    "kernel": "vector_add",
-                    "args": ["lhs", "rhs", "out", "size"],
-                }
-            ],
-            "channels": [],
-            "dependencies": [],
-        },
-        "analysis": {},
-        "package": {"emitted": False},
-    }
+from tests.programs import nvgpu_serving_program, portable_vector_add_program, pto_vector_dag_program
 
 
 def test_compile_program_emits_pto_package_and_keeps_stage_replay(tmp_path):
@@ -51,7 +11,7 @@ def test_compile_program_emits_pto_package_and_keeps_stage_replay(tmp_path):
     compiled = htp.compile_program(
         package_dir=package_dir,
         target="pto-a2a3sim",
-        program=_vector_add_program(),
+        program=pto_vector_dag_program(),
     )
 
     assert compiled.target.backend == "pto"
@@ -61,7 +21,7 @@ def test_compile_program_emits_pto_package_and_keeps_stage_replay(tmp_path):
         "hardware_profile": "ascend:a2a3sim",
         "option": "a2a3sim",
     }
-    assert compiled.manifest["inputs"]["entry"] == "vector_add"
+    assert compiled.manifest["inputs"]["entry"] == "vector_dag"
     assert compiled.manifest["pipeline"]["pass_ids"] == list(MANDATORY_PASS_IDS)
     assert compiled.manifest["capabilities"]["target"]["backend"] == "pto"
     assert compiled.pipeline.current_stage == f"s{len(MANDATORY_PASS_IDS):02d}"
@@ -71,6 +31,7 @@ def test_compile_program_emits_pto_package_and_keeps_stage_replay(tmp_path):
     assert replay.ok is True
     assert replay.result["package"]["emitted"] is True
     assert replay.result["target"] == {"backend": "pto", "option": "a2a3sim"}
+    assert len(replay.result["kernel_ir"]["ops"]) >= 5
     assert replay.result["kernel_ir"]["ops"][0]["op"] == "elementwise_binary"
 
 
@@ -80,7 +41,7 @@ def test_compile_program_emits_pto_device_package(tmp_path):
     compiled = htp.compile_program(
         package_dir=package_dir,
         target="pto-a2a3",
-        program=_vector_add_program(),
+        program=pto_vector_dag_program(),
     )
 
     assert compiled.target.backend == "pto"
@@ -100,47 +61,7 @@ def test_compile_program_emits_nvgpu_package_and_keeps_stage_replay(tmp_path):
     compiled = htp.compile_program(
         package_dir=package_dir,
         target="nvgpu-ampere",
-        program={
-            "entry": "gemm_tile",
-            "kernel": {
-                "name": "gemm_tile",
-                "args": [
-                    {"name": "A", "kind": "buffer", "dtype": "f32", "shape": ["M", "K"], "role": "input"},
-                    {"name": "B", "kind": "buffer", "dtype": "f32", "shape": ["K", "N"], "role": "input"},
-                    {"name": "C", "kind": "buffer", "dtype": "f32", "shape": ["M", "N"], "role": "output"},
-                    {"name": "M", "kind": "scalar", "dtype": "i32", "role": "shape"},
-                    {"name": "N", "kind": "scalar", "dtype": "i32", "role": "shape"},
-                    {"name": "K", "kind": "scalar", "dtype": "i32", "role": "shape"},
-                ],
-                "ops": [
-                    {
-                        "op": "matmul",
-                        "lhs": "A",
-                        "rhs": "B",
-                        "out": "C",
-                        "m": "M",
-                        "n": "N",
-                        "k": "K",
-                        "dtype": "f32",
-                    }
-                ],
-            },
-            "workload": {
-                "entry": "gemm_tile",
-                "tasks": [
-                    {
-                        "task_id": "task0",
-                        "kind": "kernel_call",
-                        "kernel": "gemm_tile",
-                        "args": ["A", "B", "C", "M", "N", "K"],
-                    }
-                ],
-                "channels": [],
-                "dependencies": [],
-            },
-            "analysis": {},
-            "package": {"emitted": False},
-        },
+        program=nvgpu_serving_program(),
     )
 
     assert compiled.target.backend == "nvgpu"
@@ -159,7 +80,11 @@ def test_compile_program_emits_nvgpu_package_and_keeps_stage_replay(tmp_path):
     assert replay.ok is True
     assert replay.result["package"]["emitted"] is True
     assert replay.result["target"] == {"backend": "nvgpu", "option": "ampere"}
-    assert replay.result["kernel_ir"]["ops"][0]["op"] == "matmul"
+    assert "matmul" in [op["op"] for op in replay.result["kernel_ir"]["ops"]]
+    assert [task["task_id"] for task in replay.result["workload_ir"]["tasks"][:2]] == [
+        "prefill",
+        "decode_step_0",
+    ]
 
 
 def test_compile_program_emits_aie_package_and_keeps_stage_replay(tmp_path):
@@ -168,7 +93,44 @@ def test_compile_program_emits_aie_package_and_keeps_stage_replay(tmp_path):
     compiled = htp.compile_program(
         package_dir=package_dir,
         target="aie-xdna2-npu1",
-        program=_vector_add_program(),
+        program={
+            "entry": "vector_add",
+            "kernel": {
+                "name": "vector_add",
+                "args": [
+                    {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                    {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
+                    {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
+                    {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
+                ],
+                "ops": [
+                    {
+                        "op": "elementwise_binary",
+                        "operator": "add",
+                        "lhs": "lhs",
+                        "rhs": "rhs",
+                        "out": "out",
+                        "shape": ["size"],
+                        "dtype": "f32",
+                    }
+                ],
+            },
+            "workload": {
+                "entry": "vector_add",
+                "tasks": [
+                    {
+                        "task_id": "task0",
+                        "kind": "kernel_call",
+                        "kernel": "vector_add",
+                        "args": ["lhs", "rhs", "out", "size"],
+                    }
+                ],
+                "channels": [],
+                "dependencies": [],
+            },
+            "analysis": {},
+            "package": {"emitted": False},
+        },
     )
 
     assert compiled.target.backend == "aie"
@@ -195,7 +157,7 @@ def test_compile_program_emits_cpu_ref_package(tmp_path):
     compiled = htp.compile_program(
         package_dir=package_dir,
         target="cpu_ref",
-        program=_vector_add_program(),
+        program=portable_vector_add_program(),
     )
 
     assert compiled.target.backend == "cpu_ref"

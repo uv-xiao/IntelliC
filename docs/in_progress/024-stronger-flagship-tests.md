@@ -18,10 +18,10 @@ Strengthen the existing high-level test suites in place by replacing repeated to
 
 ## Scope Checklist
 
-- [ ] add shared richer authored programs for high-level test use
-- [ ] replace toy programs in compiler, pipeline, and tools tests in place
-- [ ] keep low-level raw-payload tests only where they are actually contract-directed
-- [ ] sync programming-surface TODO/docs to reflect the stronger test baseline
+- [x] add shared richer authored programs for high-level test use
+- [x] replace toy programs in compiler, pipeline, and tools tests in place
+- [x] keep low-level raw-payload tests only where they are actually contract-directed
+- [x] sync programming-surface TODO/docs to reflect the stronger test baseline
 
 ## Code Surfaces
 
@@ -32,18 +32,31 @@ Strengthen the existing high-level test suites in place by replacing repeated to
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for the motivating gap
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating gap
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. The point is to make existing tests harder, not to inflate counts.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for the stronger test/program baseline if needed
-- [ ] update `docs/todo/` to narrow the remaining programming-surface gap
+- [x] update `docs/design/` for the stronger test/program baseline if needed
+- [x] update `docs/todo/` to narrow the remaining programming-surface gap
 - [ ] remove this file from `docs/in_progress/` before merge
+
+## Progress Notes
+
+- Added `tests/programs.py` so high-level suites share authored programs from
+  real examples instead of local toy payload dicts.
+- Replaced weak inputs in `tests/compiler/`, `tests/pipeline/`, `tests/tools/`,
+  and `tests/extensions/` where the test intent is high-level behavior rather
+  than raw artifact shape.
+- Kept raw payloads only in backend-specific or malformed-contract tests where
+  the payload itself is the contract under test.
+- Verification completed with the documented fallback stack:
+  - `pytest -q`
+  - `pre-commit run --all-files`
 
 ## Commit Plan
 

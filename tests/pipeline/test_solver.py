@@ -18,95 +18,11 @@ from htp.solver import (
     validate_final_artifacts,
 )
 from htp_ext.aie.declarations import declaration_for as aie_declaration_for
-
-
-def _vector_add_program() -> dict[str, object]:
-    return {
-        "entry": "vector_add",
-        "kernel": {
-            "name": "vector_add",
-            "args": [
-                {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-                {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-                {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
-                {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
-            ],
-            "ops": [
-                {
-                    "op": "elementwise_binary",
-                    "operator": "add",
-                    "lhs": "lhs",
-                    "rhs": "rhs",
-                    "out": "out",
-                    "shape": ["size"],
-                    "dtype": "f32",
-                }
-            ],
-        },
-        "workload": {
-            "entry": "vector_add",
-            "tasks": [
-                {
-                    "task_id": "task0",
-                    "kind": "kernel_call",
-                    "kernel": "vector_add",
-                    "args": ["lhs", "rhs", "out", "size"],
-                }
-            ],
-            "channels": [],
-            "dependencies": [],
-        },
-        "analysis": {},
-        "package": {"emitted": False},
-        "target": {"backend": "pto", "option": "a2a3sim"},
-    }
-
-
-def _matmul_program() -> dict[str, object]:
-    return {
-        "entry": "matmul_demo",
-        "kernel": {
-            "name": "matmul_demo",
-            "args": [
-                {"name": "A", "kind": "buffer", "dtype": "f32", "shape": ["M", "K"], "role": "input"},
-                {"name": "B", "kind": "buffer", "dtype": "f32", "shape": ["K", "N"], "role": "input"},
-                {"name": "C", "kind": "buffer", "dtype": "f32", "shape": ["M", "N"], "role": "output"},
-                {"name": "M", "kind": "scalar", "dtype": "i32", "role": "shape"},
-                {"name": "N", "kind": "scalar", "dtype": "i32", "role": "shape"},
-                {"name": "K", "kind": "scalar", "dtype": "i32", "role": "shape"},
-            ],
-            "ops": [
-                {
-                    "op": "matmul",
-                    "lhs": "A",
-                    "rhs": "B",
-                    "out": "C",
-                    "dtype": "f32",
-                    "shape": ["M", "N", "K"],
-                }
-            ],
-        },
-        "workload": {
-            "entry": "matmul_demo",
-            "tasks": [
-                {
-                    "task_id": "task0",
-                    "kind": "kernel_call",
-                    "kernel": "matmul_demo",
-                    "args": ["A", "B", "C", "M", "N", "K"],
-                }
-            ],
-            "channels": [],
-            "dependencies": [],
-        },
-        "analysis": {},
-        "package": {"emitted": False},
-        "target": {"backend": "nvgpu", "option": "ampere"},
-    }
+from tests.programs import nvgpu_serving_payload, pto_vector_dag_payload
 
 
 def test_solver_accepts_default_pipeline_and_tracks_capabilities():
-    result = solve_default_pipeline(program=_vector_add_program())
+    result = solve_default_pipeline(program=pto_vector_dag_payload())
 
     assert result.ok is True
     assert result.template_id == "htp.default.v1"
@@ -120,11 +36,11 @@ def test_solver_prefers_resume_template_for_matching_existing_package(tmp_path):
     compiled = htp.compile_program(
         package_dir=package_dir,
         target="pto-a2a3sim",
-        program=_vector_add_program(),
+        program=pto_vector_dag_payload(),
     )
 
     result = solve_default_pipeline(
-        program=_vector_add_program(),
+        program=pto_vector_dag_payload(),
         existing_package_dir=compiled.package_dir,
     )
 
@@ -142,11 +58,11 @@ def test_solver_ignores_resume_package_when_target_mismatches(tmp_path):
     compiled = htp.compile_program(
         package_dir=package_dir,
         target="pto-a2a3sim",
-        program=_vector_add_program(),
+        program=pto_vector_dag_payload(),
     )
 
     result = solve_default_pipeline(
-        program=_matmul_program(),
+        program=nvgpu_serving_payload(),
         existing_package_dir=compiled.package_dir,
     )
 
@@ -169,7 +85,7 @@ def test_backend_declarations_define_handler_support_contract():
     assert "matmul" in nvgpu_declaration_for("ampere").supported_ops
     assert "matmul" not in pto_declaration_for("a2a3sim").supported_ops
 
-    result = solve_default_pipeline(program=_matmul_program())
+    result = solve_default_pipeline(program=nvgpu_serving_payload())
 
     assert result.ok is True
 
@@ -189,7 +105,7 @@ def test_solver_reports_missing_capability():
         required_outputs=(),
     )
 
-    result = solve_pipeline(program=_vector_add_program(), template=template)
+    result = solve_pipeline(program=pto_vector_dag_payload(), template=template)
 
     assert result.ok is False
     assert result.failure is not None
@@ -213,7 +129,7 @@ def test_solver_reports_missing_layout_and_effect_invariants():
         required_outputs=(),
     )
 
-    result = solve_pipeline(program=_vector_add_program(), template=template)
+    result = solve_pipeline(program=pto_vector_dag_payload(), template=template)
 
     assert result.ok is False
     assert result.failure is not None
@@ -249,7 +165,7 @@ def test_solver_reports_stale_analysis_after_invalidation():
         required_outputs=(),
     )
 
-    result = solve_pipeline(program=_vector_add_program(), template=template)
+    result = solve_pipeline(program=pto_vector_dag_payload(), template=template)
 
     assert result.ok is False
     assert result.failure is not None
@@ -259,7 +175,7 @@ def test_solver_reports_stale_analysis_after_invalidation():
 
 
 def test_solver_reports_missing_backend_handler():
-    program = _vector_add_program()
+    program = pto_vector_dag_payload()
     program["target"] = {"backend": "pto", "option": "a2a3sim"}
     program["kernel"] = {
         "name": "channel_kernel",
@@ -294,7 +210,7 @@ def test_solver_reports_missing_backend_handler():
 
 
 def test_solver_writes_failure_report_for_missing_final_artifact(tmp_path):
-    result = solve_default_pipeline(program=_vector_add_program())
+    result = solve_default_pipeline(program=pto_vector_dag_payload())
 
     artifact_check = validate_final_artifacts(tmp_path, result)
 
@@ -320,7 +236,7 @@ def test_validate_final_artifacts_prefers_manifest_outputs_contract(tmp_path):
         )
         + "\n"
     )
-    result = solve_default_pipeline(program=_vector_add_program())
+    result = solve_default_pipeline(program=pto_vector_dag_payload())
 
     artifact_check = validate_final_artifacts(tmp_path, result)
 
@@ -442,7 +358,7 @@ def test_solver_prefers_lower_cost_satisfiable_template(monkeypatch):
 
     monkeypatch.setattr("htp.solver.available_pipeline_templates", lambda *, program: (high_cost, low_cost))
 
-    result = solve_default_pipeline(program=_vector_add_program())
+    result = solve_default_pipeline(program=pto_vector_dag_payload())
 
     assert result.ok is True
     assert result.template_id == "test.low_cost.v1"
@@ -450,7 +366,7 @@ def test_solver_prefers_lower_cost_satisfiable_template(monkeypatch):
 
 
 def test_solver_fails_when_requested_mlir_extension_is_ineligible():
-    program = _vector_add_program()
+    program = pto_vector_dag_payload()
     program["target"] = {"backend": "nvgpu", "option": "ampere"}
     program["extensions"] = {"requested": ["htp_ext.mlir_cse"]}
 

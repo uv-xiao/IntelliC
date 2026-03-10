@@ -22,8 +22,8 @@ Those are concrete future tasks again, so this broad topic is reopened.
 
 - total checklist items: 4
 - complete: 0
-- partial: 0
-- open: 4
+- partial: 1
+- open: 3
 
 ## Detailed checklist
 
@@ -38,6 +38,20 @@ Those are concrete future tasks again, so this broad topic is reopened.
 
 ### Reference-calibrated flagship examples
 - [ ] Add harder flagship examples calibrated against `references/pypto/`, `references/triton-distributed-knowingnothing/python/little_kernel/`, and `references/arknife/`, and keep using them as the readability bar for public surfaces.
+
+## Recent progress
+
+- high-level compiler / solver / CLI / tool tests now reuse shared authored
+  programs from `tests/programs.py` instead of repeating toy vector-add and
+  one-op matmul payload dicts
+- those shared programs are imported from the public examples under `examples/`
+  so the regression suite now continuously exercises the real frontend surface
+  rather than only narrow contract builders
+
+This means the “reference-calibrated flagship examples” item is now partial:
+HTP is using its stronger authored examples as the high-level test baseline,
+but the broader frontend gaps in loop/region authoring, scratch/memory-scope
+authoring, and workload/dataflow readability are still open.
 
 ## Coding pointers
 

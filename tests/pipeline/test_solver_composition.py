@@ -2,48 +2,7 @@ from __future__ import annotations
 
 from htp.pipeline.defaults import run_default_pipeline
 from htp.solver import available_pipeline_templates, solve_default_pipeline, solve_existing_package
-
-
-def _vector_add_program() -> dict[str, object]:
-    return {
-        "entry": "vector_add",
-        "kernel": {
-            "name": "vector_add",
-            "args": [
-                {"name": "lhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-                {"name": "rhs", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "input"},
-                {"name": "out", "kind": "buffer", "dtype": "f32", "shape": ["size"], "role": "output"},
-                {"name": "size", "kind": "scalar", "dtype": "i32", "role": "shape"},
-            ],
-            "ops": [
-                {
-                    "op": "elementwise_binary",
-                    "operator": "add",
-                    "lhs": "lhs",
-                    "rhs": "rhs",
-                    "out": "out",
-                    "shape": ["size"],
-                    "dtype": "f32",
-                }
-            ],
-        },
-        "workload": {
-            "entry": "vector_add",
-            "tasks": [
-                {
-                    "task_id": "task0",
-                    "kind": "kernel_call",
-                    "kernel": "vector_add",
-                    "args": ["lhs", "rhs", "out", "size"],
-                }
-            ],
-            "channels": [],
-            "dependencies": [],
-        },
-        "analysis": {},
-        "package": {"emitted": False},
-        "target": {"backend": "pto", "option": "a2a3sim"},
-    }
+from tests.programs import pto_vector_dag_payload
 
 
 def test_solver_exposes_extension_template_candidates_when_requested():
@@ -87,7 +46,7 @@ def test_solver_selects_extension_template_when_requested_and_eligible():
 
 def test_solver_can_resume_from_existing_package(tmp_path):
     package_dir = tmp_path / "package"
-    run_default_pipeline(package_dir=package_dir, program=_vector_add_program())
+    run_default_pipeline(package_dir=package_dir, program=pto_vector_dag_payload())
 
     result = solve_existing_package(package_dir)
 
