@@ -21,6 +21,8 @@ NVGPU_CODEGEN_SCHEMA_ID = "htp.nvgpu.codegen.v1"
 NVGPU_TOOLCHAIN_SCHEMA_ID = "htp.nvgpu.toolchain.v1"
 AIE_CODEGEN_SCHEMA_ID = "htp.aie.codegen.v1"
 AIE_TOOLCHAIN_SCHEMA_ID = "htp.aie.toolchain.v1"
+CPU_REF_CODEGEN_SCHEMA_ID = "htp.cpu_ref.codegen.v1"
+CPU_REF_TOOLCHAIN_SCHEMA_ID = "htp.cpu_ref.toolchain.v1"
 
 CONTRACT_REFS = (
     "docs/design/artifacts_replay_debug.md",
@@ -299,6 +301,11 @@ def _output_schema_map(backend: str | None) -> dict[str, str]:
         return {
             "aie_codegen_index": AIE_CODEGEN_SCHEMA_ID,
             "toolchain_manifest": AIE_TOOLCHAIN_SCHEMA_ID,
+        }
+    if backend == "cpu_ref":
+        return {
+            "cpu_ref_codegen_index": CPU_REF_CODEGEN_SCHEMA_ID,
+            "toolchain_manifest": CPU_REF_TOOLCHAIN_SCHEMA_ID,
         }
     return {}
 

@@ -122,6 +122,11 @@ def _codegen_index(plan: NVGPUCodegenPlan) -> dict[str, Any]:
                 "op": kernel.op,
                 "attrs": dict(kernel.attrs),
                 **(
+                    {"profile_plan": dict(kernel.attrs.get("profile_plan", {}))}
+                    if isinstance(kernel.attrs.get("profile_plan"), Mapping)
+                    else {}
+                ),
+                **(
                     {"instruction_plan": [dict(item) for item in kernel.attrs.get("instruction_plan", ())]}
                     if isinstance(kernel.attrs.get("instruction_plan"), list)
                     else {}
@@ -145,6 +150,8 @@ def _toolchain_payload(plan: NVGPUCodegenPlan) -> dict[str, Any]:
         "codegen_mode": plan.codegen_mode,
         "cuda_runtime_contract": plan.cuda_runtime_contract,
         "cuda_arches": list(plan.cuda_arches),
+        "nvcc_flags": _nvcc_flags(plan),
+        "profiling_contract": "metrics/perf.json",
         "derived_outputs": derived_outputs,
     }
 
@@ -188,10 +195,18 @@ def _kernel_source(kernel: NVGPUKernelSpec) -> str:
 
 
 def _matmul_kernel_source(kernel: NVGPUKernelSpec) -> str:
+    profile_plan = (
+        dict(kernel.attrs.get("profile_plan", {}))
+        if isinstance(kernel.attrs.get("profile_plan"), Mapping)
+        else {}
+    )
     return "\n".join(
         (
             "#include <cuda_runtime.h>",
             "",
+            f"// matrix_engine: {profile_plan.get('matrix_engine', 'mma_sync')}",
+            f"// async_loader: {profile_plan.get('async_loader', 'cp_async')}",
+            f"// cluster_shape: {profile_plan.get('cluster_shape', [1, 1, 1])}",
             f'extern "C" __global__ void {kernel.func_id}(const float* A, const float* B, float* C, int M, int N, int K) {{',
             "  const int row = blockIdx.y * blockDim.y + threadIdx.y;",
             "  const int col = blockIdx.x * blockDim.x + threadIdx.x;",
@@ -214,9 +229,15 @@ def _arknife_kernel_source(kernel: NVGPUKernelSpec) -> str:
     instruction_plan = [dict(item) for item in attrs.get("instruction_plan", ())]
     hardware = dict(attrs.get("hardware", {}))
     channels = [dict(item) for item in attrs.get("channels", ())]
+    profile_plan = (
+        dict(attrs.get("profile_plan", {})) if isinstance(attrs.get("profile_plan"), Mapping) else {}
+    )
     comment_lines = [
         f"// Arknife hardware profile: {hardware.get('hardware_profile', '')}",
         f"// Capabilities: {', '.join(str(item) for item in hardware.get('capabilities', ()))}",
+        f"// Matrix engine: {profile_plan.get('matrix_engine', 'wgmma')}",
+        f"// Async loader: {profile_plan.get('async_loader', 'tma')}",
+        f"// Cluster shape: {profile_plan.get('cluster_shape', [1, 1, 1])}",
     ]
     for channel in channels:
         comment_lines.append(
@@ -255,6 +276,9 @@ def _arknife_kernel_source(kernel: NVGPUKernelSpec) -> str:
 def _fused_elementwise_source(kernel: NVGPUKernelSpec) -> str:
     attrs = kernel.attrs
     lowered_ops = attrs.get("ops", [])
+    profile_plan = (
+        dict(attrs.get("profile_plan", {})) if isinstance(attrs.get("profile_plan"), Mapping) else {}
+    )
     if not isinstance(lowered_ops, list) or not lowered_ops:
         operator = str(attrs.get("operator", "add"))
         lowered_ops = [
@@ -273,6 +297,8 @@ def _fused_elementwise_source(kernel: NVGPUKernelSpec) -> str:
         "#include <cuda_runtime.h>",
         "#include <math.h>",
         "",
+        f"// profile: {profile_plan.get('profile', 'ampere')}",
+        f"// pipeline_stages: {profile_plan.get('pipeline_stages', 1)}",
         f'extern "C" __global__ void {kernel.func_id}({_param_signature(kernel)}) {{',
         "  const int idx = blockIdx.x * blockDim.x + threadIdx.x;",
         "  if (idx >= size) {",
@@ -409,6 +435,15 @@ def _float_literal(value: Any) -> str:
 def _project_relative(source_path: str) -> str:
     source = PurePosixPath(source_path)
     return source.relative_to(NVGPU_PROJECT_DIR).as_posix()
+
+
+def _nvcc_flags(plan: NVGPUCodegenPlan) -> list[str]:
+    flags = ["--std=c++17", "--generate-line-info"]
+    if plan.profile == "blackwell":
+        flags.append("-DHTP_NVGPU_BLACKWELL=1")
+    else:
+        flags.append("-DHTP_NVGPU_AMPERE=1")
+    return flags
 
 
 def _load_manifest(package_dir: Path) -> dict[str, Any]:

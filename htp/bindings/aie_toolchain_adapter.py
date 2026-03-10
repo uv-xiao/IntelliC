@@ -3,12 +3,13 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from htp.schemas import ADAPTER_TRACE_SCHEMA_ID
+from htp.schemas import ADAPTER_TRACE_SCHEMA_ID, PERF_SCHEMA_ID
 
 
 def build_package(
@@ -70,6 +71,7 @@ def run_package(
             trace_ref,
         )
     try:
+        start_time = time.perf_counter()
         module = _load_python_module(host_path, module_name="htp_aie_host_launch")
         result = module.launch(
             *args,
@@ -91,12 +93,34 @@ def run_package(
             [{"code": "HTP.BINDINGS.AIE_RUN_ERROR", "detail": str(exc), "mode": mode, "entry": entry}],
             trace_ref,
         )
+    runtime_ms = round((time.perf_counter() - start_time) * 1000.0, 6)
+    perf_path = package_dir / "metrics" / "perf.json"
+    perf_path.parent.mkdir(parents=True, exist_ok=True)
+    perf_path.write_text(
+        json.dumps(
+            {
+                "schema": PERF_SCHEMA_ID,
+                "backend": "aie",
+                "entry": entry,
+                "mode": mode,
+                "runtime_ms": runtime_ms,
+            },
+            indent=2,
+        )
+        + "\n"
+    )
     trace_ref = _write_adapter_trace(
         package_dir,
         action="run",
-        payload={"ok": True, "mode": mode, "entry": entry},
+        payload={
+            "ok": True,
+            "mode": mode,
+            "entry": entry,
+            "runtime_ms": runtime_ms,
+            "perf": "metrics/perf.json",
+        },
     )
-    return True, result, [], trace_ref
+    return True, {**result, "runtime_ms": runtime_ms, "perf": "metrics/perf.json"}, [], trace_ref
 
 
 def _write_adapter_trace(package_dir: Path, *, action: str, payload: dict[str, Any]) -> str:

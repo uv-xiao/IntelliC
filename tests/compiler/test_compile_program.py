@@ -74,6 +74,26 @@ def test_compile_program_emits_pto_package_and_keeps_stage_replay(tmp_path):
     assert replay.result["kernel_ir"]["ops"][0]["op"] == "elementwise_binary"
 
 
+def test_compile_program_emits_pto_device_package(tmp_path):
+    package_dir = tmp_path / "pto_device_pkg"
+
+    compiled = htp.compile_program(
+        package_dir=package_dir,
+        target="pto-a2a3",
+        program=_vector_add_program(),
+    )
+
+    assert compiled.target.backend == "pto"
+    assert compiled.manifest["target"] == {
+        "backend": "pto",
+        "variant": "a2a3",
+        "hardware_profile": "ascend:a2a3",
+        "option": "a2a3",
+    }
+    toolchain_manifest = json.loads((package_dir / "build" / "toolchain.json").read_text())
+    assert toolchain_manifest["compiler_contract"] == "cann:stub"
+
+
 def test_compile_program_emits_nvgpu_package_and_keeps_stage_replay(tmp_path):
     package_dir = tmp_path / "nvgpu_pkg"
 
@@ -167,6 +187,27 @@ def test_compile_program_emits_aie_package_and_keeps_stage_replay(tmp_path):
     assert replay.ok is True
     assert replay.result["target"] == {"backend": "aie", "option": "xdna2-npu1"}
     assert replay.result["package"]["emitted"] is True
+
+
+def test_compile_program_emits_cpu_ref_package(tmp_path):
+    package_dir = tmp_path / "cpu_ref_pkg"
+
+    compiled = htp.compile_program(
+        package_dir=package_dir,
+        target="cpu_ref",
+        program=_vector_add_program(),
+    )
+
+    assert compiled.target.backend == "cpu_ref"
+    assert compiled.manifest["target"] == {
+        "backend": "cpu_ref",
+        "variant": "python",
+        "hardware_profile": "host:python:numpy",
+    }
+    assert compiled.manifest["outputs"] == {
+        "cpu_ref_codegen_index": "codegen/cpu_ref/cpu_ref_codegen.json",
+        "toolchain_manifest": "build/toolchain.json",
+    }
 
 
 def test_compile_program_rejects_unknown_targets(tmp_path):

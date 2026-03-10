@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -61,12 +62,19 @@ def test_nvgpu_cuda_adapter_builds_ptx_and_cubin(tmp_path, monkeypatch):
     monkeypatch.setattr(nvgpu_cuda_adapter, "_find_nvcc", lambda: "/usr/local/cuda/bin/nvcc")
 
     def fake_run_nvcc(
-        nvcc_path: str, source_path: Path, output_path: Path, cuda_arch: str, *, target_format: str
+        nvcc_path: str,
+        source_path: Path,
+        output_path: Path,
+        cuda_arch: str,
+        *,
+        target_format: str,
+        extra_flags=(),
     ) -> None:
         assert nvcc_path.endswith("nvcc")
         assert source_path.name == "gemm_tile.cu"
         assert cuda_arch == "sm_80"
         assert target_format in {"ptx", "cubin"}
+        assert "--generate-line-info" in extra_flags
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(target_format.encode())
 
@@ -115,6 +123,7 @@ def test_nvgpu_cuda_adapter_runs_kernel_with_tensor_arguments(tmp_path, monkeypa
             "thread_block": list(kernel.thread_block),
             "grid": [1, 1, 1],
             "params": [param.name for param in kernel.params],
+            "profile_plan": kernel.profile_plan,
         }
 
     monkeypatch.setattr(nvgpu_cuda_adapter, "_run_with_cuda_driver", fake_run_with_cuda_driver)
@@ -133,18 +142,30 @@ def test_nvgpu_cuda_adapter_runs_kernel_with_tensor_arguments(tmp_path, monkeypa
 
     assert ok is True
     assert diagnostics == []
-    assert result == {
-        "adapter": "cuda_driver",
-        "entry": "gemm_tile",
-        "kernel": "gemm_tile_kernel0",
-        "cubin": (package_dir / "build" / "nvgpu" / "gemm_tile.cubin").as_posix(),
-        "thread_block": [16, 16, 1],
-        "grid": [1, 1, 1],
-        "params": ["A", "B", "C", "M", "N", "K"],
-        "trace_ref": trace_ref,
+    assert result["adapter"] == "cuda_driver"
+    assert result["entry"] == "gemm_tile"
+    assert result["kernel"] == "gemm_tile_kernel0"
+    assert result["cubin"] == (package_dir / "build" / "nvgpu" / "gemm_tile.cubin").as_posix()
+    assert result["thread_block"] == [16, 16, 1]
+    assert result["grid"] == [1, 1, 1]
+    assert result["params"] == ["A", "B", "C", "M", "N", "K"]
+    assert result["profile_plan"] == {
+        "profile": "ampere",
+        "matrix_engine": "mma_sync",
+        "async_loader": "cp_async",
+        "pipeline_stages": 2,
+        "cluster_shape": [1, 1, 1],
     }
+    assert isinstance(result["runtime_ms"], float)
+    assert result["perf_ref"] == "metrics/perf.json"
+    assert result["trace_ref"] == trace_ref
     assert trace_ref is not None
     assert (package_dir / trace_ref).is_file()
+    perf_payload = json.loads((package_dir / "metrics" / "perf.json").read_text())
+    assert perf_payload["schema"] == "htp.perf.v1"
+    assert perf_payload["backend"] == "nvgpu"
+    assert perf_payload["entry"] == "gemm_tile"
+    assert perf_payload["profile_plan"]["profile"] == "ampere"
     assert calls == [
         {
             "entry": "gemm_tile",
@@ -193,9 +214,15 @@ def test_nvgpu_cuda_adapter_rebuilds_when_cuda_source_changes(tmp_path, monkeypa
     monkeypatch.setattr(nvgpu_cuda_adapter, "_find_nvcc", lambda: "/usr/local/cuda/bin/nvcc")
 
     def fake_run_nvcc(
-        nvcc_path: str, source_path: Path, output_path: Path, cuda_arch: str, *, target_format: str
+        nvcc_path: str,
+        source_path: Path,
+        output_path: Path,
+        cuda_arch: str,
+        *,
+        target_format: str,
+        extra_flags=(),
     ) -> None:
-        del nvcc_path, source_path, cuda_arch, target_format
+        del nvcc_path, source_path, cuda_arch, target_format, extra_flags
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(str(time.time()).encode())
 

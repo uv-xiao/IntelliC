@@ -10,6 +10,9 @@ from examples.aie_channel_pipeline.demo import compile_example as compile_aie_ex
 from examples.aie_channel_pipeline.demo import replay_latest_stage as replay_aie_stage
 from examples.csp_channel_pipeline.demo import compile_example as compile_csp_example
 from examples.csp_channel_pipeline.demo import replay_latest_stage as replay_csp_stage
+from examples.extensions.cpu_ref_vector_add.demo import compile_example as compile_cpu_ref_example
+from examples.extensions.cpu_ref_vector_add.demo import replay_latest_stage as replay_cpu_ref_stage
+from examples.extensions.cpu_ref_vector_add.demo import run_demo as run_cpu_ref_demo
 from examples.mlir_cse_extension.demo import compile_example as compile_mlir_cse_example
 from examples.mlir_cse_extension.demo import replay_latest_stage as replay_mlir_cse_stage
 from examples.nvgpu_arknife_blackwell.demo import compile_example as compile_nvgpu_blackwell_example
@@ -213,6 +216,18 @@ def test_aie_example_compiles_and_replays(tmp_path):
     ]
     assert [tile["task_id"] for tile in replay_summary["mapping"]["tiles"]] == ["p0", "p1"]
     assert replay_summary["fifos"]["channels"][0]["name"] == "tiles"
+
+
+def test_cpu_ref_example_compiles_and_replays(tmp_path):
+    package_dir = tmp_path / "cpu_ref_example"
+    compile_summary = compile_cpu_ref_example(package_dir)
+    replay_summary = replay_cpu_ref_stage(package_dir)
+    run_summary = run_cpu_ref_demo(package_dir)["run"]
+
+    assert compile_summary["target"] == {"backend": "cpu_ref", "option": None}
+    assert replay_summary["ok"] is True
+    assert run_summary["ok"] is True
+    assert run_summary["max_abs_error"] == 0.0
 
 
 def test_mlir_cse_extension_example_compiles_and_replays(tmp_path):

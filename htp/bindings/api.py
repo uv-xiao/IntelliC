@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,15 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
             backend="pto",
             variant=variant,
         )
+    if backend == "cpu_ref":
+        from .cpu_ref import CPURefBinding
+
+        return CPURefBinding(
+            package_dir=package_path,
+            manifest=manifest,
+            backend="cpu_ref",
+            variant="python" if variant is None else variant,
+        )
 
     has_nvgpu_markers = (
         (isinstance(outputs, dict) and "nvgpu_codegen_index" in outputs)
@@ -67,7 +77,7 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
         (isinstance(outputs, dict) and any(key in outputs for key in ("kernel_config", "pto_codegen_index")))
         or (isinstance(extensions, dict) and "pto" in extensions)
         or (package_path / "codegen" / "pto").exists()
-        or (package_path / "build" / "toolchain.json").exists()
+        or _toolchain_backend(package_path) == "pto"
     )
     if has_pto_markers:
         from .pto import PTOBinding
@@ -83,6 +93,7 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
         (isinstance(outputs, dict) and "aie_codegen_index" in outputs)
         or (isinstance(extensions, dict) and "aie" in extensions)
         or (package_path / "codegen" / "aie").exists()
+        or _toolchain_backend(package_path) == "aie"
     )
     if has_aie_markers:
         from .aie import AIEBinding
@@ -92,6 +103,22 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
             manifest=manifest,
             backend="aie",
             variant="mlir-aie" if variant is None else variant,
+        )
+
+    has_cpu_ref_markers = (
+        (isinstance(outputs, dict) and "cpu_ref_codegen_index" in outputs)
+        or (isinstance(extensions, dict) and "cpu_ref" in extensions)
+        or (package_path / "codegen" / "cpu_ref").exists()
+        or _toolchain_backend(package_path) == "cpu_ref"
+    )
+    if has_cpu_ref_markers:
+        from .cpu_ref import CPURefBinding
+
+        return CPURefBinding(
+            package_dir=package_path,
+            manifest=manifest,
+            backend="cpu_ref",
+            variant="python" if variant is None else variant,
         )
 
     if backend is None:
@@ -113,3 +140,15 @@ def bind(package_dir: Path | str, binding_override: BindingFactory | None = None
 
 
 __all__ = ["BindingFactory", "bind"]
+
+
+def _toolchain_backend(package_path: Path) -> str | None:
+    toolchain_path = package_path / "build" / "toolchain.json"
+    if not toolchain_path.exists():
+        return None
+    try:
+        payload = json.loads(toolchain_path.read_text())
+    except Exception:
+        return None
+    backend = payload.get("backend")
+    return backend if isinstance(backend, str) else None

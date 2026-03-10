@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import time
 from pathlib import Path
@@ -93,6 +94,33 @@ class _FakeBindingsModule:
         assert aicore_binary == b"aicore-runtime"
 
 
+class _FakeDeviceRuntimeBuilder:
+    def __init__(self, platform: str) -> None:
+        assert platform == "a2a3"
+
+    def build(self, runtime_name: str):
+        assert runtime_name == "host_build_graph"
+        return (b"host-runtime-device", b"aicpu-runtime-device", b"aicore-runtime-device")
+
+    def get_kernel_compiler(self) -> _FakeKernelCompiler:
+        return _FakeKernelCompiler()
+
+
+class _FakeDeviceBindingsModule(_FakeBindingsModule):
+    @staticmethod
+    def bind_host_binary(binary: bytes):
+        assert binary == b"host-runtime-device"
+        return _FakeBindingsModule.bind_host_binary(b"host-runtime")
+
+    @staticmethod
+    def launch_runtime(runtime, aicpu_thread_num, block_dim, device_id, aicpu_binary, aicore_binary) -> None:
+        assert aicpu_thread_num == 1
+        assert block_dim == 1
+        assert device_id == 0
+        assert aicpu_binary == b"aicpu-runtime-device"
+        assert aicore_binary == b"aicore-runtime-device"
+
+
 def test_pto_runtime_adapter_builds_expected_outputs(tmp_path, monkeypatch):
     package_dir = tmp_path / "out"
     package_dir.mkdir()
@@ -158,23 +186,86 @@ def test_pto_runtime_adapter_runs_built_package(tmp_path, monkeypatch):
 
     assert ok is True
     assert diagnostics == []
-    assert result == {
-        "adapter": "pto-runtime",
-        "entry": "demo_kernel",
-        "platform": "a2a3sim",
-        "runtime_name": "host_build_graph",
-        "built_outputs": [
-            "build/pto/runtime/libhost_runtime.so",
-            "build/pto/runtime/libaicpu_runtime.so",
-            "build/pto/runtime/aicore_runtime.bin",
-            "build/pto/orchestration/demo_kernel_orchestration.so",
-            "build/pto/kernels/0.bin",
-        ],
-        "output_names": ["out"],
-        "trace_ref": trace_ref,
-    }
+    assert result["adapter"] == "pto-runtime"
+    assert result["entry"] == "demo_kernel"
+    assert result["platform"] == "a2a3sim"
+    assert result["runtime_name"] == "host_build_graph"
+    assert result["compiler_contract"] is None
+    assert result["built_outputs"] == [
+        "build/pto/runtime/libhost_runtime.so",
+        "build/pto/runtime/libaicpu_runtime.so",
+        "build/pto/runtime/aicore_runtime.bin",
+        "build/pto/orchestration/demo_kernel_orchestration.so",
+        "build/pto/kernels/0.bin",
+    ]
+    assert result["output_names"] == ["out"]
+    assert result["trace_ref"] == trace_ref
     assert trace_ref is not None
     assert (package_dir / trace_ref).is_file()
+
+
+def test_pto_runtime_adapter_builds_device_contract_outputs(tmp_path, monkeypatch):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(package_dir, program={"entry": "demo_kernel", "ops": ["compute_tile"]}, variant="a2a3")
+    manifest = load_manifest(package_dir)
+
+    monkeypatch.setattr(
+        pto_runtime_adapter,
+        "_load_reference_modules",
+        lambda: (
+            type("RuntimeBuilderModule", (), {"RuntimeBuilder": _FakeDeviceRuntimeBuilder}),
+            _FakeDeviceBindingsModule,
+        ),
+    )
+
+    built_outputs, diagnostics, trace_ref = pto_runtime_adapter.build_package(
+        package_dir,
+        manifest,
+        mode="device",
+        force=True,
+    )
+
+    build_record = json.loads((package_dir / "build" / "pto" / "build_record.json").read_text())
+    assert diagnostics == []
+    assert built_outputs[-1] == "build/pto/kernels/0.bin"
+    assert build_record["platform"] == "a2a3"
+    assert build_record["compiler_contract"] == "cann:stub"
+    assert trace_ref is not None
+
+
+def test_pto_runtime_adapter_runs_device_package(tmp_path, monkeypatch):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+    emit_package(package_dir, program={"entry": "demo_kernel", "ops": ["compute_tile"]}, variant="a2a3")
+    manifest = load_manifest(package_dir)
+
+    monkeypatch.setattr(
+        pto_runtime_adapter,
+        "_load_reference_modules",
+        lambda: (
+            type("RuntimeBuilderModule", (), {"RuntimeBuilder": _FakeDeviceRuntimeBuilder}),
+            _FakeDeviceBindingsModule,
+        ),
+    )
+
+    lhs = np.arange(16, dtype=np.float32)
+    rhs = np.arange(16, dtype=np.float32)
+    out = np.zeros(16, dtype=np.float32)
+    ok, result, diagnostics, trace_ref = pto_runtime_adapter.run_package(
+        package_dir,
+        manifest,
+        mode="device",
+        entry="demo_kernel",
+        args=(lhs, rhs, out, lhs.size),
+        kwargs=None,
+    )
+
+    assert ok is True
+    assert diagnostics == []
+    assert result["platform"] == "a2a3"
+    assert result["compiler_contract"] == "cann:stub"
+    assert trace_ref is not None
 
 
 def test_pto_runtime_adapter_reports_missing_reference_runtime(tmp_path, monkeypatch):

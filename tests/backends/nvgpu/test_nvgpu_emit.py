@@ -80,7 +80,26 @@ def test_nvgpu_emit_prefers_cu_source_artifacts(tmp_path):
                 ],
                 "launch": {"kind": "grid_2d", "extents": ["M", "N"]},
                 "op": "matmul",
-                "attrs": {"dtype": "f32", "m": "M", "n": "N", "k": "K"},
+                "attrs": {
+                    "dtype": "f32",
+                    "m": "M",
+                    "n": "N",
+                    "k": "K",
+                    "profile_plan": {
+                        "profile": "ampere",
+                        "matrix_engine": "mma_sync",
+                        "async_loader": "cp_async",
+                        "pipeline_stages": 2,
+                        "cluster_shape": [1, 1, 1],
+                    },
+                },
+                "profile_plan": {
+                    "profile": "ampere",
+                    "matrix_engine": "mma_sync",
+                    "async_loader": "cp_async",
+                    "pipeline_stages": 2,
+                    "cluster_shape": [1, 1, 1],
+                },
             }
         ],
     }
@@ -92,11 +111,14 @@ def test_nvgpu_emit_prefers_cu_source_artifacts(tmp_path):
         "codegen_mode": "cuda_source",
         "cuda_runtime_contract": "cuda-runtime:driver",
         "cuda_arches": ["sm80"],
+        "nvcc_flags": ["--std=c++17", "--generate-line-info", "-DHTP_NVGPU_AMPERE=1"],
+        "profiling_contract": "metrics/perf.json",
         "derived_outputs": [
             "build/nvgpu/demo_kernel.ptx",
             "build/nvgpu/demo_kernel.cubin",
         ],
     }
+    assert "// matrix_engine: mma_sync" in kernel_source.read_text()
     assert "const int row = blockIdx.y * blockDim.y + threadIdx.y;" in kernel_source.read_text()
     assert (
         'def launch_demo_kernel(A, B, C, M, N, K, mode="sim", trace=None, runtime=None):'
@@ -152,8 +174,19 @@ def test_nvgpu_codegen_records_arknife_hardware_and_instruction_plan(tmp_path):
         "wgmma",
         "tma_store",
     ]
+    assert kernel["profile_plan"] == {
+        "profile": "blackwell",
+        "matrix_engine": "wgmma",
+        "async_loader": "tma",
+        "pipeline_stages": 3,
+        "cluster_shape": [2, 1, 1],
+    }
     assert (
         "wgmma"
+        in (compiled.package_dir / "codegen" / "nvgpu" / "kernels" / "blackwell_mainloop.cu").read_text()
+    )
+    assert (
+        "// Matrix engine: wgmma"
         in (compiled.package_dir / "codegen" / "nvgpu" / "kernels" / "blackwell_mainloop.cu").read_text()
     )
 

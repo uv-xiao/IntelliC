@@ -5,6 +5,7 @@ import ctypes.util
 import json
 import shutil
 import subprocess
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -14,7 +15,7 @@ from uuid import uuid4
 
 import numpy as np
 
-from htp.schemas import ADAPTER_TRACE_SCHEMA_ID
+from htp.schemas import ADAPTER_TRACE_SCHEMA_ID, PERF_SCHEMA_ID
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,7 @@ class NVGPUKernelContract:
     params: tuple[NVGPUParamContract, ...]
     launch: NVGPULaunchContract
     op: str
+    profile_plan: dict[str, Any]
     attrs: dict[str, Any]
 
 
@@ -50,6 +52,7 @@ class NVGPUContract:
     entrypoint: str
     hardware_profile: str
     cuda_arch: str
+    nvcc_flags: tuple[str, ...]
     kernels: tuple[NVGPUKernelContract, ...]
     derived_outputs: tuple[str, ...]
 
@@ -80,6 +83,7 @@ def build_package(
                 payload={
                     "entry": contract.entrypoint,
                     "cuda_arch": contract.cuda_arch,
+                    "nvcc_flags": list(contract.nvcc_flags),
                     "diagnostics": diagnostics,
                 },
             ),
@@ -101,6 +105,7 @@ def build_package(
                 payload={
                     "entry": contract.entrypoint,
                     "cuda_arch": contract.cuda_arch,
+                    "nvcc_flags": list(contract.nvcc_flags),
                     "built_outputs": built_outputs,
                     "cached": True,
                 },
@@ -113,8 +118,22 @@ def build_package(
             ptx_path = package_dir / f"build/nvgpu/{Path(kernel.source).stem}.ptx"
             cubin_path = package_dir / f"build/nvgpu/{Path(kernel.source).stem}.cubin"
             ptx_path.parent.mkdir(parents=True, exist_ok=True)
-            _run_nvcc(nvcc_path, source_path, ptx_path, contract.cuda_arch, target_format="ptx")
-            _run_nvcc(nvcc_path, source_path, cubin_path, contract.cuda_arch, target_format="cubin")
+            _run_nvcc(
+                nvcc_path,
+                source_path,
+                ptx_path,
+                contract.cuda_arch,
+                target_format="ptx",
+                extra_flags=contract.nvcc_flags,
+            )
+            _run_nvcc(
+                nvcc_path,
+                source_path,
+                cubin_path,
+                contract.cuda_arch,
+                target_format="cubin",
+                extra_flags=contract.nvcc_flags,
+            )
     except Exception as exc:
         diagnostics = [
             {
@@ -133,6 +152,7 @@ def build_package(
                 payload={
                     "entry": contract.entrypoint,
                     "cuda_arch": contract.cuda_arch,
+                    "nvcc_flags": list(contract.nvcc_flags),
                     "diagnostics": diagnostics,
                 },
             ),
@@ -147,6 +167,7 @@ def build_package(
             payload={
                 "entry": contract.entrypoint,
                 "cuda_arch": contract.cuda_arch,
+                "nvcc_flags": list(contract.nvcc_flags),
                 "built_outputs": built_outputs,
                 "cached": False,
             },
@@ -227,6 +248,7 @@ def run_package(
             ),
         )
 
+    start_time = time.perf_counter()
     try:
         result = _run_with_cuda_driver(contract, kernel, args)
     except Exception as exc:
@@ -254,6 +276,19 @@ def run_package(
                 },
             ),
         )
+    runtime_ms = round((time.perf_counter() - start_time) * 1000.0, 6)
+    perf_ref = _write_perf_metrics(
+        package_dir,
+        payload={
+            "entry": entry,
+            "backend": "nvgpu",
+            "runtime_ms": runtime_ms,
+            "hardware_profile": contract.hardware_profile,
+            "cuda_arch": contract.cuda_arch,
+            "kernel": kernel.func_id,
+            "profile_plan": dict(kernel.profile_plan),
+        },
+    )
     trace_ref = _write_adapter_trace(
         package_dir,
         adapter="cuda-driver",
@@ -264,10 +299,17 @@ def run_package(
             "cuda_arch": contract.cuda_arch,
             "build_trace_ref": build_trace_ref,
             "built_outputs": built_outputs,
+            "runtime_ms": runtime_ms,
+            "perf_ref": perf_ref,
             "result": result,
         },
     )
-    return True, {**result, "trace_ref": trace_ref}, [], trace_ref
+    return (
+        True,
+        {**result, "runtime_ms": runtime_ms, "perf_ref": perf_ref, "trace_ref": trace_ref},
+        [],
+        trace_ref,
+    )
 
 
 def load_contract(package_dir: Path, manifest: Mapping[str, Any]) -> NVGPUContract:
@@ -301,6 +343,7 @@ def load_contract(package_dir: Path, manifest: Mapping[str, Any]) -> NVGPUContra
                 extents=tuple(str(value) for value in kernel.get("launch", {}).get("extents", ())),
             ),
             op=str(kernel.get("op", "elementwise_binary")),
+            profile_plan=dict(kernel.get("profile_plan", {})),
             attrs=dict(kernel.get("attrs", {})),
         )
         for kernel in codegen_index["kernels"]
@@ -316,6 +359,7 @@ def load_contract(package_dir: Path, manifest: Mapping[str, Any]) -> NVGPUContra
         entrypoint=str(codegen_index["entrypoint"]),
         hardware_profile=str(codegen_index["hardware_profile"]),
         cuda_arch=_normalize_cuda_arch(str(cuda_arches[0])),
+        nvcc_flags=tuple(str(flag) for flag in toolchain_manifest.get("nvcc_flags", ())),
         kernels=kernels,
         derived_outputs=tuple(derived_outputs),
     )
@@ -332,6 +376,7 @@ def _run_nvcc(
     cuda_arch: str,
     *,
     target_format: str,
+    extra_flags: tuple[str, ...] = (),
 ) -> None:
     format_flag = "-ptx" if target_format == "ptx" else "-cubin"
     result = subprocess.run(
@@ -339,6 +384,7 @@ def _run_nvcc(
             nvcc_path,
             format_flag,
             f"-arch={cuda_arch}",
+            *extra_flags,
             "-o",
             str(output_path),
             str(source_path),
@@ -397,6 +443,14 @@ def _write_adapter_trace(
         )
         + "\n"
     )
+    return relative_path.as_posix()
+
+
+def _write_perf_metrics(package_dir: Path, *, payload: Mapping[str, Any]) -> str:
+    relative_path = Path("metrics") / "perf.json"
+    perf_path = package_dir / relative_path
+    perf_path.parent.mkdir(parents=True, exist_ok=True)
+    perf_path.write_text(json.dumps({"schema": PERF_SCHEMA_ID, **dict(payload)}, indent=2) + "\n")
     return relative_path.as_posix()
 
 

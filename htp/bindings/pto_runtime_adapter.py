@@ -29,6 +29,7 @@ class PTOContract:
     entrypoint: str
     platform: str
     runtime_name: str
+    compiler_contract: str | None
     runtime_config: dict[str, Any]
     orchestration_source: Path
     orchestration_function: str
@@ -70,6 +71,7 @@ def build_package(
                     "mode": mode,
                     "platform": contract.platform,
                     "runtime_name": contract.runtime_name,
+                    "compiler_contract": contract.compiler_contract,
                     "entrypoint": contract.entrypoint,
                     "built_outputs": output_paths,
                     "cached": True,
@@ -91,6 +93,7 @@ def build_package(
                 payload={
                     "mode": mode,
                     "platform": contract.platform,
+                    "compiler_contract": contract.compiler_contract,
                     "error": str(exc),
                     "diagnostics": diagnostics,
                 },
@@ -129,6 +132,7 @@ def build_package(
                 payload={
                     "mode": mode,
                     "platform": contract.platform,
+                    "compiler_contract": contract.compiler_contract,
                     "error": str(exc),
                     "diagnostics": diagnostics,
                 },
@@ -156,8 +160,10 @@ def build_package(
             {
                 "platform": contract.platform,
                 "runtime_name": contract.runtime_name,
+                "compiler_contract": contract.compiler_contract,
                 "kernel_func_ids": [int(kernel["func_id"]) for kernel in contract.kernels],
                 "adapter": "pto-runtime",
+                "pto_isa_root": pto_isa_root,
             },
             indent=2,
         )
@@ -174,6 +180,7 @@ def build_package(
                 "mode": mode,
                 "platform": contract.platform,
                 "runtime_name": contract.runtime_name,
+                "compiler_contract": contract.compiler_contract,
                 "entrypoint": contract.entrypoint,
                 "built_outputs": output_paths,
                 "cached": False,
@@ -429,6 +436,7 @@ def _run_package_in_process(
             "entry": contract.entrypoint,
             "platform": contract.platform,
             "runtime_name": contract.runtime_name,
+            "compiler_contract": contract.compiler_contract,
             "built_outputs": built_outputs,
             "output_names": list(marshaled.output_names),
             "build_trace_ref": build_trace_ref,
@@ -452,6 +460,7 @@ def _run_package_in_process(
             "entry": contract.entrypoint,
             "platform": contract.platform,
             "runtime_name": contract.runtime_name,
+            "compiler_contract": contract.compiler_contract,
             "built_outputs": built_outputs,
             "output_names": list(marshaled.output_names),
             "trace_ref": trace_ref,
@@ -530,6 +539,9 @@ def load_contract(package_dir: Path, manifest: Mapping[str, Any]) -> PTOContract
         entrypoint=str(codegen_index["entrypoint"]),
         platform=str(runtime_config.get("platform", manifest.get("target", {}).get("variant", "a2a3sim"))),
         runtime_name=str(runtime_config.get("runtime", "host_build_graph")),
+        compiler_contract=toolchain_manifest.get("compiler_contract")
+        if isinstance(toolchain_manifest.get("compiler_contract"), str)
+        else None,
         runtime_config=runtime_config,
         orchestration_source=_resolve_project_path(package_dir, orchestration["source"]),
         orchestration_function=str(orchestration["function_name"]),
