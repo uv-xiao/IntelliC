@@ -171,6 +171,7 @@ Specific requirements:
 - do not add comment noise for obvious statements
 - use explicit, semantic names; avoid opaque abbreviations and single-letter names unless mathematically standard
 - examples and tests should read top-to-bottom without forcing the reader to reconstruct hidden state from globals
+- `examples/` is part of the allowed feature-work corridor; public example changes are expected when they are part of the contract proof surface.
 
 ## 9. Testing and CI discipline
 
