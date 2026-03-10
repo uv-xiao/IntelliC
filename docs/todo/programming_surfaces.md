@@ -1,64 +1,69 @@
 # TODO — Programming Surfaces
 
-This document tracks the reopened programming-surface work derived from
-`docs/design/littlekernel_ast_comparison.md`.
+This document tracks the remaining programming-surface work after the first AST-centric frontend improvements.
 
-## Why this topic is reopened
+## Why this topic remains open
 
-The LittleKernel comparison closed one old question — whether HTP understood
-the syntax and architecture lessons well enough to apply them. It also exposed
-the next concrete surface gaps:
+HTP now has a real traced kernel surface, WSP/CSP builders, readable staged Python artifacts, and stronger flagship examples than before. That is not enough yet.
 
-- richer loop / region authoring
-- explicit scratch and memory-scope declarations without constructor soup
-- stronger workload/dataflow authoring patterns that still read like ordinary
-  Python
-- continued calibration against the best reference examples rather than only
-  minimal compiler demos
+The remaining gap is no longer “can HTP avoid raw payload dicts?” It is more specific:
 
-Those are concrete future tasks again, so this broad topic is reopened.
+- can non-trivial mainloops be written as concise Python programs instead of helper choreography?
+- can workload/dataflow programs read like authored programs instead of metadata builders?
+- can example quality reach the semantic richness of the best PyPTO, LittleKernel, and Arknife references?
+
+The latest review under `docs/in_progress/026-programming-surface-conciseness-review.md` makes those gaps concrete.
 
 ## Completion snapshot
 
-- total checklist items: 4
+- total checklist items: 7
 - complete: 0
 - partial: 1
-- open: 3
+- open: 6
 
 ## Detailed checklist
 
-### Loop and region authoring
-- [ ] Add native loop / region authoring surfaces that remain readable Python and still lower into the canonical HTP program model.
+### Tile/view and loop-index surface
+- [ ] Add first-class tile/view slicing on native HTP kernel values so staged copies and tensor-core steps operate on explicit views rather than whole-buffer placeholders.
+- [ ] Promote loop indices from trace annotations into semantic objects that can participate in view construction, staging, and index-dependent operations.
 
-### Scratch and memory-scope authoring
-- [ ] Add explicit scratch-buffer / buffer-array / memory-scope declarations on native HTP values so shared-memory and staged-storage examples do not depend on hidden string slots or overly implicit temporaries.
+### WSP authored workload readability
+- [ ] Add scoped/default schedule contexts so WSP programs do not repeat `.tile(...)`, `.bind(...)`, `.pipeline(...)`, and `.resources(...)` on every task.
+- [ ] Replace string-only stage markers (`.prologue(...)`, `.steady(...)`, `.epilogue(...)`) with structured or executable task-local authored bodies.
 
-### Workload/dataflow readability
-- [ ] Raise WSP and CSP authoring so multi-stage pipelines, role-local steps, and protocol narratives read as complete human programs rather than only thin wrappers around task metadata.
+### CSP authored process readability
+- [ ] Replace `.compute("name", ...)` as the flagship style with process-local authored bodies built around real `get(...)`, `put(...)`, and compute steps.
+
+### Binding and naming integrity
+- [ ] Remove string-tuple argument wiring from flagship WSP/CSP examples by introducing value-based or bind-object-based task/process argument capture.
 
 ### Reference-calibrated flagship examples
-- [ ] Add harder flagship examples calibrated against `references/pypto/`, `references/triton-distributed-knowingnothing/python/little_kernel/`, and `references/arknife/`, and keep using them as the readability bar for public surfaces.
+- [ ] Rebuild the WSP/CSP flagship examples so they match the semantic richness of `references/pypto/`, `references/triton-distributed-knowingnothing/python/little_kernel/`, and `references/arknife/`.
 
 ## Recent progress
 
-- high-level compiler / solver / CLI / tool tests now reuse shared authored
-  programs from `tests/programs.py` instead of repeating toy vector-add and
-  one-op matmul payload dicts
-- those shared programs are imported from the public examples under `examples/`
-  so the regression suite now continuously exercises the real frontend surface
-  rather than only narrow contract builders
+- high-level compiler / solver / CLI / tool tests now reuse shared authored programs from `tests/programs.py` instead of repeating toy payload dicts
+- expression-first kernel authoring landed for arithmetic, temporaries, and staged value flow
+- readable staged `program.py` artifacts now remain runnable Python instead of opaque payload dumps
 
-This means the “reference-calibrated flagship examples” item is now partial:
-HTP is using its stronger authored examples as the high-level test baseline,
-but the broader frontend gaps in loop/region authoring, scratch/memory-scope
-authoring, and workload/dataflow readability are still open.
+This keeps the topic *partially* closed at the repository level: the frontend is real and testable, but the remaining surface work is now about semantic directness and reference-level readability rather than basic AST tracing.
+
+## Derived PR queue
+
+1. `tile-view-loop-surface`
+2. `wsp-authored-task-bodies`
+3. `csp-authored-process-bodies`
+4. `value-bound-workload-wiring`
+5. `reference-grade-flagship-example-rewrite`
 
 ## Coding pointers
 
 - `docs/design/programming_surfaces.md`
 - `docs/design/littlekernel_ast_comparison.md`
 - `htp/kernel.py`
-- `htp/routine.py`
 - `htp/wsp/__init__.py`
 - `htp/csp/__init__.py`
 - `examples/`
+- `references/pypto/examples/language/`
+- `references/triton-distributed-knowingnothing/python/little_kernel/`
+- `references/arknife/tests/python/`
