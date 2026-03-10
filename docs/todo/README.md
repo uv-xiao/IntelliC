@@ -39,7 +39,7 @@ For feature work:
 - `docs/todo/compiler_model.md`
   - remaining work: broaden semantic/type/layout/effect breadth beyond the newly landed fused-elementwise semantics and deepen routine semantics
 - `docs/todo/programming_surfaces.md`
-  - remaining work: no standalone open item; future surface work now rolls into richer semantics and backend depth
+  - remaining work: no standalone open item; the latest pass landed richer WSP task roles/stage plans and CSP process roles/compute steps, so future surface work now rolls into richer semantics and backend depth
 - `docs/todo/pipeline_and_solver.md`
   - remaining work: richer search/composition and broader MLIR island breadth
 - `docs/todo/artifacts_replay_debug.md`
