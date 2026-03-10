@@ -2,7 +2,7 @@
 
 - ID: `026-programming-surface-conciseness-review`
 - Branch: `htp/feat-programming-surface-conciseness-review`
-- PR: `TBD`
+- PR: `#61`
 - Status: `in_progress`
 - Owner: `Codex`
 
