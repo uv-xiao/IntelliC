@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `020-compiler-model-closure.md` — PR `#55`
+- none
