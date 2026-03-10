@@ -74,6 +74,9 @@ The implemented substrate already covers:
 - layout payloads using a facet-product structure
 - explicit async-token, barrier, event, collective, and protocol obligations in `effects.json`
 - schedule payloads for mapping, specialization, pipelining, and launch structure
+- a public `htp.types` surface that lets user code describe dtypes, symbolic
+  dimensions, tensor shapes, distribution facts, and channel types without
+  dropping into raw payload dictionaries
 
 ## Implemented feature inventory
 
@@ -96,11 +99,12 @@ The op registry in `htp/ir/op_specs.py` now provides explicit semantics for oper
 - load/store
 - cast
 - broadcast
-- reshape/view/transpose
+- reshape/view/transpose/slice/concat
 - reduction
 - async copy / wait
 - barrier
 - matrix-like operations
+- explicit collectives including `allreduce`, `allgather`, and `reduce_scatter`
 - channel/protocol-facing operations
 
 That registry is the bridge between front-end authoring, legality checks, passes, and backend discharge.
@@ -112,7 +116,20 @@ The compiler already enforces real legality checks instead of only packaging wha
 - broken alias/view relationships
 - mismatched layout or placement facts
 - undischarged async/protocol obligations
+- missing or redundant collective discharge
 - illegal schedule directives for the current target/capabilities
+
+### Serving-routine semantics
+
+Serving routines are now first-class semantic objects instead of only example
+conventions. When workload tasks carry serving attrs such as `phase`, `state`,
+`stream`, and `batch`, `workload_ir.json` emits a `routine` summary with:
+- serving phases and the tasks in each phase
+- state-transition edges derived from workload dependencies
+- channel-flow summaries for serving streams
+
+This is how HTP keeps serving semantics visible to replay, diagnostics, and
+future passes instead of hiding them in Python helper code alone.
 
 ## Coding pointers
 
@@ -121,13 +138,18 @@ If you are working in this layer, start here:
 - `htp/ir/types.py` — structured type/value payloads
 - `htp/ir/layout.py` — layout helpers and payload structure
 - `htp/ir/op_specs.py` — operation semantics and metadata
+- `htp/types.py` — public structured dtype/shape/distribution/channel surface
 - `htp/intrinsics.py` — intrinsic declarations and handler registration
 - `htp/passes/program_model.py` — semantic synthesis from the current frontend/program surface
 - `htp/passes/typecheck_layout_effects.py` — legality and typing checks
 - `examples/pto_pypto_swiglu/demo.py` — a concrete fused unary/binary semantic proof case
+- `examples/serving_routine/demo.py` — a serving-routine case with first-class
+  typed channels, serving phases, and routine summary artifacts
 
 Then inspect stage artifacts under `ir/stages/<id>/` from a compiled example to see what this layer actually emits.
 
 ## Current limits
 
-What is implemented here is already meaningful, but it is not the final semantic envelope. The missing breadth now lives in `docs/todo/compiler_model.md`.
+The compiler-model topic is now closed at the architecture level. Remaining
+future work lives in backend-depth and agent-product topics, not in a missing
+core semantic substrate.

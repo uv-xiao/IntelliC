@@ -7,35 +7,61 @@ from typing import Any
 from htp import bind, compile_program
 from htp.kernel import buffer, kernel, scalar, store
 from htp.routine import call, fifo_channel, program
+from htp.types import bf16, channel_type, dim, f32, index, shape, tensor
 
 
 @kernel
 def decode_step(
-    hidden: buffer(dtype="f32", shape=("B", "H"), role="input"),
-    weights: buffer(dtype="f32", shape=("H", "H"), role="input"),
-    next_hidden: buffer(dtype="f32", shape=("B", "H"), role="output"),
-    B: scalar(dtype="i32", role="shape"),
-    H: scalar(dtype="i32", role="shape"),
+    hidden: buffer(type=tensor(f32, shape(dim("B"), dim("H"))), role="input"),
+    weights: buffer(type=tensor(bf16, shape(dim("H"), dim("H"))), role="input"),
+    next_hidden: buffer(type=tensor(f32, shape(dim("B"), dim("H"))), role="output"),
+    B: scalar(dtype=index, role="shape"),
+    H: scalar(dtype=index, role="shape"),
 ) -> None:
     store(next_hidden, hidden @ weights)
 
 
 @program(target="nvgpu-ampere")
 def serving_routine(
-    hidden: buffer(dtype="f32", shape=("B", "H"), role="input"),
-    weights: buffer(dtype="f32", shape=("H", "H"), role="input"),
-    next_hidden: buffer(dtype="f32", shape=("B", "H"), role="output"),
-    B: scalar(dtype="i32", role="shape"),
-    H: scalar(dtype="i32", role="shape"),
+    hidden: buffer(type=tensor(f32, shape(dim("B"), dim("H"))), role="input"),
+    weights: buffer(type=tensor(bf16, shape(dim("H"), dim("H"))), role="input"),
+    next_hidden: buffer(type=tensor(f32, shape(dim("B"), dim("H"))), role="output"),
+    B: scalar(dtype=index, role="shape"),
+    H: scalar(dtype=index, role="shape"),
 ) -> None:
-    """Serving routine with explicit decode stages and typed channels."""
+    """Serving routine with explicit serving phases, states, and typed channels."""
 
-    fifo_channel("token_batches", dtype="f32", capacity=2)
-    fifo_channel("decoded_batches", dtype="f32", capacity=2)
+    fifo_channel("token_batches", type=channel_type(f32, capacity=2))
+    fifo_channel("decoded_batches", type=channel_type(f32, capacity=2))
 
-    prefill = call(decode_step, hidden, weights, next_hidden, B, H, task="prefill")
+    prefill = call(
+        decode_step,
+        hidden,
+        weights,
+        next_hidden,
+        B,
+        H,
+        task="prefill",
+        phase="prefill",
+        role="compute",
+        state="kv_fill",
+        stream="token_batches",
+        batch="prompt_tokens",
+    )
     decode_step_0 = call(
-        decode_step, next_hidden, weights, next_hidden, B, H, task="decode_step_0", after=prefill
+        decode_step,
+        next_hidden,
+        weights,
+        next_hidden,
+        B,
+        H,
+        task="decode_step_0",
+        after=prefill,
+        phase="decode",
+        role="compute",
+        state="token_step_0",
+        stream="decoded_batches",
+        batch="token_batch",
     )
     decode_step_1 = call(
         decode_step,
@@ -46,9 +72,42 @@ def serving_routine(
         H,
         task="decode_step_1",
         after=decode_step_0,
+        phase="decode",
+        role="compute",
+        state="token_step_1",
+        stream="decoded_batches",
+        batch="token_batch",
     )
-    sample = call(decode_step, next_hidden, weights, next_hidden, B, H, task="sample", after=decode_step_1)
-    call(decode_step, next_hidden, weights, next_hidden, B, H, task="writeback", after=sample)
+    sample = call(
+        decode_step,
+        next_hidden,
+        weights,
+        next_hidden,
+        B,
+        H,
+        task="sample",
+        after=decode_step_1,
+        phase="sample",
+        role="compute",
+        state="token_selection",
+        stream="decoded_batches",
+        batch="token_batch",
+    )
+    call(
+        decode_step,
+        next_hidden,
+        weights,
+        next_hidden,
+        B,
+        H,
+        task="writeback",
+        after=sample,
+        phase="writeback",
+        role="consumer",
+        state="output_commit",
+        stream="decoded_batches",
+        batch="token_batch",
+    )
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:

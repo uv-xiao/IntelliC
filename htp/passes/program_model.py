@@ -148,11 +148,16 @@ def build_semantic_model(
         channels=tuple(dict(channel) for channel in workload.get("channels", ())),
         dependencies=tuple(dict(dep) for dep in workload.get("dependencies", ())),
         processes=tuple(dict(item) for item in workload.get("processes", ())),
+        routine=dict(workload["routine"])
+        if isinstance(workload.get("routine"), Mapping)
+        else _routine_summary(workload),
     )
     workload_payload = {"schema": WORKLOAD_IR_SCHEMA_ID, **to_payload(workload_ir)}
     for task in workload_payload.get("tasks", ()):
         if isinstance(task, dict) and task.get("attrs") == {}:
             task.pop("attrs", None)
+    if workload_payload.get("routine") is None:
+        workload_payload.pop("routine", None)
     return (
         {"schema": KERNEL_IR_SCHEMA_ID, **to_payload(kernel_ir)},
         workload_payload,
@@ -556,6 +561,11 @@ def _normalize_kernel_surface(entry: str, kernel: Mapping[str, Any]) -> dict[str
                     str(argument["memory_space"]) if argument.get("memory_space") is not None else None
                 ),
                 **(
+                    {"axis_layout": [str(item) for item in argument.get("axis_layout", ())]}
+                    if argument.get("axis_layout")
+                    else {}
+                ),
+                **(
                     {
                         "distribution": [
                             dict(item) if isinstance(item, Mapping) else {"kind": str(item)}
@@ -607,7 +617,7 @@ def _normalize_workload_surface(
             raise ValueError("HTP.WORKLOAD.INVALID_CHANNEL: channels require a non-empty string dtype.")
         channel_payload.setdefault("kind", "fifo")
         normalized_channels.append(channel_payload)
-    return {
+    normalized_workload = {
         "entry": str(workload.get("entry", entry)),
         "tasks": [
             {
@@ -640,6 +650,10 @@ def _normalize_workload_surface(
             else {}
         ),
     }
+    routine = _routine_summary(normalized_workload)
+    if routine is not None:
+        normalized_workload["routine"] = routine
+    return normalized_workload
 
 
 def _lower_csp_surface(entry: str, csp: Mapping[str, Any], kernel: object) -> dict[str, Any]:
@@ -795,6 +809,68 @@ def _op_attrs(op: Mapping[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def _routine_summary(workload: Mapping[str, Any]) -> dict[str, Any] | None:
+    tasks = [dict(item) for item in workload.get("tasks", ()) if isinstance(item, Mapping)]
+    if not tasks:
+        return None
+    phase_order: list[str] = []
+    phase_tasks: dict[str, list[str]] = {}
+    phase_states: dict[str, list[str]] = {}
+    task_states: dict[str, str] = {}
+    for task in tasks:
+        attrs = dict(task.get("attrs", {})) if isinstance(task.get("attrs"), Mapping) else {}
+        phase = str(attrs.get("phase", ""))
+        state = str(attrs.get("state", ""))
+        task_id = str(task.get("task_id", ""))
+        if phase:
+            if phase not in phase_tasks:
+                phase_order.append(phase)
+                phase_tasks[phase] = []
+                phase_states[phase] = []
+            phase_tasks[phase].append(task_id)
+            if state and state not in phase_states[phase]:
+                phase_states[phase].append(state)
+        if state:
+            task_states[task_id] = state
+    if not phase_order:
+        return None
+    state_edges: list[dict[str, str]] = []
+    for dependency in workload.get("dependencies", ()):
+        if not isinstance(dependency, Mapping):
+            continue
+        src_state = task_states.get(str(dependency.get("src", "")))
+        dst_state = task_states.get(str(dependency.get("dst", "")))
+        if src_state and dst_state and src_state != dst_state:
+            state_edges.append(
+                {
+                    "src": src_state,
+                    "dst": dst_state,
+                    "via": str(dependency.get("dst", "")),
+                }
+            )
+    return {
+        "kind": "serving_routine",
+        "phases": [
+            {
+                "name": phase,
+                "tasks": phase_tasks[phase],
+                "states": phase_states[phase],
+            }
+            for phase in phase_order
+        ],
+        "state_edges": state_edges,
+        "channel_flow": [
+            {
+                "channel": str(channel.get("name", "")),
+                "participants": [],
+                "protocol": str(channel.get("protocol", "fifo")),
+            }
+            for channel in workload.get("channels", ())
+            if isinstance(channel, Mapping)
+        ],
+    }
+
+
 def _buffer_type_payload(argument: Mapping[str, Any], memory_spaces: Mapping[str, str]) -> dict[str, Any]:
     name = str(argument["name"])
     return type_to_payload(
@@ -902,6 +978,14 @@ def _layout_facets(memory_spaces: Mapping[str, str], kernel_ir: Mapping[str, Any
             distribution = lhs
         elif str(op.get("op")) == "matmul":
             distribution = _matmul_output_distribution(lhs, rhs) or lhs
+        elif str(op.get("op")) == "allgather":
+            distribution = _apply_collective_distribution(lhs, kind="allgather", axis=attrs.get("axis"))
+        elif str(op.get("op")) == "reduce_scatter":
+            distribution = _apply_collective_distribution(
+                lhs,
+                kind="reduce_scatter",
+                axis=attrs.get("axis"),
+            )
         else:
             distribution = join_distribution_facets(lhs, rhs) or lhs
         attrs = op.get("attrs", {})
@@ -979,7 +1063,7 @@ def _layout_joins(kernel_ir: Mapping[str, Any], layout: Mapping[str, Any]) -> li
 def _layout_relayouts(kernel_ir: Mapping[str, Any], layout: Mapping[str, Any]) -> list[dict[str, Any]]:
     relayouts: list[dict[str, Any]] = []
     for op in kernel_ir.get("ops", ()):
-        if str(op.get("op")) != "relayout":
+        if str(op.get("op")) not in {"relayout", "allgather", "reduce_scatter"}:
             continue
         source_name = str(op.get("inputs", [None])[0] or "")
         out_name = str(op.get("outputs", [None])[0] or "")
@@ -990,6 +1074,7 @@ def _layout_relayouts(kernel_ir: Mapping[str, Any], layout: Mapping[str, Any]) -
                 "out": out_name,
                 "source_distribution": layout_to_payload(_distribution_for_buffer(layout, source_name)),
                 "out_distribution": layout_to_payload(_distribution_for_buffer(layout, out_name)),
+                **({"kind": str(op.get("op"))} if str(op.get("op")) != "relayout" else {}),
             }
         )
     return relayouts
@@ -999,6 +1084,26 @@ def _matmul_output_distribution(lhs: DistributionFacet, rhs: DistributionFacet) 
     if len(lhs.dims) < 2 or len(rhs.dims) < 2:
         return None
     return DistributionFacet((lhs.dims[0], rhs.dims[1]))
+
+
+def _apply_collective_distribution(
+    distribution: DistributionFacet,
+    *,
+    kind: str,
+    axis: object,
+) -> DistributionFacet:
+    dims = list(distribution.dims)
+    if not dims:
+        return distribution
+    axis_index = int(axis or 0)
+    if axis_index < 0 or axis_index >= len(dims):
+        return distribution
+    current = dims[axis_index]
+    if kind == "allgather":
+        dims[axis_index] = current.__class__(kind="replicate", axis=None)
+    elif kind == "reduce_scatter":
+        dims[axis_index] = current.__class__(kind="shard", axis=str(axis_index))
+    return DistributionFacet(tuple(dims))
 
 
 def _threading_for_backend(backend: str, kernel_ir: Mapping[str, Any]) -> dict[str, Any]:
@@ -1355,22 +1460,34 @@ def _collective_effects(kernel_ir: Mapping[str, Any], *, layout: Mapping[str, An
     required_outputs = _collective_requirements(kernel_ir, layout)
     records: list[dict[str, Any]] = []
     for op in kernel_ir.get("ops", ()):
-        if str(op.get("intrinsic", "")) != "portable.allreduce":
+        intrinsic = str(op.get("intrinsic", ""))
+        if intrinsic not in {
+            "portable.allreduce",
+            "portable.allgather",
+            "portable.reduce_scatter",
+        }:
             continue
         op_id = str(op["op_id"])
         outputs = [str(name) for name in op.get("outputs", ())]
         collective_id = f"{op_id}.collective"
         discharged = any(name in required_outputs for name in outputs)
+        kind = intrinsic.partition(".")[2]
         records.append(
             {
                 "collective_id": collective_id,
                 "op_id": op_id,
-                "kind": "allreduce",
+                "kind": kind,
                 "outputs": outputs,
                 "status": "discharged" if discharged else "redundant",
                 "discharged_by": op_id if discharged else None,
                 "required_by": sorted(name for name in outputs if name in required_outputs),
-                "discharge_rule": "allreduce_over_sharded_output" if discharged else "no_pending_obligation",
+                "discharge_rule": (
+                    "allreduce_over_sharded_output"
+                    if kind == "allreduce" and discharged
+                    else f"{kind}_over_distributed_output"
+                    if discharged
+                    else "no_pending_obligation"
+                ),
             }
         )
     for buffer_name in sorted(required_outputs):
@@ -1380,12 +1497,12 @@ def _collective_effects(kernel_ir: Mapping[str, Any], *, layout: Mapping[str, An
             {
                 "collective_id": f"{buffer_name}.collective",
                 "op_id": None,
-                "kind": "allreduce",
+                "kind": "collective",
                 "outputs": [buffer_name],
                 "status": "pending",
                 "discharged_by": None,
                 "required_by": [buffer_name],
-                "discharge_rule": "allreduce_over_sharded_output",
+                "discharge_rule": "collective_over_distributed_output",
             }
         )
     return records
@@ -1411,6 +1528,8 @@ def _collective_requirements(kernel_ir: Mapping[str, Any], layout: Mapping[str, 
             source = _distribution_for_buffer(layout, source_name)
             if len(source.dims) > axis and str(source.dims[axis].kind) == "shard":
                 requirements.update(outputs)
+        elif op_name in {"allgather", "reduce_scatter"}:
+            requirements.update(outputs)
     return requirements
 
 
@@ -1436,7 +1555,7 @@ def _validate_dtype_contracts(kernel_ir: Mapping[str, Any], *, target: Mapping[s
     entry = str(kernel_ir.get("entry", ""))
     arknife_ops = {"cp_async", "ldmatrix", "mma_sync", "tma_load", "wgmma", "tma_store", "commit"}
     has_arknife_nvgpu_ops = any(str(op.get("op")) in arknife_ops for op in kernel_ir.get("ops", ()))
-    allowed_nvgpu_dtypes = {"f32"} if not has_arknife_nvgpu_ops else {"f32", "f16", "bf16"}
+    allowed_nvgpu_dtypes = {"f32", "bf16"} if not has_arknife_nvgpu_ops else {"f32", "f16", "bf16"}
     for index, argument in enumerate(kernel_ir.get("args", ())):
         if argument.get("kind") != "buffer":
             continue

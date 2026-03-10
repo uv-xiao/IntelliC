@@ -234,3 +234,137 @@ def test_build_type_layout_effects_rejects_unknown_view_alias():
 
     with pytest.raises(ValueError, match="HTP.TYPECHECK.UNKNOWN_ALIAS"):
         build_type_layout_effects(kernel_ir, workload_ir, target={"backend": "generic", "option": "default"})
+
+
+def test_build_type_layout_effects_tracks_allgather_and_reduce_scatter_collectives():
+    canonical = canonicalize_program(
+        {
+            "entry": "collective_kernel",
+            "target": {"backend": "generic", "option": "default"},
+            "kernel": {
+                "name": "collective_kernel",
+                "args": [
+                    {
+                        "name": "src",
+                        "kind": "buffer",
+                        "dtype": "f32",
+                        "shape": ["M", "N"],
+                        "role": "input",
+                        "distribution": [{"kind": "replicate"}, {"kind": "shard", "axis": "1"}],
+                    },
+                    {"name": "tmp", "kind": "buffer", "dtype": "f32", "shape": ["M", "N"], "role": "temp"},
+                    {
+                        "name": "out",
+                        "kind": "buffer",
+                        "dtype": "f32",
+                        "shape": ["M", "N"],
+                        "role": "output",
+                        "distribution": [{"kind": "replicate"}, {"kind": "shard", "axis": "1"}],
+                    },
+                ],
+                "ops": [
+                    {"op": "allgather", "source": "src", "out": "tmp", "axis": 1, "mesh_axis": 1},
+                    {"op": "reduce_scatter", "source": "tmp", "out": "out", "axis": 1, "mesh_axis": 1},
+                ],
+            },
+            "workload": {
+                "entry": "collective_kernel",
+                "tasks": [
+                    {
+                        "task_id": "task0",
+                        "kind": "kernel_call",
+                        "kernel": "collective_kernel",
+                        "args": ["src", "tmp", "out"],
+                    }
+                ],
+                "channels": [],
+                "dependencies": [],
+            },
+        }
+    )
+
+    kernel_ir, workload_ir, _entities, _bindings = build_semantic_model(canonical)
+    _types, layout, effects = build_type_layout_effects(
+        kernel_ir,
+        workload_ir,
+        target={"backend": "generic", "option": "default"},
+    )
+
+    assert [op["intrinsic"] for op in kernel_ir["ops"]] == [
+        "portable.allgather",
+        "portable.reduce_scatter",
+    ]
+    assert [item["kind"] for item in effects["collectives"]] == ["allgather", "reduce_scatter"]
+    assert effects["collectives"][0]["status"] == "discharged"
+    assert effects["collectives"][1]["status"] == "discharged"
+    assert layout["relayouts"][0]["kind"] == "allgather"
+    assert layout["relayouts"][1]["kind"] == "reduce_scatter"
+
+
+def test_build_semantic_model_emits_serving_routine_summary():
+    canonical = canonicalize_program(
+        {
+            "entry": "serving_routine",
+            "target": {"backend": "nvgpu", "option": "ampere"},
+            "kernel": {
+                "name": "decode_step",
+                "args": [
+                    {
+                        "name": "hidden",
+                        "kind": "buffer",
+                        "dtype": "f32",
+                        "shape": ["B", "H"],
+                        "role": "input",
+                    },
+                    {
+                        "name": "weights",
+                        "kind": "buffer",
+                        "dtype": "f32",
+                        "shape": ["H", "H"],
+                        "role": "input",
+                    },
+                    {
+                        "name": "next_hidden",
+                        "kind": "buffer",
+                        "dtype": "f32",
+                        "shape": ["B", "H"],
+                        "role": "output",
+                    },
+                ],
+                "ops": [{"op": "matmul", "lhs": "hidden", "rhs": "weights", "out": "next_hidden"}],
+            },
+            "workload": {
+                "entry": "serving_routine",
+                "tasks": [
+                    {
+                        "task_id": "prefill",
+                        "kind": "kernel_call",
+                        "kernel": "decode_step",
+                        "args": ["hidden", "weights", "next_hidden"],
+                        "attrs": {"phase": "prefill", "state": "kv_fill", "role": "compute"},
+                    },
+                    {
+                        "task_id": "decode",
+                        "kind": "kernel_call",
+                        "kernel": "decode_step",
+                        "args": ["next_hidden", "weights", "next_hidden"],
+                        "attrs": {"phase": "decode", "state": "token_step", "role": "compute"},
+                    },
+                ],
+                "channels": [{"name": "tokens", "dtype": "f32", "kind": "fifo", "capacity": 2}],
+                "dependencies": [{"src": "prefill", "dst": "decode"}],
+            },
+        }
+    )
+
+    _kernel_ir, workload_ir, _entities, _bindings = build_semantic_model(canonical)
+
+    assert workload_ir["routine"] == {
+        "kind": "serving_routine",
+        "phases": [
+            {"name": "prefill", "tasks": ["prefill"], "states": ["kv_fill"]},
+            {"name": "decode", "tasks": ["decode"], "states": ["token_step"]},
+        ],
+        "state_edges": [{"src": "kv_fill", "dst": "token_step", "via": "decode"}],
+        "channel_flow": [{"channel": "tokens", "participants": [], "protocol": "fifo"}],
+    }

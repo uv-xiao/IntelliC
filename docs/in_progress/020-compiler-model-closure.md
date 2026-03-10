@@ -2,8 +2,8 @@
 
 - ID: `020-compiler-model-closure`
 - Branch: `htp/feat-compiler-model-closure`
-- PR: `TBD`
-- Status: `planned`
+- PR: `#55`
+- Status: `in_review`
 - Owner: `Codex`
 
 ## Goal
@@ -26,11 +26,11 @@ first-class semantic case rather than an example-only wrapper.
 
 ## Scope Checklist
 
-- [ ] broaden the shared op/type surface beyond the current fused-elementwise mix
-- [ ] make the user-facing type surface match the staged model more closely
-- [ ] deepen collective/distribution semantics and discharge rules
-- [ ] make serving-routine semantics first-class in staged workload artifacts
-- [ ] close `docs/todo/compiler_model.md` and sync summary counts
+- [x] broaden the shared op/type surface beyond the current fused-elementwise mix
+- [x] make the user-facing type surface match the staged model more closely
+- [x] deepen collective/distribution semantics and discharge rules
+- [x] make serving-routine semantics first-class in staged workload artifacts
+- [x] close `docs/todo/compiler_model.md` and sync summary counts
 
 ## Code Surfaces
 
@@ -43,19 +43,19 @@ first-class semantic case rather than an example-only wrapper.
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for the motivating gap
-- [ ] a human-friendly example update or addition
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating gap
+- [x] a human-friendly example update or addition
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete semantic
 contract.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for implemented behavior
-- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] update `docs/design/` for implemented behavior
+- [x] update `docs/todo/` to remove or narrow the gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan

@@ -14,8 +14,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
-from inspect import signature
+from inspect import getclosurevars, signature
 from typing import Any
+
+from htp.types import (
+    DType,
+    TensorType,
+    dims_payload,
+    distribution_payload,
+    dtype_name,
+)
 
 ScalarLiteral = int | float
 
@@ -30,6 +38,7 @@ class KernelArgSpec:
     role: str | None = None
     memory_space: str | None = None
     axis_layout: tuple[str, ...] = ()
+    distribution: tuple[dict[str, Any], ...] = ()
     attrs: dict[str, Any] | None = None
     name: str | None = None
 
@@ -42,6 +51,7 @@ class KernelArgSpec:
             role=self.role,
             memory_space=self.memory_space,
             axis_layout=self.axis_layout,
+            distribution=self.distribution,
             attrs=None if self.attrs is None else dict(self.attrs),
         )
 
@@ -60,6 +70,8 @@ class KernelArgSpec:
             payload["memory_space"] = self.memory_space
         if self.axis_layout:
             payload["axis_layout"] = list(self.axis_layout)
+        if self.distribution:
+            payload["distribution"] = [dict(item) for item in self.distribution]
         if self.attrs:
             payload["attrs"] = dict(self.attrs)
         return payload
@@ -76,6 +88,7 @@ class KernelValue:
     role: str | None = None
     memory_space: str | None = None
     axis_layout: tuple[str, ...] = ()
+    distribution: tuple[dict[str, Any], ...] = ()
     attrs: dict[str, Any] | None = None
 
     def to_arg_payload(self) -> dict[str, Any]:
@@ -91,6 +104,8 @@ class KernelValue:
             payload["memory_space"] = self.memory_space
         if self.axis_layout:
             payload["axis_layout"] = list(self.axis_layout)
+        if self.distribution:
+            payload["distribution"] = [dict(item) for item in self.distribution]
         if self.attrs:
             payload["attrs"] = dict(self.attrs)
         return payload
@@ -183,21 +198,34 @@ _TRACE_RECORDER: ContextVar[_KernelTrace | None] = ContextVar("htp_kernel_trace_
 def buffer(
     name: str | None = None,
     *,
-    dtype: str,
-    shape: tuple[str | KernelValue, ...] | list[str | KernelValue],
+    dtype: str | DType | None = None,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | None = None,
     role: str,
+    type: TensorType | None = None,
     memory_space: str | None = None,
     axis_layout: tuple[str, ...] | list[str] = (),
+    distribution: tuple[object, ...] | list[object] | None = None,
     attrs: dict[str, Any] | None = None,
 ) -> KernelArgSpec:
+    dtype_name_value, shape_value, memory_space_value, axis_layout_value, distribution_value = (
+        _resolve_buffer_type(
+            dtype=dtype,
+            shape=shape,
+            type=type,
+            memory_space=memory_space,
+            axis_layout=axis_layout,
+            distribution=distribution,
+        )
+    )
     return KernelArgSpec(
         name=name,
         kind="buffer",
-        dtype=dtype,
-        shape=_normalize_dims(shape),
+        dtype=dtype_name_value,
+        shape=shape_value,
         role=role,
-        memory_space=memory_space,
-        axis_layout=tuple(str(item) for item in axis_layout),
+        memory_space=memory_space_value,
+        axis_layout=axis_layout_value,
+        distribution=distribution_value,
         attrs=None if attrs is None else dict(attrs),
     )
 
@@ -205,14 +233,14 @@ def buffer(
 def scalar(
     name: str | None = None,
     *,
-    dtype: str,
+    dtype: str | DType,
     role: str,
     attrs: dict[str, Any] | None = None,
 ) -> KernelArgSpec:
     return KernelArgSpec(
         name=name,
         kind="scalar",
-        dtype=dtype,
+        dtype=dtype_name(dtype),
         shape=(),
         role=role,
         attrs=None if attrs is None else dict(attrs),
@@ -223,21 +251,34 @@ def value(
     name: str,
     *,
     kind: str = "buffer",
-    dtype: str,
-    shape: tuple[str | KernelValue, ...] | list[str | KernelValue] = (),
+    dtype: str | DType | None = None,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | None = None,
     role: str | None = None,
+    type: TensorType | None = None,
     memory_space: str | None = None,
     axis_layout: tuple[str, ...] | list[str] = (),
+    distribution: tuple[object, ...] | list[object] | None = None,
     attrs: dict[str, Any] | None = None,
 ) -> KernelValue:
+    dtype_name_value, shape_value, memory_space_value, axis_layout_value, distribution_value = (
+        _resolve_buffer_type(
+            dtype=dtype,
+            shape=shape,
+            type=type,
+            memory_space=memory_space,
+            axis_layout=axis_layout,
+            distribution=distribution,
+        )
+    )
     return KernelValue(
         name=name,
-        dtype=dtype,
-        shape=_normalize_dims(shape),
+        dtype=dtype_name_value,
+        shape=shape_value,
         kind=kind,
         role=role,
-        memory_space=memory_space,
-        axis_layout=tuple(str(item) for item in axis_layout),
+        memory_space=memory_space_value,
+        axis_layout=axis_layout_value,
+        distribution=distribution_value,
         attrs=None if attrs is None else dict(attrs),
     )
 
@@ -277,6 +318,7 @@ def _trace_kernel(function: Callable[..., Any]) -> KernelSpec:
                 role=annotation.role,
                 memory_space=annotation.memory_space,
                 axis_layout=annotation.axis_layout,
+                distribution=annotation.distribution,
                 attrs=None if annotation.attrs is None else dict(annotation.attrs),
             )
         )
@@ -614,6 +656,43 @@ def reduction_sum(
     )
 
 
+def slice_tensor(
+    source: str | KernelValue,
+    *,
+    out: str | KernelValue,
+    offsets: tuple[int, ...] | list[int],
+    sizes: tuple[str | KernelValue | int, ...] | list[str | KernelValue | int],
+    dtype: str | DType,
+) -> dict[str, Any]:
+    return _emit_or_return(
+        {
+            "op": "slice",
+            "source": _ref(source),
+            "out": _ref(out),
+            "offsets": list(offsets),
+            "sizes": [str(_ref(item)) for item in sizes],
+            "dtype": dtype_name(dtype),
+        }
+    )
+
+
+def concat(
+    *inputs: str | KernelValue,
+    out: str | KernelValue,
+    axis: int,
+    dtype: str | DType,
+) -> dict[str, Any]:
+    return _emit_or_return(
+        {
+            "op": "concat",
+            "inputs": [str(_ref(item)) for item in inputs],
+            "out": _ref(out),
+            "axis": axis,
+            "dtype": dtype_name(dtype),
+        }
+    )
+
+
 def async_copy(
     source: str | KernelValue,
     *,
@@ -741,6 +820,48 @@ def allreduce(source: str | KernelValue, *, out: str | KernelValue, op: str, dty
     )
 
 
+def allgather(
+    source: str | KernelValue,
+    *,
+    out: str | KernelValue,
+    axis: int,
+    mesh_axis: int | str,
+    dtype: str | DType,
+) -> dict[str, Any]:
+    return _emit_or_return(
+        {
+            "op": "allgather",
+            "source": _ref(source),
+            "out": _ref(out),
+            "axis": axis,
+            "mesh_axis": mesh_axis,
+            "dtype": dtype_name(dtype),
+        }
+    )
+
+
+def reduce_scatter(
+    source: str | KernelValue,
+    *,
+    out: str | KernelValue,
+    axis: int,
+    mesh_axis: int | str,
+    dtype: str | DType,
+    op: str = "sum",
+) -> dict[str, Any]:
+    return _emit_or_return(
+        {
+            "op": "reduce_scatter",
+            "source": _ref(source),
+            "out": _ref(out),
+            "axis": axis,
+            "mesh_axis": mesh_axis,
+            "reduction": op,
+            "dtype": dtype_name(dtype),
+        }
+    )
+
+
 def barrier() -> dict[str, Any]:
     return _emit_or_return({"op": "barrier"})
 
@@ -833,6 +954,7 @@ def _resolve_result_value(
             role=out.role,
             memory_space=out.memory_space,
             axis_layout=out.axis_layout,
+            distribution=out.distribution,
             attrs=None if out.attrs is None else dict(out.attrs),
         )
     return KernelValue(name=out, dtype=resolved_dtype, shape=resolved_shape)
@@ -863,6 +985,7 @@ def _as_named_value(value: str | KernelValue, *, fallback: KernelValue | None = 
             role=fallback.role,
             memory_space=fallback.memory_space,
             axis_layout=fallback.axis_layout,
+            distribution=fallback.distribution,
             attrs=None if fallback.attrs is None else dict(fallback.attrs),
         )
     raise ValueError("String-only kernel references require a typed fallback.")
@@ -914,13 +1037,49 @@ def _is_scalar_literal(value: Operand) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _normalize_dims(shape: tuple[str | KernelValue, ...] | list[str | KernelValue]) -> tuple[str, ...]:
+def _normalize_dims(
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | None,
+) -> tuple[str, ...]:
+    if shape is None:
+        return ()
     return tuple(str(_ref(dim)) for dim in shape)
+
+
+def _resolve_buffer_type(
+    *,
+    dtype: str | DType | None,
+    shape: tuple[str | KernelValue, ...] | list[str | KernelValue] | None,
+    type: TensorType | None,
+    memory_space: str | None,
+    axis_layout: tuple[str, ...] | list[str],
+    distribution: tuple[object, ...] | list[object] | None,
+) -> tuple[str, tuple[str, ...], str | None, tuple[str, ...], tuple[dict[str, Any], ...]]:
+    if type is not None:
+        return (
+            dtype_name(type.dtype),
+            dims_payload(type.shape),
+            type.memory_space if memory_space is None else memory_space,
+            type.axis_layout if not axis_layout else tuple(str(item) for item in axis_layout),
+            distribution_payload(type.distribution if distribution is None else distribution),
+        )
+    if dtype is None:
+        raise TypeError("buffer/value requires either dtype=... or type=...")
+    return (
+        dtype_name(dtype),
+        _normalize_dims(shape),
+        memory_space,
+        tuple(str(item) for item in axis_layout),
+        distribution_payload(distribution),
+    )
 
 
 def _resolve_annotation(annotation: Any, *, function: Callable[..., Any]) -> Any:
     if isinstance(annotation, str):
-        return eval(annotation, function.__globals__, function.__globals__)
+        closure = getclosurevars(function)
+        namespace = dict(function.__globals__)
+        namespace.update(closure.globals)
+        namespace.update(closure.nonlocals)
+        return eval(annotation, namespace, namespace)
     return annotation
 
 
@@ -929,6 +1088,7 @@ __all__ = [
     "KernelSpec",
     "KernelValue",
     "allreduce",
+    "allgather",
     "async_copy",
     "await_token",
     "barrier",
@@ -937,6 +1097,7 @@ __all__ = [
     "cast",
     "channel_recv",
     "channel_send",
+    "concat",
     "elementwise_add",
     "elementwise_div",
     "elementwise_mul",
@@ -947,11 +1108,13 @@ __all__ = [
     "matmul",
     "mma",
     "recip",
+    "reduce_scatter",
     "reduction_sum",
     "relayout",
     "reshape",
     "scalar",
     "sigmoid",
+    "slice_tensor",
     "store",
     "transpose",
     "value",

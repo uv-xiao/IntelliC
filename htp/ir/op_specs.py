@@ -104,6 +104,21 @@ OP_SPECS = {
         reads=("source",),
         writes=("out",),
     ),
+    "slice": OpSpec(
+        name="slice",
+        intrinsic="portable.slice",
+        phase="compute",
+        latency=1,
+        reads=("source",),
+        writes=("out",),
+    ),
+    "concat": OpSpec(
+        name="concat",
+        intrinsic="portable.concat",
+        phase="compute",
+        latency=1,
+        writes=("out",),
+    ),
     "relayout": OpSpec(
         name="relayout",
         intrinsic="portable.relayout",
@@ -223,6 +238,22 @@ OP_SPECS = {
         reads=("source",),
         writes=("out",),
     ),
+    "allgather": OpSpec(
+        name="allgather",
+        intrinsic="portable.allgather",
+        phase="sync",
+        latency=2,
+        reads=("source",),
+        writes=("out",),
+    ),
+    "reduce_scatter": OpSpec(
+        name="reduce_scatter",
+        intrinsic="portable.reduce_scatter",
+        phase="sync",
+        latency=2,
+        reads=("source",),
+        writes=("out",),
+    ),
     "barrier": OpSpec(name="barrier", intrinsic="portable.barrier", phase="sync", latency=1),
     "await": OpSpec(name="await", intrinsic="portable.await", phase="sync", latency=1, reads=("token",)),
 }
@@ -236,6 +267,11 @@ def get_op_spec(op_name: str) -> OpSpec:
 
 def op_effects(op_name: str, op: dict[str, Any]) -> dict[str, tuple[str, ...]]:
     spec = get_op_spec(op_name)
+    if op_name == "concat":
+        return {
+            "reads": tuple(str(item) for item in op.get("inputs", ())),
+            "writes": tuple(str(op[field]) for field in spec.writes if field in op),
+        }
     effects = {
         "reads": tuple(str(op[field]) for field in spec.reads if field in op),
         "writes": tuple(str(op[field]) for field in spec.writes if field in op),

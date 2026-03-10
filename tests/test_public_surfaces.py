@@ -26,6 +26,7 @@ from htp.kernel import (
     value,
 )
 from htp.routine import call, fifo_channel, program
+from htp.types import bf16, channel_type, dim, f32, index, shape, shard, tensor
 from htp.wsp import program as wsp_program
 
 
@@ -45,6 +46,72 @@ def test_compile_program_accepts_public_program_surface(tmp_path):
 
     assert compiled.manifest["inputs"]["entry"] == "vector_add"
     assert compiled.manifest["target"]["backend"] == "pto"
+
+
+def test_public_type_surface_drives_kernel_and_channel_annotations(tmp_path):
+    @kernel
+    def typed_decode(
+        x: buffer(
+            type=tensor(f32, shape(dim("B"), dim("H")), distribution=(shard(axis=0), "replicate")),
+            role="input",
+        ),
+        w: buffer(type=tensor(bf16, shape(dim("H"), dim("H"))), role="input"),
+        y: buffer(type=tensor(f32, shape(dim("B"), dim("H"))), role="output"),
+        B: scalar(dtype=index, role="shape"),
+    ) -> None:
+        store(y, x @ w)
+
+    @program(target="nvgpu-ampere")
+    def typed_serving(
+        x: buffer(
+            type=tensor(f32, shape(dim("B"), dim("H")), distribution=(shard(axis=0), "replicate")),
+            role="input",
+        ),
+        w: buffer(type=tensor(bf16, shape(dim("H"), dim("H"))), role="input"),
+        y: buffer(type=tensor(f32, shape(dim("B"), dim("H"))), role="output"),
+        B: scalar(dtype=index, role="shape"),
+    ) -> None:
+        fifo_channel("tokens", type=channel_type(f32, capacity=2))
+        prefill = call(
+            typed_decode,
+            x,
+            w,
+            y,
+            B,
+            task="prefill",
+            phase="prefill",
+            role="compute",
+            state="kv_fill",
+        )
+        call(
+            typed_decode,
+            y,
+            w,
+            y,
+            B,
+            task="decode",
+            after=prefill,
+            phase="decode",
+            role="compute",
+            state="token_step",
+        )
+
+    compiled = htp.compile_program(
+        package_dir=tmp_path / "typed_surface_pkg",
+        target="nvgpu-ampere",
+        program=typed_serving,
+    )
+
+    stage_id = compiled.manifest["stages"]["current"]
+    workload_ir = (compiled.package_dir / "ir" / "stages" / stage_id / "workload_ir.json").read_text()
+    types_json = (compiled.package_dir / "ir" / "stages" / stage_id / "types.json").read_text()
+    layout_json = (compiled.package_dir / "ir" / "stages" / stage_id / "layout.json").read_text()
+
+    assert '"kind": "serving_routine"' in workload_ir
+    assert '"phase": "prefill"' in workload_ir
+    assert '"state": "kv_fill"' in workload_ir
+    assert '"name": "index"' in types_json
+    assert '"axis": "0"' in layout_json or '"axis": 0' in layout_json
 
 
 def test_compile_program_accepts_expression_first_kernel_surface(tmp_path):
@@ -152,6 +219,32 @@ def test_public_routine_surface_emits_human_readable_workload_shape():
     assert payload["workload"]["tasks"][0]["task_id"] == "prefill"
     assert payload["workload"]["dependencies"] == [{"src": "prefill", "dst": "decode"}]
     assert payload["workload"]["channels"][0]["name"] == "token_batches"
+
+
+def test_public_kernel_surface_covers_collective_and_tensor_reshape_ops():
+    payload = kernel(
+        "collective_kernel",
+        args=[
+            buffer(
+                "src", dtype="f32", shape=("M", "N"), role="input", distribution=("replicate", shard(axis=1))
+            ),
+            buffer("tmp", dtype="f32", shape=("M", "N"), role="temp"),
+            buffer("out", dtype="f32", shape=("M", "N"), role="output"),
+        ],
+        ops=[
+            {"op": "slice", "source": "src", "out": "tmp", "offsets": [0, 0], "sizes": ["M", "N"]},
+            {"op": "allgather", "source": "tmp", "out": "tmp", "axis": 1, "mesh_axis": 1},
+            {"op": "reduce_scatter", "source": "tmp", "out": "out", "axis": 1, "mesh_axis": 1},
+            {"op": "concat", "inputs": ["tmp", "out"], "out": "out", "axis": 0},
+        ],
+    ).to_payload()
+
+    assert [op["op"] for op in payload["ops"]] == [
+        "slice",
+        "allgather",
+        "reduce_scatter",
+        "concat",
+    ]
 
 
 def test_public_routine_surface_assigns_readable_task_ids_when_omitted():
