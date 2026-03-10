@@ -12,3 +12,4 @@ Rules:
 ## Active tasks
 
 - none
+- `026-programming-surface-conciseness-review.md` — PR `TBD`
