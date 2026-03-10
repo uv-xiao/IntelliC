@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- none
+- `024-stronger-flagship-tests.md` — PR `TBD`
