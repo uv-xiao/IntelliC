@@ -242,6 +242,14 @@ def test_serving_routine_example_compiles_and_replays(tmp_path):
         "sample",
         "writeback",
     ]
+    assert replay_summary["workload_ir"]["routine"]["kind"] == "serving_routine"
+    assert replay_summary["workload_ir"]["routine"]["phases"][0]["name"] == "prefill"
+    assert replay_summary["workload_ir"]["routine"]["phases"][1]["name"] == "decode"
+    assert replay_summary["workload_ir"]["routine"]["state_edges"][0] == {
+        "src": "kv_fill",
+        "dst": "token_step_0",
+        "via": "decode_step_0",
+    }
     assert [channel["name"] for channel in replay_summary["workload_ir"]["channels"]] == [
         "token_batches",
         "decoded_batches",

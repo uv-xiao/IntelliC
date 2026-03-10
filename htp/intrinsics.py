@@ -201,6 +201,8 @@ def _bootstrap() -> None:
         ),
         IntrinsicDecl("portable.view", 1, "portable", "view", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
         IntrinsicDecl("portable.reshape", 1, "portable", "reshape", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
+        IntrinsicDecl("portable.slice", 1, "portable", "slice", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
+        IntrinsicDecl("portable.concat", 1, "portable", "concat", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
         IntrinsicDecl(
             "portable.relayout", 1, "portable", "relayout", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"
         ),
@@ -264,6 +266,26 @@ def _bootstrap() -> None:
             produces_effects=("collective.allreduce",),
             discharges_effects=("collective.pending_allreduce", "collective.allreduce"),
         ),
+        IntrinsicDecl(
+            "portable.allgather",
+            1,
+            "portable",
+            "allgather",
+            "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+            requires_effects=("collective.pending_allgather",),
+            produces_effects=("collective.allgather",),
+            discharges_effects=("collective.pending_allgather", "collective.allgather"),
+        ),
+        IntrinsicDecl(
+            "portable.reduce_scatter",
+            1,
+            "portable",
+            "reduce_scatter",
+            "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC",
+            requires_effects=("collective.pending_reduce_scatter",),
+            produces_effects=("collective.reduce_scatter",),
+            discharges_effects=("collective.pending_reduce_scatter", "collective.reduce_scatter"),
+        ),
         IntrinsicDecl("nvgpu.cp_async", 1, "backend", "cp_async", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
         IntrinsicDecl("nvgpu.ldmatrix", 1, "backend", "ldmatrix", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
         IntrinsicDecl("nvgpu.mma_sync", 1, "backend", "mma_sync", "HTP.REPLAY.STUB_UNSUPPORTED_INTRINSIC"),
@@ -297,6 +319,8 @@ def _bootstrap() -> None:
         "portable.transpose",
         "portable.view",
         "portable.reshape",
+        "portable.slice",
+        "portable.concat",
         "portable.relayout",
         "portable.reduction_sum",
         "portable.async_copy",
@@ -305,6 +329,8 @@ def _bootstrap() -> None:
         "portable.channel_send",
         "portable.channel_recv",
         "portable.allreduce",
+        "portable.allgather",
+        "portable.reduce_scatter",
     ):
         register_handlers("generic", intrinsic, simulate=_portable_simulator_for(intrinsic))
     register_handlers(
@@ -334,9 +360,14 @@ def _bootstrap() -> None:
         "portable.await",
         "portable.reduction_sum",
         "portable.broadcast",
+        "portable.slice",
+        "portable.concat",
         "portable.channel_send",
         "portable.channel_recv",
         "portable.mma",
+        "portable.allreduce",
+        "portable.allgather",
+        "portable.reduce_scatter",
     ):
         register_handlers(
             "nvgpu",
@@ -510,6 +541,26 @@ def _simulate_view_like(
     return source
 
 
+def _simulate_slice(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del mode, trace
+    source = args[0]
+    offsets = tuple(int(item) for item in attrs.get("offsets", ()))
+    sizes = tuple(int(item) for item in attrs.get("sizes", ()))
+    slices = tuple(slice(offset, offset + size) for offset, size in zip(offsets, sizes))
+    return source[slices]
+
+
+def _simulate_concat(
+    *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
+) -> object:
+    del mode, trace
+    import numpy as np
+
+    return np.concatenate(args, axis=int(attrs.get("axis", 0) or 0))
+
+
 def _simulate_reduction_sum(
     *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
 ) -> object:
@@ -637,6 +688,30 @@ def _simulate_allreduce(
     return args[0]
 
 
+def _simulate_allgather(
+    *,
+    args: tuple[object, ...],
+    attrs: Mapping[str, object],
+    mode: str,
+    trace: object | None = None,
+    runtime: object | None = None,
+) -> object:
+    del attrs, mode, trace, runtime
+    return args[0]
+
+
+def _simulate_reduce_scatter(
+    *,
+    args: tuple[object, ...],
+    attrs: Mapping[str, object],
+    mode: str,
+    trace: object | None = None,
+    runtime: object | None = None,
+) -> object:
+    del attrs, mode, trace, runtime
+    return args[0]
+
+
 def _simulate_nvgpu_identity(
     *, args: tuple[object, ...], attrs: Mapping[str, object], mode: str, trace: object | None = None
 ) -> object:
@@ -653,6 +728,8 @@ def _portable_simulator_for(intrinsic: str) -> Callable[..., object]:
         "portable.transpose": _simulate_transpose,
         "portable.view": _simulate_view_like,
         "portable.reshape": _simulate_view_like,
+        "portable.slice": _simulate_slice,
+        "portable.concat": _simulate_concat,
         "portable.relayout": _simulate_view_like,
         "portable.reduction_sum": _simulate_reduction_sum,
         "portable.async_copy": _simulate_async_copy,
@@ -661,6 +738,8 @@ def _portable_simulator_for(intrinsic: str) -> Callable[..., object]:
         "portable.channel_send": _simulate_channel_send,
         "portable.channel_recv": _simulate_channel_recv,
         "portable.allreduce": _simulate_allreduce,
+        "portable.allgather": _simulate_allgather,
+        "portable.reduce_scatter": _simulate_reduce_scatter,
         "portable.mma": _simulate_mma,
     }
     return mapping[intrinsic]

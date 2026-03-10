@@ -241,7 +241,7 @@ def test_compile_program_writes_compiler_failure_for_layout_typecheck(tmp_path):
                         {
                             "name": "A",
                             "kind": "buffer",
-                            "dtype": "bf16",
+                            "dtype": "f16",
                             "shape": ["M", "K"],
                             "role": "input",
                         },
@@ -305,7 +305,7 @@ def test_compile_program_writes_compiler_failure_for_layout_typecheck(tmp_path):
         "stage_before": "s02",
         "diagnostic": {
             "code": "HTP.TYPECHECK.UNSUPPORTED_BUFFER_DTYPE",
-            "detail": "nvgpu buffer 'A' requires one of ['f32'], got 'bf16'.",
+            "detail": "nvgpu buffer 'A' requires one of ['bf16', 'f32'], got 'f16'.",
             "node_id": "bad_kernel:Arg:0",
             "entity_id": "bad_kernel:E0",
             "stage_id": "s02",
@@ -313,7 +313,7 @@ def test_compile_program_writes_compiler_failure_for_layout_typecheck(tmp_path):
             "payload_ref": "ir/stages/s02/kernel_ir.json",
             "fix_hints_ref": "docs/design/compiler_model.md",
             "backend": "nvgpu",
-            "manifest_value": "bf16",
+            "manifest_value": "f16",
         },
     }
 

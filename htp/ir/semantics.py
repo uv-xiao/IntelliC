@@ -54,6 +54,7 @@ class WorkloadIR:
     channels: tuple[dict[str, Any], ...]
     dependencies: tuple[dict[str, Any], ...]
     processes: tuple[dict[str, Any], ...] = ()
+    routine: dict[str, Any] | None = None
 
 
 def to_payload(value: Any) -> Any:

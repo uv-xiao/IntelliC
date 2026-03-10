@@ -18,16 +18,16 @@ For feature work:
 ### Overall
 
 - total tracked TODO checklist items: 56
-- complete: 46
-- partial: 5
-- open: 4
-- completion ratio: about 80%
+- complete: 50
+- partial: 3
+- open: 2
+- completion ratio: about 89%
 
 ### By topic
 
 | Topic | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Compiler model, semantics, typing | 6 | 2 | 2 | 10 |
+| Compiler model, semantics, typing | 10 | 0 | 0 | 10 |
 | Programming surfaces | 10 | 0 | 0 | 10 |
 | Pipeline and solver | 9 | 0 | 0 | 9 |
 | Artifacts, replay, debug | 8 | 0 | 0 | 8 |
@@ -37,7 +37,7 @@ For feature work:
 ## Feature summaries
 
 - `docs/todo/compiler_model.md`
-  - remaining work: broaden semantic/type/layout/effect breadth beyond the newly landed fused-elementwise semantics and deepen routine semantics
+  - remaining work: no standalone open item; future semantic work now rolls into backend depth and agent workflow rather than a missing compiler-model substrate
 - `docs/todo/programming_surfaces.md`
   - remaining work: no standalone open item; the latest pass landed richer WSP task roles/stage plans and CSP process roles/compute steps, so future surface work now rolls into richer semantics and backend depth
 - `docs/todo/pipeline_and_solver.md`

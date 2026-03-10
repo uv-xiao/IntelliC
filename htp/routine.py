@@ -5,11 +5,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
-from inspect import signature
+from inspect import getclosurevars, signature
 from typing import Any
 
 from htp.compiler import parse_target
 from htp.kernel import KernelArgSpec, KernelSpec, KernelValue
+from htp.types import ChannelType, DType, dtype_name
 
 
 @dataclass(frozen=True)
@@ -20,14 +21,18 @@ class KernelCallSpec:
     kernel: str
     args: tuple[str, ...]
     kind: str = "kernel_call"
+    attrs: dict[str, Any] | None = None
 
     def to_payload(self) -> dict[str, Any]:
-        return {
+        payload = {
             "task_id": self.task_id,
             "kind": self.kind,
             "kernel": self.kernel,
             "args": list(self.args),
         }
+        if self.attrs:
+            payload["attrs"] = dict(self.attrs)
+        return payload
 
 
 @dataclass(frozen=True)
@@ -111,16 +116,41 @@ def dependency(src: str, dst: str) -> DependencySpec:
     return DependencySpec(src=src, dst=dst)
 
 
-def channel(name: str, *, dtype: str, capacity: int, protocol: str = "fifo") -> ChannelSpec:
-    spec = ChannelSpec(name=name, dtype=dtype, capacity=capacity, protocol=protocol)
+def channel(
+    name: str,
+    *,
+    dtype: str | DType | None = None,
+    capacity: int | None = None,
+    protocol: str = "fifo",
+    type: ChannelType | None = None,
+) -> ChannelSpec:
+    if type is not None:
+        dtype_value = dtype_name(type.dtype)
+        capacity_value = type.capacity
+        protocol_value = type.protocol
+    else:
+        if dtype is None or capacity is None:
+            raise TypeError("channel(...) requires either dtype=... and capacity=..., or type=...")
+        dtype_value = dtype_name(dtype)
+        capacity_value = capacity
+        protocol_value = protocol
+    if capacity_value is None:
+        raise TypeError("channel(...) requires a concrete capacity")
+    spec = ChannelSpec(name=name, dtype=dtype_value, capacity=capacity_value, protocol=protocol_value)
     trace = _PROGRAM_TRACE.get()
     if trace is not None:
         trace.channels.append(spec)
     return spec
 
 
-def fifo_channel(name: str, *, dtype: str, capacity: int) -> ChannelSpec:
-    return channel(name, dtype=dtype, capacity=capacity, protocol="fifo")
+def fifo_channel(
+    name: str,
+    *,
+    dtype: str | DType | None = None,
+    capacity: int | None = None,
+    type: ChannelType | None = None,
+) -> ChannelSpec:
+    return channel(name, dtype=dtype, capacity=capacity, protocol="fifo", type=type)
 
 
 def call(
@@ -128,6 +158,12 @@ def call(
     *args: str | KernelValue,
     task: str | None = None,
     after: TaskHandle | None = None,
+    phase: str | None = None,
+    role: str | None = None,
+    state: str | None = None,
+    stream: str | None = None,
+    batch: str | None = None,
+    attrs: dict[str, Any] | None = None,
 ) -> TaskHandle:
     trace = _PROGRAM_TRACE.get()
     if trace is None:
@@ -137,8 +173,22 @@ def call(
     elif trace.seen_kernel.name != kernel_spec.name:
         raise ValueError("The current public routine surface supports exactly one kernel per program")
     task_id = task if task is not None else _auto_task_id(trace, kernel_spec.name)
+    task_attrs = dict(attrs or {})
+    if phase is not None:
+        task_attrs["phase"] = phase
+    if role is not None:
+        task_attrs["role"] = role
+    if state is not None:
+        task_attrs["state"] = state
+    if stream is not None:
+        task_attrs["stream"] = stream
+    if batch is not None:
+        task_attrs["batch"] = batch
     task_spec = KernelCallSpec(
-        task_id=task_id, kernel=kernel_spec.name, args=tuple(_ref(arg) for arg in args)
+        task_id=task_id,
+        kernel=kernel_spec.name,
+        args=tuple(_ref(arg) for arg in args),
+        attrs=task_attrs or None,
     )
     trace.tasks.append(task_spec)
     if after is not None:
@@ -230,7 +280,11 @@ def _auto_task_id(trace: _ProgramTrace, kernel_name: str) -> str:
 
 def _resolve_annotation(annotation: Any, *, function: Callable[..., Any]) -> Any:
     if isinstance(annotation, str):
-        return eval(annotation, function.__globals__, function.__globals__)
+        closure = getclosurevars(function)
+        namespace = dict(function.__globals__)
+        namespace.update(closure.globals)
+        namespace.update(closure.nonlocals)
+        return eval(annotation, namespace, namespace)
     return annotation
 
 
