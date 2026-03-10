@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `021-backend-depth-closure.md` — PR `TBD`
+- none
