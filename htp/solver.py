@@ -461,6 +461,10 @@ def _backend_declaration(target: dict[str, str]) -> BackendSolverDeclaration:
         from htp_ext.aie.declarations import declaration_for as aie_declaration_for
 
         return aie_declaration_for(option)
+    if backend == "cpu_ref":
+        from htp_ext.cpu_ref.declarations import declaration_for as cpu_ref_declaration_for
+
+        return cpu_ref_declaration_for(option)
     return BackendSolverDeclaration(
         backend=backend,
         variant=option or "default",

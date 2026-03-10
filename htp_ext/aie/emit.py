@@ -218,6 +218,7 @@ def _write_codegen_tree(package_dir: Path, *, state: Mapping[str, Any], profile:
         "derived_outputs": [
             "build/aie/build_product.json",
             "build/aie/host_runtime.json",
+            "build/aie/launch_plan.json",
         ],
         "build_flags": [],
     }

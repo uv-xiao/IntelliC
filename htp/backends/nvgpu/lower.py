@@ -70,13 +70,16 @@ def lower_program(program: Mapping[str, Any], *, profile: str | None = None) -> 
     arknife = _arknife_payload_for_program(program)
     if arknife is not None:
         _validate_arknife_payload(arknife, arch=arch)
-        kernel_op = _lower_arknife_kernel(kernel_ir, arknife=arknife)
+        kernel_op = _lower_arknife_kernel(kernel_ir, arknife=arknife, arch=arch)
     else:
-        kernel_op = _primary_kernel_op(kernel_ir)
+        kernel_op = _primary_kernel_op(kernel_ir, arch=arch)
     threading = (
         program.get("layout", {}).get("threading", {}) if isinstance(program.get("layout"), Mapping) else {}
     )
-    default_thread_block = [16, 16, 1] if str(kernel_op.get("op")) == "matmul" else [128, 1, 1]
+    if str(kernel_op.get("op")) in {"matmul", "arknife_mainloop"}:
+        default_thread_block = [32, 16, 1] if arch.profile == "blackwell" else [16, 16, 1]
+    else:
+        default_thread_block = [128, 1, 1]
     thread_block = tuple(int(value) for value in threading.get("thread_block", default_thread_block))
     params = tuple(
         NVGPUParamSpec(
@@ -128,20 +131,20 @@ def _kernel_ir_for_program(program: Mapping[str, Any]) -> Mapping[str, Any]:
     return lowered_kernel_ir
 
 
-def _primary_kernel_op(kernel_ir: Mapping[str, Any]) -> Mapping[str, Any]:
+def _primary_kernel_op(kernel_ir: Mapping[str, Any], *, arch: Any) -> Mapping[str, Any]:
     ops = kernel_ir.get("ops")
     if not isinstance(ops, list) or not ops:
         raise ValueError("NV-GPU codegen requires a non-empty kernel_ir.ops list")
     if _is_fused_elementwise_kernel(ops):
-        return _lower_fused_elementwise_kernel(ops)
+        return _lower_fused_elementwise_kernel(ops, arch=arch)
     if len(ops) > 1:
-        return _lower_composite_kernel(ops, kernel_ir=kernel_ir)
+        return _lower_composite_kernel(ops, kernel_ir=kernel_ir, arch=arch)
     primary = ops[0]
     if not isinstance(primary, Mapping):
         raise ValueError("NV-GPU kernel_ir.ops entries must be mappings")
     intrinsic = str(primary.get("intrinsic", ""))
     require_handler("nvgpu", intrinsic, role="lower")
-    return lower_intrinsic("nvgpu", primary)
+    return _attach_profile_plan(dict(lower_intrinsic("nvgpu", primary)), arch=arch)
 
 
 def _arknife_payload_for_program(program: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -178,7 +181,7 @@ def _is_fused_elementwise_kernel(ops: list[Any]) -> bool:
     )
 
 
-def _lower_fused_elementwise_kernel(ops: list[Any]) -> dict[str, Any]:
+def _lower_fused_elementwise_kernel(ops: list[Any], *, arch: Any) -> dict[str, Any]:
     lowered_ops: list[dict[str, Any]] = []
     shape: list[str] | None = None
     dtype: str | None = None
@@ -192,17 +195,20 @@ def _lower_fused_elementwise_kernel(ops: list[Any]) -> dict[str, Any]:
             shape = [str(value) for value in attrs["shape"]]
         if dtype is None and isinstance(attrs, Mapping) and isinstance(attrs.get("dtype"), str):
             dtype = str(attrs["dtype"])
-    return {
-        "op": "fused_elementwise",
-        "attrs": {
-            "ops": lowered_ops,
-            "shape": shape or ["size"],
-            "dtype": dtype or "f32",
+    return _attach_profile_plan(
+        {
+            "op": "fused_elementwise",
+            "attrs": {
+                "ops": lowered_ops,
+                "shape": shape or ["size"],
+                "dtype": dtype or "f32",
+            },
         },
-    }
+        arch=arch,
+    )
 
 
-def _lower_composite_kernel(ops: list[Any], *, kernel_ir: Mapping[str, Any]) -> dict[str, Any]:
+def _lower_composite_kernel(ops: list[Any], *, kernel_ir: Mapping[str, Any], arch: Any) -> dict[str, Any]:
     lowered_ops: list[dict[str, Any]] = []
     for op in ops:
         if not isinstance(op, Mapping):
@@ -211,13 +217,16 @@ def _lower_composite_kernel(ops: list[Any], *, kernel_ir: Mapping[str, Any]) -> 
         require_handler("nvgpu", intrinsic, role="lower")
         lowered_ops.append(dict(lower_intrinsic("nvgpu", op)))
     output_shape = _first_output_shape(kernel_ir)
-    return {
-        "op": "composite",
-        "attrs": {
-            "ops": lowered_ops,
-            "shape": output_shape or ["size"],
+    return _attach_profile_plan(
+        {
+            "op": "composite",
+            "attrs": {
+                "ops": lowered_ops,
+                "shape": output_shape or ["size"],
+            },
         },
-    }
+        arch=arch,
+    )
 
 
 def _first_output_shape(kernel_ir: Mapping[str, Any]) -> list[str] | None:
@@ -258,7 +267,9 @@ def _validate_arknife_payload(arknife: Mapping[str, Any], *, arch: Any) -> None:
             )
 
 
-def _lower_arknife_kernel(kernel_ir: Mapping[str, Any], *, arknife: Mapping[str, Any]) -> Mapping[str, Any]:
+def _lower_arknife_kernel(
+    kernel_ir: Mapping[str, Any], *, arknife: Mapping[str, Any], arch: Any
+) -> Mapping[str, Any]:
     ops = list(kernel_ir.get("ops", ()))
     if not ops:
         raise ValueError("Arknife NV-GPU lowering requires a non-empty kernel_ir.ops list.")
@@ -279,17 +290,51 @@ def _lower_arknife_kernel(kernel_ir: Mapping[str, Any], *, arknife: Mapping[str,
         }
         for op in ops
     ]
-    return {
-        "op": "arknife_mainloop",
-        "attrs": {
-            "dtype": str(output_buffer.get("dtype", "f32")),
-            "m": output_shape[0] if output_shape else "M",
-            "n": output_shape[1] if len(output_shape) > 1 else "N",
-            "k": "K",
-            "instruction_plan": instruction_plan,
-            "hardware": dict(arknife.get("hardware", {})),
-            "channels": [dict(item) for item in arknife.get("channels", ())],
+    return _attach_profile_plan(
+        {
+            "op": "arknife_mainloop",
+            "attrs": {
+                "dtype": str(output_buffer.get("dtype", "f32")),
+                "m": output_shape[0] if output_shape else "M",
+                "n": output_shape[1] if len(output_shape) > 1 else "N",
+                "k": "K",
+                "instruction_plan": instruction_plan,
+                "hardware": dict(arknife.get("hardware", {})),
+                "channels": [dict(item) for item in arknife.get("channels", ())],
+            },
         },
+        arch=arch,
+    )
+
+
+def _attach_profile_plan(lowered: dict[str, Any], *, arch: Any) -> dict[str, Any]:
+    attrs = dict(lowered.get("attrs", {}))
+    profile_plan = dict(attrs.get("profile_plan", {}))
+    if not profile_plan:
+        profile_plan = _profile_plan_for_arch(arch, op=str(lowered.get("op", "")))
+    if profile_plan:
+        attrs["profile_plan"] = profile_plan
+    lowered["attrs"] = attrs
+    return lowered
+
+
+def _profile_plan_for_arch(arch: Any, *, op: str) -> dict[str, Any]:
+    if op not in {"matmul", "arknife_mainloop", "composite", "fused_elementwise"}:
+        return {}
+    if arch.profile == "blackwell":
+        return {
+            "profile": arch.profile,
+            "matrix_engine": "wgmma" if op in {"matmul", "arknife_mainloop"} else "simt",
+            "async_loader": "tma" if op in {"matmul", "arknife_mainloop"} else "cp.async.bulk",
+            "pipeline_stages": 3,
+            "cluster_shape": [2, 1, 1],
+        }
+    return {
+        "profile": arch.profile,
+        "matrix_engine": "mma_sync" if op in {"matmul", "arknife_mainloop"} else "simt",
+        "async_loader": "cp_async",
+        "pipeline_stages": 2,
+        "cluster_shape": [1, 1, 1],
     }
 
 

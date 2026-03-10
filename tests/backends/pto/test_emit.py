@@ -202,3 +202,22 @@ def test_pto_emit_preserves_existing_manifest_target_metadata(tmp_path):
         "variant": "a2a3",
         "hardware_profile": "ascend:a2a3",
     }
+
+
+def test_pto_emit_device_variant_uses_device_compiler_contract(tmp_path):
+    package_dir = tmp_path / "out"
+    package_dir.mkdir()
+
+    emit_package(package_dir, program={"entry": "demo_kernel", "ops": ["compute_tile"]}, variant="a2a3")
+
+    toolchain_manifest = json.loads((package_dir / "build" / "toolchain.json").read_text())
+    orchestration_source = (
+        package_dir / "codegen" / "pto" / "orchestration" / "demo_kernel_orchestration.cpp"
+    ).read_text()
+    kernel_source = (package_dir / "codegen" / "pto" / "kernels" / "aiv" / "demo_kernel.cpp").read_text()
+
+    assert toolchain_manifest["variant"] == "a2a3"
+    assert toolchain_manifest["platform"] == "a2a3"
+    assert toolchain_manifest["compiler_contract"] == "cann:stub"
+    assert 'extern "C" int demo_kernel_orchestrate' in orchestration_source
+    assert 'extern "C" __aicore__ __attribute__((always_inline)) void kernel_entry' in kernel_source

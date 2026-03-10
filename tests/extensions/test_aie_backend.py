@@ -112,15 +112,18 @@ def test_aie_extension_emits_artifact_contract_and_replays(tmp_path):
     assert build.built_outputs == [
         "build/aie/build_product.json",
         "build/aie/host_runtime.json",
+        "build/aie/launch_plan.json",
     ]
     assert (package_dir / "build" / "aie" / "build_product.json").is_file()
     assert (package_dir / "build" / "aie" / "host_runtime.json").is_file()
+    assert (package_dir / "build" / "aie" / "launch_plan.json").is_file()
 
     run = htp.bind(package_dir).load(mode="device").run("stream_add")
     assert run.ok is True
     assert run.result["entry"] == "stream_add"
     assert run.result["runtime"]["schema"] == "htp.aie.host_runtime.v1"
     assert run.result["runtime"]["entry"] == "stream_add"
+    assert run.result["perf"] == "metrics/perf.json"
 
 
 def test_aie_extension_emits_objectfifos_from_process_channels(tmp_path):

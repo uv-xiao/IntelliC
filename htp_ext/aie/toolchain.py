@@ -51,12 +51,21 @@ def build_package(
         "mapping": json.loads(mapping_path.read_text()),
         "fifos": json.loads(fifos_path.read_text()),
     }
+    launch_plan = {
+        "schema": "htp.aie.launch_plan.v1",
+        "entry": entry,
+        "host_module": "codegen/aie/host.py",
+        "host_callable": "launch",
+        "runtime_artifact": "build/aie/host_runtime.json",
+    }
 
     (build_dir / "build_product.json").write_text(json.dumps(build_product, indent=2) + "\n")
     (build_dir / "host_runtime.json").write_text(json.dumps(host_runtime, indent=2) + "\n")
+    (build_dir / "launch_plan.json").write_text(json.dumps(launch_plan, indent=2) + "\n")
     return [
         "build/aie/build_product.json",
         "build/aie/host_runtime.json",
+        "build/aie/launch_plan.json",
     ]
 
 
