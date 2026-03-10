@@ -1,8 +1,8 @@
-# Layer 6 — Agent Product and Repository Workflow
+# Agent Product and Repository Workflow
 
-This layer describes the implemented agent-facing surface and the repository workflow that supports controlled development.
+This document describes the implemented agent-facing surface and the repository workflow that supports controlled development.
 
-## Why this layer exists
+## Why this topic exists
 
 HTP treats agent-based compiler development as a native target. That means two things in practice:
 - emitted compiler artifacts must be stable and inspectable enough for machine-guided debugging and regression localization
@@ -66,4 +66,4 @@ Relevant code and policy files:
 
 ## Current limits
 
-The repository workflow is now much cleaner, but the full autonomous-development target still extends beyond the current implementation. The remaining work lives in `docs/todo/06_agent_product_and_workflow.md`.
+The repository workflow is now much cleaner, but the full autonomous-development target still extends beyond the current implementation. The remaining work lives in `docs/todo/agent_product_and_workflow.md`.

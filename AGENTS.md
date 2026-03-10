@@ -9,7 +9,7 @@ This file is the operating contract for agents and contributors working in this 
 For every feature-sized change:
 
 1. start from `htp/dev`
-2. choose a feature-sized gap from `docs/todo/README.md` and the detailed layer docs under `docs/todo/`
+2. choose a feature-sized gap from `docs/todo/README.md` and the detailed broad topic docs under `docs/todo/`
 3. create a branch named `htp/feat-<topic>`
 4. create a task file under `docs/in_progress/` using `docs/in_progress/TEMPLATE.md`
 5. make that task-file creation its own first commit
@@ -46,7 +46,7 @@ The `docs/` tree is strict.
   - implemented behavior only
   - must reference real code paths
   - `README.md` is the index and architecture entrypoint
-  - layer documents live under `docs/design/`
+  - broad topic documents live under `docs/design/`
 - `docs/todo/`
   - unimplemented or partial features only
   - `README.md` is the summary checklist for remaining feature work

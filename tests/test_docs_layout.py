@@ -31,13 +31,13 @@ def test_design_tree_has_only_supported_top_level_entries():
     entries = {path.name for path in design_root.iterdir()}
     assert entries == {
         "README.md",
-        "01_compiler_model.md",
-        "02_programming_surfaces.md",
-        "03_pipeline_and_solver.md",
-        "04_artifacts_replay_debug.md",
-        "05_backends_and_extensions.md",
-        "06_agent_product_and_workflow.md",
-        "07_littlekernel_ast_comparison.md",
+        "agent_product_and_workflow.md",
+        "artifacts_replay_debug.md",
+        "backends_and_extensions.md",
+        "compiler_model.md",
+        "littlekernel_ast_comparison.md",
+        "pipeline_and_solver.md",
+        "programming_surfaces.md",
     }
 
 
@@ -46,11 +46,11 @@ def test_todo_tree_has_only_supported_top_level_entries():
     entries = {path.name for path in todo_root.iterdir()}
     assert entries == {
         "README.md",
-        "01_compiler_model.md",
-        "02_programming_surfaces.md",
-        "03_pipeline_and_solver.md",
-        "04_artifacts_replay_debug.md",
-        "05_backends_and_extensions.md",
-        "06_agent_product_and_workflow.md",
+        "agent_product_and_workflow.md",
+        "artifacts_replay_debug.md",
+        "backends_and_extensions.md",
+        "compiler_model.md",
+        "pipeline_and_solver.md",
+        "programming_surfaces.md",
         "reports",
     }

@@ -2,8 +2,8 @@
 
 ## Documentation structure
 
-- `docs/design/` documents only implemented behavior with references to real code, organized by layer docs under `docs/design/`.
-- `docs/todo/` holds unimplemented and partial design, organized by future layer docs under `docs/todo/`.
+- `docs/design/` documents only implemented behavior with references to real code, organized as broad topic docs under `docs/design/`.
+- `docs/todo/` holds unimplemented and partial design, organized by future broad topic docs under `docs/todo/`.
 - `docs/in_progress/` holds active feature-branch task files only.
 - `docs/story.md` is the top-level intended framework story.
 - Do not leave stale duplicates across these areas.

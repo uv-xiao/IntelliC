@@ -1,6 +1,6 @@
-# TODO Layer 2 — Programming Surfaces
+# TODO — Programming Surfaces
 
-This layer tracks the remaining gap between today’s authoring surfaces and the intended Python-native framework.
+This document tracks the remaining gap between today’s authoring surfaces and the intended Python-native framework.
 
 ## Completion snapshot
 
@@ -32,7 +32,7 @@ This layer tracks the remaining gap between today’s authoring surfaces and the
 
 ## Why these tasks remain
 
-This layer is currently closed as a standalone surface gap. The public surface
+This topic is currently closed as a standalone surface gap. The public surface
 and examples are materially stronger: PTO examples cover vector add, SwiGLU,
 GELU, and a broader arithmetic DAG; WSP/CSP public examples use
 decorator/builder authoring instead of direct dict assembly; the
@@ -59,4 +59,4 @@ Relevant anchors:
 - `references/pypto/examples/language/`
 - `references/arknife/tests/python/`
 - `references/triton-distributed-knowingnothing/python/little_kernel/`
-- `docs/design/07_littlekernel_ast_comparison.md`
+- `docs/design/littlekernel_ast_comparison.md`

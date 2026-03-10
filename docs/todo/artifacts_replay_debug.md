@@ -1,6 +1,6 @@
-# TODO Layer 4 — Artifacts, Replay, and Debugging
+# TODO — Artifacts, Replay, and Debugging
 
-This layer tracks the remaining gap between the current package/debug surface and the final artifact-first framework contract.
+This document tracks the remaining gap between the current package/debug surface and the final artifact-first framework contract.
 
 ## Completion snapshot
 
@@ -25,7 +25,7 @@ This layer tracks the remaining gap between the current package/debug surface an
 
 ## Why these tasks remain
 
-This layer is now mostly closed on the package/debug-contract side. PTO,
+This topic is now mostly closed on the package/debug-contract side. PTO,
 NV-GPU, and AIE all participate in the same generic sidecar-schema checks, and
 invalid sidecars now point back to explicit `artifact_ref` evidence. The only
 meaningful remaining gap is replay/reference breadth: reducing how often

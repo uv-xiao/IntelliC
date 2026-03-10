@@ -1,8 +1,8 @@
-# Layer 2 — Programming Surfaces
+# Programming Surfaces
 
-This layer describes how users currently express programs for HTP and how those surfaces converge on the shared semantic core.
+This document describes how users currently express programs for HTP and how those surfaces converge on the shared semantic core.
 
-## Why this layer exists
+## Why this topic exists
 
 HTP is Python-AST-centric. That should mean more than “the compiler happens to store Python AST internally”. It should mean that user-facing programs are readable, inspectable Python programs and that WSP/CSP are frontend surfaces over the same compiler, not separate semantic silos.
 
@@ -240,7 +240,7 @@ That separation is what allows one frontend surface to target multiple backends 
 
 ## What HTP learned from LittleKernel
 
-The completed comparison in `docs/design/07_littlekernel_ast_comparison.md`
+The completed comparison in `docs/design/littlekernel_ast_comparison.md`
 pins down the actual difference between the two systems.
 
 LittleKernel's strongest public-surface advantage is that temporary storage,
@@ -263,7 +263,7 @@ If you are working in this layer, start here:
 - `htp/wsp/__init__.py` — WSP builder/decorator surface plus legacy helper functions
 - `htp/csp/__init__.py` — CSP builder/decorator surface plus legacy helper functions
 - `htp/ark/__init__.py` — Arknife-style hardware and instruction authoring surface
-- `docs/design/07_littlekernel_ast_comparison.md` — completed reference-backed comparison and extracted design rules
+- `docs/design/littlekernel_ast_comparison.md` — completed reference-backed comparison and extracted design rules
 - `examples/` — runnable proof surface
 - `examples/**/README.md` — example-local walkthroughs
 
@@ -315,6 +315,6 @@ code examples and the example-local docs.
 The remaining surface work is no longer about basic readability. It is about
 broader loop / region authoring, richer scratch-memory declarations, and
 continuing to raise flagship examples toward the best reference examples. The
-next gaps live in `docs/todo/01_compiler_model.md` and
-`docs/todo/05_backends_and_extensions.md`, not in a separate programming-surface
+next gaps live in `docs/todo/compiler_model.md` and
+`docs/todo/backends_and_extensions.md`, not in a separate programming-surface
 comparison TODO anymore.

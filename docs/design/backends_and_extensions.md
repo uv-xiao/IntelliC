@@ -1,8 +1,8 @@
-# Layer 5 — Backends and Extensions
+# Backends and Extensions
 
-This layer describes how implemented targets and extension packages consume the shared compiler substrate.
+This document describes how implemented targets and extension packages consume the shared compiler substrate.
 
-## Why this layer exists
+## Why this topic exists
 
 HTP is trying to support multiple hardware targets without letting each backend become a separate compiler architecture. The implemented repository already proves that this is practical at a meaningful scale:
 - PTO runs through a real runtime adapter path
@@ -125,4 +125,4 @@ remains. The main remaining work is no longer “does HTP support Arknife-style
 backend planning at all?” That part is now implemented. The remaining gap is
 deeper profile-specialized lowering, wider runtime breadth, and additional
 extension backends. Those tasks now live in
-`docs/todo/05_backends_and_extensions.md`.
+`docs/todo/backends_and_extensions.md`.

@@ -35,12 +35,12 @@ Not finished yet:
 
 Implemented architecture:
 - `docs/design/README.md`
-- `docs/design/01_compiler_model.md`
-- `docs/design/02_programming_surfaces.md`
-- `docs/design/03_pipeline_and_solver.md`
-- `docs/design/04_artifacts_replay_debug.md`
-- `docs/design/05_backends_and_extensions.md`
-- `docs/design/06_agent_product_and_workflow.md`
+- `docs/design/compiler_model.md`
+- `docs/design/programming_surfaces.md`
+- `docs/design/pipeline_and_solver.md`
+- `docs/design/artifacts_replay_debug.md`
+- `docs/design/backends_and_extensions.md`
+- `docs/design/agent_product_and_workflow.md`
 - example-local walkthroughs under `examples/**/README.md`
 
 Remaining work:

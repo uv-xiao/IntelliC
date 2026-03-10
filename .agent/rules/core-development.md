@@ -2,7 +2,7 @@
 
 - Treat `htp/dev` as stable and CI-passed.
 - Start feature work on `htp/feat-<topic>` branches only.
-- Pick features from `docs/todo/README.md` and the layer docs under `docs/todo/`.
+- Pick features from `docs/todo/README.md` and the broad topic docs under `docs/todo/`.
 - Create a task file under `docs/in_progress/` as the first commit on the branch.
 - Keep the canonical compiler form in Python-space.
 - Preserve runnable `sim` replay for stage programs.

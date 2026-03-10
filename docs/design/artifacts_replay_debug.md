@@ -1,8 +1,8 @@
-# Layer 4 — Artifacts, Replay, and Debugging
+# Artifacts, Replay, and Debugging
 
-This layer describes the package contract that makes HTP inspectable, replayable, and diagnosable.
+This document describes the package contract that makes HTP inspectable, replayable, and diagnosable.
 
-## Why this layer exists
+## Why this topic exists
 
 HTP is artifact-first. That phrase is easy to say and easy to water down. In the current implementation it has a concrete meaning:
 - the compiler emits packages whose file layout matters,
@@ -71,7 +71,7 @@ The tool layer already includes:
 
 ## Rationale
 
-This layer is central to the HTP claim that retargetability and agent-friendliness require explicit intermediate evidence. Replay, semantic sidecars, logs, traces, and fix-hint references are part of the framework contract, not only debugging conveniences.
+This topic is central to the HTP claim that retargetability and agent-friendliness require explicit intermediate evidence. Replay, semantic sidecars, logs, traces, and fix-hint references are part of the framework contract, not only debugging conveniences.
 
 ## Coding pointers
 

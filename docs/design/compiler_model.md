@@ -1,8 +1,8 @@
-# Layer 1 — Compiler Model, Semantics, and Typing
+# Compiler Model, Semantics, and Typing
 
-This layer describes the implemented semantic center of HTP: what the compiler believes a program is, which facts are explicit, and where those facts live in code and artifacts.
+This document describes the implemented semantic center of HTP: what the compiler believes a program is, which facts are explicit, and where those facts live in code and artifacts.
 
-## Why this layer exists
+## Why this topic exists
 
 HTP is intentionally Python-AST-centric. That decision is not aesthetic. It exists to support three hard constraints at once:
 - replayability of intermediate stages,
@@ -130,4 +130,4 @@ Then inspect stage artifacts under `ir/stages/<id>/` from a compiled example to 
 
 ## Current limits
 
-What is implemented here is already meaningful, but it is not the final semantic envelope. The missing breadth now lives in `docs/todo/01_compiler_model.md`.
+What is implemented here is already meaningful, but it is not the final semantic envelope. The missing breadth now lives in `docs/todo/compiler_model.md`.

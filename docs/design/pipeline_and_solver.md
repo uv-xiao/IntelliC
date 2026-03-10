@@ -1,8 +1,8 @@
-# Layer 3 — Passes, Pipeline, and Solver
+# Pipeline and Solver
 
-This layer describes the implemented transformation discipline: how HTP chooses a pipeline, how passes are registered and validated, and how extension participation works without hiding behind backend-specific ad hoc logic.
+This document describes the implemented transformation discipline: how HTP chooses a pipeline, how passes are registered and validated, and how extension participation works without hiding behind backend-specific ad hoc logic.
 
-## Why this layer exists
+## Why this topic exists
 
 Retargetability claims are weak if the compiler is effectively “just run these hard-coded passes in this order”. HTP’s implemented answer is not a fully general solver yet, but it is also not just a hard-coded script anymore. The current code already has:
 - backend declarations as capability sources,
@@ -86,4 +86,4 @@ When working here, inspect `ir/pass_trace.jsonl` together with `ir/stages/*/anal
 
 ## Current limits
 
-The solver and pipeline system is real, but still narrower than the long-term target. The missing breadth and search power live in `docs/todo/03_pipeline_and_solver.md`.
+The solver and pipeline system is real, but still narrower than the long-term target. The missing breadth and search power live in `docs/todo/pipeline_and_solver.md`.
