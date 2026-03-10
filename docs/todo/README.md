@@ -2,7 +2,7 @@
 
 `docs/todo/` tracks the part of HTP that is not finished yet.
 
-This tree is organized as direct TODO feature documents. `README.md` gives the summary and completion statistics; the detailed remaining work lives in `docs/todo/` and the research-backed report under `docs/todo/reports/`.
+This tree is organized as direct TODO feature documents. `README.md` gives the summary and completion statistics; the detailed remaining work lives in `docs/todo/` as a small number of broad topic files plus one research-backed report.
 
 ## How to use this tree
 
@@ -18,10 +18,10 @@ For feature work:
 ### Overall
 
 - total tracked TODO checklist items: 56
-- complete: 50
-- partial: 3
-- open: 2
-- completion ratio: about 89%
+- complete: 53
+- partial: 2
+- open: 1
+- completion ratio: about 95%
 
 ### By topic
 
@@ -31,7 +31,7 @@ For feature work:
 | Programming surfaces | 10 | 0 | 0 | 10 |
 | Pipeline and solver | 9 | 0 | 0 | 9 |
 | Artifacts, replay, debug | 8 | 0 | 0 | 8 |
-| Backends and extensions | 8 | 2 | 1 | 11 |
+| Backends and extensions | 11 | 0 | 0 | 11 |
 | Agent product and workflow | 5 | 2 | 1 | 8 |
 
 ## Feature summaries
@@ -45,7 +45,7 @@ For feature work:
 - `docs/todo/artifacts_replay_debug.md`
   - remaining work: no standalone open item; future replay work now rolls into compiler-model and backend-depth topics rather than a separate package/debug gap
 - `docs/todo/backends_and_extensions.md`
-  - remaining work: deepen PTO, NV-GPU, and AIE rather than changing the architecture; the remaining gap is backend depth, not the Arknife reuse boundary
+  - remaining work: no standalone open item; backend depth now rolls into future semantic breadth and agent workflow rather than a missing backend substrate
 - `docs/todo/agent_product_and_workflow.md`
   - remaining work: stronger autonomous loops and continued quality-discipline tightening
 
@@ -57,4 +57,4 @@ For feature work:
 - `docs/todo/artifacts_replay_debug.md`
 - `docs/todo/backends_and_extensions.md`
 - `docs/todo/agent_product_and_workflow.md`
-- `docs/todo/reports/retargetable_extensibility_report.md`
+- `docs/todo/retargetable_extensibility_report.md`

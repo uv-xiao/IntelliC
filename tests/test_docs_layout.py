@@ -52,5 +52,5 @@ def test_todo_tree_has_only_supported_top_level_entries():
         "compiler_model.md",
         "pipeline_and_solver.md",
         "programming_surfaces.md",
-        "reports",
+        "retargetable_extensibility_report.md",
     }

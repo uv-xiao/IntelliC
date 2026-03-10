@@ -15,7 +15,7 @@ Implemented today:
 - registry-driven passes, pipeline templates, and solver preflight
 - WSP and CSP authoring surfaces
 - MLIR CSE and AIE extension participation
-- PTO `a2a3sim`, NV-GPU CUDA, and AIE reference toolchain paths
+- PTO `a2a3sim` and `a2a3` contracts, NV-GPU CUDA profiling/Blackwell profile plans, AIE reference toolchain paths, and a CPU reference backend
 - agent-facing replay, verify, diff, explain, bisect, minimize, and promote-plan tooling
 
 Not finished yet:
@@ -46,7 +46,7 @@ Implemented architecture:
 Remaining work:
 - `docs/todo/README.md`
 - `docs/todo/`
-- `docs/todo/reports/retargetable_extensibility_report.md`
+- `docs/todo/retargetable_extensibility_report.md`
 
 ## Usage
 
