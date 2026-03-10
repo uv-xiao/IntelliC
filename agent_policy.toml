@@ -1,5 +1,5 @@
 [agent]
-allowed_edit_roots = ["htp", "htp_ext", "tests", "docs", ".github", ".agent", "AGENTS.md", "README.md"]
+allowed_edit_roots = ["htp", "htp_ext", "tests", "docs", ".github", ".agent", "AGENTS.md", "README.md", "agent_policy.toml"]
 required_gates = ["validate", "replay"]
 promotion_mode = "pr"
 
