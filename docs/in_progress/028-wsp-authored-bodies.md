@@ -29,3 +29,16 @@ Close the remaining WSP ergonomics gaps by making flagship workloads read like a
 - WSP examples no longer pass kernel arguments as raw string tuples
 - WSP stage plans are emitted from structured authored bodies, not string lists
 - docs/design and docs/todo are synchronized before merge
+
+## Progress
+
+- added `w.defaults(...)` for scoped schedule defaults
+- added `w.args.<name>` bound kernel arguments for authored workloads
+- added structured stage bodies through `task.prologue().step(...)` / `steady()` / `epilogue()`
+- rewrote the WSP flagship examples onto the new surface
+- updated design and TODO docs
+
+## Verification
+
+- `pre-commit run --all-files`
+- `pytest -q`

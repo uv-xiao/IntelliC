@@ -15,17 +15,17 @@ documented under `docs/design/`.
 ### Overall
 
 - total tracked TODO checklist items: 65
-- complete: 60
+- complete: 62
 - partial: 1
-- open: 4
-- completion ratio: about 92%
+- open: 2
+- completion ratio: about 95%
 
 ### By topic
 
 | Topic | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Compiler model, semantics, typing | 10 | 0 | 0 | 10 |
-| Programming surfaces | 14 | 1 | 4 | 19 |
+| Programming surfaces | 16 | 1 | 2 | 19 |
 | Pipeline and solver | 9 | 0 | 0 | 9 |
 | Artifacts, replay, debug | 8 | 0 | 0 | 8 |
 | Backends and extensions | 11 | 0 | 0 | 11 |

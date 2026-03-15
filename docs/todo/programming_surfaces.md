@@ -17,9 +17,9 @@ The latest surface review distilled those complaints into the checklist below. T
 ## Completion snapshot
 
 - total checklist items: 7
-- complete: 2
+- complete: 4
 - partial: 1
-- open: 4
+- open: 2
 
 ## Detailed checklist
 
@@ -28,8 +28,8 @@ The latest surface review distilled those complaints into the checklist below. T
 - [x] Promote loop indices from trace annotations into semantic objects that can participate in view construction, staging, and index-dependent operations.
 
 ### WSP authored workload readability
-- [ ] Add scoped/default schedule contexts so WSP programs do not repeat `.tile(...)`, `.bind(...)`, `.pipeline(...)`, and `.resources(...)` on every task.
-- [ ] Replace string-only stage markers (`.prologue(...)`, `.steady(...)`, `.epilogue(...)`) with structured or executable task-local authored bodies.
+- [x] Add scoped/default schedule contexts so WSP programs do not repeat `.tile(...)`, `.bind(...)`, `.pipeline(...)`, and `.resources(...)` on every task.
+- [x] Replace string-only stage markers (`.prologue(...)`, `.steady(...)`, `.epilogue(...)`) with structured or executable task-local authored bodies.
 
 ### CSP authored process readability
 - [ ] Replace `.compute("name", ...)` as the flagship style with process-local authored bodies built around real `get(...)`, `put(...)`, and compute steps.
@@ -48,16 +48,15 @@ The latest surface review distilled those complaints into the checklist below. T
 - `htp.kernel` now supports explicit scratch declarations (`scratch(...)`, `scratch_array(...)`, `shared(...)`, `shared_array(...)`, `registers(...)`, `register_array(...)`)
 - traced loop/region helpers (`unroll(...)`, `serial(...)`, and `region(...)`) now annotate emitted ops while staying on ordinary Python `for` loops
 - the WSP GEMM examples now use explicit scratch arrays, loop/region annotations, and Python-native tile views instead of manually repeated staging code
+- WSP workloads now support scoped schedule defaults, bound kernel arguments via `w.args`, and structured stage-body steps instead of only repeated fluent schedule chains and string stage markers
 
 This keeps the topic *partially* closed at the repository level: the frontend is real and testable, but the remaining surface work is now about semantic directness and reference-level readability rather than basic AST tracing.
 
 ## Derived PR queue
 
-1. `tile-view-loop-surface`
-2. `wsp-authored-task-bodies`
-3. `csp-authored-process-bodies`
-4. `value-bound-workload-wiring`
-5. `reference-grade-flagship-example-rewrite`
+1. `csp-authored-process-bodies`
+2. `value-bound-workload-wiring`
+3. `reference-grade-flagship-example-rewrite`
 
 ## Coding pointers
 

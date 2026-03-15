@@ -54,37 +54,31 @@ def pipelined_mainloop_gemm(
 
 @wsp_program(target="nvgpu-ampere", kernel=pipelined_mainloop_gemm)
 def littlekernel_pipelined_gemm(w) -> None:
-    prefetch_tiles = (
-        w.launch(pipelined_mainloop_gemm, "A", "B", "C", "M", "N", "K", task_id="prefetch_tiles")
-        .role("producer")
-        .tile(block=(128, 256, 64))
-        .bind(grid="block", lane="warp")
-        .pipeline(depth=3, buffering="double")
-        .resources(num_warps=8)
-        .prologue("cp_async(stage0:A)", "cp_async(stage0:B)", "cp_async(stage1:A)", "cp_async(stage1:B)")
-    )
-    steady_tiles = (
-        w.mainloop(pipelined_mainloop_gemm, "A", "B", "C", "M", "N", "K", task_id="steady_tiles")
-        .after(prefetch_tiles)
-        .tile(block=(128, 256, 64))
-        .bind(grid="block", lane="warp")
-        .pipeline(depth=3, buffering="double")
-        .resources(num_warps=8)
-        .role("consumer")
-        .prologue("ldmatrix(stage0)", "ldmatrix(stage1)")
-        .steady("mma_sync(stage0)", "mma_sync(stage1)", "advance_pipeline")
-    )
-    (
-        w.launch(pipelined_mainloop_gemm, "A", "B", "C", "M", "N", "K", task_id="writeback_tiles")
-        .after(steady_tiles)
-        .tile(block=(128, 256, 64))
-        .bind(grid="block", lane="warp")
-        .pipeline(depth=3, buffering="double")
-        .resources(num_warps=8)
-        .role("epilogue")
-        .epilogue("store(C)")
-        .specialize(operator="pipelined_mainloop", stage_plan="prefetch_tiles->steady_tiles->writeback_tiles")
-    )
+    with w.defaults(
+        tile={"block": (128, 256, 64)},
+        bind={"grid": "block", "lane": "warp"},
+        pipeline={"depth": 3, "buffering": "double"},
+        resources={"num_warps": 8},
+    ):
+        prefetch_tiles = w.launch(task_id="prefetch_tiles").role("producer")
+        prefetch_tiles.prologue().step("cp_async", source=w.args.A, target="a_stage0")
+        prefetch_tiles.prologue().step("cp_async", source=w.args.B, target="b_stage0")
+        prefetch_tiles.prologue().step("cp_async", source=w.args.A, target="a_stage1")
+        prefetch_tiles.prologue().step("cp_async", source=w.args.B, target="b_stage1")
+
+        steady_tiles = w.mainloop(task_id="steady_tiles").after(prefetch_tiles).role("consumer")
+        steady_tiles.prologue().step("ldmatrix", source="a_stage")
+        steady_tiles.prologue().step("ldmatrix", source="b_stage")
+        steady_tiles.steady().step("mma_sync", stage=0)
+        steady_tiles.steady().step("mma_sync", stage=1)
+        steady_tiles.steady().step("advance_pipeline")
+
+        writeback_tiles = w.launch(task_id="writeback_tiles").after(steady_tiles).role("epilogue")
+        writeback_tiles.epilogue().step("store", target=w.args.C)
+        writeback_tiles.specialize(
+            operator="pipelined_mainloop",
+            stage_plan="prefetch_tiles->steady_tiles->writeback_tiles",
+        )
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:
