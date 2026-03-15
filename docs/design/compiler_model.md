@@ -107,6 +107,11 @@ The op registry in `htp/ir/op_specs.py` now provides explicit semantics for oper
 - explicit collectives including `allreduce`, `allgather`, and `reduce_scatter`
 - channel/protocol-facing operations
 
+The slice/view story is now stronger than a generic “view op exists” claim:
+- native Python slicing on `KernelValue` lowers into explicit `slice` ops;
+- loop-carried indices are preserved as symbolic index expressions instead of collapsing to ad-hoc strings;
+- staged semantic payloads carry both concrete replay offsets/sizes and human-readable `offset_exprs` / `size_exprs` so replay, codegen, and debugging all see the same tile/view intent.
+
 That registry is the bridge between front-end authoring, legality checks, passes, and backend discharge.
 
 ### Compiler legality

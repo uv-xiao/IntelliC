@@ -48,6 +48,11 @@ Implemented today:
 - Explicit Arknife-style instruction-plan metadata for Ampere and Blackwell.
 - Profile-specialized plan metadata, NVCC flag contracts, and emitted perf records.
 
+The current NV-GPU path now also consumes compiler-owned tile/view semantics directly:
+- native Python slicing on kernel values lowers into explicit `slice` ops in `kernel_ir.json`;
+- the NV-GPU solver declaration advertises `slice` as a supported shared-semantic op instead of treating it as an Arknife-only side channel;
+- flagship WSP examples compile through that same shared substrate, then validate and replay through the normal NV-GPU binding path.
+
 This is the current proof that HTP can own the source artifact while delegating execution policy to the binding/adapter layer.
 
 #### Arknife integration inside NV-GPU

@@ -52,6 +52,11 @@ reassembles `PROGRAM_STATE` from those bindings. The result is still fully
 runnable Python, but it is also a practical debugging artifact a human can
 read, diff, and execute directly.
 
+That readability now extends to staged tile/view programs:
+- loop-derived slice offsets survive as readable symbolic expressions in staged sidecars;
+- replay still uses concretely replayable offsets/sizes, so the same package remains executable in `sim`;
+- when an extent is intentionally “full axis”, replay derives the concrete size from the runtime array shape instead of discarding the original symbolic intent.
+
 The implemented replay/runtime path now covers more than elementwise stubs:
 - portable tensor reference ops such as `matmul`, `load`, `store`, `cast`,
   `broadcast`, `transpose`, `view`, `reshape`, `relayout`, and
