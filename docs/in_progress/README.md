@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `030-reference-flagship-rewrite.md` — PR `#65`
+- None currently. Open a new `docs/in_progress/<id>-<topic>.md` file as the first commit of the next feature branch.
