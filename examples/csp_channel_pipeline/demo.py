@@ -44,40 +44,18 @@ def token_pipeline(p) -> None:
     tiles = p.fifo("tiles", dtype="f32", capacity=2)
     partials = p.fifo("partials", dtype="f32", capacity=1)
 
-    (
-        p.process(
-            "dispatch_tiles",
-            task_id="dispatch_tiles",
-            kernel=channel_stage,
-            args=("A", "B", "C", "M", "N", "K"),
-        )
-        .role("producer")
-        .put(tiles)
-        .compute("pack_tile", source="A")
-    )
-    (
-        p.process(
-            "combine_tiles",
-            task_id="combine_tiles",
-            kernel=channel_stage,
-            args=("A", "B", "C", "M", "N", "K"),
-        )
-        .role("router")
-        .get(tiles)
-        .compute("reduce_partials", channel="tiles")
-        .put(partials)
-    )
-    (
-        p.process(
-            "writeback_tiles",
-            task_id="writeback_tiles",
-            kernel=channel_stage,
-            args=("A", "B", "C", "M", "N", "K"),
-        )
-        .role("consumer")
-        .get(partials)
-        .compute("write_output", target="C")
-    )
+    dispatch = p.process("dispatch_tiles", task_id="dispatch_tiles").role("producer")
+    dispatch.compute_step("pack_tile", source=p.args.A)
+    dispatch.put(tiles)
+
+    combine = p.process("combine_tiles", task_id="combine_tiles").role("router")
+    combine.get(tiles)
+    combine.compute_step("reduce_partials", channel=tiles)
+    combine.put(partials)
+
+    writeback = p.process("writeback_tiles", task_id="writeback_tiles").role("consumer")
+    writeback.get(partials)
+    writeback.compute_step("write_output", target=p.args.C)
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:

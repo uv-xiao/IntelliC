@@ -754,6 +754,48 @@ def test_csp_process_surface_carries_role_and_compute_steps():
     }
 
 
+def test_csp_surface_supports_bound_args_and_structured_process_bodies():
+    @kernel
+    def pipeline_stage(
+        X: buffer(dtype="f32", shape=("M", "N"), role="input"),
+        Y: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        tile_payload = channel_recv("tiles", dtype="f32", shape=("M", "N"))
+        summary = reduction_sum(tile_payload, axis=0, dtype="f32", shape=("N",))
+        channel_send(summary, channel="partials")
+        store(Y, broadcast(summary, shape=("M", "N"), dtype="f32"))
+
+    @csp_program(target="nvgpu-ampere", kernel=pipeline_stage)
+    def pipeline_demo(p) -> None:
+        tiles = p.fifo("tiles", dtype="f32", capacity=2)
+        partials = p.fifo("partials", dtype="f32", capacity=1)
+
+        dispatch = p.process("dispatch", task_id="dispatch").role("producer")
+        dispatch.compute_step("pack_tile", source=p.args.X)
+        dispatch.put(tiles)
+
+        combine = p.process("combine", task_id="combine").role("router")
+        combine.get(tiles)
+        combine.compute_step("reduce_partials", channel=tiles)
+        combine.put(partials)
+
+    payload = pipeline_demo.to_program()
+
+    assert payload["csp"]["processes"][0]["args"] == ["X", "Y", "M", "N"]
+    assert payload["csp"]["processes"][0]["steps"][0] == {
+        "kind": "compute",
+        "op": "pack_tile",
+        "source": "X",
+    }
+    assert payload["csp"]["processes"][1]["steps"][1] == {
+        "kind": "compute",
+        "op": "reduce_partials",
+        "channel": "tiles",
+    }
+
+
 def test_wsp_decorator_surface_rejects_non_kernel_spec():
     with pytest.raises(TypeError, match="KernelSpec"):
         wsp_program(target="nvgpu-ampere", kernel={"name": "raw_kernel"})
