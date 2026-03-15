@@ -17,6 +17,7 @@ DEFAULT_POLICY = {
             "htp",
             "htp_ext",
             "tests",
+            "examples",
             "docs",
             ".github",
             ".agent",

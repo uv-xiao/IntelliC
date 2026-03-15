@@ -9,8 +9,9 @@ It proves three implemented contracts:
   named workload tasks.
 - each task can carry explicit stage-plan evidence such as `prologue`,
   `steady`, and `epilogue`.
-- the kernel body still uses typed temporaries instead of raw scratch-string
-  plumbing.
+- the kernel body uses explicit `shared_array(...)` storage plus
+  `for ... in unroll(range(...))` loop annotations instead of raw scratch
+  strings or manually duplicated stages.
 - the default pipeline preserves those directives into staged `schedule.json`
   and `workload_ir.json`.
 

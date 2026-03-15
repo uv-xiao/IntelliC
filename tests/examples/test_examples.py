@@ -140,6 +140,8 @@ def test_wsp_example_compiles_and_replays(tmp_path):
         {"src": "load_tiles", "dst": "mma_tiles"},
         {"src": "mma_tiles", "dst": "store_tiles"},
     ]
+    assert replay_summary["kernel_ir"]["ops"][0]["attrs"]["regions"][0]["modifier"] == "unroll"
+    assert replay_summary["kernel_ir"]["ops"][0]["attrs"]["regions"][1]["kind"] == "warp_tile"
 
 
 def test_littlekernel_example_compiles_and_replays(tmp_path):
@@ -153,6 +155,9 @@ def test_littlekernel_example_compiles_and_replays(tmp_path):
     assert replay_summary["schedule"]["launch"]["num_warps"] == 8
     assert replay_summary["workload_ir"]["tasks"][1]["attrs"]["stages"][0]["name"] == "prologue"
     assert replay_summary["workload_ir"]["tasks"][1]["attrs"]["stages"][1]["name"] == "steady"
+    assert replay_summary["kernel_ir"]["ops"][0]["attrs"]["target"] == "a_stage_0"
+    assert replay_summary["kernel_ir"]["ops"][0]["attrs"]["regions"][0]["modifier"] == "unroll"
+    assert replay_summary["kernel_ir"]["ops"][0]["attrs"]["regions"][1]["kind"] == "mainloop_stage"
 
 
 def test_csp_example_compiles_and_replays(tmp_path):

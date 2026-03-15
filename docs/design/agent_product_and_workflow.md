@@ -47,6 +47,7 @@ Supporting policy/config surfaces include:
 ## Implemented workflow controls
 
 The repository now enforces a concrete operating model:
+- `examples/` is an allowed edit root because flagship examples are part of the proof surface, not optional documentation
 - `htp/dev` is the stable branch
 - feature work happens on `htp/feat-*`
 - each PR-sized task starts with a task file under `docs/in_progress/`

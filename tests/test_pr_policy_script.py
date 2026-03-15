@@ -40,6 +40,14 @@ def test_agent_policy_requires_corridor_docs_and_tests():
     assert "docs/design/agent_product_and_workflow.md" in report["missing_required_docs"]
 
 
+def test_agent_policy_allows_example_edits_within_global_roots():
+    module = _load_module()
+
+    report = module.evaluate_edit_policy(["examples/wsp_warp_gemm/demo.py"])
+
+    assert "examples/wsp_warp_gemm/demo.py" not in report["root_violations"]
+
+
 def test_agent_policy_passes_when_workflow_corridor_is_satisfied():
     module = _load_module()
 

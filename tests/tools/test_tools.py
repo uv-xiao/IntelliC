@@ -255,6 +255,12 @@ def test_promotion_plan_holds_when_required_gate_fails(tmp_path):
     assert plan["failed_required_gates"] == ["golden_diff"]
 
 
+def test_policy_check_allows_example_paths_as_global_edit_roots():
+    result = policy_check(["examples/wsp_warp_gemm/demo.py"])
+
+    assert result["evaluation"]["root_violations"] == []
+
+
 def test_policy_check_reports_missing_corridor_docs_and_tests():
     result = policy_check(["htp/agent_policy.py"])
 
