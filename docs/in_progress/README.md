@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `028-wsp-authored-bodies.md` — PR `#63`
+- `029-csp-authored-bodies.md` — PR `#pending`
