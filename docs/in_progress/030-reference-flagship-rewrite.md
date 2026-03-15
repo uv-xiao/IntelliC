@@ -23,7 +23,20 @@ Close the last programming-surface TODO by rewriting the flagship WSP/CSP exampl
 
 ## Exit criteria
 
-- the remaining open checklist item in `docs/todo/programming_surfaces.md` is closed
+- the remaining open programming-surfaces checklist item is closed
 - `docs/todo/README.md` reports no remaining TODO checklist items
 - stale `docs/in_progress/029-csp-authored-bodies.md` is removed
 - this task file is removed before merge
+
+## Progress
+
+- deepened the flagship WSP examples into four-task staged pipelines
+- deepened the flagship CSP example into a four-process, three-channel pipeline
+- updated example-local docs and design docs to describe the richer narratives
+- removed the last open programming-surfaces TODO from `docs/todo/`
+- removed the stale completed CSP task file
+
+## Verification
+
+- `pytest -q`
+- `pre-commit run --all-files`

@@ -73,11 +73,15 @@ def littlekernel_pipelined_gemm(w) -> None:
         steady_tiles.steady().step("mma_sync", stage=1)
         steady_tiles.steady().step("advance_pipeline")
 
-        writeback_tiles = w.launch(task_id="writeback_tiles").after(steady_tiles).role("epilogue")
+        epilogue_tiles = w.launch(task_id="epilogue_tiles").after(steady_tiles).role("reducer")
+        epilogue_tiles.epilogue().step("reduce_accumulators", source="acc")
+        epilogue_tiles.epilogue().step("convert_output", target=w.args.C)
+
+        writeback_tiles = w.launch(task_id="writeback_tiles").after(epilogue_tiles).role("epilogue")
         writeback_tiles.epilogue().step("store", target=w.args.C)
         writeback_tiles.specialize(
             operator="pipelined_mainloop",
-            stage_plan="prefetch_tiles->steady_tiles->writeback_tiles",
+            stage_plan="prefetch_tiles->steady_tiles->epilogue_tiles->writeback_tiles",
         )
 
 

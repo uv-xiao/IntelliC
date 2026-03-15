@@ -12,6 +12,8 @@ It proves three implemented contracts:
   only string markers.
 - the workload uses `w.defaults(...)` and `w.args.<name>` so repeated schedule
   facts and kernel-argument wiring stay concise and native.
+- the workload is now a four-task pipeline (`load`, `mma`, `accumulate`,
+  `store`) instead of a minimal producer/consumer sketch.
 - the kernel body uses explicit `shared_array(...)` storage, semantic loop
   indices from `unroll(...)`, and Python slice views such as
   `A[:, k0:k0+16]` / `B[k0:k0+16, :]` instead of raw scratch strings or

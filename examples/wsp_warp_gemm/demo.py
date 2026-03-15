@@ -65,10 +65,15 @@ def warp_gemm(w) -> None:
         mma_tiles.steady().step("mma_sync", accum="acc")
         mma_tiles.steady().step("accumulate", source="acc")
 
-        store_tiles = w.launch(task_id="store_tiles").after(mma_tiles).role("epilogue")
+        accumulate_tiles = w.launch(task_id="accumulate_tiles").after(mma_tiles).role("reducer")
+        accumulate_tiles.epilogue().step("reduce_accumulators", source="acc")
+        accumulate_tiles.epilogue().step("apply_epilogue", target=w.args.C)
+
+        store_tiles = w.launch(task_id="store_tiles").after(accumulate_tiles).role("epilogue")
         store_tiles.epilogue().step("store", target=w.args.C)
         store_tiles.specialize(
-            operator="tensor_core_mainloop", stage_plan="load_tiles->mma_tiles->store_tiles"
+            operator="tensor_core_mainloop",
+            stage_plan="load_tiles->mma_tiles->accumulate_tiles->store_tiles",
         )
 
 

@@ -11,6 +11,8 @@ It proves three implemented contracts:
   `compute_step(...)`.
 - the workload uses `p.args.<name>` and default process argument capture so the
   flagship CSP example does not wire kernel arguments through raw string tuples.
+- the pipeline is now decomposed into four named processes over three channels
+  (`tiles`, `partials`, `ready_rows`) instead of a minimal three-process toy.
 - balanced channel obligations and deadlock-safety evidence are recorded in
   staged `effects.json`.
 - process-local protocol steps remain visible in staged `workload_ir.json`.

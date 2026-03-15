@@ -206,6 +206,9 @@ Three concrete surface upgrades matter here:
 - `task.prologue()`, `task.steady()`, and `task.epilogue()` now support
   structured stage bodies via `.step(...)` objects, while the older string
   helpers remain available for compatibility tests.
+- the flagship WSP examples now carry four-task narratives (`load/prefetch`,
+  `mainloop/steady`, `accumulate/epilogue`, `store/writeback`) that are closer
+  to the reference mainloop structure instead of a minimal two-step proof.
 
 ### Arknife-style explicit hardware surface
 
@@ -274,6 +277,9 @@ values and routines instead of inventing parallel semantic roots.
 - process-local step traces that survive into `workload_ir.json`
 - public examples that now describe named dispatch/combine/writeback roles and
   protocol-local steps instead of assembling process dicts by hand
+- a richer four-process flagship pipeline (`dispatch`, `combine`, `finalize`,
+  `writeback`) over three explicit channels, closer to the FlashComm-style
+  reference decomposition
 
 The public surface now supports protocol narratives like:
 
@@ -282,6 +288,11 @@ combine = p.process("combine_tiles", task_id="combine_tiles").role("router")
 combine.get(tiles)
 combine.compute_step("reduce_partials", channel=tiles)
 combine.put(partials)
+
+finalize = p.process("finalize_rows", task_id="finalize_rows").role("reducer")
+finalize.get(partials)
+finalize.compute_step("normalize_rows", channel=partials)
+finalize.put(ready_rows)
 ```
 
 Those authored process steps are not a second compiler substrate. They are

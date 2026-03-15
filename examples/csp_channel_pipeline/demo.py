@@ -43,6 +43,7 @@ def channel_stage(
 def token_pipeline(p) -> None:
     tiles = p.fifo("tiles", dtype="f32", capacity=2)
     partials = p.fifo("partials", dtype="f32", capacity=1)
+    ready_rows = p.fifo("ready_rows", dtype="f32", capacity=1)
 
     dispatch = p.process("dispatch_tiles", task_id="dispatch_tiles").role("producer")
     dispatch.compute_step("pack_tile", source=p.args.A)
@@ -53,8 +54,13 @@ def token_pipeline(p) -> None:
     combine.compute_step("reduce_partials", channel=tiles)
     combine.put(partials)
 
+    finalize = p.process("finalize_rows", task_id="finalize_rows").role("reducer")
+    finalize.get(partials)
+    finalize.compute_step("normalize_rows", channel=partials)
+    finalize.put(ready_rows)
+
     writeback = p.process("writeback_tiles", task_id="writeback_tiles").role("consumer")
-    writeback.get(partials)
+    writeback.get(ready_rows)
     writeback.compute_step("write_output", target=p.args.C)
 
 
