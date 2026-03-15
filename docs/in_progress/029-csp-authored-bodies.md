@@ -27,3 +27,16 @@ Close the remaining CSP frontend gap by replacing metadata-style process steps a
 - flagship CSP examples no longer rely on `.compute(\"name\", ...)` as the primary authored form
 - flagship CSP examples no longer wire kernel arguments as raw string tuples
 - docs/design and docs/todo are synchronized before merge
+
+## Progress
+
+- added bound kernel arguments via `p.args`
+- added default decorated-kernel argument capture for `p.process(...)`
+- added structured `compute_step(...)` process bodies
+- rewrote the flagship CSP example onto the new surface
+- updated design and TODO docs
+
+## Verification
+
+- `pytest -q`
+- `pre-commit run --all-files`
