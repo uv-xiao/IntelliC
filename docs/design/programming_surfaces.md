@@ -128,21 +128,28 @@ backend-only frontends; they are now part of the shared kernel surface that can
 be consumed by the normal semantic model and backend lowering.
 
 The current surface also now supports lightweight loop/region annotation in
-plain Python:
+plain Python, and loop indices now participate in real tile/view authoring
+instead of only attaching metadata to repeated ops:
 
 ```text
 for stage in unroll(range(2), name="stage"):
+    k0 = stage * 16
+    a_view = A[:, k0 : k0 + 16]
+    b_view = B[k0 : k0 + 16, :]
     with region("mainloop_stage", phase="steady"):
-        async_copy(A, target=a_stages[stage], dtype="f32")
-        async_copy(B, target=b_stages[stage], dtype="f32")
+        async_copy(a_view, target=a_stages[stage], dtype="f32")
+        async_copy(b_view, target=b_stages[stage], dtype="f32")
         barrier()
-        partial = mma(a_stages[stage], b_stages[stage], m=M, n=N, k=K, dtype="f32")
+        partial = mma(a_stages[stage], b_stages[stage], m=M, n=N, k=16, dtype="f32")
 ```
 
-This is not a second loop IR. It is a traced annotation layer over ordinary
-Python `for` loops. Emitted ops carry `attrs.regions` so replay, semantic
-payloads, and backend debugging can all point at the same loop/region evidence
-without leaving Python-space.
+This is still not a second loop IR. It is a traced annotation layer over
+ordinary Python `for` loops, but the loop variable is now a semantic index
+object and slicing syntax emits real `slice` ops on the shared HTP surface.
+Emitted ops carry `attrs.regions`, `offsets`, `sizes`, and symbolic
+`offset_exprs` / `size_exprs`, so replay, semantic payloads, and backend
+debugging can all point at the same loop/tile evidence without leaving
+Python-space.
 
 ### `htp.compile_program(...)`
 

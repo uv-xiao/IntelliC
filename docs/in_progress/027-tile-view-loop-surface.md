@@ -18,10 +18,10 @@ Add Python-native tile/view slicing and semantic loop-index objects to the publi
 
 ## Scope Checklist
 
-- [ ] add first-class tile/view slicing on native kernel values
-- [ ] make loop indices semantic objects that can participate in slice expressions
-- [ ] rewrite at least one flagship WSP example and tests to use real tile views
-- [ ] sync `docs/design/` and narrow `docs/todo/programming_surfaces.md`
+- [x] add first-class tile/view slicing on native kernel values
+- [x] make loop indices semantic objects that can participate in slice expressions
+- [x] rewrite at least one flagship WSP example and tests to use real tile views
+- [x] sync `docs/design/` and narrow `docs/todo/programming_surfaces.md`
 
 ## Code Surfaces
 
@@ -33,11 +33,11 @@ Add Python-native tile/view slicing and semantic loop-index objects to the publi
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for the motivating bug or gap
-- [ ] human-friendly example updated or added
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating bug or gap
+- [x] human-friendly example updated or added
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
 
@@ -58,3 +58,16 @@ Do not add low-signal tests. Each added test must defend a concrete contract, fa
 ## Review Notes
 
 Reviewers should check whether slicing and loop indices stay on the shared HTP surface instead of becoming a hidden sidecar IR, and whether the rewritten examples are semantically more meaningful instead of only syntactically shorter.
+
+## Progress Notes
+
+- added Python slice-based tile/view authoring on `KernelValue` so staged kernels can write `A[:, k0:k0+16]` and `B[k0:k0+16, :]`
+- promoted loop variables from pure trace annotations into semantic index objects that preserve symbolic expressions while remaining usable as Python indices
+- rewrote the flagship WSP GEMM examples and their regression tests around indexed tile views instead of whole-buffer placeholder copies
+
+## Verification Evidence
+
+- local fallback verification used because `pixi` is not installed in this shell
+- `pytest -q tests/test_public_surfaces.py tests/examples/test_examples.py`
+- `pytest -q`
+- `pre-commit run --all-files`

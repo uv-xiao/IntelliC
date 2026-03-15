@@ -546,10 +546,33 @@ def _simulate_slice(
 ) -> object:
     del mode, trace
     source = args[0]
-    offsets = tuple(int(item) for item in attrs.get("offsets", ()))
-    sizes = tuple(int(item) for item in attrs.get("sizes", ()))
+    offsets = tuple(
+        _coerce_slice_index(item, axis=index, source=source, kind="offset")
+        for index, item in enumerate(attrs.get("offsets", ()))
+    )
+    sizes = tuple(
+        _coerce_slice_index(item, axis=index, source=source, kind="size", offset=offsets[index])
+        for index, item in enumerate(attrs.get("sizes", ()))
+    )
     slices = tuple(slice(offset, offset + size) for offset, size in zip(offsets, sizes))
     return source[slices]
+
+
+def _coerce_slice_index(
+    item: object,
+    *,
+    axis: int,
+    source: object,
+    kind: str,
+    offset: int = 0,
+) -> int:
+    try:
+        return int(item)
+    except (TypeError, ValueError):
+        pass
+    if kind == "size" and hasattr(source, "shape"):
+        return int(source.shape[axis]) - offset
+    raise ValueError(f"Slice {kind} {item!r} is not concretely replayable in sim mode.")
 
 
 def _simulate_concat(

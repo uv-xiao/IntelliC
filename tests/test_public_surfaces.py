@@ -444,6 +444,36 @@ def test_public_kernel_surface_supports_explicit_scratch_arrays_and_memory_scope
     assert payload["ops"][7]["attrs"]["regions"][0]["iteration"] == 1
 
 
+def test_public_kernel_surface_supports_tile_views_with_semantic_loop_indices():
+    @kernel
+    def tiled_mainloop(
+        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+    ) -> None:
+        a_tiles = shared_array("a_tile", count=2, dtype="f32", shape=("M", 16))
+        b_tiles = shared_array("b_tile", count=2, dtype="f32", shape=(16, "N"))
+        for stage in unroll(range(2), name="stage"):
+            k0 = stage * 16
+            a_view = A[:, k0 : k0 + 16]
+            b_view = B[k0 : k0 + 16, :]
+            async_copy(a_view, target=a_tiles[stage], dtype="f32")
+            async_copy(b_view, target=b_tiles[stage], dtype="f32")
+            barrier()
+            tile_acc = mma(a_tiles[stage], b_tiles[stage], dtype="f32")
+            store(C, tile_acc)
+
+    payload = tiled_mainloop.to_payload()
+    slice_ops = [op for op in payload["ops"] if op["op"] == "slice"]
+
+    assert slice_ops[0]["offsets"] == [0, 0]
+    assert slice_ops[0]["sizes"] == ["M", 16]
+    assert slice_ops[0]["offset_exprs"] == ["0", "stage * 16"]
+    assert slice_ops[1]["offset_exprs"] == ["stage * 16", "0"]
+    assert slice_ops[2]["offsets"] == [0, 16]
+    assert slice_ops[2]["offset_exprs"] == ["0", "stage * 16"]
+
+
 def test_public_kernel_surface_supports_region_annotations_inside_loops():
     @kernel
     def staged_epilogue(
@@ -469,6 +499,17 @@ def test_public_kernel_surface_supports_region_annotations_inside_loops():
 def test_scratch_array_requires_positive_count():
     with pytest.raises(ValueError, match="count > 0"):
         scratch_array("tiles", count=0, dtype="f32", shape=("M", "N"), memory_space="shared")
+
+
+def test_kernel_slice_syntax_rejects_step_values():
+    with pytest.raises(ValueError, match="step"):
+
+        @kernel
+        def bad_slice(
+            A: buffer(dtype="f32", shape=("M", "N"), role="input"),
+            C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        ) -> None:
+            store(C, A[0:16:2, :])
 
 
 def test_wsp_program_surface_accepts_kernel_specs_and_task_helpers():
