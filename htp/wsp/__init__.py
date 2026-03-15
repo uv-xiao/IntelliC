@@ -21,6 +21,7 @@ That keeps WSP authoring in normal Python while preserving the existing
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from inspect import signature
 from typing import Any
@@ -136,6 +137,24 @@ class WSPProgramSpec:
         }
 
 
+class WSPBoundArgs:
+    """Named kernel-argument bindings exposed to WSP authored workloads."""
+
+    def __init__(self, values: Mapping[str, KernelValue]):
+        self._values = dict(values)
+
+    def __getattr__(self, name: str) -> KernelValue:
+        try:
+            return self._values[name]
+        except KeyError as exc:  # pragma: no cover - defensive surface
+            raise AttributeError(name) from exc
+
+    def ordered(self, names: Sequence[str] | None = None) -> tuple[KernelValue, ...]:
+        if names is None:
+            return tuple(self._values[name] for name in self._values)
+        return tuple(self._values[name] for name in names)
+
+
 @dataclass
 class WSPBuilder:
     """Mutable builder used by `@wsp.program(...)` decorator mode."""
@@ -155,21 +174,45 @@ class WSPBuilder:
             "specialize": {},
         }
     )
+    _schedule_defaults_stack: list[dict[str, dict[str, Any]]] = field(default_factory=list)
+    args: WSPBoundArgs = field(init=False)
+
+    def __post_init__(self) -> None:
+        bound_values = {
+            argument.name: KernelValue(
+                name=argument.name,
+                dtype=argument.dtype,
+                shape=argument.shape,
+                kind=argument.kind,
+                role=argument.role,
+                memory_space=argument.memory_space,
+                axis_layout=argument.axis_layout,
+                distribution=argument.distribution,
+                attrs=None if argument.attrs is None else dict(argument.attrs),
+            )
+            for argument in self.kernel_spec.args
+            if argument.name is not None
+        }
+        self.args = WSPBoundArgs(bound_values)
 
     def launch(
         self,
-        kernel: KernelSpec | str,
+        kernel: KernelSpec | str | None = None,
         *args: str | KernelValue,
         task_id: str | None = None,
         kind: str = "kernel_call",
     ) -> WSPTaskBuilder:
-        spec = task(kernel, *args, task_id=task_id, kind=kind)
+        resolved_kernel = self.kernel_spec if kernel is None else kernel
+        resolved_args = args or self._default_args_for(resolved_kernel)
+        spec = task(resolved_kernel, *resolved_args, task_id=task_id, kind=kind)
         self.tasks.append(spec)
-        return WSPTaskBuilder(owner=self, spec=spec)
+        builder = WSPTaskBuilder(owner=self, spec=spec)
+        builder._apply_schedule_defaults(self._current_schedule_defaults())
+        return builder
 
     def mainloop(
         self,
-        kernel: KernelSpec | str,
+        kernel: KernelSpec | str | None = None,
         *args: str | KernelValue,
         task_id: str | None = None,
     ) -> WSPTaskBuilder:
@@ -177,12 +220,43 @@ class WSPBuilder:
 
     def task(
         self,
-        kernel: KernelSpec | str,
+        kernel: KernelSpec | str | None = None,
         *args: str | KernelValue,
         task_id: str | None = None,
         kind: str = "kernel_call",
     ) -> WSPTaskBuilder:
         return self.launch(kernel, *args, task_id=task_id, kind=kind)
+
+    @contextmanager
+    def defaults(
+        self,
+        *,
+        tile: Mapping[str, Any] | None = None,
+        bind: Mapping[str, Any] | None = None,
+        pipeline: Mapping[str, Any] | None = None,
+        resources: Mapping[str, Any] | None = None,
+        specialize: Mapping[str, Any] | None = None,
+    ):
+        frame: dict[str, dict[str, Any]] = {}
+        if tile is not None:
+            frame["tile"] = _normalize_schedule_payload("tile", tile)
+        if bind is not None:
+            frame["bind"] = _normalize_schedule_payload("bind", bind)
+        if pipeline is not None:
+            frame["pipeline"] = _normalize_schedule_payload("pipeline", pipeline)
+        if resources is not None:
+            frame["resources"] = _normalize_schedule_payload("resources", resources)
+        if specialize is not None:
+            frame["specialize"] = _normalize_schedule_payload("specialize", specialize)
+
+        self._schedule_defaults_stack.append(frame)
+        merged = self._current_schedule_defaults()
+        for key, value in merged.items():
+            self.schedule_state[key] = dict(value)
+        try:
+            yield self
+        finally:
+            self._schedule_defaults_stack.pop()
 
     def tile(self, *, block: tuple[int, int, int] | list[int]) -> WSPBuilder:
         self.schedule_state["tile"] = tile(block=block)
@@ -217,6 +291,31 @@ class WSPBuilder:
             ),
             schedule=self.schedule_state,
         ).to_program()
+
+    def _default_args_for(self, kernel: KernelSpec | str) -> tuple[KernelValue, ...]:
+        kernel_name = kernel.name if isinstance(kernel, KernelSpec) else str(kernel)
+        if kernel_name != self.kernel_spec.name:
+            return ()
+        return self.args.ordered()
+
+    def _current_schedule_defaults(self) -> dict[str, dict[str, Any]]:
+        merged = {key: {} for key in self.schedule_state}
+        for frame in self._schedule_defaults_stack:
+            for key, value in frame.items():
+                merged[key] = dict(value)
+        return merged
+
+
+@dataclass
+class WSPStageBuilder:
+    task: WSPTaskBuilder
+    stage_spec: dict[str, Any]
+
+    def step(self, op: str, /, **attrs: Any) -> WSPStageBuilder:
+        payload = {"kind": "step", "op": str(op)}
+        payload.update({key: _stage_attr_value(value) for key, value in attrs.items()})
+        self.stage_spec.setdefault("steps", []).append(payload)
+        return self
 
 
 @dataclass
@@ -277,19 +376,25 @@ class WSPTaskBuilder:
         return self
 
     def stage(self, name: str, *steps: str) -> WSPTaskBuilder:
-        self._attrs().setdefault("stages", []).append(
-            {"name": str(name), "steps": [str(step) for step in steps]}
-        )
-        return self
+        if steps:
+            self._stage_spec(name)["steps"].extend(str(step) for step in steps)
+            return self
+        return WSPStageBuilder(task=self, stage_spec=self._stage_spec(name))
 
-    def prologue(self, *steps: str) -> WSPTaskBuilder:
+    def prologue(self, *steps: str) -> WSPTaskBuilder | WSPStageBuilder:
         return self.stage("prologue", *steps)
 
-    def steady(self, *steps: str) -> WSPTaskBuilder:
+    def steady(self, *steps: str) -> WSPTaskBuilder | WSPStageBuilder:
         return self.stage("steady", *steps)
 
-    def epilogue(self, *steps: str) -> WSPTaskBuilder:
+    def epilogue(self, *steps: str) -> WSPTaskBuilder | WSPStageBuilder:
         return self.stage("epilogue", *steps)
+
+    def _apply_schedule_defaults(self, defaults: Mapping[str, Mapping[str, Any]]) -> None:
+        task_schedule = self._task_schedule()
+        for key, value in defaults.items():
+            if value:
+                task_schedule.setdefault(key, dict(value))
 
     def _attrs(self) -> dict[str, Any]:
         attrs = self.spec.setdefault("attrs", {})
@@ -300,6 +405,16 @@ class WSPTaskBuilder:
 
     def _task_schedule(self) -> dict[str, Any]:
         return self._attrs().setdefault("schedule", {})
+
+    def _stage_spec(self, name: str) -> dict[str, Any]:
+        stages = self._attrs().setdefault("stages", [])
+        for stage in stages:
+            if stage.get("name") == str(name):
+                stage.setdefault("steps", [])
+                return stage
+        stage = {"name": str(name), "steps": []}
+        stages.append(stage)
+        return stage
 
 
 def program(
@@ -385,10 +500,33 @@ def _normalize_target(target: Mapping[str, Any] | str | None) -> dict[str, Any]:
     return dict(target)
 
 
+def _normalize_schedule_payload(kind: str, payload: Mapping[str, Any]) -> dict[str, Any]:
+    if kind == "tile":
+        return tile(block=tuple(payload["block"]))
+    if kind == "bind":
+        return bind(grid=payload.get("grid"), lane=payload.get("lane"))
+    if kind == "pipeline":
+        return pipeline(depth=int(payload["depth"]), buffering=str(payload.get("buffering", "double")))
+    if kind == "resources":
+        return resources(num_warps=int(payload["num_warps"]))
+    if kind == "specialize":
+        operator = payload.get("operator")
+        if operator is None:
+            return {}
+        return specialize(operator=str(operator), **{k: v for k, v in payload.items() if k != "operator"})
+    raise ValueError(f"Unsupported WSP schedule payload kind {kind!r}.")
+
+
 def _ref(value: str | KernelValue) -> str:
     if isinstance(value, KernelValue):
         return value.name
     return str(value)
+
+
+def _stage_attr_value(value: Any) -> Any:
+    if isinstance(value, KernelValue):
+        return value.name
+    return value
 
 
 __all__ = [

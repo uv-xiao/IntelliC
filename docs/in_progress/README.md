@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- None currently. Open a new `docs/in_progress/<id>-<topic>.md` file as the first commit of the next feature branch.
+- `028-wsp-authored-bodies.md` — PR `#63`

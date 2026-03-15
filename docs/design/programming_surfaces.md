@@ -183,21 +183,29 @@ Public examples can now express a producer/mainloop/epilogue task graph in
 native Python while still lowering through the same canonical HTP payload:
 
 ```text
-load_tiles = (
-    w.launch(...)
-    .role("producer")
-    .prologue("cp_async(A->shared)", "cp_async(B->shared)")
-)
-mma_tiles = (
-    w.mainloop(...)
-    .after(load_tiles)
-    .role("consumer")
-    .steady("barrier", "mma_sync", "accumulate")
-)
+with w.defaults(...):
+    load_tiles = w.launch(task_id="load_tiles").role("producer")
+    load_tiles.prologue().step("cp_async", source=w.args.A, target="a_tile")
+    load_tiles.prologue().step("cp_async", source=w.args.B, target="b_tile")
+
+    mma_tiles = w.mainloop(task_id="mma_tiles").after(load_tiles).role("consumer")
+    mma_tiles.steady().step("barrier")
+    mma_tiles.steady().step("mma_sync", accum="acc")
 ```
 
 That structure survives into the staged workload artifacts instead of being
 only a comment in the example.
+
+Three concrete surface upgrades matter here:
+
+- `w.defaults(...)` now scopes repeated schedule facts so flagship WSP programs
+  do not repeat `.tile(...)`, `.bind(...)`, `.pipeline(...)`, and
+  `.resources(...)` on every task.
+- `w.args.<name>` now exposes bound kernel arguments as native `KernelValue`
+  objects, so examples can stop wiring task calls through raw string tuples.
+- `task.prologue()`, `task.steady()`, and `task.epilogue()` now support
+  structured stage bodies via `.step(...)` objects, while the older string
+  helpers remain available for compatibility tests.
 
 ### Arknife-style explicit hardware surface
 

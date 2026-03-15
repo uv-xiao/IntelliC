@@ -591,6 +591,87 @@ def test_wsp_mainloop_surface_carries_roles_dependencies_and_stage_plan():
     assert payload["wsp"]["workload"]["dependencies"] == [{"src": "load_tiles", "dst": "mma_tiles"}]
 
 
+def test_wsp_surface_supports_defaults_bound_args_and_structured_stage_bodies():
+    @kernel
+    def gemm_tile(
+        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(C, A @ B)
+
+    @wsp_program(target="nvgpu-ampere", kernel=gemm_tile)
+    def gemm_workload(w) -> None:
+        with w.defaults(
+            tile={"block": (64, 128, 32)},
+            bind={"grid": "block", "lane": "warp"},
+            pipeline={"depth": 3, "buffering": "double"},
+            resources={"num_warps": 4},
+        ):
+            load = w.launch(
+                gemm_tile,
+                w.args.A,
+                w.args.B,
+                w.args.C,
+                w.args.M,
+                w.args.N,
+                w.args.K,
+                task_id="load_tiles",
+            ).role("producer")
+            load.prologue().step("cp_async", source=w.args.A, target="a_tile")
+            load.prologue().step("cp_async", source=w.args.B, target="b_tile")
+
+            mma_stage = (
+                w.mainloop(
+                    gemm_tile,
+                    w.args.A,
+                    w.args.B,
+                    w.args.C,
+                    w.args.M,
+                    w.args.N,
+                    w.args.K,
+                    task_id="mma_tiles",
+                )
+                .after(load)
+                .role("consumer")
+            )
+            mma_stage.steady().step("ldmatrix", source="a_tile")
+            mma_stage.steady().step("mma_sync", accum="acc")
+            mma_stage.epilogue().step("store", target=w.args.C)
+
+    payload = gemm_workload.to_program()
+
+    tasks = payload["wsp"]["workload"]["tasks"]
+    assert tasks[0]["args"] == ["A", "B", "C", "M", "N", "K"]
+    assert tasks[0]["attrs"]["schedule"] == {
+        "tile": {"block": [64, 128, 32]},
+        "bind": {"grid": "block", "lane": "warp"},
+        "pipeline": {"depth": 3, "buffering": "double"},
+        "resources": {"num_warps": 4},
+    }
+    assert tasks[0]["attrs"]["stages"][0] == {
+        "name": "prologue",
+        "steps": [
+            {"kind": "step", "op": "cp_async", "source": "A", "target": "a_tile"},
+            {"kind": "step", "op": "cp_async", "source": "B", "target": "b_tile"},
+        ],
+    }
+    assert tasks[1]["attrs"]["stages"][0] == {
+        "name": "steady",
+        "steps": [
+            {"kind": "step", "op": "ldmatrix", "source": "a_tile"},
+            {"kind": "step", "op": "mma_sync", "accum": "acc"},
+        ],
+    }
+    assert tasks[1]["attrs"]["stages"][1] == {
+        "name": "epilogue",
+        "steps": [{"kind": "step", "op": "store", "target": "C"}],
+    }
+
+
 def test_csp_program_surface_accepts_kernel_specs_and_step_helpers():
     @kernel
     def gemm_tile(
