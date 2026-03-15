@@ -1,6 +1,6 @@
 # In-Progress — WSP Authored Bodies
 
-- PR: `#pending`
+- PR: `#63`
 - Branch: `htp/feat-wsp-authored-bodies`
 - Status: in progress
 
