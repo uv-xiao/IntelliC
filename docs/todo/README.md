@@ -4,7 +4,7 @@
 
 ## Current state
 
-There is currently one reopened broad-topic TODO document in this repository:
+There is currently one active broad-topic TODO document in this repository:
 `docs/todo/programming_surfaces.md`.
 
 The rest of the previously tracked broad-topic gaps remain implemented and
@@ -14,18 +14,18 @@ documented under `docs/design/`.
 
 ### Overall
 
-- total tracked TODO checklist items: 60
+- total tracked TODO checklist items: 63
 - complete: 56
 - partial: 1
-- open: 3
-- completion ratio: about 93%
+- open: 6
+- completion ratio: about 89%
 
 ### By topic
 
 | Topic | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Compiler model, semantics, typing | 10 | 0 | 0 | 10 |
-| Programming surfaces | 10 | 1 | 3 | 14 |
+| Programming surfaces | 10 | 1 | 6 | 17 |
 | Pipeline and solver | 9 | 0 | 0 | 9 |
 | Artifacts, replay, debug | 8 | 0 | 0 | 8 |
 | Backends and extensions | 11 | 0 | 0 | 11 |
