@@ -1,6 +1,6 @@
 # In-Progress — Reference Flagship Rewrite
 
-- PR: `#pending`
+- PR: `#65`
 - Branch: `htp/feat-reference-flagship-rewrite`
 - Status: in progress
 

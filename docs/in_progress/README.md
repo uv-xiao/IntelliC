@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `030-reference-flagship-rewrite.md` — PR `#pending`
+- `030-reference-flagship-rewrite.md` — PR `#65`
