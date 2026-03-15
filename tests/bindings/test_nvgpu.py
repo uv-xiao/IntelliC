@@ -3,6 +3,7 @@ import json
 import numpy as np
 
 import htp.runtime as runtime_api
+from examples.wsp_warp_gemm.demo import compile_example as compile_wsp_example
 from htp.backends.nvgpu.emit import emit_package
 from htp.bindings import nvgpu_cuda_adapter
 from htp.bindings.api import bind
@@ -209,3 +210,16 @@ def test_nvgpu_validate_reports_artifact_ref_for_invalid_codegen_schema(tmp_path
         and diagnostic.get("artifact_ref") == "codegen/nvgpu/nvgpu_codegen.json"
         for diagnostic in report.diagnostics
     )
+
+
+def test_nvgpu_binding_replays_wsp_slice_views_in_sim_mode(tmp_path):
+    package_dir = tmp_path / "wsp_example"
+    compile_wsp_example(package_dir)
+
+    session = bind(package_dir).load(mode="sim")
+    stage_id = session.manifest["stages"]["current"]
+    result = session.replay(stage_id)
+
+    assert result.ok is True
+    assert result.stage_id == stage_id
+    assert result.diagnostics == []

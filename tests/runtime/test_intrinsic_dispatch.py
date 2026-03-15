@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from htp.runtime import ReplayDiagnosticError
@@ -52,3 +53,21 @@ def test_runtime_channel_recv_reports_empty_queue_without_stub_wrapping():
 
     assert excinfo.value.code == "HTP.REPLAY.STUB_HIT"
     assert excinfo.value.payload["detail"] == "channel 'tiles' is empty in sim replay"
+
+
+def test_runtime_slice_intrinsic_accepts_symbolic_extent_sizes():
+    runtime = Runtime()
+
+    result = runtime.invoke_intrinsic(
+        "portable.slice",
+        args=(np.arange(8, dtype=np.float32).reshape(2, 4),),
+        attrs={
+            "offsets": (0, 1),
+            "sizes": ("rows", 2),
+            "offset_exprs": ("0", "stage * 2"),
+            "size_exprs": ("rows", "2"),
+        },
+        mode="sim",
+    )
+
+    assert np.array_equal(result, np.array([[1, 2], [5, 6]], dtype=np.float32))

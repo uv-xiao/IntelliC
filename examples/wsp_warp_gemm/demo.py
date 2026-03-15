@@ -19,6 +19,8 @@ from htp.kernel import (
 )
 from htp.wsp import program as wsp_program
 
+BLOCK_K = 16
+
 
 @kernel
 def warp_mainloop_tile(
@@ -31,15 +33,18 @@ def warp_mainloop_tile(
 ) -> None:
     """Warp-level GEMM mainloop with staged copies and tensor-core math."""
 
-    a_tiles = shared_array("a_tile", count=2, dtype="f32", shape=("M", "K"))
-    b_tiles = shared_array("b_tile", count=2, dtype="f32", shape=("K", "N"))
+    a_tiles = shared_array("a_tile", count=2, dtype="f32", shape=("M", BLOCK_K))
+    b_tiles = shared_array("b_tile", count=2, dtype="f32", shape=(BLOCK_K, "N"))
     partials = []
     for stage in unroll(range(2), name="warp_stage"):
+        k0 = stage * BLOCK_K
+        a_view = A[:, k0 : k0 + BLOCK_K]
+        b_view = B[k0 : k0 + BLOCK_K, :]
         with region("warp_tile", phase="steady"):
-            async_copy(A, target=a_tiles[stage], dtype="f32")
-            async_copy(B, target=b_tiles[stage], dtype="f32")
+            async_copy(a_view, target=a_tiles[stage], dtype="f32")
+            async_copy(b_view, target=b_tiles[stage], dtype="f32")
             barrier()
-            partials.append(mma(a_tiles[stage], b_tiles[stage], m=M, n=N, k=K, dtype="f32"))
+            partials.append(mma(a_tiles[stage], b_tiles[stage], m=M, n=N, k=BLOCK_K, dtype="f32"))
     store(C, partials[0] + partials[1])
 
 

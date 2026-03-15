@@ -9,9 +9,10 @@ It proves three implemented contracts:
   named workload tasks.
 - each task can carry explicit stage-plan evidence such as `prologue`,
   `steady`, and `epilogue`.
-- the kernel body uses explicit `shared_array(...)` storage plus
-  `for ... in unroll(range(...))` loop annotations instead of raw scratch
-  strings or manually duplicated stages.
+- the kernel body uses explicit `shared_array(...)` storage, semantic loop
+  indices from `unroll(...)`, and Python slice views such as
+  `A[:, k0:k0+16]` / `B[k0:k0+16, :]` instead of raw scratch strings or
+  manually duplicated stages.
 - the default pipeline preserves those directives into staged `schedule.json`
   and `workload_ir.json`.
 

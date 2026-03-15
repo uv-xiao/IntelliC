@@ -1,6 +1,8 @@
 import json
 
+from examples.wsp_warp_gemm.demo import compile_example as compile_wsp_example
 from htp import ark, compile_program
+from htp.backends.nvgpu.declarations import declaration_for
 from htp.backends.nvgpu.emit import emit_package
 from htp.bindings.api import bind
 
@@ -257,6 +259,25 @@ def test_bind_prefers_nvgpu_binding_when_backend_is_missing(tmp_path):
             "expected_value": "nvgpu",
         }
     ]
+
+
+def test_nvgpu_wsp_example_codegen_records_symbolic_slice_views(tmp_path):
+    package_dir = tmp_path / "wsp_example"
+    compile_wsp_example(package_dir)
+
+    assert "slice" in declaration_for("ampere").supported_ops
+
+    kernel_ir = json.loads(
+        (
+            package_dir
+            / "ir"
+            / "stages"
+            / json.loads((package_dir / "manifest.json").read_text())["stages"]["current"]
+            / "kernel_ir.json"
+        ).read_text()
+    )
+    assert kernel_ir["ops"][0]["op"] == "slice"
+    assert kernel_ir["ops"][0]["attrs"]["offset_exprs"] == ["0", "warp_stage * 16"]
 
 
 def test_bind_prefers_nvgpu_binding_over_shared_toolchain_marker(tmp_path):

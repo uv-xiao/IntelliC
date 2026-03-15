@@ -17,15 +17,15 @@ The latest surface review distilled those complaints into the checklist below. T
 ## Completion snapshot
 
 - total checklist items: 7
-- complete: 0
+- complete: 2
 - partial: 1
-- open: 6
+- open: 4
 
 ## Detailed checklist
 
 ### Tile/view and loop-index surface
-- [ ] Add first-class tile/view slicing on native HTP kernel values so staged copies and tensor-core steps operate on explicit views rather than whole-buffer placeholders.
-- [ ] Promote loop indices from trace annotations into semantic objects that can participate in view construction, staging, and index-dependent operations.
+- [x] Add first-class tile/view slicing on native HTP kernel values so staged copies and tensor-core steps operate on explicit views rather than whole-buffer placeholders.
+- [x] Promote loop indices from trace annotations into semantic objects that can participate in view construction, staging, and index-dependent operations.
 
 ### WSP authored workload readability
 - [ ] Add scoped/default schedule contexts so WSP programs do not repeat `.tile(...)`, `.bind(...)`, `.pipeline(...)`, and `.resources(...)` on every task.
@@ -47,7 +47,7 @@ The latest surface review distilled those complaints into the checklist below. T
 - readable staged `program.py` artifacts now remain runnable Python instead of opaque payload dumps
 - `htp.kernel` now supports explicit scratch declarations (`scratch(...)`, `scratch_array(...)`, `shared(...)`, `shared_array(...)`, `registers(...)`, `register_array(...)`)
 - traced loop/region helpers (`unroll(...)`, `serial(...)`, and `region(...)`) now annotate emitted ops while staying on ordinary Python `for` loops
-- the WSP GEMM examples now use explicit scratch arrays and loop/region annotations instead of manually repeated staging code
+- the WSP GEMM examples now use explicit scratch arrays, loop/region annotations, and Python-native tile views instead of manually repeated staging code
 
 This keeps the topic *partially* closed at the repository level: the frontend is real and testable, but the remaining surface work is now about semantic directness and reference-level readability rather than basic AST tracing.
 

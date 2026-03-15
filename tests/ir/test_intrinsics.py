@@ -148,6 +148,25 @@ def test_portable_intrinsic_simulation_covers_tensor_reference_ops():
     assert np.array_equal(reduced, matrix.sum(axis=0))
 
 
+def test_portable_slice_simulation_supports_symbolic_full_extent_sizes():
+    source = np.arange(24, dtype=np.float32).reshape(2, 12)
+
+    sliced = simulate_intrinsic(
+        "portable.slice",
+        args=(source,),
+        attrs={
+            "offsets": (0, 4),
+            "sizes": ("M", 4),
+            "offset_exprs": ("0", "warp_stage * 4"),
+            "size_exprs": ("M", "4"),
+        },
+        mode="sim",
+        target="nvgpu",
+    )
+
+    assert np.array_equal(sliced, source[:, 4:8])
+
+
 def test_portable_intrinsic_simulation_covers_async_and_mma_reference_ops():
     lhs = np.arange(6, dtype=np.float32).reshape(2, 3)
     rhs = np.arange(6, dtype=np.float32).reshape(3, 2)

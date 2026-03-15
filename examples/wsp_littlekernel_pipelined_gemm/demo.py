@@ -20,6 +20,8 @@ from htp.kernel import (
 )
 from htp.wsp import program as wsp_program
 
+BLOCK_K = 16
+
 
 @kernel
 def pipelined_mainloop_gemm(
@@ -32,20 +34,22 @@ def pipelined_mainloop_gemm(
 ) -> None:
     """Pipelined GEMM mainloop with double-buffered shared-memory stages."""
 
-    a_stages = shared_array("a_stage", count=2, dtype="f32", shape=("M", "K"))
-    b_stages = shared_array("b_stage", count=2, dtype="f32", shape=("K", "N"))
+    a_stages = shared_array("a_stage", count=2, dtype="f32", shape=("M", BLOCK_K))
+    b_stages = shared_array("b_stage", count=2, dtype="f32", shape=(BLOCK_K, "N"))
     partials = []
-    accum = registers("acc", dtype="f32", shape=("M", "N"))
+    registers("acc", dtype="f32", shape=("M", "N"))
 
     for stage in unroll(range(2), name="stage"):
+        k0 = stage * BLOCK_K
+        a_view = A[:, k0 : k0 + BLOCK_K]
+        b_view = B[k0 : k0 + BLOCK_K, :]
         with region("mainloop_stage", phase="steady"):
-            async_copy(A, target=a_stages[stage], dtype="f32")
-            async_copy(B, target=b_stages[stage], dtype="f32")
+            async_copy(a_view, target=a_stages[stage], dtype="f32")
+            async_copy(b_view, target=b_stages[stage], dtype="f32")
             barrier()
-            partial = mma(a_stages[stage], b_stages[stage], m=M, n=N, k=K, dtype="f32")
+            partial = mma(a_stages[stage], b_stages[stage], m=M, n=N, k=BLOCK_K, dtype="f32")
             partials.append(partial)
-    accum = partials[0] + partials[1]
-    store(C, accum)
+    store(C, partials[0] + partials[1])
 
 
 @wsp_program(target="nvgpu-ampere", kernel=pipelined_mainloop_gemm)

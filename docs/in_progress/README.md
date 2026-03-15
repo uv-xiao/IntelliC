@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `025-loop-scratch-surfaces.md` — PR `#60`
+- None currently. Open a new `docs/in_progress/<id>-<topic>.md` file as the first commit of the next feature branch.

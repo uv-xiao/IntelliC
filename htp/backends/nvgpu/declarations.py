@@ -26,6 +26,7 @@ def declaration_for(profile: str | None = None) -> BackendSolverDeclaration:
         "commit",
         "mma",
         "reduction_sum",
+        "slice",
     ]
     if arch.profile == "ampere":
         supported_ops.extend(["cp_async", "ldmatrix", "mma_sync"])

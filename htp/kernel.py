@@ -141,8 +141,65 @@ class KernelValue:
     def __neg__(self) -> KernelValue:
         return _unary_expr("neg", self)
 
+    def __getitem__(self, key: slice | tuple[slice | int | IndexExpr, ...] | int | IndexExpr) -> KernelValue:
+        return _slice_expr(self, key)
+
+
+@dataclass(frozen=True)
+class IndexExpr:
+    """Symbolic index expression used by loop-aware tile/view slicing."""
+
+    expr: str
+    value: int | None = None
+
+    def __add__(self, other: IndexOperand) -> IndexExpr:
+        return _binary_index_expr(self, other, operator="+")
+
+    def __radd__(self, other: IndexOperand) -> IndexExpr:
+        return _binary_index_expr(other, self, operator="+")
+
+    def __sub__(self, other: IndexOperand) -> IndexExpr:
+        return _binary_index_expr(self, other, operator="-")
+
+    def __rsub__(self, other: IndexOperand) -> IndexExpr:
+        return _binary_index_expr(other, self, operator="-")
+
+    def __mul__(self, other: IndexOperand) -> IndexExpr:
+        return _binary_index_expr(self, other, operator="*")
+
+    def __rmul__(self, other: IndexOperand) -> IndexExpr:
+        return _binary_index_expr(other, self, operator="*")
+
+    def __index__(self) -> int:
+        if self.value is None:
+            raise TypeError(f"Index expression {self.expr!r} has no concrete Python integer value.")
+        return self.value
+
+    def __int__(self) -> int:
+        return self.__index__()
+
+    def __str__(self) -> str:
+        return self.expr
+
+
+@dataclass(frozen=True)
+class LoopIndex(IndexExpr):
+    """Loop index that retains both a concrete iteration and a symbolic name."""
+
+    name: str | None = None
+    iteration: int | None = None
+    modifier: str | None = None
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, LoopIndex):
+            return (self.value, self.expr) == (other.value, other.expr)
+        if isinstance(other, int):
+            return self.value == other
+        return False
+
 
 Operand = str | ScalarLiteral | KernelValue
+IndexOperand = str | int | KernelValue | IndexExpr
 
 
 @dataclass
@@ -475,7 +532,16 @@ class _LoopIterable:
                 if isinstance(item, (int, float, str)):
                     frame_attrs["value"] = item
                 active_token = _REGION_STACK.set((*base_stack, _RegionFrame(kind="loop", attrs=frame_attrs)))
-                yield item
+                if isinstance(item, int) and not isinstance(item, bool):
+                    yield LoopIndex(
+                        expr=self._name or f"{self._modifier}_{index}",
+                        value=item,
+                        name=self._name,
+                        iteration=index,
+                        modifier=self._modifier,
+                    )
+                else:
+                    yield item
         finally:
             if active_token is not None:
                 _REGION_STACK.reset(active_token)
@@ -869,21 +935,36 @@ def reduction_sum(
 def slice_tensor(
     source: str | KernelValue,
     *,
-    out: str | KernelValue,
-    offsets: tuple[int, ...] | list[int],
-    sizes: tuple[str | KernelValue | int, ...] | list[str | KernelValue | int],
+    out: str | KernelValue | None = None,
+    offsets: tuple[IndexOperand, ...] | list[IndexOperand],
+    sizes: tuple[IndexOperand, ...] | list[IndexOperand],
     dtype: str | DType,
-) -> dict[str, Any]:
-    return _emit_or_return(
-        {
-            "op": "slice",
-            "source": _ref(source),
-            "out": _ref(out),
-            "offsets": list(offsets),
-            "sizes": [str(_ref(item)) for item in sizes],
-            "dtype": dtype_name(dtype),
-        }
+) -> dict[str, Any] | KernelValue:
+    _require_kernel_value(source, op_name="slice")
+    result = _resolve_result_value(
+        out=out,
+        shape=_slice_shape_from_sizes(sizes),
+        dtype=dtype_name(dtype),
+        sources=(source,),
+        prefix="slice",
     )
+    offset_exprs = [_as_index_expr(item) for item in offsets]
+    size_exprs = [_as_index_expr(item) for item in sizes]
+    payload: dict[str, Any] = {
+        "op": "slice",
+        "source": _ref(source),
+        "out": result.name,
+        "offsets": [_index_storage_value(item) for item in offset_exprs],
+        "sizes": [_index_storage_value(item) for item in size_exprs],
+        "dtype": dtype_name(dtype),
+    }
+    symbolic_offsets = [item.expr for item in offset_exprs]
+    symbolic_sizes = [item.expr for item in size_exprs]
+    if symbolic_offsets != [str(item) for item in payload["offsets"]]:
+        payload["offset_exprs"] = symbolic_offsets
+    if symbolic_sizes != [str(item) for item in payload["sizes"]]:
+        payload["size_exprs"] = symbolic_sizes
+    return _emit_or_return(payload, result=result)
 
 
 def concat(
@@ -1136,6 +1217,88 @@ def _matmul_expr(lhs: KernelValue, rhs: KernelValue) -> KernelValue:
     return result
 
 
+def _slice_expr(
+    source: KernelValue,
+    key: slice | tuple[slice | int | IndexExpr, ...] | int | IndexExpr,
+) -> KernelValue:
+    raw_items = key if isinstance(key, tuple) else (key,)
+    if len(raw_items) > len(source.shape):
+        raise ValueError("Slice rank cannot exceed the source rank.")
+
+    normalized_items = list(raw_items)
+    if len(normalized_items) < len(source.shape):
+        normalized_items.extend(
+            slice(None, None, None) for _ in range(len(source.shape) - len(normalized_items))
+        )
+
+    offsets: list[IndexExpr] = []
+    sizes: list[IndexExpr] = []
+    for dim, item in zip(source.shape, normalized_items, strict=True):
+        offset_expr, size_expr = _normalize_slice_item(dim, item)
+        offsets.append(offset_expr)
+        sizes.append(size_expr)
+
+    result = slice_tensor(
+        source,
+        offsets=tuple(offsets),
+        sizes=tuple(sizes),
+        dtype=_require_source_dtype(source, op_name="slice"),
+    )
+    if not isinstance(result, KernelValue):
+        raise RuntimeError("Expression-form slice requires traced kernel execution.")
+    return result
+
+
+def _normalize_slice_item(dim: str, item: slice | int | IndexExpr) -> tuple[IndexExpr, IndexExpr]:
+    if isinstance(item, slice):
+        if item.step is not None:
+            raise ValueError("Kernel slice syntax does not support step values.")
+        start = _as_index_expr(0 if item.start is None else item.start)
+        if item.stop is None:
+            full_dim = _as_index_expr(dim)
+            if start.value == 0 and start.expr == "0":
+                return start, full_dim
+            return start, full_dim - start
+        stop = _as_index_expr(item.stop)
+        return start, stop - start
+    index_expr = _as_index_expr(item)
+    return index_expr, IndexExpr("1", value=1)
+
+
+def _binary_index_expr(lhs: IndexOperand, rhs: IndexOperand, *, operator: str) -> IndexExpr:
+    left = _as_index_expr(lhs)
+    right = _as_index_expr(rhs)
+    if operator == "+":
+        value = left.value + right.value if left.value is not None and right.value is not None else None
+    elif operator == "-":
+        value = left.value - right.value if left.value is not None and right.value is not None else None
+    elif operator == "*":
+        value = left.value * right.value if left.value is not None and right.value is not None else None
+    else:
+        raise ValueError(f"Unsupported index operator: {operator}")
+    return IndexExpr(expr=f"{left.expr} {operator} {right.expr}", value=value)
+
+
+def _as_index_expr(value: IndexOperand) -> IndexExpr:
+    if isinstance(value, IndexExpr):
+        return value
+    if isinstance(value, KernelValue):
+        return IndexExpr(expr=value.name)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return IndexExpr(expr=str(value), value=value)
+    if isinstance(value, str):
+        return IndexExpr(expr=value)
+    raise TypeError(f"Unsupported slice/index operand: {value!r}")
+
+
+def _index_storage_value(value: IndexExpr) -> int | str:
+    return value.value if value.value is not None else value.expr
+
+
+def _slice_shape_from_sizes(sizes: tuple[IndexOperand, ...] | list[IndexOperand]) -> tuple[str, ...]:
+    return tuple(_as_index_expr(item).expr for item in sizes)
+
+
 def _resolve_result_value(
     *,
     out: str | KernelValue | None,
@@ -1247,6 +1410,12 @@ def _require_kernel_value(value: str | KernelValue, *, op_name: str) -> KernelVa
     raise ValueError(f"Expression-form {op_name} requires typed symbolic operands, not raw strings.")
 
 
+def _require_source_dtype(value: KernelValue, *, op_name: str) -> str:
+    if value.dtype is None:
+        raise ValueError(f"Expression-form {op_name} requires typed symbolic operands.")
+    return value.dtype
+
+
 def _ref(value: str | KernelValue | int | float) -> str | int | float:
     if isinstance(value, KernelValue):
         return value.name
@@ -1304,7 +1473,9 @@ def _resolve_annotation(annotation: Any, *, function: Callable[..., Any]) -> Any
 
 
 __all__ = [
+    "IndexExpr",
     "KernelArgSpec",
+    "LoopIndex",
     "KernelSpec",
     "KernelValue",
     "allreduce",
