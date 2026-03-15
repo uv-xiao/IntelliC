@@ -17,9 +17,9 @@ The latest surface review distilled those complaints into the checklist below. T
 ## Completion snapshot
 
 - total checklist items: 7
-- complete: 4
+- complete: 6
 - partial: 1
-- open: 2
+- open: 1
 
 ## Detailed checklist
 
@@ -32,10 +32,10 @@ The latest surface review distilled those complaints into the checklist below. T
 - [x] Replace string-only stage markers (`.prologue(...)`, `.steady(...)`, `.epilogue(...)`) with structured or executable task-local authored bodies.
 
 ### CSP authored process readability
-- [ ] Replace `.compute("name", ...)` as the flagship style with process-local authored bodies built around real `get(...)`, `put(...)`, and compute steps.
+- [x] Replace `.compute("name", ...)` as the flagship style with process-local authored bodies built around real `get(...)`, `put(...)`, and compute steps.
 
 ### Binding and naming integrity
-- [ ] Remove string-tuple argument wiring from flagship WSP/CSP examples by introducing value-based or bind-object-based task/process argument capture.
+- [x] Remove string-tuple argument wiring from flagship WSP/CSP examples by introducing value-based or bind-object-based task/process argument capture.
 
 ### Reference-calibrated flagship examples
 - [ ] Rebuild the WSP/CSP flagship examples so they match the semantic richness of `references/pypto/`, `references/triton-distributed-knowingnothing/python/little_kernel/`, and `references/arknife/`.
@@ -49,14 +49,13 @@ The latest surface review distilled those complaints into the checklist below. T
 - traced loop/region helpers (`unroll(...)`, `serial(...)`, and `region(...)`) now annotate emitted ops while staying on ordinary Python `for` loops
 - the WSP GEMM examples now use explicit scratch arrays, loop/region annotations, and Python-native tile views instead of manually repeated staging code
 - WSP workloads now support scoped schedule defaults, bound kernel arguments via `w.args`, and structured stage-body steps instead of only repeated fluent schedule chains and string stage markers
+- CSP workloads now support bound kernel arguments via `p.args`, default process argument capture, and structured `compute_step(...)` bodies in the flagship channel pipeline example
 
 This keeps the topic *partially* closed at the repository level: the frontend is real and testable, but the remaining surface work is now about semantic directness and reference-level readability rather than basic AST tracing.
 
 ## Derived PR queue
 
-1. `csp-authored-process-bodies`
-2. `value-bound-workload-wiring`
-3. `reference-grade-flagship-example-rewrite`
+1. `reference-grade-flagship-example-rewrite`
 
 ## Coding pointers
 

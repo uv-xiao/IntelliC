@@ -194,8 +194,18 @@ def test_csp_example_compiles_and_replays(tmp_path):
         "combine_tiles",
         "writeback_tiles",
     ]
+    assert replay_summary["workload_ir"]["processes"][0]["args"] == ["A", "B", "C", "M", "N", "K"]
     assert replay_summary["workload_ir"]["processes"][0]["role"] == "producer"
-    assert replay_summary["workload_ir"]["processes"][1]["steps"][1]["kind"] == "compute"
+    assert replay_summary["workload_ir"]["processes"][0]["steps"][0] == {
+        "kind": "compute",
+        "op": "pack_tile",
+        "source": "A",
+    }
+    assert replay_summary["workload_ir"]["processes"][1]["steps"][1] == {
+        "kind": "compute",
+        "op": "reduce_partials",
+        "channel": "tiles",
+    }
     assert replay_summary["effects"]["protocols"] == [
         {
             "channel": "tiles",

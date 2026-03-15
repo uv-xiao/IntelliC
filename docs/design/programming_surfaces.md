@@ -268,7 +268,9 @@ values and routines instead of inventing parallel semantic roots.
 - deadlock/progress evidence
 - lowering into shared workload/effect state
 - decorator/builder authoring through `@csp.program(...)`
-- fluent process builders such as `.process(...).role(...).compute(...).get(...).put(...)`
+- bound kernel arguments via `p.args.<name>`
+- default kernel/argument capture for `p.process(...)`
+- fluent process builders such as `.process(...).role(...).compute_step(...).get(...).put(...)`
 - process-local step traces that survive into `workload_ir.json`
 - public examples that now describe named dispatch/combine/writeback roles and
   protocol-local steps instead of assembling process dicts by hand
@@ -276,14 +278,13 @@ values and routines instead of inventing parallel semantic roots.
 The public surface now supports protocol narratives like:
 
 ```text
-p.process("combine_tiles", ...)
- .role("router")
- .get(tiles)
- .compute("reduce_partials", channel="tiles")
- .put(partials)
+combine = p.process("combine_tiles", task_id="combine_tiles").role("router")
+combine.get(tiles)
+combine.compute_step("reduce_partials", channel=tiles)
+combine.put(partials)
 ```
 
-Those `compute(...)` steps are not a second compiler substrate. They are
+Those authored process steps are not a second compiler substrate. They are
 process-level evidence attached to the shared workload model so replay,
 legality, and diagnostics can all point at the same structure.
 

@@ -7,7 +7,10 @@ It proves three implemented contracts:
 
 - CSP process/channel metadata lowers into typed workload and effect state through a decorator/builder surface instead of direct dict assembly.
 - the example now carries explicit `producer`, `router`, and `consumer`
-  process roles plus named protocol-local compute steps.
+  process roles plus structured protocol-local compute steps emitted via
+  `compute_step(...)`.
+- the workload uses `p.args.<name>` and default process argument capture so the
+  flagship CSP example does not wire kernel arguments through raw string tuples.
 - balanced channel obligations and deadlock-safety evidence are recorded in
   staged `effects.json`.
 - process-local protocol steps remain visible in staged `workload_ir.json`.
