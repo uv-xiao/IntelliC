@@ -132,18 +132,25 @@ def test_wsp_example_compiles_and_replays(tmp_path):
     assert [task["task_id"] for task in replay_summary["workload_ir"]["tasks"]] == [
         "load_tiles",
         "mma_tiles",
+        "accumulate_tiles",
         "store_tiles",
     ]
     assert replay_summary["workload_ir"]["tasks"][0]["attrs"]["role"] == "producer"
     assert replay_summary["workload_ir"]["tasks"][1]["attrs"]["role"] == "consumer"
+    assert replay_summary["workload_ir"]["tasks"][2]["attrs"]["role"] == "reducer"
     assert replay_summary["workload_ir"]["dependencies"] == [
         {"src": "load_tiles", "dst": "mma_tiles"},
-        {"src": "mma_tiles", "dst": "store_tiles"},
+        {"src": "mma_tiles", "dst": "accumulate_tiles"},
+        {"src": "accumulate_tiles", "dst": "store_tiles"},
     ]
     assert replay_summary["workload_ir"]["tasks"][0]["args"] == ["A", "B", "C", "M", "N", "K"]
     assert replay_summary["workload_ir"]["tasks"][0]["attrs"]["stages"][0]["steps"] == [
         {"kind": "step", "op": "cp_async", "source": "A", "target": "a_tile"},
         {"kind": "step", "op": "cp_async", "source": "B", "target": "b_tile"},
+    ]
+    assert replay_summary["workload_ir"]["tasks"][2]["attrs"]["stages"][0]["steps"] == [
+        {"kind": "step", "op": "reduce_accumulators", "source": "acc"},
+        {"kind": "step", "op": "apply_epilogue", "target": "C"},
     ]
     assert replay_summary["kernel_ir"]["ops"][0]["op"] == "slice"
     assert replay_summary["kernel_ir"]["ops"][0]["attrs"]["offset_exprs"] == ["0", "warp_stage * 16"]
@@ -160,6 +167,12 @@ def test_littlekernel_example_compiles_and_replays(tmp_path):
     assert replay_summary["ok"] is True
     assert replay_summary["schedule"]["pipeline_depth"] >= 3
     assert replay_summary["schedule"]["launch"]["num_warps"] == 8
+    assert [task["task_id"] for task in replay_summary["workload_ir"]["tasks"]] == [
+        "prefetch_tiles",
+        "steady_tiles",
+        "epilogue_tiles",
+        "writeback_tiles",
+    ]
     assert replay_summary["workload_ir"]["tasks"][0]["args"] == ["A", "B", "C", "M", "N", "K"]
     assert replay_summary["workload_ir"]["tasks"][1]["attrs"]["stages"][0] == {
         "name": "prologue",
@@ -174,6 +187,13 @@ def test_littlekernel_example_compiles_and_replays(tmp_path):
             {"kind": "step", "op": "mma_sync", "stage": 0},
             {"kind": "step", "op": "mma_sync", "stage": 1},
             {"kind": "step", "op": "advance_pipeline"},
+        ],
+    }
+    assert replay_summary["workload_ir"]["tasks"][2]["attrs"]["stages"][0] == {
+        "name": "epilogue",
+        "steps": [
+            {"kind": "step", "op": "reduce_accumulators", "source": "acc"},
+            {"kind": "step", "op": "convert_output", "target": "C"},
         ],
     }
     assert replay_summary["kernel_ir"]["ops"][0]["op"] == "slice"
@@ -192,6 +212,7 @@ def test_csp_example_compiles_and_replays(tmp_path):
     assert [process["name"] for process in replay_summary["workload_ir"]["processes"]] == [
         "dispatch_tiles",
         "combine_tiles",
+        "finalize_rows",
         "writeback_tiles",
     ]
     assert replay_summary["workload_ir"]["processes"][0]["args"] == ["A", "B", "C", "M", "N", "K"]
@@ -205,6 +226,11 @@ def test_csp_example_compiles_and_replays(tmp_path):
         "kind": "compute",
         "op": "reduce_partials",
         "channel": "tiles",
+    }
+    assert replay_summary["workload_ir"]["processes"][2]["steps"][1] == {
+        "kind": "compute",
+        "op": "normalize_rows",
+        "channel": "partials",
     }
     assert replay_summary["effects"]["protocols"] == [
         {
@@ -225,7 +251,18 @@ def test_csp_example_compiles_and_replays(tmp_path):
             "puts": 1,
             "gets": 1,
             "balanced": True,
-            "participants": ["combine_tiles", "writeback_tiles"],
+            "participants": ["combine_tiles", "finalize_rows"],
+            "hazards": [],
+            "deadlock_safe": True,
+        },
+        {
+            "channel": "ready_rows",
+            "protocol": "fifo",
+            "capacity": 1,
+            "puts": 1,
+            "gets": 1,
+            "balanced": True,
+            "participants": ["finalize_rows", "writeback_tiles"],
             "hazards": [],
             "deadlock_safe": True,
         },

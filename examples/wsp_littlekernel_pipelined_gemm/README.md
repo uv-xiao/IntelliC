@@ -15,7 +15,9 @@ steady-state, and writeback as separate workload tasks with:
 - `w.args.<name>` for bound kernel arguments,
 - structured `prologue` / `steady` / `epilogue` step bodies instead of only
   string stage markers,
-- explicit dependency edges between the task phases.
+- explicit dependency edges between the task phases,
+- and an explicit `epilogue_tiles` phase before final writeback so the example
+  reads more like a real staged mainloop than a two-step sketch.
 
 Run:
 

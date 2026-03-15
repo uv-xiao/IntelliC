@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `029-csp-authored-bodies.md` — PR `#64`
+- None currently. Open a new `docs/in_progress/<id>-<topic>.md` file as the first commit of the next feature branch.

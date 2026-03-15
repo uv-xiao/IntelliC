@@ -4,28 +4,26 @@
 
 ## Current state
 
-There is currently one active broad-topic TODO document in this repository:
-`docs/todo/programming_surfaces.md`.
-
-The rest of the previously tracked broad-topic gaps remain implemented and
-documented under `docs/design/`.
+There are currently no active broad-topic TODO documents in this repository.
+The previously tracked gaps are now implemented and documented under
+`docs/design/`.
 
 ## Completion statistics
 
 ### Overall
 
 - total tracked TODO checklist items: 65
-- complete: 63
-- partial: 1
-- open: 1
-- completion ratio: about 97%
+- complete: 65
+- partial: 0
+- open: 0
+- completion ratio: 100%
 
 ### By topic
 
 | Topic | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Compiler model, semantics, typing | 10 | 0 | 0 | 10 |
-| Programming surfaces | 17 | 1 | 1 | 19 |
+| Programming surfaces | 19 | 0 | 0 | 19 |
 | Pipeline and solver | 9 | 0 | 0 | 9 |
 | Artifacts, replay, debug | 8 | 0 | 0 | 8 |
 | Backends and extensions | 11 | 0 | 0 | 11 |
@@ -45,4 +43,5 @@ documented under `docs/design/`.
 
 ## Active TODO files
 
-- `docs/todo/programming_surfaces.md`
+- None currently. Add a new broad-topic TODO file only when new unimplemented
+  feature families appear.
