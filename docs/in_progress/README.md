@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `027-tile-view-loop-surface.md` — PR `#62`
+- None currently. Open a new `docs/in_progress/<id>-<topic>.md` file as the first commit of the next feature branch.
