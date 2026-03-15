@@ -2,7 +2,7 @@
 
 - ID: `027-tile-view-loop-surface`
 - Branch: `htp/feat-tile-view-loop-surface`
-- PR: `TBD`
+- PR: `#62`
 - Status: `in_progress`
 - Owner: `Codex`
 

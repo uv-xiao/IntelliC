@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `027-tile-view-loop-surface.md` — PR `TBD`
+- `027-tile-view-loop-surface.md` — PR `#62`
