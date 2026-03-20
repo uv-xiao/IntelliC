@@ -21,7 +21,7 @@ Implemented today:
 
 Current TODO status:
 - `docs/todo/README.md` is authoritative for future work
-- the currently reopened topic is `docs/todo/programming_surfaces.md`
+- the currently reopened topic is `docs/todo/alignment_and_product_gaps.md`
 
 ## Documentation layout
 
@@ -42,6 +42,7 @@ Implemented architecture:
 - `docs/design/artifacts_replay_debug.md`
 - `docs/design/backends_and_extensions.md`
 - `docs/design/agent_product_and_workflow.md`
+- `docs/design/status_and_alignment.md`
 - example-local walkthroughs under `examples/**/README.md`
 
 Supporting analysis:

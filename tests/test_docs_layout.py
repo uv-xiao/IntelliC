@@ -38,10 +38,11 @@ def test_design_tree_has_only_supported_top_level_entries():
         "littlekernel_ast_comparison.md",
         "pipeline_and_solver.md",
         "programming_surfaces.md",
+        "status_and_alignment.md",
     }
 
 
 def test_todo_tree_has_only_supported_top_level_entries():
     todo_root = Path("docs/todo")
     entries = {path.name for path in todo_root.iterdir()}
-    assert entries == {"README.md"}
+    assert entries == {"README.md", "alignment_and_product_gaps.md"}

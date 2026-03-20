@@ -3,7 +3,7 @@
 - ID: `027-alignment-review-sync`
 - Branch: `htp/feat-alignment-review-sync`
 - PR: `TBD`
-- Status: `in_progress`
+- Status: `in_review`
 - Owner: `Codex`
 
 ## Goal
@@ -18,9 +18,9 @@ Turn the current repository review into the repo's normal docs structure. The br
 
 ## Scope Checklist
 
-- [ ] add a comprehensive implemented-state review under `docs/design/`
-- [ ] reopen concrete TODO items under `docs/todo/` based on the review
-- [ ] fix stale references in `README.md` and `docs/design/`
+- [x] add a comprehensive implemented-state review under `docs/design/`
+- [x] reopen concrete TODO items under `docs/todo/` based on the review
+- [x] fix stale references in `README.md` and `docs/design/`
 
 ## Code Surfaces
 
@@ -32,18 +32,18 @@ Turn the current repository review into the repo's normal docs structure. The br
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for the motivating bug or gap
-- [ ] human-friendly example updated or added
-- [ ] `pixi run verify` or documented fallback
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating bug or gap
+- [x] human-friendly example updated or added
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
 
 ## Documentation Plan
 
-- [ ] update `docs/design/` for implemented behavior
-- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] update `docs/design/` for implemented behavior
+- [x] update `docs/todo/` to remove or narrow the gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan

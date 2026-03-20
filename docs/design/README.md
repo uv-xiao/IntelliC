@@ -39,6 +39,7 @@ Agent Product + Workflow
 - `docs/design/backends_and_extensions.md`
 - `docs/design/agent_product_and_workflow.md`
 - `docs/design/littlekernel_ast_comparison.md`
+- `docs/design/status_and_alignment.md`
 
 ## Implemented feature documents
 
@@ -49,6 +50,7 @@ Agent Product + Workflow
 - `docs/design/backends_and_extensions.md` — PTO, NV-GPU, AIE, extension integration, and Arknife-style NV-GPU support
 - `docs/design/agent_product_and_workflow.md` — agent-facing tooling and repository workflow
 - `docs/design/littlekernel_ast_comparison.md` — completed LittleKernel comparison and the surface rules extracted from it
+- `docs/design/status_and_alignment.md` — current repository review: what is solid, what is narrow, and what has been reopened as TODO
 
 ## Examples
 
