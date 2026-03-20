@@ -4,30 +4,38 @@
 - Branch: `htp/feat-ast-all-the-way-contracts`
 - PR: `TBD`
 - Status: `planned`
+- Status: `designing`
 - Owner: `Codex`
 
 ## Goal
 
-Turn the newly stated project objective into real compiler contracts. This feature should formalize what it means for HTP to be human-friendly and LLM-friendly through AST all the way, then start the first implementation slice that threads that rule through the compiler model, pass contracts, artifact surfaces, and extension boundaries.
+Turn the newly stated project objective into real compiler contracts. This
+feature is now a joint redesign of programming surfaces and the IR/artifact
+system: it should formalize what it means for HTP to be human-friendly and
+LLM-friendly through AST all the way, then thread that rule through the
+compiler model, programming surfaces, pass contracts, artifact surfaces, and
+extension boundaries.
 
 ## Why
 
-- contract gap: the repo now states AST all the way as the primary project rule, but the implementation contracts do not yet enforce or expose that requirement consistently
+- contract gap: the repo now states AST all the way as the primary project rule, but the implementation contracts do not yet enforce or expose that requirement consistently across programming surfaces, IR representation, passes, and extension boundaries
 - user-facing impact: without a clear contract, stage artifacts may remain replayable while still drifting away from native Python readability and editability
-- architectural reason: this is the first gap reopened by the design review and it should drive the next redesign wave rather than stay only in story prose
+- architectural reason: this is the first gap reopened by the design review and it should drive a joint redesign rather than a narrow replay-only adjustment
 
 ## Scope Checklist
 
+- [ ] write the redesign doc under `docs/in_progress/design/ast_all_the_way_redesign.md`
 - [ ] define the normative AST-all-the-way contract at global stage boundaries
-- [ ] thread that contract through pass and extension-island surfaces
+- [ ] define the flattened IR protocol around Python-AST carriers, composable aspects, and interpreters
+- [ ] thread that contract through programming surfaces, pass surfaces, and extension-island surfaces
 - [ ] add tests and example evidence for readable runnable stage artifacts after non-trivial rewrites
 
 ## Code Surfaces
 
-- producer: `htp/passes/`, `htp/pipeline/`, `htp/artifacts/`, `htp_ext/mlir_cse/`
+- producer: `htp/kernel.py`, `htp/routine.py`, `htp/wsp/`, `htp/csp/`, `htp/passes/`, `htp/pipeline/`, `htp/artifacts/`, `htp_ext/mlir_cse/`
 - validator/binding: `htp/tools.py`, replay/package verification surfaces as needed
 - tests: pipeline, replay, docs/process consistency
-- docs: `docs/design/`, `docs/todo/`, `docs/in_progress/`, `README.md` only if the contract wording needs refinement
+- docs: `docs/design/`, `docs/todo/`, `docs/in_progress/`, `docs/in_progress/design/`, `README.md` only if the contract wording needs refinement
 
 ## Test and Verification Plan
 
@@ -44,16 +52,21 @@ Do not add low-signal tests. Each added test must defend a concrete contract, fa
 
 - [ ] update `docs/design/` for implemented behavior
 - [ ] update `docs/todo/` to remove or narrow the gap
+- [ ] sync the validated redesign from `docs/in_progress/design/` into `docs/design/compiler_model.md`, `docs/design/programming_surfaces.md`, and `docs/design/artifacts_replay_debug.md`
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan
 
 1. create task file and clear stale prior task file
-2. land AST-all-the-way contract surface changes
-3. land tests and example evidence
-4. sync docs and TODO narrowing
-5. rebase, review, and merge
+2. write redesign doc under `docs/in_progress/design/`
+3. land AST-all-the-way programming-surface and IR contract changes
+4. land tests and example evidence
+5. sync docs and TODO narrowing
+6. rebase, review, and merge
 
 ## Review Notes
 
-Reviewers should focus on whether the implementation really sharpens the compiler contract rather than only rephrasing docs, and whether extension/MLIR boundaries still return to Python-owned global stage artifacts.
+Reviewers should focus on whether the implementation really sharpens the joint
+programming-surface and IR contract rather than only rephrasing docs, and
+whether extension/MLIR boundaries still return to Python-owned global stage
+artifacts.

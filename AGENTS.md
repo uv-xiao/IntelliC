@@ -12,12 +12,14 @@ For every feature-sized change:
 2. choose a feature-sized gap from `docs/todo/README.md`
 3. create a branch named `htp/feat-<topic>`
 4. create a task file under `docs/in_progress/` using `docs/in_progress/TEMPLATE.md`
-5. make that task-file creation its own first commit
-6. open a PR from the feature branch to `htp/dev`
-7. land implementation as additional commits on that PR
-8. before merge:
+5. create a design document under `docs/in_progress/design/` before implementation when the feature changes architecture, IR shape, programming surfaces, passes, artifacts, or extension boundaries
+6. make task-file creation and design-doc creation the first commit(s) on the branch
+7. open a PR from the feature branch to `htp/dev`
+8. land implementation as additional commits on that PR
+9. before merge:
    - update `docs/design/` for what is now implemented
    - update `docs/todo/README.md` and any active `docs/todo/` feature file if one exists
+   - sync the final validated design from `docs/in_progress/design/` into the relevant `docs/design/` document(s)
    - remove the corresponding file from `docs/in_progress/`
    - rebase on current `htp/dev`
    - verify locally and wait for green CI
@@ -35,6 +37,7 @@ Before editing:
    - `.agent/rules/docs-and-artifacts.md`
    - `.agent/rules/testing-and-verification.md`
 4. if touching a backend, binding, runtime, replay path, artifact layout, or extension seam, read the corresponding doc in `docs/design/` and the relevant example-local `examples/**/README.md`
+5. if the feature is architectural, confirm that a design doc exists under `docs/in_progress/design/` and reflects the current intended implementation before touching code
 
 Do not begin with speculative edits.
 
@@ -54,6 +57,7 @@ The `docs/` tree is strict.
 - `docs/in_progress/`
   - active feature-branch task files only
   - one file per feature PR
+  - `docs/in_progress/design/` holds active feature design docs that must be written before major architectural implementation
 - `docs/story.md`
   - the final intended framework story and target envelope
 - `docs/reference/`, `docs/research/`
