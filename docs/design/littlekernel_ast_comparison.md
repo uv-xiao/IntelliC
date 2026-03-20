@@ -150,7 +150,7 @@ This comparison yields concrete rules for future surface work:
 ## Remaining surface work after this comparison
 
 This comparison is no longer just a narrative conclusion. Its extracted future
-work is now tracked directly in `docs/todo/programming_surfaces.md`.
+work is now tracked directly in `docs/todo/alignment_and_product_gaps.md`.
 
 The concrete remaining frontier is:
 

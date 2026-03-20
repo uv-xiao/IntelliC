@@ -4,30 +4,34 @@
 
 ## Current state
 
-There are currently no active broad-topic TODO documents in this repository.
-The previously tracked gaps are now implemented and documented under
-`docs/design/`.
+The review reopened one broad-topic TODO document:
+
+- `docs/todo/alignment_and_product_gaps.md`
+
+That topic now explicitly includes the stronger top-level requirement that HTP
+must become human-friendly and LLM-friendly through AST all the way, not just
+through a replayable subset of the current pipeline.
 
 ## Completion statistics
 
 ### Overall
 
-- total tracked TODO checklist items: 65
+- total tracked TODO checklist items: 81
 - complete: 65
 - partial: 0
-- open: 0
-- completion ratio: 100%
+- open: 16
+- completion ratio: 80.2%
 
 ### By topic
 
 | Topic | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Compiler model, semantics, typing | 10 | 0 | 0 | 10 |
-| Programming surfaces | 19 | 0 | 0 | 19 |
-| Pipeline and solver | 9 | 0 | 0 | 9 |
+| Compiler model, semantics, typing | 10 | 0 | 3 | 13 |
+| Programming surfaces and examples | 19 | 0 | 8 | 27 |
+| Pipeline and solver | 9 | 0 | 1 | 10 |
 | Artifacts, replay, debug | 8 | 0 | 0 | 8 |
-| Backends and extensions | 11 | 0 | 0 | 11 |
-| Agent product and workflow | 8 | 0 | 0 | 8 |
+| Backends and extensions | 11 | 0 | 3 | 14 |
+| Agent product and workflow | 8 | 0 | 1 | 9 |
 
 ## How to use this tree when new work appears
 
@@ -43,5 +47,4 @@ The previously tracked gaps are now implemented and documented under
 
 ## Active TODO files
 
-- None currently. Add a new broad-topic TODO file only when new unimplemented
-  feature families appear.
+- `docs/todo/alignment_and_product_gaps.md`

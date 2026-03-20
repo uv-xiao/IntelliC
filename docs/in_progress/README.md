@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- None currently. Open a new `docs/in_progress/<id>-<topic>.md` file as the first commit of the next feature branch.
+- `docs/in_progress/027-alignment-review-sync.md`

@@ -63,12 +63,24 @@ Do not leave stale duplicates across `design`, `todo`, and `in_progress`.
 
 ## 4. Non-negotiable architecture rules
 
+- The primary goal of HTP is to build a compiler stack that is both human-friendly and LLM-friendly.
 - Python-space is the canonical compiler form.
+- The route to that goal is AST all the way: parsing, passes, extension islands,
+  MLIR round-trips, and backend-facing global stage boundaries must preserve a
+  Python-owned representation that can be unparsed back into native Python code.
 - Stage programs must remain runnable in `sim`, or fail with a structured replay diagnostic.
 - Staged `program.py` artifacts must be pretty-printed readable runnable Python, not only opaque payload dumps.
+- Human-friendly means intermediate artifacts must stay readable and editable as
+  native Python programs, not degrade into compiler-only payload blobs or
+  backend-owned textual junk.
+- LLM-friendly means mutated intermediate artifacts must still unparse into
+  runnable Python with an interpreter/executor path, so agents can inspect,
+  rewrite, and replay them mechanically.
 - Emitted artifacts are part of the public contract.
 - Bindings must report malformed package state through structured diagnostics, not crashes.
 - MLIR is an extension mechanism, not a native semantic owner of the core compiler.
+- Even when an extension or MLIR pipeline participates, HTP must come back to a
+  Python-owned stage artifact before the next global stage boundary.
 - Extension-owned functionality belongs under `htp_ext/` unless the design explicitly places it in core.
 - Ampere and Blackwell are profiles of the same `nvgpu` backend.
 
