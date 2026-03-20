@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `docs/in_progress/027-alignment-review-sync.md`
+- `docs/in_progress/028-ast-all-the-way-contracts.md`
