@@ -2,10 +2,21 @@
 
 HTP is a Python-AST-centric compiler framework for heterogeneous tile programs, kernel programs, and workload/dataflow programs.
 
+Its primary goal is not only retargetability. It is to build a compiler stack
+that is both human-friendly and LLM-friendly, with AST all the way as the core
+discipline.
+
 The repository has three active responsibilities:
 - implement the current framework in `htp/` and `htp_ext/`
 - document landed behavior in `docs/design/`
 - track active feature work through `docs/in_progress/` and reopen `docs/todo/` only when new concrete gaps appear
+
+That top-level goal has two strict consequences:
+
+- human-friendly: intermediate compiler artifacts must still unparse into
+  readable native Python that a person can inspect and edit
+- LLM-friendly: mutated intermediate artifacts must still unparse into runnable
+  Python with an executor/interpreter path so tools and agents can replay them
 
 ## Repository status
 
@@ -22,6 +33,8 @@ Implemented today:
 Current TODO status:
 - `docs/todo/README.md` is authoritative for future work
 - the currently reopened topic is `docs/todo/alignment_and_product_gaps.md`
+- that TODO explicitly includes the end-to-end redesign work needed to satisfy
+  the stronger AST-all-the-way goal
 
 ## Documentation layout
 

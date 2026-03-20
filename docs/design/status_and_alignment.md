@@ -43,6 +43,8 @@ The strongest parts today are:
 
 The weakest parts today are:
 
+- the framework does not yet fully satisfy the stricter “AST all the way for
+  both human and LLM friendliness” target,
 - the final frontend quality of WSP and especially CSP authoring,
 - the breadth of backend execution beyond the flagship paths,
 - and stale documentation that still implies broader closure than the current
@@ -71,6 +73,11 @@ Main code anchors:
 - `htp/ir/layout.py`
 - `htp/passes/program_model.py`
 - `htp/passes/typecheck_layout_effects.py`
+
+What is still not fully proved is the stronger end-to-end rule that every
+global stage boundary, including extension/MLIR participation, comes back to a
+native-Python unparseable artifact that remains suitable for direct human
+editing and LLM-driven execution.
 
 ### Pipeline and solver
 
@@ -202,6 +209,7 @@ The current broad reopened topic is:
 
 That file is now the correct place to track:
 
+- AST-all-the-way redesign work,
 - programming-surface quality gaps,
 - example realism gaps,
 - backend-depth gaps,
