@@ -5,6 +5,8 @@ import pytest
 import htp
 from htp import ark
 from htp.csp import program as csp_program
+from htp.ir.module import ProgramModule
+from htp.ir.semantics import KernelIR, WorkloadIR
 from htp.kernel import (
     KernelValue,
     async_copy,
@@ -51,6 +53,41 @@ def test_compile_program_accepts_public_program_surface(tmp_path):
     compiled = htp.compile_program(package_dir=package_dir, target="pto-a2a3sim", program=vector_add)
 
     assert compiled.manifest["inputs"]["entry"] == "vector_add"
+    assert compiled.manifest["target"]["backend"] == "pto"
+
+
+def test_kernel_surface_exposes_program_module_and_compiler_prefers_it(tmp_path):
+    @kernel
+    def affine_mix(
+        lhs: buffer(dtype="f32", shape=("size",), role="input"),
+        rhs: buffer(dtype="f32", shape=("size",), role="input"),
+        out: buffer(dtype="f32", shape=("size",), role="output"),
+        size: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(out, lhs + rhs)
+
+    module = affine_mix.to_program_module()
+
+    assert isinstance(module, ProgramModule)
+    assert isinstance(module.items.kernel_ir, KernelIR)
+    assert isinstance(module.items.workload_ir, WorkloadIR)
+    assert module.items.kernel_ir.entry == "affine_mix"
+    assert module.items.workload_ir.tasks[0].kernel == "affine_mix"
+
+    class ModuleOnlySurface:
+        def to_program_module(self) -> ProgramModule:
+            return module
+
+        def to_program(self) -> dict[str, object]:
+            raise AssertionError("compile_program should prefer to_program_module()")
+
+    compiled = htp.compile_program(
+        package_dir=tmp_path / "module_surface_pkg",
+        target="pto-a2a3sim",
+        program=ModuleOnlySurface(),
+    )
+
+    assert compiled.manifest["inputs"]["entry"] == "affine_mix"
     assert compiled.manifest["target"]["backend"] == "pto"
 
 
@@ -109,15 +146,13 @@ def test_public_type_surface_drives_kernel_and_channel_annotations(tmp_path):
     )
 
     stage_id = compiled.manifest["stages"]["current"]
-    workload_ir = (compiled.package_dir / "ir" / "stages" / stage_id / "workload_ir.json").read_text()
-    types_json = (compiled.package_dir / "ir" / "stages" / stage_id / "types.json").read_text()
-    layout_json = (compiled.package_dir / "ir" / "stages" / stage_id / "layout.json").read_text()
+    state_json = (compiled.package_dir / "ir" / "stages" / stage_id / "state.json").read_text()
 
-    assert '"kind": "serving_routine"' in workload_ir
-    assert '"phase": "prefill"' in workload_ir
-    assert '"state": "kv_fill"' in workload_ir
-    assert '"name": "index"' in types_json
-    assert '"axis": "0"' in layout_json or '"axis": 0' in layout_json
+    assert '"kind": "serving_routine"' in state_json
+    assert '"phase": "prefill"' in state_json
+    assert '"state": "kv_fill"' in state_json
+    assert '"name": "index"' in state_json
+    assert '"axis": "0"' in state_json or '"axis": 0' in state_json
 
 
 def test_compile_program_accepts_expression_first_kernel_surface(tmp_path):
@@ -225,6 +260,53 @@ def test_public_routine_surface_emits_human_readable_workload_shape():
     assert payload["workload"]["tasks"][0]["task_id"] == "prefill"
     assert payload["workload"]["dependencies"] == [{"src": "prefill", "dst": "decode"}]
     assert payload["workload"]["channels"][0]["name"] == "token_batches"
+
+
+def test_public_routine_surface_exposes_program_module(tmp_path):
+    @kernel
+    def decode_step(
+        hidden: buffer(dtype="f32", shape=("B", "H"), role="input"),
+        weights: buffer(dtype="f32", shape=("H", "H"), role="input"),
+        next_hidden: buffer(dtype="f32", shape=("B", "H"), role="output"),
+        B: scalar(dtype="i32", role="shape"),
+        H: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        matmul(hidden, weights, out=next_hidden, m=B, n=H, k=H, dtype="f32")
+
+    @program(target="nvgpu-ampere")
+    def serving_routine(
+        hidden: buffer(dtype="f32", shape=("B", "H"), role="input"),
+        weights: buffer(dtype="f32", shape=("H", "H"), role="input"),
+        next_hidden: buffer(dtype="f32", shape=("B", "H"), role="output"),
+        B: scalar(dtype="i32", role="shape"),
+        H: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        fifo_channel("token_batches", dtype="f32", capacity=2)
+        prefill = call(decode_step, hidden, weights, next_hidden, B, H, task="prefill")
+        call(decode_step, next_hidden, weights, next_hidden, B, H, task="decode", after=prefill)
+
+    module = serving_routine.to_program_module()
+
+    assert isinstance(module, ProgramModule)
+    assert isinstance(module.items.kernel_ir, KernelIR)
+    assert isinstance(module.items.workload_ir, WorkloadIR)
+    assert module.items.workload_ir.entry == "serving_routine"
+    assert [task.task_id for task in module.items.workload_ir.tasks] == ["prefill", "decode"]
+    assert module.items.workload_ir.dependencies == ({"src": "prefill", "dst": "decode"},)
+    assert module.items.workload_ir.routine == {
+        "kind": "routine",
+        "entry": "serving_routine",
+        "target": {"backend": "nvgpu", "option": "ampere"},
+    }
+
+    compiled = htp.compile_program(
+        package_dir=tmp_path / "routine_module_pkg",
+        target="nvgpu-ampere",
+        program=serving_routine,
+    )
+
+    assert compiled.manifest["inputs"]["entry"] == "serving_routine"
+    assert compiled.manifest["target"]["backend"] == "nvgpu"
 
 
 def test_public_kernel_surface_covers_collective_and_tensor_reshape_ops():
@@ -542,6 +624,54 @@ def test_wsp_program_surface_accepts_kernel_specs_and_task_helpers():
     assert payload["wsp"]["schedule"]["pipeline"]["depth"] == 2
 
 
+def test_wsp_program_surface_exposes_program_module(tmp_path):
+    @kernel
+    def gemm_tile(
+        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(C, A @ B)
+
+    @wsp_program(target="nvgpu-ampere", kernel=gemm_tile)
+    def gemm_workload(w) -> None:
+        (
+            w.mainloop(task_id="mma_tiles")
+            .tile(block=(32, 64, 16))
+            .bind(grid="block", lane="warp")
+            .pipeline(depth=2, buffering="double")
+            .resources(num_warps=4)
+            .specialize(operator="matmul")
+        )
+
+    module = gemm_workload.to_program_module()
+
+    assert isinstance(module, ProgramModule)
+    assert module.items.workload_ir.routine == {
+        "kind": "wsp",
+        "entry": "gemm_workload",
+        "schedule": {
+            "tile": {"block": [32, 64, 16]},
+            "bind": {"grid": "block", "lane": "warp"},
+            "pipeline": {"depth": 2, "buffering": "double"},
+            "resources": {"num_warps": 4},
+            "specialize": {"operator": "matmul"},
+        },
+        "target": {"backend": "nvgpu", "option": "ampere"},
+    }
+
+    compiled = htp.compile_program(
+        package_dir=tmp_path / "wsp_module_pkg",
+        target="nvgpu-ampere",
+        program=gemm_workload,
+    )
+
+    assert compiled.manifest["inputs"]["entry"] == "gemm_workload"
+
+
 def test_wsp_mainloop_surface_carries_roles_dependencies_and_stage_plan():
     @kernel
     def gemm_tile(
@@ -706,6 +836,42 @@ def test_csp_program_surface_accepts_kernel_specs_and_step_helpers():
     assert payload["csp"]["channels"][0]["name"] == "tiles"
     assert payload["csp"]["processes"][0]["steps"][0]["kind"] == "put"
     assert payload["csp"]["processes"][1]["steps"][0]["kind"] == "get"
+
+
+def test_csp_program_surface_exposes_program_module(tmp_path):
+    @kernel
+    def pipeline_stage(
+        X: buffer(dtype="f32", shape=("M", "N"), role="input"),
+        Y: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(Y, X + X)
+
+    @csp_program(target="nvgpu-ampere", kernel=pipeline_stage)
+    def pipeline_demo(p) -> None:
+        tiles = p.fifo("tiles", dtype="f32", capacity=2)
+        p.process("dispatch", task_id="dispatch").role("producer").put(tiles)
+        p.process("consume", task_id="consume").role("consumer").get(tiles)
+
+    module = pipeline_demo.to_program_module()
+
+    assert isinstance(module, ProgramModule)
+    assert module.items.workload_ir.routine == {
+        "kind": "csp",
+        "entry": "pipeline_demo",
+        "target": {"backend": "nvgpu", "option": "ampere"},
+    }
+    assert [process["name"] for process in module.items.workload_ir.processes] == ["dispatch", "consume"]
+    assert module.items.workload_ir.tasks[0].attrs == {"name": "dispatch", "role": "producer"}
+
+    compiled = htp.compile_program(
+        package_dir=tmp_path / "csp_module_pkg",
+        target="nvgpu-ampere",
+        program=pipeline_demo,
+    )
+
+    assert compiled.manifest["inputs"]["entry"] == "pipeline_demo"
 
 
 def test_csp_process_surface_carries_role_and_compute_steps():

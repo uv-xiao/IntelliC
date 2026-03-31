@@ -13,6 +13,7 @@ from examples.csp_channel_pipeline.demo import replay_latest_stage as replay_csp
 from examples.extensions.cpu_ref_vector_add.demo import compile_example as compile_cpu_ref_example
 from examples.extensions.cpu_ref_vector_add.demo import replay_latest_stage as replay_cpu_ref_stage
 from examples.extensions.cpu_ref_vector_add.demo import run_demo as run_cpu_ref_demo
+from examples.ir_program_module_flow.demo import run_demo as run_ir_program_module_demo
 from examples.mlir_cse_extension.demo import compile_example as compile_mlir_cse_example
 from examples.mlir_cse_extension.demo import replay_latest_stage as replay_mlir_cse_stage
 from examples.nvgpu_arknife_blackwell.demo import compile_example as compile_nvgpu_blackwell_example
@@ -269,6 +270,18 @@ def test_csp_example_compiles_and_replays(tmp_path):
     ]
 
 
+def test_ir_program_module_example_defines_executes_and_transforms():
+    summary = run_ir_program_module_demo()
+
+    assert summary == {
+        "base_result": 24,
+        "transformed_result": 23,
+        "base_typed_items": 1,
+        "transformed_kernel": "affine_mix_fused",
+        "rendered_has_program_module": True,
+    }
+
+
 def test_aie_example_compiles_and_replays(tmp_path):
     package_dir = tmp_path / "aie_example"
     compile_summary = compile_aie_example(package_dir)
@@ -276,7 +289,7 @@ def test_aie_example_compiles_and_replays(tmp_path):
 
     assert compile_summary["target"] == {"backend": "aie", "option": "xdna2-npu1"}
     assert replay_summary["ok"] is True
-    assert replay_summary["analysis_index"]["analyses"] == [
+    assert replay_summary["analysis_inventory"] == [
         {
             "analysis_id": "htp_ext.aie::MappingPlan@1",
             "schema": "htp.analysis.aie_mapping_plan.v1",

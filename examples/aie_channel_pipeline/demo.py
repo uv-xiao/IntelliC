@@ -56,9 +56,9 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
     session = bind(package_dir).load(mode="sim")
     stage_id = session.manifest["stages"]["current"]
     result = session.replay(stage_id, trace="basic")
-    analysis_index = json.loads(
-        (package_dir / "ir" / "stages" / stage_id / "analysis" / "index.json").read_text()
-    )
+    analysis_inventory = json.loads((package_dir / "ir" / "stages" / stage_id / "stage.json").read_text())[
+        "analysis_inventory"
+    ]
     mapping = json.loads((package_dir / "codegen" / "aie" / "mapping.json").read_text())
     fifos = json.loads((package_dir / "codegen" / "aie" / "fifos.json").read_text())
     return {
@@ -66,7 +66,7 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
         "stage_id": stage_id,
         "entry": result.entry,
         "diagnostics": result.diagnostics,
-        "analysis_index": analysis_index,
+        "analysis_inventory": analysis_inventory,
         "mapping": mapping,
         "fifos": fifos,
     }

@@ -128,13 +128,13 @@ def replay_latest_stage(output_dir: Path | str) -> dict[str, Any]:
     session = bind(package_dir).load(mode="sim")
     stage_id = session.manifest["stages"]["current"]
     replay = session.replay(stage_id, trace="basic")
-    workload_ir = json.loads((package_dir / "ir" / "stages" / stage_id / "workload_ir.json").read_text())
+    state = json.loads((package_dir / "ir" / "stages" / stage_id / "state.json").read_text())
     return {
         "ok": replay.ok,
         "stage_id": stage_id,
         "entry": replay.entry,
         "diagnostics": replay.diagnostics,
-        "workload_ir": workload_ir,
+        "workload_ir": state["items"]["workload_ir"],
     }
 
 

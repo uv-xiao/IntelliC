@@ -65,9 +65,9 @@ def test_wsp_example_pipeline_preserves_schedule_directives(tmp_path):
         ),
     )
 
-    schedule = json.loads(
-        (package_dir / "ir" / "stages" / result.current_stage / "schedule.json").read_text()
-    )
+    schedule = json.loads((package_dir / "ir" / "stages" / result.current_stage / "state.json").read_text())[
+        "aspects"
+    ]["schedule"]
 
     assert schedule["pipeline_depth"] >= 1
     assert result.pass_ids[-1] == "htp::emit_package@1"
@@ -93,7 +93,9 @@ def test_csp_example_pipeline_emits_protocol_effects(tmp_path):
         ),
     )
 
-    effects = json.loads((package_dir / "ir" / "stages" / result.current_stage / "effects.json").read_text())
+    effects = json.loads((package_dir / "ir" / "stages" / result.current_stage / "state.json").read_text())[
+        "aspects"
+    ]["effects"]
 
     assert effects["protocols"] == [
         {

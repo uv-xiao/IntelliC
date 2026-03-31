@@ -18,8 +18,8 @@ It proves three implemented contracts:
   indices from `unroll(...)`, and Python slice views such as
   `A[:, k0:k0+16]` / `B[k0:k0+16, :]` instead of raw scratch strings or
   manually duplicated stages.
-- the default pipeline preserves those directives into staged `schedule.json`
-  and `workload_ir.json`.
+- the default pipeline preserves those directives into staged
+  `state.json#/aspects/schedule` and `state.json#/items/workload_ir`.
 
 Run:
 

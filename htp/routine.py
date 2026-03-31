@@ -9,6 +9,9 @@ from inspect import getclosurevars, signature
 from typing import Any
 
 from htp.compiler import parse_target
+from htp.ir.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
+from htp.ir.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
+from htp.ir.semantics import WorkloadIR, WorkloadTask
 from htp.kernel import KernelArgSpec, KernelSpec, KernelValue
 from htp.types import ChannelType, DType, dtype_name
 
@@ -94,6 +97,60 @@ class ProgramSpec:
                 "dependencies": [dependency.to_payload() for dependency in self.dependencies],
             },
         }
+
+    def to_program_module(self) -> ProgramModule:
+        authored_program = self.to_program()
+        kernel_module = self.kernel.to_program_module()
+        workload_ir = WorkloadIR(
+            entry=self.entry,
+            tasks=tuple(
+                WorkloadTask(
+                    task_id=task.task_id,
+                    kind=task.kind,
+                    kernel=task.kernel,
+                    args=task.args,
+                    entity_id=f"{self.entry}:{task.task_id}",
+                    attrs={} if task.attrs is None else dict(task.attrs),
+                )
+                for task in self.tasks
+            ),
+            channels=tuple(channel.to_payload() for channel in self.channels),
+            dependencies=tuple(dependency.to_payload() for dependency in self.dependencies),
+            routine={
+                "kind": "routine",
+                "entry": self.entry,
+                "target": dict(self.target or {}),
+            },
+        )
+        return ProgramModule(
+            items=ProgramItems(
+                canonical_ast={
+                    "schema": "htp.program_ast.v1",
+                    "program": authored_program,
+                },
+                kernel_ir=kernel_module.items.kernel_ir,
+                workload_ir=workload_ir,
+                typed_items=kernel_module.items.typed_items,
+            ),
+            aspects=ProgramAspects(
+                types=TypesAspect(schema="htp.types.v1"),
+                layout=LayoutAspect(schema="htp.layout.v1"),
+                effects=EffectsAspect(schema="htp.effects.v1"),
+                schedule=ScheduleAspect(schema="htp.schedule.v1"),
+            ),
+            analyses=kernel_module.analyses,
+            identity=ProgramIdentity(
+                entities=dict(kernel_module.identity.entities),
+                bindings=dict(kernel_module.identity.bindings),
+                entity_map=kernel_module.identity.entity_map,
+                binding_map=kernel_module.identity.binding_map,
+            ),
+            entrypoints=(ProgramEntrypoint("run"),),
+            meta={
+                "source_surface": "htp.routine.ProgramSpec",
+                "program_extras": authored_program,
+            },
+        )
 
 
 @dataclass

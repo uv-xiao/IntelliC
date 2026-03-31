@@ -8,7 +8,10 @@ from inspect import signature
 from typing import Any
 
 from htp.compiler import parse_target
-from htp.kernel import KernelSpec, KernelValue
+from htp.ir.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
+from htp.ir.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
+from htp.ir.semantics import WorkloadIR, WorkloadTask
+from htp.kernel import KernelArgSpec, KernelSpec, KernelValue
 
 
 class CSPBoundArgs:
@@ -116,6 +119,66 @@ class CSPProgramSpec:
                 "processes": [dict(item) for item in self.processes],
             },
         }
+
+    def to_program_module(self) -> ProgramModule:
+        authored_program = self.to_program()
+        kernel_spec = KernelSpec(
+            name=str(self.kernel["name"]),
+            args=tuple(_kernel_arg_spec_from_payload(item) for item in self.kernel.get("args", ())),
+            ops=tuple(dict(item) for item in self.kernel.get("ops", ())),
+        )
+        kernel_module = kernel_spec.to_program_module()
+        workload_ir = WorkloadIR(
+            entry=self.entry,
+            tasks=tuple(
+                WorkloadTask(
+                    task_id=str(process["task_id"]),
+                    kind="process",
+                    kernel=str(process["kernel"]),
+                    args=tuple(str(arg) for arg in process.get("args", ())),
+                    entity_id=f"{self.entry}:{process['task_id']}",
+                    attrs={
+                        "name": str(process["name"]),
+                        **({"role": str(process["role"])} if process.get("role") is not None else {}),
+                    },
+                )
+                for process in self.processes
+            ),
+            channels=tuple(dict(item) for item in self.channels),
+            dependencies=(),
+            processes=tuple(dict(item) for item in self.processes),
+            routine={
+                "kind": "csp",
+                "entry": self.entry,
+                "target": dict(self.target),
+            },
+        )
+        return ProgramModule(
+            items=ProgramItems(
+                canonical_ast={"schema": "htp.program_ast.v1", "program": authored_program},
+                kernel_ir=kernel_module.items.kernel_ir,
+                workload_ir=workload_ir,
+                typed_items=kernel_module.items.typed_items,
+            ),
+            aspects=ProgramAspects(
+                types=TypesAspect(schema="htp.types.v1"),
+                layout=LayoutAspect(schema="htp.layout.v1"),
+                effects=EffectsAspect(schema="htp.effects.v1"),
+                schedule=ScheduleAspect(schema="htp.schedule.v1"),
+            ),
+            analyses=kernel_module.analyses,
+            identity=ProgramIdentity(
+                entities=dict(kernel_module.identity.entities),
+                bindings=dict(kernel_module.identity.bindings),
+                entity_map=kernel_module.identity.entity_map,
+                binding_map=kernel_module.identity.binding_map,
+            ),
+            entrypoints=(ProgramEntrypoint("run"),),
+            meta={
+                "source_surface": "htp.csp.CSPProgramSpec",
+                "program_extras": authored_program,
+            },
+        )
 
 
 @dataclass
@@ -297,6 +360,20 @@ def _step_value(value: Any) -> Any:
     if isinstance(value, ChannelRef):
         return value.name
     return value
+
+
+def _kernel_arg_spec_from_payload(payload: Mapping[str, Any]) -> KernelArgSpec:
+    return KernelArgSpec(
+        name=str(payload["name"]) if payload.get("name") is not None else None,
+        kind=str(payload["kind"]),
+        dtype=str(payload["dtype"]),
+        shape=tuple(str(item) for item in payload.get("shape", ())),
+        role=str(payload["role"]) if payload.get("role") is not None else None,
+        memory_space=(str(payload["memory_space"]) if payload.get("memory_space") is not None else None),
+        axis_layout=tuple(str(item) for item in payload.get("axis_layout", ())),
+        distribution=tuple(dict(item) for item in payload.get("distribution", ())),
+        attrs=dict(payload.get("attrs", {})) or None,
+    )
 
 
 __all__ = [

@@ -14,8 +14,9 @@ It proves three implemented contracts:
 - the pipeline is now decomposed into four named processes over three channels
   (`tiles`, `partials`, `ready_rows`) instead of a minimal three-process toy.
 - balanced channel obligations and deadlock-safety evidence are recorded in
-  staged `effects.json`.
-- process-local protocol steps remain visible in staged `workload_ir.json`.
+  staged `state.json#/aspects/effects`.
+- process-local protocol steps remain visible in staged
+  `state.json#/items/workload_ir`.
 - replay can now execute channel send/recv through runtime-managed in-memory
   queues instead of turning those protocol steps into generic stub hits.
 
