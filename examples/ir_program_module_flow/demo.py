@@ -4,10 +4,28 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from htp.ir.build import program_module_from_kernels
-from htp.ir.node_exec import NODE_KERNEL_INTERPRETER_ID
-from htp.ir.nodes import BinaryExpr, ItemId, Kernel, NodeId, Return, kernel, let, literal, param, ref, region
+from htp.ir.build import program_module_from_items, program_module_from_kernels
+from htp.ir.node_exec import NODE_KERNEL_INTERPRETER_ID, NODE_PROCESS_GRAPH_INTERPRETER_ID
+from htp.ir.nodes import (
+    BinaryExpr,
+    ItemId,
+    Kernel,
+    NodeId,
+    Return,
+    channel,
+    item_ref,
+    kernel,
+    let,
+    literal,
+    param,
+    process,
+    process_graph,
+    process_step,
+    ref,
+    region,
+)
 from htp.ir.render import render_program_module_payload
+from htp.ir.semantics import KernelIR, WorkloadIR, WorkloadTask
 
 
 def define_program() -> Any:
@@ -148,12 +166,110 @@ def render_stage_program(module: Any, destination: Path) -> Path:
     return destination
 
 
+def define_process_program() -> Any:
+    affine_kernel = define_program().items.typed_items[0]
+    if not isinstance(affine_kernel, Kernel):
+        raise TypeError("expected first typed item to be a Kernel")
+    affine_kernel_ref = item_ref("ref.item.affine_mix", affine_kernel.item_id.value, affine_kernel.name)
+    tiles = channel(
+        "item.channel.tiles",
+        "tiles",
+        channel_id="chan.tiles",
+        dtype="f32",
+        capacity=2,
+    )
+    partials = channel(
+        "item.channel.partials",
+        "partials",
+        channel_id="chan.partials",
+        dtype="f32",
+        capacity=1,
+    )
+    pipeline = process_graph(
+        "item.process.affine_pipeline",
+        "affine_pipeline",
+        channels=(tiles, partials),
+        processes=(
+            process(
+                "node.process.dispatch",
+                "dispatch",
+                kernel=affine_kernel_ref,
+                args=(ref("ref.proc.x", "sym.x", "x"), ref("ref.proc.y", "sym.y", "y")),
+                steps=(
+                    process_step("step.dispatch.pack", kind="compute", attrs={"op": "pack_tile"}),
+                    process_step("step.dispatch.put", kind="put", channel_id="chan.tiles"),
+                ),
+                attrs={"role": "producer"},
+            ),
+            process(
+                "node.process.combine",
+                "combine",
+                kernel=affine_kernel_ref,
+                args=(ref("ref.proc.bias", "sym.bias", "bias"),),
+                steps=(
+                    process_step("step.combine.get", kind="get", channel_id="chan.tiles"),
+                    process_step("step.combine.reduce", kind="compute", attrs={"op": "reduce_tile"}),
+                    process_step("step.combine.put", kind="put", channel_id="chan.partials"),
+                ),
+                attrs={"role": "reducer"},
+            ),
+        ),
+    )
+    return program_module_from_items(
+        affine_kernel,
+        pipeline,
+        entry="run",
+        interpreter_id=NODE_PROCESS_GRAPH_INTERPRETER_ID,
+        kernel_ir=KernelIR(entry=affine_kernel.name, args=(), buffers=(), ops=()),
+        workload_ir=WorkloadIR(
+            entry="run",
+            tasks=(
+                WorkloadTask(
+                    task_id="dispatch",
+                    kind="process",
+                    kernel=affine_kernel.name,
+                    args=("x", "y"),
+                    entity_id="proc:dispatch",
+                    attrs={"name": "dispatch", "role": "producer"},
+                ),
+                WorkloadTask(
+                    task_id="combine",
+                    kind="process",
+                    kernel=affine_kernel.name,
+                    args=("bias",),
+                    entity_id="proc:combine",
+                    attrs={"name": "combine", "role": "reducer"},
+                ),
+            ),
+            channels=(
+                {"name": "tiles", "dtype": "f32", "capacity": 2, "protocol": "fifo"},
+                {"name": "partials", "dtype": "f32", "capacity": 1, "protocol": "fifo"},
+            ),
+            dependencies=(),
+            processes=(
+                {"name": "dispatch", "task_id": "dispatch", "kernel": affine_kernel.name},
+                {"name": "combine", "task_id": "combine", "kernel": affine_kernel.name},
+            ),
+        ),
+        analyses={
+            "demo.process_graph": {
+                "schema": "htp.analysis.demo_process_graph.v1",
+                "graph": "affine_pipeline",
+                "channels": ["tiles", "partials"],
+            }
+        },
+        meta={"source": "examples/ir_program_module_flow/demo.py", "graph": "process"},
+    )
+
+
 def run_demo() -> dict[str, Any]:
     base = define_program()
     base_result = base.run(3, 4, bias=5, scale=2)
 
     transformed = transform_program(base)
     transformed_result = transformed.run(3, 4, bias=5)
+    process_module = define_process_program()
+    process_result = process_module.run()
 
     with TemporaryDirectory() as tmpdir:
         program_path = render_stage_program(transformed, Path(tmpdir) / "program.py")
@@ -165,6 +281,8 @@ def run_demo() -> dict[str, Any]:
         "base_typed_items": len(base.items.typed_items),
         "transformed_kernel": transformed.items.kernel_ir.entry,
         "rendered_has_program_module": "ProgramModule(" in rendered_program,
+        "process_graph": process_result["graph"],
+        "process_roles": [process["attrs"]["role"] for process in process_result["processes"]],
     }
 
 

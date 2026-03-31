@@ -59,6 +59,7 @@ Implemented on this branch:
   - `htp.ir.nodes`
   - `htp.ir.node_exec`
   - `htp.ir.build`
+  - now covering kernel, task-graph, and process-graph items with typed ids
 - `ProgramModule` now owns typed `KernelIR` / `WorkloadIR` objects rather than
   raw dicts for those semantic surfaces
 - committed-stage aspects now use typed wrappers instead of raw dict ownership
@@ -79,7 +80,8 @@ Implemented on this branch:
 
 Still design-only or partial:
 
-- the full typed node hierarchy in `02_ir_structure.md`
+- the full typed node hierarchy in `02_ir_structure.md` beyond the current
+  kernel/task-graph/process-graph slice
 - the final node-first frontend substrate in `03_dialects_and_frontends.md`
 - the full typed analysis substrate beyond the current generic record wrapper
 - full dialect migration beyond the current builtin frontend set

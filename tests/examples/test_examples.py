@@ -279,6 +279,8 @@ def test_ir_program_module_example_defines_executes_and_transforms():
         "base_typed_items": 1,
         "transformed_kernel": "affine_mix_fused",
         "rendered_has_program_module": True,
+        "process_graph": "affine_pipeline",
+        "process_roles": ["producer", "reducer"],
     }
 
 

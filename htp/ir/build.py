@@ -6,57 +6,33 @@ from .aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
 from .dialects import dialect_activation_payload
 from .module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
 from .node_exec import NODE_KERNEL_INTERPRETER_ID
-from .nodes import Kernel, to_payload
+from .nodes import Item, Kernel, to_payload
 from .semantics import KernelArg, KernelIR, WorkloadIR, WorkloadTask
 
 
-def program_module_from_kernels(
-    *kernels: Kernel,
-    entry: str = "run",
-    interpreter_id: str = NODE_KERNEL_INTERPRETER_ID,
+def program_module_from_items(
+    *items: Item,
+    entry: str,
+    interpreter_id: str,
+    kernel_ir: KernelIR,
+    workload_ir: WorkloadIR,
     analyses: dict[str, dict[str, Any]] | None = None,
     meta: dict[str, Any] | None = None,
 ) -> ProgramModule:
-    if not kernels:
-        raise ValueError("program_module_from_kernels requires at least one Kernel")
-    primary = kernels[0]
+    if not items:
+        raise ValueError("program_module_from_items requires at least one Item")
     return ProgramModule(
         items=ProgramItems(
             canonical_ast={
                 "schema": "htp.program_ast.v1",
                 "program": {
                     "entry": entry,
-                    "typed_items": [to_payload(kernel) for kernel in kernels],
+                    "typed_items": [to_payload(item) for item in items],
                 },
             },
-            kernel_ir=KernelIR(
-                entry=primary.name,
-                args=tuple(
-                    KernelArg(
-                        name=parameter.name,
-                        kind=parameter.kind,
-                        dtype=parameter.dtype,
-                    )
-                    for parameter in primary.params
-                ),
-                buffers=(),
-                ops=(),
-            ),
-            workload_ir=WorkloadIR(
-                entry=entry,
-                tasks=(
-                    WorkloadTask(
-                        task_id="task0",
-                        kind="kernel_call",
-                        kernel=primary.name,
-                        args=tuple(parameter.name for parameter in primary.params),
-                        entity_id=f"{primary.item_id.value}:task0",
-                    ),
-                ),
-                channels=(),
-                dependencies=(),
-            ),
-            typed_items=tuple(kernels),
+            kernel_ir=kernel_ir,
+            workload_ir=workload_ir,
+            typed_items=tuple(items),
         ),
         aspects=ProgramAspects(
             types=TypesAspect(schema="htp.types.v1"),
@@ -77,4 +53,53 @@ def program_module_from_kernels(
     )
 
 
-__all__ = ["program_module_from_kernels"]
+def program_module_from_kernels(
+    *kernels: Kernel,
+    entry: str = "run",
+    interpreter_id: str = NODE_KERNEL_INTERPRETER_ID,
+    analyses: dict[str, dict[str, Any]] | None = None,
+    meta: dict[str, Any] | None = None,
+) -> ProgramModule:
+    if not kernels:
+        raise ValueError("program_module_from_kernels requires at least one Kernel")
+    primary = kernels[0]
+    return program_module_from_items(
+        *kernels,
+        entry=entry,
+        interpreter_id=interpreter_id,
+        kernel_ir=KernelIR(
+            entry=primary.name,
+            args=tuple(
+                KernelArg(
+                    name=parameter.name,
+                    kind=parameter.kind,
+                    dtype=parameter.dtype,
+                )
+                for parameter in primary.params
+            ),
+            buffers=(),
+            ops=(),
+        ),
+        workload_ir=WorkloadIR(
+            entry=entry,
+            tasks=(
+                WorkloadTask(
+                    task_id="task0",
+                    kind="kernel_call",
+                    kernel=primary.name,
+                    args=tuple(parameter.name for parameter in primary.params),
+                    entity_id=f"{primary.item_id.value}:task0",
+                ),
+            ),
+            channels=(),
+            dependencies=(),
+        ),
+        analyses=analyses,
+        meta=meta,
+    )
+
+
+__all__ = [
+    "program_module_from_items",
+    "program_module_from_kernels",
+]

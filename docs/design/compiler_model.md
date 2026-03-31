@@ -79,6 +79,16 @@ leaked dict-first semantics:
   `identity.binding_map` are typed identity wrappers
 - `analyses.*` are typed analysis-record wrappers
 
+The first typed-node substrate now also extends beyond a kernel-only proof
+case. `htp.ir.nodes` and `htp.ir.node_exec` cover:
+- kernel items
+- task-graph items
+- process-graph items
+
+Those node families already execute through typed interpreter paths instead of
+raw payload walkers, which is an important proof point for the AST-all-the-way
+redesign.
+
 ### Staged state bundle
 
 The current implementation emits and consumes a compact staged state bundle:

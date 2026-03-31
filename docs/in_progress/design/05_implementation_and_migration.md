@@ -177,7 +177,9 @@ end state.
   - `htp.ir.nodes`
   - `htp.ir.node_exec`
   - `htp.ir.build`
-  but it currently covers only a small kernel-oriented subset
+  and now covers kernel, task-graph, and process-graph items with typed ids and
+  interpreter paths, but it still does not cover the fuller statement/control
+  hierarchy planned in `02_ir_structure.md`
 - the current interpreter path proves the executable contract, but it is still
   registry-and-payload-oriented rather than the final typed-node interpreter
   substrate
