@@ -56,6 +56,12 @@ The current frontend set also records an explicit active-dialect list into
 declaration of which builtin frontend dialects were responsible for the
 authored program surface.
 
+That ingress path is now shared as well as direct. The public authoring
+surfaces reuse the common frontend-definition substrate in `htp/ir/frontend.py`
+to rebuild `KernelSpec`, assemble frontend workload/process structure, and
+construct `ProgramModule` with consistent dialect metadata rather than each
+surface hand-assembling its own module wrapper.
+
 A stage is therefore not just “an AST snapshot”. It is a small evidence package describing both executable behavior and compiler understanding.
 
 `ProgramModule` is now the semantic owner for committed stages. The normalized

@@ -152,6 +152,9 @@ end state.
   `htp.wsp.WSPProgramSpec`, and `htp.csp.CSPProgramSpec` now lower to
   `ProgramModule` directly through `to_program_module()`, and
   `compile_program()` prefers that path.
+- those public frontends now share a common frontend-definition substrate in
+  `htp.ir.frontend` for rebuilding `KernelSpec`, assembling `FrontendWorkload`,
+  and constructing `ProgramModule` with consistent metadata/dialect ownership
 - a first dialect-registry slice exists for builtin frontend dialects, and the
   public frontends now record their active dialect set in `ProgramModule.meta`
 - committed stages emit the compact contract:
@@ -177,16 +180,17 @@ end state.
 - the current interpreter path proves the executable contract, but it is still
   registry-and-payload-oriented rather than the final typed-node interpreter
   substrate
-- public frontends now enter through `ProgramModule`, but they still target the
-  older semantic payload shapes internally and have not yet been rebuilt on a
-  common frontend-definition substrate
+- the shared frontend-definition substrate now exists, but it still rebuilds
+  workload/process/channel structure from legacy payload-shaped fields instead
+  of the final typed frontend-definition API described in
+  `03_dialects_and_frontends.md`
 
 ### Not implemented yet
 
 - the common typed `Node` / `Item` / `Expr` / `Stmt` / `Region` hierarchy
 - the fuller dialect packaging/activation model described in
   `03_dialects_and_frontends.md`
-- migration of the public frontends onto the final common node/front-end
+- migration of the public frontends onto the final node-first frontend
   definition substrate
 - full extension migration onto dialect-owned nodes/aspects/intrinsics
 

@@ -52,6 +52,11 @@ over `to_program()`. In the current implementation this is true for:
 - `htp.wsp.WSPProgramSpec`
 - `htp.csp.CSPProgramSpec`
 
+Those frontend surfaces now share one common ingress helper in
+`htp/ir/frontend.py`. Routine, WSP, and CSP no longer each hand-assemble a
+`ProgramModule`; they rebuild workload/process structure and dialect metadata
+through the same frontend-definition substrate.
+
 The important implementation decision is that public authoring is now traced
 from ordinary Python functions. A flagship example can therefore read like:
 

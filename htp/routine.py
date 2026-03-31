@@ -9,10 +9,9 @@ from inspect import getclosurevars, signature
 from typing import Any
 
 from htp.compiler import parse_target
-from htp.ir.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
-from htp.ir.dialects import normalize_active_dialects
-from htp.ir.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
-from htp.ir.semantics import WorkloadIR, WorkloadTask
+from htp.ir.frontend import FrontendWorkload, build_frontend_program_module
+from htp.ir.module import ProgramModule
+from htp.ir.semantics import WorkloadTask
 from htp.kernel import KernelArgSpec, KernelSpec, KernelValue
 from htp.types import ChannelType, DType, dtype_name
 
@@ -102,7 +101,7 @@ class ProgramSpec:
     def to_program_module(self) -> ProgramModule:
         authored_program = self.to_program()
         kernel_module = self.kernel.to_program_module()
-        workload_ir = WorkloadIR(
+        workload = FrontendWorkload(
             entry=self.entry,
             tasks=tuple(
                 WorkloadTask(
@@ -123,35 +122,12 @@ class ProgramSpec:
                 "target": dict(self.target or {}),
             },
         )
-        return ProgramModule(
-            items=ProgramItems(
-                canonical_ast={
-                    "schema": "htp.program_ast.v1",
-                    "program": authored_program,
-                },
-                kernel_ir=kernel_module.items.kernel_ir,
-                workload_ir=workload_ir,
-                typed_items=kernel_module.items.typed_items,
-            ),
-            aspects=ProgramAspects(
-                types=TypesAspect(schema="htp.types.v1"),
-                layout=LayoutAspect(schema="htp.layout.v1"),
-                effects=EffectsAspect(schema="htp.effects.v1"),
-                schedule=ScheduleAspect(schema="htp.schedule.v1"),
-            ),
-            analyses=kernel_module.analyses,
-            identity=ProgramIdentity(
-                entities=dict(kernel_module.identity.entities),
-                bindings=dict(kernel_module.identity.bindings),
-                entity_map=kernel_module.identity.entity_map,
-                binding_map=kernel_module.identity.binding_map,
-            ),
-            entrypoints=(ProgramEntrypoint("run"),),
-            meta={
-                "source_surface": "htp.routine.ProgramSpec",
-                "active_dialects": list(normalize_active_dialects("htp.core", "htp.kernel", "htp.routine")),
-                "program_extras": authored_program,
-            },
+        return build_frontend_program_module(
+            kernel_module=kernel_module,
+            authored_program=authored_program,
+            workload=workload,
+            source_surface="htp.routine.ProgramSpec",
+            active_dialects=("htp.core", "htp.kernel", "htp.routine"),
         )
 
 

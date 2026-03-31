@@ -69,6 +69,8 @@ Implemented on this branch:
   `htp.wsp.WSPProgramSpec`, and `htp.csp.CSPProgramSpec` now expose
   `to_program_module()`, and `compile_program()` prefers the `ProgramModule`
   path over `to_program()`
+- those public frontends now share the first common frontend-definition
+  substrate in `htp.ir.frontend`
 - a first dialect registry slice now exists for builtin frontend dialects, and
   public frontends record their active dialect set into `ProgramModule.meta`
 - a human-facing IR definition / execution / transformation example under
@@ -77,8 +79,8 @@ Implemented on this branch:
 Still design-only or partial:
 
 - the full typed node hierarchy in `02_ir_structure.md`
-- the uniform dialect registry/frontends substrate in
-  `03_dialects_and_frontends.md`
+- the fuller dialect packaging/activation and final node-first frontend
+  substrate in `03_dialects_and_frontends.md`
 - the full typed analysis substrate beyond the current generic record wrapper
 - full dialect packaging/activation beyond the current builtin frontend set
 - extension and dialect migration beyond the current public frontend set
