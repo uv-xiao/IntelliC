@@ -269,7 +269,9 @@ def build_kernel_program_module(spec: KernelSpec) -> ProgramModule:
     kernel_ir = KernelIR(
         entry=spec.name,
         args=tuple(_semantic_kernel_arg(argument) for argument in runtime_args),
-        buffers=tuple(_semantic_kernel_arg(argument) for argument in runtime_args if argument.kind == "buffer"),
+        buffers=tuple(
+            _semantic_kernel_arg(argument) for argument in runtime_args if argument.kind == "buffer"
+        ),
         ops=tuple(_semantic_kernel_op(spec.name, index=index, op=op) for index, op in enumerate(spec.ops)),
     )
     workload_ir = WorkloadIR(

@@ -385,7 +385,10 @@ def test_compile_program_uses_registered_frontend_rule(tmp_path: Path) -> None:
         module = ProgramModule.from_program_dict(
             {
                 "entry": context.surface.entry,
-                "canonical_ast": {"schema": "htp.program_ast.v1", "program": {"entry": context.surface.entry}},
+                "canonical_ast": {
+                    "schema": "htp.program_ast.v1",
+                    "program": {"entry": context.surface.entry},
+                },
                 "kernel_ir": {},
                 "workload_ir": {},
                 "target": {"backend": "cpu_ref"},

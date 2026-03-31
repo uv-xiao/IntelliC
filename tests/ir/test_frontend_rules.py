@@ -17,7 +17,10 @@ def test_frontend_rule_builds_program_module() -> None:
         module = ProgramModule.from_program_dict(
             {
                 "entry": context.surface.entry,
-                "canonical_ast": {"schema": "htp.program_ast.v1", "program": {"entry": context.surface.entry}},
+                "canonical_ast": {
+                    "schema": "htp.program_ast.v1",
+                    "program": {"entry": context.surface.entry},
+                },
                 "kernel_ir": {},
                 "workload_ir": {},
             },

@@ -72,7 +72,9 @@ def ensure_builtin_frontends() -> tuple[FrontendSpec, ...]:
             surface_type=ProgramSpec,
             rule=FrontendRule(
                 name="routine_spec_to_program_module",
-                build=lambda context: FrontendRuleResult(module=build_routine_program_module(context.surface)),
+                build=lambda context: FrontendRuleResult(
+                    module=build_routine_program_module(context.surface)
+                ),
             ),
         ),
         FrontendSpec(
