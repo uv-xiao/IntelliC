@@ -4,8 +4,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from .frontend_rules import FrontendBuildContext, FrontendRule, FrontendRuleResult
+from .frontend import FrontendWorkload
+from .frontend_rules import FrontendBuildContext, FrontendRule, FrontendRuleResult, ProgramSurfaceRule
 from .module import ProgramModule
+from .semantics import WorkloadTask
 
 
 @dataclass(frozen=True)
@@ -39,6 +41,83 @@ class FrontendSpec:
 _FRONTEND_REGISTRY: dict[str, FrontendSpec] = {}
 
 
+def _routine_frontend_workload(surface: Any) -> FrontendWorkload:
+    return FrontendWorkload(
+        entry=surface.entry,
+        tasks=tuple(
+            WorkloadTask(
+                task_id=task.task_id,
+                kind=task.kind,
+                kernel=task.kernel,
+                args=task.args,
+                entity_id=f"{surface.entry}:{task.task_id}",
+                attrs={} if task.attrs is None else dict(task.attrs),
+            )
+            for task in surface.tasks
+        ),
+        channels=tuple(channel.to_payload() for channel in surface.channels),
+        dependencies=tuple(dependency.to_payload() for dependency in surface.dependencies),
+        routine={
+            "kind": "routine",
+            "entry": surface.entry,
+            "target": dict(surface.target or {}),
+        },
+    )
+
+
+def _wsp_frontend_workload(surface: Any) -> FrontendWorkload:
+    return FrontendWorkload(
+        entry=surface.entry,
+        tasks=tuple(
+            WorkloadTask(
+                task_id=str(task["task_id"]),
+                kind=str(task["kind"]),
+                kernel=str(task["kernel"]),
+                args=tuple(str(arg) for arg in task.get("args", ())),
+                entity_id=f"{surface.entry}:{task['task_id']}",
+                attrs=dict(task.get("attrs", {})),
+            )
+            for task in surface.workload.get("tasks", ())
+        ),
+        channels=tuple(dict(item) for item in surface.workload.get("channels", ())),
+        dependencies=tuple(dict(item) for item in surface.workload.get("dependencies", ())),
+        routine={
+            "kind": "wsp",
+            "entry": surface.entry,
+            "schedule": {key: dict(value) for key, value in surface.schedule.items()},
+            "target": dict(surface.target),
+        },
+    )
+
+
+def _csp_frontend_workload(surface: Any) -> FrontendWorkload:
+    return FrontendWorkload(
+        entry=surface.entry,
+        tasks=tuple(
+            WorkloadTask(
+                task_id=str(process["task_id"]),
+                kind="process",
+                kernel=str(process["kernel"]),
+                args=tuple(str(arg) for arg in process.get("args", ())),
+                entity_id=f"{surface.entry}:{process['task_id']}",
+                attrs={
+                    "name": str(process["name"]),
+                    **({"role": str(process["role"])} if process.get("role") is not None else {}),
+                },
+            )
+            for process in surface.processes
+        ),
+        channels=tuple(dict(item) for item in surface.channels),
+        dependencies=(),
+        processes=tuple(dict(item) for item in surface.processes),
+        routine={
+            "kind": "csp",
+            "entry": surface.entry,
+            "target": dict(surface.target),
+        },
+    )
+
+
 def register_frontend(spec: FrontendSpec, *, replace: bool = False) -> None:
     existing = _FRONTEND_REGISTRY.get(spec.frontend_id)
     if existing is not None and not replace:
@@ -51,10 +130,10 @@ def frontend_registry_snapshot() -> dict[str, FrontendSpec]:
 
 
 def ensure_builtin_frontends() -> tuple[FrontendSpec, ...]:
-    from htp.csp import CSPProgramSpec, build_csp_program_module
+    from htp.csp import CSPProgramSpec
     from htp.kernel import KernelSpec, build_kernel_program_module
-    from htp.routine import ProgramSpec, build_routine_program_module
-    from htp.wsp import WSPProgramSpec, build_wsp_program_module
+    from htp.routine import ProgramSpec
+    from htp.wsp import WSPProgramSpec
 
     builtin = (
         FrontendSpec(
@@ -70,29 +149,39 @@ def ensure_builtin_frontends() -> tuple[FrontendSpec, ...]:
             frontend_id="htp.routine.ProgramSpec",
             dialect_id="htp.routine",
             surface_type=ProgramSpec,
-            rule=FrontendRule(
+            rule=ProgramSurfaceRule(
                 name="routine_spec_to_program_module",
-                build=lambda context: FrontendRuleResult(
-                    module=build_routine_program_module(context.surface)
-                ),
+                source_surface="htp.routine.ProgramSpec",
+                active_dialects=("htp.core", "htp.kernel", "htp.routine"),
+                kernel_spec=lambda surface: surface.kernel,
+                authored_program=lambda surface: surface.to_program(),
+                workload=_routine_frontend_workload,
             ),
         ),
         FrontendSpec(
             frontend_id="htp.wsp.WSPProgramSpec",
             dialect_id="htp.wsp",
             surface_type=WSPProgramSpec,
-            rule=FrontendRule(
+            rule=ProgramSurfaceRule(
                 name="wsp_spec_to_program_module",
-                build=lambda context: FrontendRuleResult(module=build_wsp_program_module(context.surface)),
+                source_surface="htp.wsp.WSPProgramSpec",
+                active_dialects=("htp.core", "htp.kernel", "htp.wsp"),
+                kernel_spec=lambda surface: surface.kernel_spec(),
+                authored_program=lambda surface: surface.to_program(),
+                workload=_wsp_frontend_workload,
             ),
         ),
         FrontendSpec(
             frontend_id="htp.csp.CSPProgramSpec",
             dialect_id="htp.csp",
             surface_type=CSPProgramSpec,
-            rule=FrontendRule(
+            rule=ProgramSurfaceRule(
                 name="csp_spec_to_program_module",
-                build=lambda context: FrontendRuleResult(module=build_csp_program_module(context.surface)),
+                source_surface="htp.csp.CSPProgramSpec",
+                active_dialects=("htp.core", "htp.kernel", "htp.csp"),
+                kernel_spec=lambda surface: surface.kernel_spec(),
+                authored_program=lambda surface: surface.to_program(),
+                workload=_csp_frontend_workload,
             ),
         ),
     )

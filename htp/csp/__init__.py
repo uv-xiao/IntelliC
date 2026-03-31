@@ -8,9 +8,9 @@ from inspect import signature
 from typing import Any
 
 from htp.compiler import parse_target
-from htp.ir.frontend import FrontendWorkload, build_frontend_program_module, kernel_spec_from_payload
+from htp.ir.frontend import kernel_spec_from_payload
+from htp.ir.frontends import resolve_frontend
 from htp.ir.module import ProgramModule
-from htp.ir.semantics import WorkloadTask
 from htp.kernel import KernelSpec, KernelValue
 
 
@@ -120,46 +120,14 @@ class CSPProgramSpec:
             },
         }
 
+    def kernel_spec(self) -> KernelSpec:
+        return kernel_spec_from_payload(self.kernel)
+
     def to_program_module(self) -> ProgramModule:
-        return build_csp_program_module(self)
-
-
-def build_csp_program_module(spec: CSPProgramSpec) -> ProgramModule:
-    authored_program = spec.to_program()
-    kernel_spec = kernel_spec_from_payload(spec.kernel)
-    kernel_module = kernel_spec.to_program_module()
-    workload = FrontendWorkload(
-        entry=spec.entry,
-        tasks=tuple(
-            WorkloadTask(
-                task_id=str(process["task_id"]),
-                kind="process",
-                kernel=str(process["kernel"]),
-                args=tuple(str(arg) for arg in process.get("args", ())),
-                entity_id=f"{spec.entry}:{process['task_id']}",
-                attrs={
-                    "name": str(process["name"]),
-                    **({"role": str(process["role"])} if process.get("role") is not None else {}),
-                },
-            )
-            for process in spec.processes
-        ),
-        channels=tuple(dict(item) for item in spec.channels),
-        dependencies=(),
-        processes=tuple(dict(item) for item in spec.processes),
-        routine={
-            "kind": "csp",
-            "entry": spec.entry,
-            "target": dict(spec.target),
-        },
-    )
-    return build_frontend_program_module(
-        kernel_module=kernel_module,
-        authored_program=authored_program,
-        workload=workload,
-        source_surface="htp.csp.CSPProgramSpec",
-        active_dialects=("htp.core", "htp.kernel", "htp.csp"),
-    )
+        frontend = resolve_frontend(self)
+        if frontend is None:  # pragma: no cover - defensive registry failure
+            raise TypeError("No registered frontend for htp.csp.CSPProgramSpec")
+        return frontend.build(self)
 
 
 @dataclass
@@ -348,7 +316,6 @@ __all__ = [
     "CSPProcessBuilder",
     "CSPProgramSpec",
     "ChannelRef",
-    "build_csp_program_module",
     "channel",
     "fifo",
     "get",

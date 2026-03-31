@@ -27,9 +27,9 @@ from inspect import signature
 from typing import Any
 
 from htp.compiler import parse_target
-from htp.ir.frontend import FrontendWorkload, build_frontend_program_module, kernel_spec_from_payload
+from htp.ir.frontend import kernel_spec_from_payload
+from htp.ir.frontends import resolve_frontend
 from htp.ir.module import ProgramModule
-from htp.ir.semantics import WorkloadTask
 from htp.kernel import KernelSpec, KernelValue
 
 
@@ -139,43 +139,14 @@ class WSPProgramSpec:
             },
         }
 
+    def kernel_spec(self) -> KernelSpec:
+        return kernel_spec_from_payload(self.kernel)
+
     def to_program_module(self) -> ProgramModule:
-        return build_wsp_program_module(self)
-
-
-def build_wsp_program_module(spec: WSPProgramSpec) -> ProgramModule:
-    authored_program = spec.to_program()
-    kernel_spec = kernel_spec_from_payload(spec.kernel)
-    kernel_module = kernel_spec.to_program_module()
-    workload = FrontendWorkload(
-        entry=spec.entry,
-        tasks=tuple(
-            WorkloadTask(
-                task_id=str(task["task_id"]),
-                kind=str(task["kind"]),
-                kernel=str(task["kernel"]),
-                args=tuple(str(arg) for arg in task.get("args", ())),
-                entity_id=f"{spec.entry}:{task['task_id']}",
-                attrs=dict(task.get("attrs", {})),
-            )
-            for task in spec.workload.get("tasks", ())
-        ),
-        channels=tuple(dict(item) for item in spec.workload.get("channels", ())),
-        dependencies=tuple(dict(item) for item in spec.workload.get("dependencies", ())),
-        routine={
-            "kind": "wsp",
-            "entry": spec.entry,
-            "schedule": {key: dict(value) for key, value in spec.schedule.items()},
-            "target": dict(spec.target),
-        },
-    )
-    return build_frontend_program_module(
-        kernel_module=kernel_module,
-        authored_program=authored_program,
-        workload=workload,
-        source_surface="htp.wsp.WSPProgramSpec",
-        active_dialects=("htp.core", "htp.kernel", "htp.wsp"),
-    )
+        frontend = resolve_frontend(self)
+        if frontend is None:  # pragma: no cover - defensive registry failure
+            raise TypeError("No registered frontend for htp.wsp.WSPProgramSpec")
+        return frontend.build(self)
 
 
 class WSPBoundArgs:
@@ -574,7 +545,6 @@ __all__ = [
     "WSPBuilder",
     "WSPTaskBuilder",
     "WSPProgramSpec",
-    "build_wsp_program_module",
     "bind",
     "pipeline",
     "program",

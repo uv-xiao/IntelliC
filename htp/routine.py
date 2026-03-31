@@ -9,9 +9,8 @@ from inspect import getclosurevars, signature
 from typing import Any
 
 from htp.compiler import parse_target
-from htp.ir.frontend import FrontendWorkload, build_frontend_program_module
+from htp.ir.frontends import resolve_frontend
 from htp.ir.module import ProgramModule
-from htp.ir.semantics import WorkloadTask
 from htp.kernel import KernelArgSpec, KernelSpec, KernelValue
 from htp.types import ChannelType, DType, dtype_name
 
@@ -99,40 +98,10 @@ class ProgramSpec:
         }
 
     def to_program_module(self) -> ProgramModule:
-        return build_routine_program_module(self)
-
-
-def build_routine_program_module(spec: ProgramSpec) -> ProgramModule:
-    authored_program = spec.to_program()
-    kernel_module = spec.kernel.to_program_module()
-    workload = FrontendWorkload(
-        entry=spec.entry,
-        tasks=tuple(
-            WorkloadTask(
-                task_id=task.task_id,
-                kind=task.kind,
-                kernel=task.kernel,
-                args=task.args,
-                entity_id=f"{spec.entry}:{task.task_id}",
-                attrs={} if task.attrs is None else dict(task.attrs),
-            )
-            for task in spec.tasks
-        ),
-        channels=tuple(channel.to_payload() for channel in spec.channels),
-        dependencies=tuple(dependency.to_payload() for dependency in spec.dependencies),
-        routine={
-            "kind": "routine",
-            "entry": spec.entry,
-            "target": dict(spec.target or {}),
-        },
-    )
-    return build_frontend_program_module(
-        kernel_module=kernel_module,
-        authored_program=authored_program,
-        workload=workload,
-        source_surface="htp.routine.ProgramSpec",
-        active_dialects=("htp.core", "htp.kernel", "htp.routine"),
-    )
+        frontend = resolve_frontend(self)
+        if frontend is None:  # pragma: no cover - defensive registry failure
+            raise TypeError("No registered frontend for htp.routine.ProgramSpec")
+        return frontend.build(self)
 
 
 @dataclass
@@ -339,5 +308,4 @@ __all__ = [
     "fifo_channel",
     "kernel_call",
     "program",
-    "build_routine_program_module",
 ]

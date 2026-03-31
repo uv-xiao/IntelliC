@@ -3,6 +3,9 @@ from __future__ import annotations
 import pytest
 
 import htp
+import htp.csp as csp_module
+import htp.routine as routine_module
+import htp.wsp as wsp_module
 from htp import ark
 from htp.csp import program as csp_program
 from htp.ir.frontends import resolve_frontend
@@ -38,6 +41,17 @@ from htp.kernel import (
 from htp.routine import call, fifo_channel, program
 from htp.types import bf16, channel_type, dim, f32, index, shape, shard, tensor
 from htp.wsp import program as wsp_program
+
+
+def _frontend_probe_module(entry: str) -> ProgramModule:
+    return ProgramModule.from_program_dict(
+        {
+            "entry": entry,
+            "canonical_ast": {"schema": "htp.program_ast.v1", "program": {"entry": entry}},
+            "kernel_ir": {},
+            "workload_ir": {},
+        }
+    )
 
 
 def test_compile_program_accepts_public_program_surface(tmp_path):
@@ -143,6 +157,61 @@ def test_routine_wsp_and_csp_surfaces_are_built_through_registered_frontend_rule
         assert spec.frontend_id == frontend_id
         assert spec.rule is not None
         assert spec.build_program_module is None
+
+
+def test_public_surface_program_modules_delegate_to_registered_frontend_builders(monkeypatch) -> None:
+    expected_routine = _frontend_probe_module("routine_frontend_probe")
+    expected_wsp = _frontend_probe_module("wsp_frontend_probe")
+    expected_csp = _frontend_probe_module("csp_frontend_probe")
+
+    class StubFrontend:
+        def __init__(self, expected_surface, result: ProgramModule) -> None:
+            self.expected_surface = expected_surface
+            self.result = result
+
+        def build(self, surface) -> ProgramModule:
+            assert surface is self.expected_surface
+            return self.result
+
+    routine_spec = routine_module.ProgramSpec(
+        entry="routine_frontend_probe",
+        kernel=KernelSpec(name="affine", args=(), ops=()),
+        tasks=(),
+    )
+    wsp_spec = wsp_module.WSPProgramSpec(
+        entry="wsp_frontend_probe",
+        target={},
+        kernel={"name": "affine", "args": [], "ops": []},
+        workload={"entry": "wsp_frontend_probe", "tasks": [], "channels": [], "dependencies": []},
+        schedule={"tile": {}, "bind": {}, "pipeline": {}, "resources": {}, "specialize": {}},
+    )
+    csp_spec = csp_module.CSPProgramSpec(
+        entry="csp_frontend_probe",
+        target={},
+        kernel={"name": "affine", "args": [], "ops": []},
+        channels=(),
+        processes=(),
+    )
+
+    monkeypatch.setattr(
+        routine_module,
+        "resolve_frontend",
+        lambda surface: StubFrontend(routine_spec, expected_routine),
+    )
+    monkeypatch.setattr(
+        wsp_module,
+        "resolve_frontend",
+        lambda surface: StubFrontend(wsp_spec, expected_wsp),
+    )
+    monkeypatch.setattr(
+        csp_module,
+        "resolve_frontend",
+        lambda surface: StubFrontend(csp_spec, expected_csp),
+    )
+
+    assert routine_spec.to_program_module() is expected_routine
+    assert wsp_spec.to_program_module() is expected_wsp
+    assert csp_spec.to_program_module() is expected_csp
 
 
 def test_public_type_surface_drives_kernel_and_channel_annotations(tmp_path):
