@@ -118,9 +118,7 @@ def _normalize_program_input(
         return dict(program)
     frontend = resolve_frontend(program)
     if frontend is not None:
-        module = frontend.build_program_module(program)
-        if not isinstance(module, ProgramModule):
-            raise TypeError(f"{frontend.frontend_id} must build a ProgramModule")
+        module = frontend.build(program)
         return module.to_state_dict()
     to_program_module = getattr(program, "to_program_module", None)
     if callable(to_program_module):

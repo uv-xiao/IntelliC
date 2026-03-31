@@ -1,8 +1,19 @@
+from __future__ import annotations
+
 import json
+from pathlib import Path
 
 import htp
+from htp.ir.frontend_rules import FrontendBuildContext, FrontendRule, FrontendRuleResult
+from htp.ir.frontends import FrontendSpec, register_frontend
+from htp.ir.module import ProgramModule
 from htp.pipeline.defaults import MANDATORY_PASS_IDS
 from tests.programs import nvgpu_serving_program, portable_vector_add_program, pto_vector_dag_program
+
+
+class DemoSurface:
+    def __init__(self, entry: str) -> None:
+        self.entry = entry
 
 
 def test_compile_program_emits_pto_package_and_keeps_stage_replay(tmp_path):
@@ -367,3 +378,36 @@ def test_compile_program_writes_compiler_failure_for_protocol_violation(tmp_path
     assert failure["diagnostic"]["channel"] == "pipe0"
     assert failure["diagnostic"]["puts"] == 2
     assert failure["diagnostic"]["gets"] == 0
+
+
+def test_compile_program_uses_registered_frontend_rule(tmp_path: Path) -> None:
+    def build_demo(context: FrontendBuildContext) -> FrontendRuleResult:
+        module = ProgramModule.from_program_dict(
+            {
+                "entry": context.surface.entry,
+                "canonical_ast": {"schema": "htp.program_ast.v1", "program": {"entry": context.surface.entry}},
+                "kernel_ir": {},
+                "workload_ir": {},
+                "target": {"backend": "cpu_ref"},
+            },
+            meta={"source_surface": "demo.rule"},
+        )
+        return FrontendRuleResult(module=module)
+
+    register_frontend(
+        FrontendSpec(
+            frontend_id="demo.surface",
+            dialect_id="htp.core",
+            surface_type=DemoSurface,
+            rule=FrontendRule(name="build_demo", build=build_demo),
+        ),
+        replace=True,
+    )
+
+    compiled = htp.compile_program(
+        package_dir=tmp_path / "demo_surface_pkg",
+        target="cpu_ref",
+        program=DemoSurface("demo_entry"),
+    )
+
+    assert compiled.manifest["inputs"]["entry"] == "demo_entry"
