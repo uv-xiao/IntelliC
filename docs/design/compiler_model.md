@@ -51,6 +51,11 @@ The public frontend path now feeds that same owner directly. The implemented
 surface objects can enter the pipeline without first collapsing back to a raw
 program dict.
 
+The current frontend set also records an explicit active-dialect list into
+`ProgramModule.meta`, so committed-stage state now carries a machine-readable
+declaration of which builtin frontend dialects were responsible for the
+authored program surface.
+
 A stage is therefore not just “an AST snapshot”. It is a small evidence package describing both executable behavior and compiler understanding.
 
 `ProgramModule` is now the semantic owner for committed stages. The normalized

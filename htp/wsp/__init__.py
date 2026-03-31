@@ -28,6 +28,7 @@ from typing import Any
 
 from htp.compiler import parse_target
 from htp.ir.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
+from htp.ir.dialects import normalize_active_dialects
 from htp.ir.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
 from htp.ir.semantics import WorkloadIR, WorkloadTask
 from htp.kernel import KernelArgSpec, KernelSpec, KernelValue
@@ -192,6 +193,7 @@ class WSPProgramSpec:
             entrypoints=(ProgramEntrypoint("run"),),
             meta={
                 "source_surface": "htp.wsp.WSPProgramSpec",
+                "active_dialects": list(normalize_active_dialects("htp.core", "htp.kernel", "htp.wsp")),
                 "program_extras": authored_program,
             },
         )

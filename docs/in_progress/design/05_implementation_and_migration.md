@@ -152,6 +152,8 @@ end state.
   `htp.wsp.WSPProgramSpec`, and `htp.csp.CSPProgramSpec` now lower to
   `ProgramModule` directly through `to_program_module()`, and
   `compile_program()` prefers that path.
+- a first dialect-registry slice exists for builtin frontend dialects, and the
+  public frontends now record their active dialect set in `ProgramModule.meta`
 - committed stages emit the compact contract:
   - `program.py`
   - `stage.json`
@@ -182,7 +184,7 @@ end state.
 ### Not implemented yet
 
 - the common typed `Node` / `Item` / `Expr` / `Stmt` / `Region` hierarchy
-- the uniform dialect packaging/activation model described in
+- the fuller dialect packaging/activation model described in
   `03_dialects_and_frontends.md`
 - migration of the public frontends onto the final common node/front-end
   definition substrate

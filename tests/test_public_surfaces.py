@@ -73,6 +73,7 @@ def test_kernel_surface_exposes_program_module_and_compiler_prefers_it(tmp_path)
     assert isinstance(module.items.workload_ir, WorkloadIR)
     assert module.items.kernel_ir.entry == "affine_mix"
     assert module.items.workload_ir.tasks[0].kernel == "affine_mix"
+    assert module.meta["active_dialects"] == ["htp.core", "htp.kernel"]
 
     class ModuleOnlySurface:
         def to_program_module(self) -> ProgramModule:
@@ -293,6 +294,7 @@ def test_public_routine_surface_exposes_program_module(tmp_path):
     assert module.items.workload_ir.entry == "serving_routine"
     assert [task.task_id for task in module.items.workload_ir.tasks] == ["prefill", "decode"]
     assert module.items.workload_ir.dependencies == ({"src": "prefill", "dst": "decode"},)
+    assert module.meta["active_dialects"] == ["htp.core", "htp.kernel", "htp.routine"]
     assert module.items.workload_ir.routine == {
         "kind": "routine",
         "entry": "serving_routine",
@@ -650,6 +652,7 @@ def test_wsp_program_surface_exposes_program_module(tmp_path):
     module = gemm_workload.to_program_module()
 
     assert isinstance(module, ProgramModule)
+    assert module.meta["active_dialects"] == ["htp.core", "htp.kernel", "htp.wsp"]
     assert module.items.workload_ir.routine == {
         "kind": "wsp",
         "entry": "gemm_workload",
@@ -857,6 +860,7 @@ def test_csp_program_surface_exposes_program_module(tmp_path):
     module = pipeline_demo.to_program_module()
 
     assert isinstance(module, ProgramModule)
+    assert module.meta["active_dialects"] == ["htp.core", "htp.kernel", "htp.csp"]
     assert module.items.workload_ir.routine == {
         "kind": "csp",
         "entry": "pipeline_demo",
