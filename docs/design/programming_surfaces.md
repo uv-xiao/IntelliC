@@ -67,6 +67,24 @@ are registered in `htp/ir/frontends.py`, and `htp.compile_program(...)`
 resolves them through frontend specs before falling back to older
 `to_program_module()` / `to_program()` probing.
 
+That frontend registry now has a rule-backed frontend-definition substrate:
+
+- a rule-backed frontend-definition substrate now exists in
+  `htp/ir/frontend_rules.py`
+- builtin public surfaces are resolved through registered `FrontendSpec` objects
+  in `htp/ir/frontends.py`
+- builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
+  surfaces now all use `rule=`-backed `FrontendSpec` registration
+- remaining gap: those rules still delegate to shared surface builders rather
+  than the final node-first rule/combinator API
+
+Code pointers for the implemented ingress path:
+
+- `htp/ir/frontend_rules.py`
+- `htp/ir/frontends.py`
+- `htp/kernel.py`
+- `htp/compiler.py`
+
 The important implementation decision is that public authoring is now traced
 from ordinary Python functions. A flagship example can therefore read like:
 

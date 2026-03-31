@@ -148,15 +148,19 @@ end state.
   - rewrite maps
 - committed-stage analyses now use typed `AnalysisRecord` wrappers instead of
   raw dict ownership
-- `htp.kernel.KernelSpec`, `htp.routine.ProgramSpec`,
-  `htp.wsp.WSPProgramSpec`, and `htp.csp.CSPProgramSpec` now lower to
-  `ProgramModule` directly through `to_program_module()`, and
-  `compile_program()` prefers that path.
-- those public frontends now share a common frontend-definition substrate in
-  `htp.ir.frontend` for rebuilding `KernelSpec`, assembling `FrontendWorkload`,
-  and constructing `ProgramModule` with consistent metadata/dialect ownership
-- a first frontend registry substrate now exists in `htp.ir.frontends`, and the
-  compiler resolves builtin public surfaces through registered frontend specs
+- builtin public surfaces are resolved through registered `FrontendSpec` objects
+  in `htp/ir/frontends.py`, and `htp.compile_program(...)` routes ingress
+  through `FrontendSpec.build(...)` in `htp/compiler.py`
+- a rule-backed frontend-definition substrate now exists in
+  `htp/ir/frontend_rules.py` and is used by `FrontendSpec.build(...)` to execute
+  registered `FrontendRule` objects
+- builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
+  surfaces are now all registered as `rule=`-backed frontend specs rather than
+  direct `build_program_module=` callbacks
+- public surface builders still reuse shared helpers in `htp/ir/frontend.py`
+  for workload assembly, dialect activation metadata, and `ProgramModule`
+  construction, but the final node-first rule/combinator API has not been
+  implemented yet
 - a manifest-style dialect activation slice now exists for builtin frontend
   dialects, and the public frontends now record both active dialect closure and
   activation payloads in `ProgramModule.meta`
@@ -190,8 +194,9 @@ end state.
   of the final typed frontend-definition API described in
   `03_dialects_and_frontends.md`
 - the frontend registry exists only for builtin public surfaces and still
-  resolves by Python surface type rather than the fuller rule/combinator API
-  described in `03_dialects_and_frontends.md`
+  resolves primarily by Python surface type; the builtin public surfaces are
+  now rule-backed, but the fuller node-first rule/combinator API described in
+  `03_dialects_and_frontends.md` is not implemented yet
 - dialect activation now handles dependency closure and activation payloads, but
   builtin and extension dialects have not yet been migrated onto the full
   node/aspect/intrinsic registration substrate described in
@@ -200,9 +205,17 @@ end state.
 ### Not implemented yet
 
 - the common typed `Node` / `Item` / `Expr` / `Stmt` / `Region` hierarchy
-- migration of the public frontends onto the final node-first frontend
-  definition substrate
+- the final node-first rule/combinator frontend-definition API described in
+  `03_dialects_and_frontends.md`
 - full extension migration onto dialect-owned nodes/aspects/intrinsics
+
+## Code pointers (frontend-definition substrate)
+
+- `htp/ir/frontend_rules.py` — `FrontendBuildContext`, `FrontendRule`, `FrontendRuleResult`
+- `htp/ir/frontends.py` — `FrontendSpec`, registry, `resolve_frontend(...)`
+- `htp/ir/frontend.py` — shared builder helpers for routine/WSP/CSP
+- `htp/kernel.py` — first public surface with `rule=`-backed ingress
+- `htp/compiler.py` — compiler ingress routes through `FrontendSpec.build(...)`
 
 ## Validation example
 

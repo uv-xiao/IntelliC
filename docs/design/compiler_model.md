@@ -56,6 +56,18 @@ surfaces are resolved through `htp.ir.frontends`, which gives the compiler an
 explicit frontend-definition substrate for surface-to-`ProgramModule`
 construction.
 
+That substrate is now rule-backed in code:
+
+- a rule-backed frontend-definition substrate now exists in
+  `htp/ir/frontend_rules.py`
+- builtin public surfaces are resolved through registered `FrontendSpec` objects
+  in `htp/ir/frontends.py`, and compiler ingress routes through
+  `FrontendSpec.build(...)` in `htp/compiler.py`
+- builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
+  surfaces now all use `rule=`-backed `FrontendSpec` registration
+- remaining gap: those rules still delegate to shared surface builders rather
+  than the final node-first rule/combinator frontend API
+
 The current frontend set also records explicit dialect activation metadata into
 `ProgramModule.meta`, so committed-stage state now carries both:
 - the dependency-closed active dialect list

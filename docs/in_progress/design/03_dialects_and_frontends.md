@@ -62,6 +62,32 @@ The frontend mechanism should support:
 This is effectively an object-oriented parser-combinator API for authoring
 sugar and JIT capture.
 
+## Implemented status (frontend-definition substrate)
+
+The initial frontend-definition substrate is now implemented in code:
+
+- a rule-backed frontend-definition substrate now exists in `htp/ir/frontend_rules.py`
+  (`FrontendBuildContext`, `FrontendRule`, `FrontendRuleResult`)
+- builtin public surfaces are resolved through registered `FrontendSpec` objects
+  in `htp/ir/frontends.py` (`resolve_frontend(...)`, `FrontendSpec.build(...)`)
+- builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
+  surfaces now all use `rule=`-backed `FrontendSpec` registration rather than
+  direct `build_program_module=` callbacks
+
+Remaining gap relative to this design document:
+
+- the current rules still delegate to surface-owned builders and shared helper
+  code; the final node-first rule/combinator API described above is not
+  implemented yet
+
+Code pointers for the implemented substrate:
+
+- `htp/ir/frontend_rules.py`
+- `htp/ir/frontends.py`
+- `htp/ir/frontend.py`
+- `htp/kernel.py`
+- `htp/compiler.py`
+
 ## Intrinsic model
 
 Intrinsics are also dialect-owned registry objects.

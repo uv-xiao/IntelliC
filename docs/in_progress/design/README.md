@@ -70,10 +70,20 @@ Implemented on this branch:
   `htp.wsp.WSPProgramSpec`, and `htp.csp.CSPProgramSpec` now expose
   `to_program_module()`, and `compile_program()` prefers the `ProgramModule`
   path over `to_program()`
-- those public frontends now share the first common frontend-definition
-  substrate in `htp.ir.frontend`
-- a first frontend registry substrate now exists in `htp.ir.frontends`, and the
-  compiler resolves builtin public surfaces through registered frontend specs
+- those public frontends now share common frontend builder helpers in
+  `htp/ir/frontend.py` (workload assembly, dialect activation metadata, and
+  `ProgramModule` construction)
+- a rule-backed frontend-definition substrate now exists in
+  `htp/ir/frontend_rules.py`
+- builtin public surfaces are resolved through registered `FrontendSpec` objects
+  in `htp/ir/frontends.py` (`resolve_frontend(...)`, `ensure_builtin_frontends()`)
+  and compiler ingress routes through `FrontendSpec.build(...)` in
+  `htp/compiler.py`
+- builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
+  surfaces are now all registered as `rule=`-backed frontend specs rather than
+  direct `build_program_module=` callbacks
+- remaining gap: those rules still delegate to shared builders rather than the
+  final node-first rule/combinator frontend API
 - a first dialect registry slice now exists for builtin frontend dialects, and
   public frontends record their active dialect set and activation manifest into
   `ProgramModule.meta`
@@ -85,7 +95,7 @@ Still design-only or partial:
 - the full typed node hierarchy in `02_ir_structure.md` beyond the current
   kernel/task-graph/process-graph slice
 - the final node-first frontend substrate in `03_dialects_and_frontends.md`
-  beyond the current builtin frontend registry slice
+  beyond the current `FrontendRule` / `FrontendSpec.build(...)` substrate
 - the full typed analysis substrate beyond the current generic record wrapper
 - full dialect migration beyond the current builtin frontend set
 - extension and dialect migration beyond the current public frontend set
