@@ -5,7 +5,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from htp.schemas import IDS_BINDINGS_SCHEMA_ID, IDS_ENTITIES_SCHEMA_ID, REPLAY_STUBS_SCHEMA_ID
+from htp.ir.module import PROGRAM_MODULE_SCHEMA_ID, ProgramModule
+from htp.ir.render import render_program_module_payload
+from htp.schemas import REPLAY_STUBS_SCHEMA_ID
 
 from .validate import validate_path_component, validate_runnable_py
 
@@ -35,18 +37,9 @@ class StageSpec:
     runnable_py: RunnablePySpec
     analyses: tuple[AnalysisSpec, ...] = ()
     islands: tuple[dict[str, str], ...] = ()
-    program_ast_payload: dict[str, Any] = field(default_factory=dict)
-    kernel_ir_payload: dict[str, Any] = field(default_factory=dict)
-    workload_ir_payload: dict[str, Any] = field(default_factory=dict)
-    types_payload: dict[str, Any] = field(default_factory=dict)
-    layout_payload: dict[str, Any] = field(default_factory=dict)
-    effects_payload: dict[str, Any] = field(default_factory=dict)
-    schedule_payload: dict[str, Any] = field(default_factory=dict)
-    entities_payload: dict[str, Any] = field(default_factory=dict)
-    bindings_payload: dict[str, Any] = field(default_factory=dict)
+    program_module_payload: dict[str, Any] = field(default_factory=dict)
     entity_map_payload: dict[str, Any] | None = None
     binding_map_payload: dict[str, Any] | None = None
-    summary_payload: dict[str, Any] | None = None
     digests: dict[str, str | None] = field(default_factory=dict)
 
 
@@ -62,32 +55,13 @@ def write_stage(package_dir: Path, stage: StageSpec) -> dict[str, object]:
 
     stage_dir = Path(package_dir) / "ir" / "stages" / stage.stage_id
     analysis_dir = stage_dir / "analysis"
-    ids_dir = stage_dir / "ids"
-    maps_dir = stage_dir / "maps"
     replay_dir = stage_dir / "replay"
 
     analysis_dir.mkdir(parents=True, exist_ok=True)
-    ids_dir.mkdir(parents=True, exist_ok=True)
 
     _write_text(stage_dir / "program.py", _program_text(stage))
-    _write_json(stage_dir / "program.pyast.json", _program_ast_payload(stage))
-    _write_json(stage_dir / "kernel_ir.json", _kernel_ir_payload(stage))
-    _write_json(stage_dir / "workload_ir.json", _workload_ir_payload(stage))
-    _write_json(stage_dir / "types.json", _types_payload(stage))
-    _write_json(stage_dir / "layout.json", _layout_payload(stage))
-    _write_json(stage_dir / "effects.json", _effects_payload(stage))
-    _write_json(stage_dir / "schedule.json", _schedule_payload(stage))
-    _write_json(stage_dir / "summary.json", _summary_payload(stage))
-    _write_json(stage_dir / "ids" / "entities.json", _entities_payload(stage))
-    _write_json(stage_dir / "ids" / "bindings.json", _bindings_payload(stage))
-    _write_json(stage_dir / "analysis" / "index.json", _analysis_index_payload(package_dir, stage))
-
-    if stage.entity_map_payload is not None or stage.binding_map_payload is not None:
-        maps_dir.mkdir(parents=True, exist_ok=True)
-    if stage.entity_map_payload is not None:
-        _write_json(stage_dir / "maps" / "entity_map.json", stage.entity_map_payload)
-    if stage.binding_map_payload is not None:
-        _write_json(stage_dir / "maps" / "binding_map.json", stage.binding_map_payload)
+    _write_json(stage_dir / "stage.json", _stage_summary_payload(package_dir, stage))
+    _write_json(stage_dir / "state.json", _state_payload(stage))
 
     if stage.runnable_py.stubs_payload is not None:
         replay_dir.mkdir(parents=True, exist_ok=True)
@@ -112,42 +86,51 @@ def write_stage(package_dir: Path, stage: StageSpec) -> dict[str, object]:
                 else None
             ),
         },
-        "analysis_index": _relative_path(stage_dir / "analysis" / "index.json", package_dir),
-        "program_pyast": _relative_path(stage_dir / "program.pyast.json", package_dir),
-        "semantic": {
-            "kernel_ir": _relative_path(stage_dir / "kernel_ir.json", package_dir),
-            "workload_ir": _relative_path(stage_dir / "workload_ir.json", package_dir),
-            "types": _relative_path(stage_dir / "types.json", package_dir),
-            "layout": _relative_path(stage_dir / "layout.json", package_dir),
-            "effects": _relative_path(stage_dir / "effects.json", package_dir),
-            "schedule": _relative_path(stage_dir / "schedule.json", package_dir),
-        },
-        "ids": {
-            "entities": _relative_path(stage_dir / "ids" / "entities.json", package_dir),
-            "bindings": _relative_path(stage_dir / "ids" / "bindings.json", package_dir),
-        },
-        "maps": {
-            "entity_map": (
-                _relative_path(stage_dir / "maps" / "entity_map.json", package_dir)
-                if stage.entity_map_payload is not None
-                else None
-            ),
-            "binding_map": (
-                _relative_path(stage_dir / "maps" / "binding_map.json", package_dir)
-                if stage.binding_map_payload is not None
-                else None
-            ),
+        "program": _relative_path(stage_dir / "program.py", package_dir),
+        "stage": _relative_path(stage_dir / "stage.json", package_dir),
+        "state": _relative_path(stage_dir / "state.json", package_dir),
+        "rewrite_maps": {
+            "entity_map": stage.entity_map_payload is not None,
+            "binding_map": stage.binding_map_payload is not None,
         },
         "islands": [dict(island) for island in stage.islands],
         "digests": _digests_payload(stage),
-        "summary": _relative_path(stage_dir / "summary.json", package_dir),
     }
 
 
-def _analysis_index_payload(package_dir: Path, stage: StageSpec) -> dict[str, object]:
+def _program_module_payload(stage: StageSpec) -> dict[str, Any]:
+    if stage.program_module_payload:
+        return stage.program_module_payload
+    return ProgramModule.from_program_dict({}).to_payload()
+
+
+def _state_payload(stage: StageSpec) -> dict[str, Any]:
+    payload = dict(_program_module_payload(stage))
+    identity = _as_mapping(payload.get("identity", {}))
+    if stage.entity_map_payload is not None:
+        identity["entity_map"] = dict(stage.entity_map_payload)
+    if stage.binding_map_payload is not None:
+        identity["binding_map"] = dict(stage.binding_map_payload)
+    if identity:
+        payload["identity"] = identity
+    payload.setdefault("schema", PROGRAM_MODULE_SCHEMA_ID)
+    return payload
+
+
+def _stage_summary_payload(package_dir: Path, stage: StageSpec) -> dict[str, Any]:
+    stage_dir = Path(package_dir) / "ir" / "stages" / stage.stage_id
+    state_payload = _state_payload(stage)
     return {
-        "schema": ANALYSIS_INDEX_SCHEMA_ID,
-        "analyses": [
+        "schema": "htp.stage.v2",
+        "stage_id": stage.stage_id,
+        "pass_id": stage.pass_id,
+        "entrypoints": list(state_payload.get("entrypoints", [])),
+        "executability": {
+            "status": stage.runnable_py.status,
+            "modes": list(stage.runnable_py.modes),
+        },
+        "aspect_inventory": sorted(_as_mapping(state_payload.get("aspects", {})).keys()),
+        "analysis_inventory": [
             {
                 "analysis_id": analysis.analysis_id,
                 "schema": analysis.schema,
@@ -158,82 +141,15 @@ def _analysis_index_payload(package_dir: Path, stage: StageSpec) -> dict[str, ob
             }
             for analysis in stage.analyses
         ],
-    }
-
-
-def _program_ast_payload(stage: StageSpec) -> dict[str, Any]:
-    if stage.program_ast_payload:
-        return stage.program_ast_payload
-    return {"schema": "htp.program_ast.v1", "program": {}}
-
-
-def _kernel_ir_payload(stage: StageSpec) -> dict[str, Any]:
-    if stage.kernel_ir_payload:
-        return stage.kernel_ir_payload
-    return {"schema": "htp.kernel_ir.v1", "entry": "", "args": [], "buffers": [], "ops": []}
-
-
-def _workload_ir_payload(stage: StageSpec) -> dict[str, Any]:
-    if stage.workload_ir_payload:
-        return stage.workload_ir_payload
-    return {"schema": "htp.workload_ir.v1", "entry": "", "tasks": [], "channels": [], "dependencies": []}
-
-
-def _types_payload(stage: StageSpec) -> dict[str, Any]:
-    if stage.types_payload:
-        return stage.types_payload
-    return {"schema": "htp.types.v1", "values": {}, "buffers": {}}
-
-
-def _layout_payload(stage: StageSpec) -> dict[str, Any]:
-    if stage.layout_payload:
-        return stage.layout_payload
-    return {"schema": "htp.layout.v1", "memory_spaces": {}, "threading": {}, "tiling": {}}
-
-
-def _effects_payload(stage: StageSpec) -> dict[str, Any]:
-    if stage.effects_payload:
-        return stage.effects_payload
-    return {"schema": "htp.effects.v1", "reads": {}, "writes": {}, "barriers": [], "channels": []}
-
-
-def _schedule_payload(stage: StageSpec) -> dict[str, Any]:
-    if stage.schedule_payload:
-        return stage.schedule_payload
-    return {"schema": "htp.schedule.v1", "ticks": [], "ordered_ops": [], "pipeline_depth": 0}
-
-
-def _entities_payload(stage: StageSpec) -> dict[str, Any]:
-    if stage.entities_payload:
-        return stage.entities_payload
-    return {
-        "schema": IDS_ENTITIES_SCHEMA_ID,
-        "def_id": "",
-        "entities": [],
-        "node_to_entity": [],
-    }
-
-
-def _bindings_payload(stage: StageSpec) -> dict[str, Any]:
-    if stage.bindings_payload:
-        return stage.bindings_payload
-    return {
-        "schema": IDS_BINDINGS_SCHEMA_ID,
-        "def_id": "",
-        "scopes": [],
-        "bindings": [],
-        "name_uses": [],
-    }
-
-
-def _summary_payload(stage: StageSpec) -> dict[str, Any]:
-    if stage.summary_payload is not None:
-        return stage.summary_payload
-    return {
-        "stage_id": stage.stage_id,
-        "pass": stage.pass_id,
-        "runnable_py": stage.runnable_py.status,
-        "modes": list(stage.runnable_py.modes),
+        "rewrite_maps": {
+            "entity_map": stage.entity_map_payload is not None,
+            "binding_map": stage.binding_map_payload is not None,
+        },
+        "paths": {
+            "program": _relative_path(stage_dir / "program.py", package_dir),
+            "state": _relative_path(stage_dir / "state.json", package_dir),
+        },
+        "diagnostics": [],
     }
 
 
@@ -249,16 +165,11 @@ def _digests_payload(stage: StageSpec) -> dict[str, str | None]:
 def _program_text(stage: StageSpec) -> str:
     if stage.runnable_py.program_text:
         return stage.runnable_py.program_text
-    lines = [
-        f'STAGE_ID = "{stage.stage_id}"',
-        f'RUNNABLE_PY = "{stage.runnable_py.status}"',
-        f"MODES = {tuple(stage.runnable_py.modes)!r}",
-        "",
-        "def run(*args, **kwargs):",
-        '    raise NotImplementedError("Stage replay is not implemented in v1")',
-        "",
-    ]
-    return "\n".join(lines)
+    return _render_program_module(stage)
+
+
+def _render_program_module(stage: StageSpec) -> str:
+    return render_program_module_payload(_state_payload(stage))
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -275,8 +186,13 @@ def _relative_path(path: Path, package_dir: Path) -> str:
     return Path(path).relative_to(package_dir).as_posix()
 
 
+def _as_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
 __all__ = [
-    "ANALYSIS_INDEX_SCHEMA_ID",
     "AnalysisSpec",
     "RunnablePySpec",
     "StageSpec",

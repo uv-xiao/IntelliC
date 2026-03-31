@@ -132,6 +132,34 @@ def run(*args, **kwargs):
     assert result.diagnostics[0]["code"] == "HTP.BINDINGS.MISSING_ENTRYPOINT"
 
 
+def test_replay_can_dispatch_to_program_module_entrypoint_without_module_level_function(tmp_path):
+    package_dir = tmp_path / "package"
+    package_dir.mkdir()
+    stage_record = _write_stage(
+        package_dir,
+        program_text="""
+from htp.ir.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
+
+PROGRAM_MODULE = ProgramModule(
+    items=ProgramItems(canonical_ast={}, kernel_ir={}, workload_ir={}),
+    aspects=ProgramAspects(types={}, layout={}, effects={}, schedule={}),
+    identity=ProgramIdentity(entities={}, bindings={}),
+    entrypoints=(ProgramEntrypoint("inspect"),),
+)
+
+def program_module():
+    return PROGRAM_MODULE
+""".lstrip(),
+    )
+    _write_manifest(package_dir, stage_records=[stage_record])
+
+    session = htp.bind(package_dir).load(mode="sim")
+    result = session.replay("s01", entry="inspect")
+
+    assert result.ok is True
+    assert result.result["program_module"]["schema"] == "htp.program_module.v1"
+
+
 def test_replay_converts_stub_hits_into_structured_diagnostics(tmp_path):
     package_dir = tmp_path / "package"
     package_dir.mkdir()
@@ -246,7 +274,7 @@ def run(*args, **kwargs):
     return "ok"
 """.lstrip(),
     )
-    program_ast_path = package_dir / stage_record["program_pyast"]
+    program_ast_path = package_dir / stage_record["state"]
     payload = json.loads(program_ast_path.read_text())
     payload["schema"] = "wrong.schema"
     program_ast_path.write_text(json.dumps(payload, indent=2) + "\n")
@@ -257,8 +285,8 @@ def run(*args, **kwargs):
     assert result.ok is False
     assert {
         "code": "HTP.BINDINGS.INVALID_SCHEMA",
-        "detail": f"{stage_record['program_pyast']} must declare schema 'htp.program_ast.v1'.",
-        "artifact_ref": stage_record["program_pyast"],
+        "detail": f"{stage_record['state']} must declare schema 'htp.program_module.v1'.",
+        "artifact_ref": stage_record["state"],
     } in result.diagnostics
 
 

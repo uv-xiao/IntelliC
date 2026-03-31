@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Any
 
 from htp.artifacts.stages import RunnablePySpec
+from htp.ir.module import ProgramModule, program_dict_view
 from htp.passes.contracts import AnalysisOutput, PassContract
 from htp.passes.manager import PassResult
 from htp.passes.program_model import build_warp_role_plan, normalize_target, stage_payloads_from_program
@@ -34,11 +35,11 @@ CONTRACT = PassContract.analysis(
 
 
 def run(
-    program: Mapping[str, Any], *, stage_before: Mapping[str, object]
-) -> tuple[dict[str, Any], PassResult]:
+    program: ProgramModule | Mapping[str, Any], *, stage_before: Mapping[str, object]
+) -> tuple[ProgramModule, PassResult]:
     del stage_before
 
-    next_program = deepcopy(dict(program))
+    next_program = deepcopy(program_dict_view(program))
     warp_role_plan = build_warp_role_plan(
         entry=next_program["entry"],
         kernel_ir=next_program.get("kernel_ir", {}),
@@ -48,22 +49,15 @@ def run(
     analysis_state = dict(next_program.get("analysis", {}))
     analysis_state["warp_role_plan"] = warp_role_plan
     next_program["analysis"] = analysis_state
-    stage_payloads = stage_payloads_from_program(next_program)
+    next_module = ProgramModule.from_program_dict(next_program)
+    stage_payloads = stage_payloads_from_program(next_module)
 
-    return next_program, PassResult(
+    return next_module, PassResult(
         runnable_py=RunnablePySpec(
-            status="preserves", modes=("sim",), program_text=render_program_state_module(next_program)
+            status="preserves", modes=("sim",), program_text=render_program_state_module(next_module)
         ),
         analyses={ANALYSIS_PATH: warp_role_plan},
-        entities_payload=stage_payloads["entities_payload"],
-        bindings_payload=stage_payloads["bindings_payload"],
-        program_ast_payload=stage_payloads["program_ast_payload"],
-        kernel_ir_payload=stage_payloads["kernel_ir_payload"],
-        workload_ir_payload=stage_payloads["workload_ir_payload"],
-        types_payload=stage_payloads["types_payload"],
-        layout_payload=stage_payloads["layout_payload"],
-        effects_payload=stage_payloads["effects_payload"],
-        schedule_payload=stage_payloads["schedule_payload"],
+        program_module_payload=stage_payloads["program_module_payload"],
         digests={"analysis_hash": "demo-warp-role-plan-v1"},
         time_ms=0.2,
     )

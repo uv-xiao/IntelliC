@@ -72,10 +72,10 @@ def test_aie_extension_emits_artifact_contract_and_replays(tmp_path):
     assert (package_dir / "codegen" / "aie" / "fifos.json").is_file()
     assert (package_dir / "codegen" / "aie" / "toolchain.json").is_file()
     assert (package_dir / "codegen" / "aie" / "aie_codegen.json").is_file()
-    analysis_index = json.loads(
-        (package_dir / "ir" / "stages" / "s01" / "analysis" / "index.json").read_text()
-    )
-    analysis_paths = {item["analysis_id"]: item["path"] for item in analysis_index["analyses"]}
+    analysis_index = json.loads((package_dir / "ir" / "stages" / "s01" / "stage.json").read_text())[
+        "analysis_inventory"
+    ]
+    analysis_paths = {item["analysis_id"]: item["path"] for item in analysis_index}
     assert analysis_paths == {
         "htp_ext.aie::MappingPlan@1": "ir/stages/s01/analysis/aie_mapping_plan.json",
         "htp_ext.aie::FIFOPlan@1": "ir/stages/s01/analysis/aie_fifo_plan.json",

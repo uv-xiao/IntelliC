@@ -73,11 +73,13 @@ def test_semantic_diff_reports_manifest_and_semantic_changes(tmp_path):
     assert diff["stage_ids"] == {"left": expected_stage, "right": expected_stage}
     assert "details" in diff
     assert "current_stage.kernel_ir" in diff["details"]
-    assert diff["details"]["current_stage.kernel_ir"]["refs"]["left"].endswith("/kernel_ir.json")
-    assert diff["details"]["current_stage.kernel_ir"]["refs"]["right"].endswith("/kernel_ir.json")
+    assert diff["details"]["current_stage.kernel_ir"]["refs"]["left"].endswith("/state.json#/items/kernel_ir")
+    assert diff["details"]["current_stage.kernel_ir"]["refs"]["right"].endswith(
+        "/state.json#/items/kernel_ir"
+    )
     assert "current_stage.identity" in diff["details"]
     assert diff["details"]["current_stage.identity"]["details"]["refs"]["left"]["entities"].endswith(
-        "/ids/entities.json"
+        "/state.json#/identity/entities"
     )
     assert diff["details"]["current_stage.identity"]["details"]["entity_blame"]["right_added"]
     assert diff["details"]["current_stage.identity"]["details"]["entity_blame"]["right_added"][0]["node_ids"]
@@ -313,15 +315,15 @@ def test_bisect_stages_reports_first_divergent_stage(tmp_path):
     compile_program(package_dir=right_dir, target="nvgpu-ampere", program=pto_vector_dag_program())
     manifest = json.loads((right_dir / "manifest.json").read_text())
     current_stage = manifest["stages"]["current"]
-    kernel_ir_path = (
+    state_path = (
         right_dir
-        / next(stage for stage in manifest["stages"]["graph"] if stage["id"] == current_stage)["semantic"][
-            "kernel_ir"
-        ]
+        / next(stage for stage in manifest["stages"]["graph"] if stage["id"] == current_stage)["state"]
     )
-    kernel_ir = json.loads(kernel_ir_path.read_text())
+    state = json.loads(state_path.read_text())
+    kernel_ir = state["items"]["kernel_ir"]
     kernel_ir["ops"][0]["attrs"]["operator"] = "mul"
-    kernel_ir_path.write_text(json.dumps(kernel_ir, indent=2) + "\n")
+    state["items"]["kernel_ir"] = kernel_ir
+    state_path.write_text(json.dumps(state, indent=2) + "\n")
 
     result = bisect_stages(left_dir, right_dir)
 

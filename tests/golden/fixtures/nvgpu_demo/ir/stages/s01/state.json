@@ -1,0 +1,57 @@
+{
+  "items": {
+    "canonical_ast": {
+      "schema": "htp.program_ast.v1",
+      "program": {
+        "entry": "s01",
+        "entities_payload": {
+          "schema": "htp.ids.entities.v1",
+          "def_id": "",
+          "entities": [],
+          "node_to_entity": []
+        },
+        "bindings_payload": {
+          "schema": "htp.ids.bindings.v1",
+          "def_id": "",
+          "scopes": [],
+          "bindings": [],
+          "name_uses": []
+        }
+      }
+    },
+    "kernel_ir": {},
+    "workload_ir": {}
+  },
+  "aspects": {
+    "types": {},
+    "layout": {},
+    "effects": {},
+    "schedule": {}
+  },
+  "analyses": {},
+  "identity": {
+    "entities": {
+      "schema": "htp.ids.entities.v1",
+      "def_id": "",
+      "entities": [],
+      "node_to_entity": []
+    },
+    "bindings": {
+      "schema": "htp.ids.bindings.v1",
+      "def_id": "",
+      "scopes": [],
+      "bindings": [],
+      "name_uses": []
+    },
+    "entity_map": null,
+    "binding_map": null
+  },
+  "entrypoints": [
+    {
+      "name": "run",
+      "kind": "stage_run"
+    }
+  ],
+  "meta": {},
+  "schema": "htp.program_module.v1"
+}

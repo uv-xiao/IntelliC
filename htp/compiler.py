@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from htp.bindings.api import bind
+from htp.ir.module import ProgramModule
 from htp.pipeline.defaults import DefaultPipelineResult, run_default_pipeline
 from htp.solver import solve_default_pipeline, validate_final_artifacts
 
@@ -26,6 +27,10 @@ class CompiledPackage:
 
 class ProgramSurface(Protocol):
     def to_program(self) -> dict[str, Any]: ...
+
+
+class ProgramModuleSurface(Protocol):
+    def to_program_module(self) -> ProgramModule: ...
 
 
 def parse_target(target: str) -> TargetSpec:
@@ -92,18 +97,28 @@ def compile_program(
     )
 
 
-def _normalize_program_input(program: dict[str, Any] | ProgramSurface | None) -> dict[str, Any]:
+def _normalize_program_input(
+    program: dict[str, Any] | ProgramSurface | ProgramModuleSurface | ProgramModule | None,
+) -> dict[str, Any]:
     if program is None:
         return {}
+    if isinstance(program, ProgramModule):
+        return program.to_state_dict()
     if isinstance(program, dict):
         return dict(program)
+    to_program_module = getattr(program, "to_program_module", None)
+    if callable(to_program_module):
+        module = to_program_module()
+        if not isinstance(module, ProgramModule):
+            raise TypeError("program.to_program_module() must return a ProgramModule")
+        return module.to_state_dict()
     to_program = getattr(program, "to_program", None)
     if callable(to_program):
         payload = to_program()
         if not isinstance(payload, dict):
             raise TypeError("program.to_program() must return a dict payload")
         return dict(payload)
-    raise TypeError("program must be a dict or expose to_program()")
+    raise TypeError("program must be a dict, ProgramModule, or expose to_program_module()/to_program()")
 
 
 def _write_solver_failure(package_dir: Path, solver_result: object) -> None:

@@ -12,11 +12,10 @@ def _artifact_paths(manifest: dict) -> tuple[list[str], list[str]]:
         dir_paths.append(stage["dir"])
         file_paths.extend(
             [
-                stage["analysis_index"],
-                stage["summary"],
+                stage["program"],
+                stage["stage"],
+                stage["state"],
                 stage["runnable_py"]["program_py"],
-                stage["ids"]["entities"],
-                stage["ids"]["bindings"],
             ]
         )
         if stage["runnable_py"]["stubs"] is not None:

@@ -313,7 +313,7 @@ def test_compile_program_writes_compiler_failure_for_layout_typecheck(tmp_path):
             "entity_id": "bad_kernel:E0",
             "stage_id": "s02",
             "pass_id": "htp::typecheck_layout_effects@1",
-            "payload_ref": "ir/stages/s02/kernel_ir.json",
+            "payload_ref": "ir/stages/s02/state.json#/items/kernel_ir",
             "fix_hints_ref": "docs/design/compiler_model.md",
             "backend": "nvgpu",
             "manifest_value": "f16",
@@ -363,7 +363,7 @@ def test_compile_program_writes_compiler_failure_for_protocol_violation(tmp_path
     assert failure["failed_at_pass"] == "htp::typecheck_layout_effects@1"
     assert failure["diagnostic"]["code"] == "HTP.PROTOCOL.UNBALANCED_CHANNEL"
     assert failure["diagnostic"]["node_id"] == "channel_kernel:Channel:0"
-    assert failure["diagnostic"]["payload_ref"] == "ir/stages/s02/workload_ir.json"
+    assert failure["diagnostic"]["payload_ref"] == "ir/stages/s02/state.json#/items/workload_ir"
     assert failure["diagnostic"]["channel"] == "pipe0"
     assert failure["diagnostic"]["puts"] == 2
     assert failure["diagnostic"]["gets"] == 0

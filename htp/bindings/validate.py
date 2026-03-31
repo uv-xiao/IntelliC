@@ -5,12 +5,8 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-from htp.artifacts.stages import ANALYSIS_INDEX_SCHEMA_ID
+from htp.ir.module import PROGRAM_MODULE_SCHEMA_ID
 from htp.schemas import (
-    BINDING_MAP_SCHEMA_ID,
-    ENTITY_MAP_SCHEMA_ID,
-    IDS_BINDINGS_SCHEMA_ID,
-    IDS_ENTITIES_SCHEMA_ID,
     MANIFEST_SCHEMA_ID,
     REPLAY_STUBS_SCHEMA_ID,
 )
@@ -105,17 +101,10 @@ def _stage_graph(manifest: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
 
 
 def _stage_contract_paths(stage: Mapping[str, Any]) -> Iterable[str]:
-    for key in ("dir", "analysis_index", "summary", "program_pyast"):
+    for key in ("dir", "program", "stage", "state"):
         value = stage.get(key)
         if isinstance(value, str):
             yield value
-
-    semantic = stage.get("semantic")
-    if isinstance(semantic, Mapping):
-        for key in ("kernel_ir", "workload_ir", "types", "layout", "effects", "schedule"):
-            value = semantic.get(key)
-            if isinstance(value, str):
-                yield value
 
     runnable_py = stage.get("runnable_py")
     if isinstance(runnable_py, Mapping):
@@ -124,25 +113,12 @@ def _stage_contract_paths(stage: Mapping[str, Any]) -> Iterable[str]:
             if isinstance(value, str):
                 yield value
 
-    ids = stage.get("ids")
-    if isinstance(ids, Mapping):
-        for key in ("entities", "bindings"):
-            value = ids.get(key)
-            if isinstance(value, str):
-                yield value
     islands = stage.get("islands")
     if isinstance(islands, list):
         for island in islands:
             if not isinstance(island, Mapping):
                 continue
             value = island.get("dir")
-            if isinstance(value, str):
-                yield value
-
-    maps = stage.get("maps")
-    if isinstance(maps, Mapping):
-        for key in ("entity_map", "binding_map"):
-            value = maps.get(key)
             if isinstance(value, str):
                 yield value
 
@@ -244,41 +220,12 @@ def _iter_schema_paths(manifest: Mapping[str, Any]) -> Iterable[tuple[str, str |
             if isinstance(relpath, str):
                 yield relpath, schema
     for stage in _stage_graph(manifest):
-        analysis_index = stage.get("analysis_index")
-        if isinstance(analysis_index, str):
-            yield analysis_index, ANALYSIS_INDEX_SCHEMA_ID
-        program_pyast = stage.get("program_pyast")
-        if isinstance(program_pyast, str):
-            yield program_pyast, "htp.program_ast.v1"
-        semantic = stage.get("semantic")
-        if isinstance(semantic, Mapping):
-            for key, schema in (
-                ("kernel_ir", "htp.kernel_ir.v1"),
-                ("workload_ir", "htp.workload_ir.v1"),
-                ("types", "htp.types.v1"),
-                ("layout", "htp.layout.v1"),
-                ("effects", "htp.effects.v1"),
-                ("schedule", "htp.schedule.v1"),
-            ):
-                relpath = semantic.get(key)
-                if isinstance(relpath, str):
-                    yield relpath, schema
-        ids = stage.get("ids")
-        if isinstance(ids, Mapping):
-            entities = ids.get("entities")
-            bindings = ids.get("bindings")
-            if isinstance(entities, str):
-                yield entities, IDS_ENTITIES_SCHEMA_ID
-            if isinstance(bindings, str):
-                yield bindings, IDS_BINDINGS_SCHEMA_ID
-        maps = stage.get("maps")
-        if isinstance(maps, Mapping):
-            entity_map = maps.get("entity_map")
-            binding_map = maps.get("binding_map")
-            if isinstance(entity_map, str):
-                yield entity_map, ENTITY_MAP_SCHEMA_ID
-            if isinstance(binding_map, str):
-                yield binding_map, BINDING_MAP_SCHEMA_ID
+        state_path = stage.get("state")
+        if isinstance(state_path, str):
+            yield state_path, PROGRAM_MODULE_SCHEMA_ID
+        stage_summary = stage.get("stage")
+        if isinstance(stage_summary, str):
+            yield stage_summary, "htp.stage.v2"
         runnable_py = stage.get("runnable_py")
         if isinstance(runnable_py, Mapping):
             stubs = runnable_py.get("stubs")

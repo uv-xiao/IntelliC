@@ -15,6 +15,7 @@ from htp.ir.layout import (
     join_distribution_facets,
     layout_to_payload,
 )
+from htp.ir.module import ProgramModule, ensure_program_module, program_dict_view
 from htp.ir.op_specs import get_op_spec, op_effects
 from htp.ir.semantics import KernelArg, KernelIR, KernelOp, WorkloadIR, WorkloadTask, to_payload
 from htp.ir.types import (
@@ -527,22 +528,15 @@ def scheduled_ops_from_plan(schedule_plan: Mapping[str, Any]) -> list[dict[str, 
     return scheduled_ops
 
 
-def stage_payloads_from_program(program: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+def stage_payloads_from_program(program: ProgramModule | Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    module = ensure_program_module(program)
     return {
-        "program_ast_payload": {"schema": PROGRAM_AST_SCHEMA_ID, "program": snapshot_program(program)},
-        "kernel_ir_payload": dict(program.get("kernel_ir", _default_kernel_ir())),
-        "workload_ir_payload": dict(program.get("workload_ir", _default_workload_ir())),
-        "types_payload": dict(program.get("types", _default_types())),
-        "layout_payload": dict(program.get("layout", _default_layout())),
-        "effects_payload": dict(program.get("effects", _default_effects())),
-        "schedule_payload": dict(program.get("schedule", _default_schedule())),
-        "entities_payload": dict(program.get("entities_payload", _default_entities_payload())),
-        "bindings_payload": dict(program.get("bindings_payload", _default_bindings_payload())),
+        "program_module_payload": module.to_payload(),
     }
 
 
-def snapshot_program(program: Mapping[str, Any]) -> dict[str, Any]:
-    return to_payload(dict(program))
+def snapshot_program(program: ProgramModule | Mapping[str, Any]) -> dict[str, Any]:
+    return to_payload(program_dict_view(program))
 
 
 def _normalize_kernel_surface(entry: str, kernel: Mapping[str, Any]) -> dict[str, Any]:

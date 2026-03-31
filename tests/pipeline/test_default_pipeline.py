@@ -66,18 +66,25 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
 
     for stage in stage_graph:
         assert (package_dir / stage["dir"]).exists()
-        assert (package_dir / stage["summary"]).exists()
-        assert (package_dir / stage["analysis_index"]).exists()
-        assert (package_dir / stage["program_pyast"]).exists()
-        for relpath in stage["semantic"].values():
-            assert (package_dir / relpath).exists(), relpath
+        assert (package_dir / stage["program"]).exists()
+        assert (package_dir / stage["stage"]).exists()
+        assert (package_dir / stage["state"]).exists()
 
     current_stage = next(stage for stage in stage_graph if stage["id"] == result.current_stage)
     program_text = (package_dir / current_stage["runnable_py"]["program_py"]).read_text()
     assert '"""Readable staged Python snapshot for HTP replay and debugging."""' in program_text
-    assert "ENTRY = " in program_text
-    assert "KERNEL = (" in program_text
-    assert "PROGRAM_STATE = {" in program_text
+    assert "PROGRAM_MODULE = ProgramModule(" in program_text
+    assert "def program_module():" in program_text
+    assert "def program_state():" in program_text
+    assert "return PROGRAM_MODULE.run(" in program_text
+
+    state_payload = json.loads((package_dir / current_stage["state"]).read_text())
+    assert state_payload["schema"] == "htp.program_module.v1"
+    assert state_payload["items"]["kernel_ir"]["entry"] == "gemm_tile"
+    stage_summary = json.loads((package_dir / current_stage["stage"]).read_text())
+    assert stage_summary["schema"] == "htp.stage.v2"
+    assert stage_summary["paths"]["program"] == current_stage["program"]
+    assert stage_summary["paths"]["state"] == current_stage["state"]
 
     trace_lines = (package_dir / "ir" / "pass_trace.jsonl").read_text().strip().splitlines()
     trace_events = [json.loads(line) for line in trace_lines]
@@ -110,8 +117,9 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
     assert semantic_trace["cap_delta"]["added_analyses"] == ["Semantic.ModelBuilt@1"]
 
     semantic_stage = next(stage for stage in stage_graph if stage["pass"] == "htp::semantic_model@1")
-    semantic_kernel_ir = json.loads((package_dir / semantic_stage["semantic"]["kernel_ir"]).read_text())
-    semantic_workload_ir = json.loads((package_dir / semantic_stage["semantic"]["workload_ir"]).read_text())
+    semantic_state = json.loads((package_dir / semantic_stage["state"]).read_text())
+    semantic_kernel_ir = semantic_state["items"]["kernel_ir"]
+    semantic_workload_ir = semantic_state["items"]["workload_ir"]
     assert semantic_kernel_ir["entry"] == "gemm_tile"
     assert semantic_kernel_ir["ops"] == [
         {
@@ -136,17 +144,14 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
     ]
 
     analyze_stage = next(stage for stage in stage_graph if stage["pass"] == "htp::analyze_schedule@1")
-    analysis_index = json.loads((package_dir / analyze_stage["analysis_index"]).read_text())
-    assert analysis_index == {
-        "schema": "htp.analysis.index.v1",
-        "analyses": [
-            {
-                "analysis_id": "htp::SchedulePlan@1",
-                "schema": "htp.analysis.schedule_plan.v1",
-                "path": f"ir/stages/{analyze_stage['id']}/analysis/schedule_plan.json",
-            }
-        ],
-    }
+    analysis_index = json.loads((package_dir / analyze_stage["stage"]).read_text())["analysis_inventory"]
+    assert analysis_index == [
+        {
+            "analysis_id": "htp::SchedulePlan@1",
+            "schema": "htp.analysis.schedule_plan.v1",
+            "path": f"ir/stages/{analyze_stage['id']}/analysis/schedule_plan.json",
+        }
+    ]
     loop_dep_stage = next(
         stage for stage in stage_graph if stage["pass"] == "htp::analyze_loop_dependencies@1"
     )

@@ -10,6 +10,11 @@ from typing import Any
 from uuid import uuid4
 
 from htp.agent_policy import evaluate_edit_policy, load_agent_policy
+from htp.artifacts.state import (
+    load_stage_state,
+    state_ref,
+    state_section,
+)
 from htp.bindings import bind
 from htp.bindings.base import ReplayResult
 from htp.bindings.validate import load_manifest
@@ -371,26 +376,19 @@ def _load_stage_semantic(
     stage_id: str,
     semantic_key: str,
 ) -> dict[str, Any]:
-    stage = next(stage for stage in manifest["stages"]["graph"] if stage["id"] == stage_id)
-    semantic = stage.get("semantic", {})
-    if isinstance(semantic, dict):
-        relpath = semantic.get(semantic_key)
-        if isinstance(relpath, str) and (package_root / relpath).exists():
-            return json.loads((package_root / relpath).read_text())
-    fallback = package_root / "ir" / "stages" / stage_id / f"{semantic_key}.json"
-    if fallback.exists():
-        return json.loads(fallback.read_text())
-    return {}
+    return state_section(load_stage_state(package_root, manifest, stage_id), semantic_key)
 
 
 def _stage_semantic_relpath(manifest: dict[str, Any], stage_id: str, semantic_key: str) -> str:
-    stage = next(stage for stage in manifest["stages"]["graph"] if stage["id"] == stage_id)
-    semantic = stage.get("semantic", {})
-    if isinstance(semantic, dict):
-        relpath = semantic.get(semantic_key)
-        if isinstance(relpath, str):
-            return relpath
-    return f"ir/stages/{stage_id}/{semantic_key}.json"
+    section_pointer = {
+        "kernel_ir": "/items/kernel_ir",
+        "workload_ir": "/items/workload_ir",
+        "types": "/aspects/types",
+        "layout": "/aspects/layout",
+        "effects": "/aspects/effects",
+        "schedule": "/aspects/schedule",
+    }[semantic_key]
+    return state_ref(manifest, stage_id, section_pointer)
 
 
 def _summarize_difference(left: Any, right: Any) -> dict[str, Any]:
@@ -488,16 +486,16 @@ def _identity_aware_stage_diff(
     left_stage_id: str,
     right_stage_id: str,
 ) -> dict[str, Any]:
-    left_stage = next(stage for stage in left_manifest["stages"]["graph"] if stage["id"] == left_stage_id)
-    right_stage = next(stage for stage in right_manifest["stages"]["graph"] if stage["id"] == right_stage_id)
-    left_entities = _load_stage_json(left_root, left_stage.get("ids", {}).get("entities"))
-    right_entities = _load_stage_json(right_root, right_stage.get("ids", {}).get("entities"))
-    left_bindings = _load_stage_json(left_root, left_stage.get("ids", {}).get("bindings"))
-    right_bindings = _load_stage_json(right_root, right_stage.get("ids", {}).get("bindings"))
-    left_entity_map = _load_stage_json(left_root, left_stage.get("maps", {}).get("entity_map"))
-    right_entity_map = _load_stage_json(right_root, right_stage.get("maps", {}).get("entity_map"))
-    left_binding_map = _load_stage_json(left_root, left_stage.get("maps", {}).get("binding_map"))
-    right_binding_map = _load_stage_json(right_root, right_stage.get("maps", {}).get("binding_map"))
+    left_identity = state_section(load_stage_state(left_root, left_manifest, left_stage_id), "identity")
+    right_identity = state_section(load_stage_state(right_root, right_manifest, right_stage_id), "identity")
+    left_entities = _as_mapping(left_identity.get("entities", {}))
+    right_entities = _as_mapping(right_identity.get("entities", {}))
+    left_bindings = _as_mapping(left_identity.get("bindings", {}))
+    right_bindings = _as_mapping(right_identity.get("bindings", {}))
+    left_entity_map = _as_mapping(left_identity.get("entity_map", {}))
+    right_entity_map = _as_mapping(right_identity.get("entity_map", {}))
+    left_binding_map = _as_mapping(left_identity.get("binding_map", {}))
+    right_binding_map = _as_mapping(right_identity.get("binding_map", {}))
     details = {
         "entities": _id_delta(
             [
@@ -535,16 +533,16 @@ def _identity_aware_stage_diff(
         "binding_map": _summarize_difference(left_binding_map, right_binding_map),
         "refs": {
             "left": {
-                "entities": left_stage.get("ids", {}).get("entities"),
-                "bindings": left_stage.get("ids", {}).get("bindings"),
-                "entity_map": left_stage.get("maps", {}).get("entity_map"),
-                "binding_map": left_stage.get("maps", {}).get("binding_map"),
+                "entities": state_ref(left_manifest, left_stage_id, "/identity/entities"),
+                "bindings": state_ref(left_manifest, left_stage_id, "/identity/bindings"),
+                "entity_map": state_ref(left_manifest, left_stage_id, "/identity/entity_map"),
+                "binding_map": state_ref(left_manifest, left_stage_id, "/identity/binding_map"),
             },
             "right": {
-                "entities": right_stage.get("ids", {}).get("entities"),
-                "bindings": right_stage.get("ids", {}).get("bindings"),
-                "entity_map": right_stage.get("maps", {}).get("entity_map"),
-                "binding_map": right_stage.get("maps", {}).get("binding_map"),
+                "entities": state_ref(right_manifest, right_stage_id, "/identity/entities"),
+                "bindings": state_ref(right_manifest, right_stage_id, "/identity/bindings"),
+                "entity_map": state_ref(right_manifest, right_stage_id, "/identity/entity_map"),
+                "binding_map": state_ref(right_manifest, right_stage_id, "/identity/binding_map"),
             },
         },
     }
@@ -700,6 +698,12 @@ def _binding_blame(
 def _load_stage_json(root: Path, relpath: Any) -> dict[str, Any]:
     if isinstance(relpath, str) and (root / relpath).exists():
         return json.loads((root / relpath).read_text())
+    return {}
+
+
+def _as_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
     return {}
 
 

@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from htp.artifacts.stages import RunnablePySpec
+from htp.artifacts.state import state_ref
 from htp.compiler_errors import CompilerDiagnosticError
+from htp.ir.module import ProgramModule, program_dict_view
 from htp.passes.contracts import PassContract
 from htp.passes.manager import PassResult
 from htp.passes.program_model import build_type_layout_effects, normalize_target, stage_payloads_from_program
@@ -31,9 +33,9 @@ CONTRACT = PassContract(
 
 
 def run(
-    program: Mapping[str, Any], *, stage_before: Mapping[str, object]
-) -> tuple[dict[str, Any], PassResult]:
-    next_program = deepcopy(dict(program))
+    program: ProgramModule | Mapping[str, Any], *, stage_before: Mapping[str, object]
+) -> tuple[ProgramModule, PassResult]:
+    next_program = deepcopy(program_dict_view(program))
     try:
         types, layout, effects = build_type_layout_effects(
             next_program.get("kernel_ir", {}),
@@ -45,23 +47,16 @@ def run(
     next_program["types"] = types
     next_program["layout"] = layout
     next_program["effects"] = effects
-    stage_payloads = stage_payloads_from_program(next_program)
+    next_module = ProgramModule.from_program_dict(next_program)
+    stage_payloads = stage_payloads_from_program(next_module)
 
-    return next_program, PassResult(
+    return next_module, PassResult(
         runnable_py=RunnablePySpec(
             status="preserves",
             modes=("sim",),
-            program_text=render_program_state_module(next_program),
+            program_text=render_program_state_module(next_module),
         ),
-        entities_payload=stage_payloads["entities_payload"],
-        bindings_payload=stage_payloads["bindings_payload"],
-        program_ast_payload=stage_payloads["program_ast_payload"],
-        kernel_ir_payload=stage_payloads["kernel_ir_payload"],
-        workload_ir_payload=stage_payloads["workload_ir_payload"],
-        types_payload=stage_payloads["types_payload"],
-        layout_payload=stage_payloads["layout_payload"],
-        effects_payload=stage_payloads["effects_payload"],
-        schedule_payload=stage_payloads["schedule_payload"],
+        program_module_payload=stage_payloads["program_module_payload"],
         digests={"types_hash": "demo-types-v2", "effects_hash": "demo-effects-v2"},
         time_ms=0.3,
     )
@@ -83,15 +78,22 @@ def _resolve_compiler_diagnostic(
 def _resolve_payload_ref_hint(hint: str, *, stage_before: Mapping[str, object]) -> str | None:
     if hint.startswith("semantic."):
         semantic_key = hint.partition(".")[2]
-        semantic = stage_before.get("semantic", {})
-        if isinstance(semantic, Mapping):
-            relpath = semantic.get(semantic_key)
-            if isinstance(relpath, str):
-                return relpath
+        stage_id = stage_before.get("id")
+        if isinstance(stage_id, str):
+            pointer = {
+                "kernel_ir": "/items/kernel_ir",
+                "workload_ir": "/items/workload_ir",
+                "types": "/aspects/types",
+                "layout": "/aspects/layout",
+                "effects": "/aspects/effects",
+                "schedule": "/aspects/schedule",
+            }.get(semantic_key)
+            if pointer is not None:
+                return state_ref({"stages": {"graph": [stage_before]}}, stage_id, pointer)
     if hint == "analysis.index":
-        relpath = stage_before.get("analysis_index")
+        relpath = stage_before.get("stage")
         if isinstance(relpath, str):
-            return relpath
+            return f"{relpath}#/analysis_inventory"
     stage_dir = stage_before.get("dir")
     if isinstance(stage_dir, str):
         return Path(stage_dir).as_posix()

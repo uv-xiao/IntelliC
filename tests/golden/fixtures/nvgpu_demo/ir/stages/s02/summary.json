@@ -1,9 +1,0 @@
-{
-  "stage_id": "s02",
-  "pass": "pkg::backend_stub@1",
-  "runnable_py": "stubbed",
-  "modes": [
-    "sim"
-  ],
-  "backend": "nvgpu"
-}
