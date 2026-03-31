@@ -157,10 +157,13 @@ end state.
 - builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
   surfaces are now all registered as `rule=`-backed frontend specs rather than
   direct `build_program_module=` callbacks
-- public surface builders still reuse shared helpers in `htp/ir/frontend.py`
-  for workload assembly, dialect activation metadata, and `ProgramModule`
-  construction, but the final node-first rule/combinator API has not been
-  implemented yet
+- `to_program_module()` on routine/WSP/CSP now delegates back through the
+  registered frontend rule instead of owning a parallel lowering body
+- public frontend rules still reuse shared helpers in `htp/ir/frontend.py` for
+  workload assembly, dialect activation metadata, and `ProgramModule`
+  construction, and they still rebuild workload/process structure from
+  payload-shaped surface fields rather than the final node-first
+  rule/combinator API
 - a manifest-style dialect activation slice now exists for builtin frontend
   dialects, and the public frontends now record both active dialect closure and
   activation payloads in `ProgramModule.meta`

@@ -70,18 +70,22 @@ resolves them through frontend specs before falling back to older
 That frontend registry now has a rule-backed frontend-definition substrate:
 
 - a rule-backed frontend-definition substrate now exists in
-  `htp/ir/frontend_rules.py`
+  `htp/ir/frontend_rules.py` (`FrontendRule`, `ProgramSurfaceRule`)
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
   in `htp/ir/frontends.py`
 - builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
   surfaces now all use `rule=`-backed `FrontendSpec` registration
-- remaining gap: those rules still delegate to shared surface builders rather
-  than the final node-first rule/combinator API
+- `to_program_module()` on routine/WSP/CSP now delegates back through that
+  registered frontend rule instead of owning a separate lowering path
+- remaining gap: those rules still rebuild workload/process structure from
+  payload-shaped surface fields rather than the final node-first
+  rule/combinator API
 
 Code pointers for the implemented ingress path:
 
 - `htp/ir/frontend_rules.py`
 - `htp/ir/frontends.py`
+- `htp/ir/frontend.py`
 - `htp/kernel.py`
 - `htp/compiler.py`
 

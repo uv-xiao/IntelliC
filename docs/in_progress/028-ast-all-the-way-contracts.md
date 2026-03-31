@@ -51,7 +51,8 @@ Code pointers for the implemented frontend-definition slice:
 Remaining gap:
 
 - builtin public surfaces are now rule-backed through `FrontendSpec.build(...)`,
-  but those rules still delegate to shared builder helpers in `htp/ir/frontend.py`
+  and routine/WSP/CSP now delegate `to_program_module()` back through that
+  registry, but the rules still rebuild payload-shaped workload/process fields
   rather than the final node-first rule/combinator frontend-definition API.
 
 ## Code Surfaces

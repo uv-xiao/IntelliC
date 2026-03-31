@@ -82,8 +82,10 @@ Implemented on this branch:
 - builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
   surfaces are now all registered as `rule=`-backed frontend specs rather than
   direct `build_program_module=` callbacks
-- remaining gap: those rules still delegate to shared builders rather than the
-  final node-first rule/combinator frontend API
+- `to_program_module()` on routine/WSP/CSP now delegates back through the
+  registered frontend rule instead of owning a parallel lowering path
+- remaining gap: those rules still rebuild payload-shaped workload/process
+  structure rather than the final node-first rule/combinator frontend API
 - a first dialect registry slice now exists for builtin frontend dialects, and
   public frontends record their active dialect set and activation manifest into
   `ProgramModule.meta`

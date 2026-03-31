@@ -59,14 +59,17 @@ construction.
 That substrate is now rule-backed in code:
 
 - a rule-backed frontend-definition substrate now exists in
-  `htp/ir/frontend_rules.py`
+  `htp/ir/frontend_rules.py` (`FrontendRule`, `ProgramSurfaceRule`)
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
   in `htp/ir/frontends.py`, and compiler ingress routes through
   `FrontendSpec.build(...)` in `htp/compiler.py`
 - builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
   surfaces now all use `rule=`-backed `FrontendSpec` registration
-- remaining gap: those rules still delegate to shared surface builders rather
-  than the final node-first rule/combinator frontend API
+- `to_program_module()` on routine/WSP/CSP now delegates back through that
+  registered frontend rule instead of owning a separate lowering path
+- remaining gap: those rules still rebuild workload/process structure from
+  payload-shaped surface fields rather than the final node-first
+  rule/combinator frontend API
 
 The current frontend set also records explicit dialect activation metadata into
 `ProgramModule.meta`, so committed-stage state now carries both:
