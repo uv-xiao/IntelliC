@@ -52,8 +52,9 @@ Remaining gap:
 
 - builtin public surfaces are now rule-backed through `FrontendSpec.build(...)`,
   and routine/WSP/CSP now delegate `to_program_module()` back through that
-  registry, but the rules still rebuild payload-shaped workload/process fields
-  rather than the final node-first rule/combinator frontend-definition API.
+  registry; WSP/CSP public specs now also use typed top-level surface objects,
+  but the rules still rebuild nested stage/process-step attrs rather than the
+  final node-first rule/combinator frontend-definition API.
 
 ## Code Surfaces
 

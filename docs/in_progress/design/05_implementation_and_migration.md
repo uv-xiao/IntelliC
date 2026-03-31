@@ -159,10 +159,12 @@ end state.
   direct `build_program_module=` callbacks
 - `to_program_module()` on routine/WSP/CSP now delegates back through the
   registered frontend rule instead of owning a parallel lowering body
+- WSP and CSP public specs now use typed top-level surface objects instead of
+  raw dict payload fields before serialization
 - public frontend rules still reuse shared helpers in `htp/ir/frontend.py` for
   workload assembly, dialect activation metadata, and `ProgramModule`
-  construction, and they still rebuild workload/process structure from
-  payload-shaped surface fields rather than the final node-first
+  construction, and they still rebuild nested stage/process-step structure from
+  payload-shaped attrs rather than the final node-first
   rule/combinator API
 - a manifest-style dialect activation slice now exists for builtin frontend
   dialects, and the public frontends now record both active dialect closure and
@@ -193,8 +195,8 @@ end state.
   registry-and-payload-oriented rather than the final typed-node interpreter
   substrate
 - the shared frontend-definition substrate now exists, but it still rebuilds
-  workload/process/channel structure from legacy payload-shaped fields instead
-  of the final typed frontend-definition API described in
+  nested workload/process stage attrs from payload-shaped fields instead of the
+  final typed frontend-definition API described in
   `03_dialects_and_frontends.md`
 - the frontend registry exists only for builtin public surfaces and still
   resolves primarily by Python surface type; the builtin public surfaces are

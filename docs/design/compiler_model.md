@@ -67,8 +67,10 @@ That substrate is now rule-backed in code:
   surfaces now all use `rule=`-backed `FrontendSpec` registration
 - `to_program_module()` on routine/WSP/CSP now delegates back through that
   registered frontend rule instead of owning a separate lowering path
-- remaining gap: those rules still rebuild workload/process structure from
-  payload-shaped surface fields rather than the final node-first
+- WSP and CSP public specs now carry typed top-level surface objects rather than
+  raw dict payload fields before serialization into `state.json`
+- remaining gap: those rules still rebuild nested stage/process-step structure
+  from payload-shaped attrs rather than the final node-first
   rule/combinator frontend API
 
 The current frontend set also records explicit dialect activation metadata into

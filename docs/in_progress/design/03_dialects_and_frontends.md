@@ -76,12 +76,14 @@ The initial frontend-definition substrate is now implemented in code:
   direct `build_program_module=` callbacks
 - `to_program_module()` on routine/WSP/CSP now delegates back through the
   registered frontend rule instead of owning a parallel lowering body
+- WSP and CSP public specs now expose typed top-level surface objects rather
+  than raw dict payload fields before serialization
 
 Remaining gap relative to this design document:
 
-- the current rules still rebuild workload/process structure from payload-shaped
-  surface fields; the final node-first rule/combinator API described above is
-  not implemented yet
+- the current rules still rebuild nested stage/process-step structure from
+  payload-shaped attrs; the final node-first rule/combinator API described
+  above is not implemented yet
 
 Code pointers for the implemented substrate:
 
