@@ -37,7 +37,7 @@ The repository is real and coherent.
 The strongest parts today are:
 
 - the Python-canonical compiler model,
-- staged semantic sidecars and replayable packages,
+- staged `ProgramModule` state bundles and replayable packages,
 - pass / solver / artifact discipline,
 - and the shared backend / extension contract structure.
 
@@ -59,8 +59,8 @@ The compiler model is the most aligned part of the repository.
 What is solid today:
 
 - Python-space remains the canonical stage form.
-- compilation stages emit explicit semantic sidecars for kernel, workload,
-  types, layout, effects, and schedule state.
+- compilation stages emit compact `ProgramModule` state bundles with explicit
+  kernel, workload, type, layout, effect, and schedule state.
 - identity and mapping are first-class artifacts instead of implicit Python
   object identity.
 - replay and semantic diff consume those staged artifacts directly.
@@ -75,9 +75,9 @@ Main code anchors:
 - `htp/passes/typecheck_layout_effects.py`
 
 What is still not fully proved is the stronger end-to-end rule that every
-global stage boundary, including extension/MLIR participation, comes back to a
-native-Python unparseable artifact that remains suitable for direct human
-editing and LLM-driven execution.
+global stage boundary is also served by equally strong frontend ergonomics. The
+committed-stage contract is now Python-owned and interpreter-backed, but WSP
+and CSP surface quality still keep the broader product goal open.
 
 ### Pipeline and solver
 
@@ -132,6 +132,10 @@ Main code anchors:
 The kernel surface is in good shape. The routine surface is usable. The WSP and
 CSP surfaces are better than raw payload assembly, but they are not yet the
 final “native Python first” answer.
+
+One real improvement is now in place: the current public frontend set
+(`kernel`, `routine`, `wsp`, and `csp`) lowers through `ProgramModule`
+entrypoints instead of dict-only compiler ingestion.
 
 Current narrow points:
 
@@ -209,7 +213,6 @@ The current broad reopened topic is:
 
 That file is now the correct place to track:
 
-- AST-all-the-way redesign work,
 - programming-surface quality gaps,
 - example realism gaps,
 - backend-depth gaps,

@@ -49,7 +49,7 @@ Implemented today:
 - Profile-specialized plan metadata, NVCC flag contracts, and emitted perf records.
 
 The current NV-GPU path now also consumes compiler-owned tile/view semantics directly:
-- native Python slicing on kernel values lowers into explicit `slice` ops in `kernel_ir.json`;
+- native Python slicing on kernel values lowers into explicit `slice` ops in `state.json#/items/kernel_ir`;
 - the NV-GPU solver declaration advertises `slice` as a supported shared-semantic op instead of treating it as an Arknife-only side channel;
 - flagship WSP examples compile through that same shared substrate, then validate and replay through the normal NV-GPU binding path.
 
@@ -77,7 +77,7 @@ That is an important architectural step. It means explicit hardware and instruct
 ### AIE extension backend
 
 Implemented today:
-- AIE planning analysis sidecars.
+- AIE planning analyses referenced from `stage.json`.
 - AIE MLIR artifact emission.
 - Reference toolchain build outputs.
 - Host-runtime launch path through the binding-owned adapter.

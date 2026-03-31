@@ -8,27 +8,27 @@ The review reopened one broad-topic TODO document:
 
 - `docs/todo/alignment_and_product_gaps.md`
 
-That topic now explicitly includes the stronger top-level requirement that HTP
-must become human-friendly and LLM-friendly through AST all the way, not just
-through a replayable subset of the current pipeline.
+That topic now tracks the remaining product gaps after the AST-all-the-way
+stage-contract slice landed: programming-surface quality, flagship example
+realism, backend depth, and documentation discipline.
 
 ## Completion statistics
 
 ### Overall
 
 - total tracked TODO checklist items: 81
-- complete: 65
+- complete: 72
 - partial: 0
-- open: 16
-- completion ratio: 80.2%
+- open: 9
+- completion ratio: 88.9%
 
 ### By topic
 
 | Topic | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Compiler model, semantics, typing | 10 | 0 | 3 | 13 |
+| Compiler model, semantics, typing | 13 | 0 | 0 | 13 |
 | Programming surfaces and examples | 19 | 0 | 8 | 27 |
-| Pipeline and solver | 9 | 0 | 1 | 10 |
+| Pipeline and solver | 10 | 0 | 0 | 10 |
 | Artifacts, replay, debug | 8 | 0 | 0 | 8 |
 | Backends and extensions | 11 | 0 | 3 | 14 |
 | Agent product and workflow | 8 | 0 | 1 | 9 |

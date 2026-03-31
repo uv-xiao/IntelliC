@@ -11,7 +11,8 @@ HTP is intentionally Python-AST-centric. That decision is not aesthetic. It exis
 
 The result is a dual representation strategy:
 - Python-space remains the canonical program form,
-- typed semantic sidecars make compiler reasoning explicit and machine-checkable.
+- typed semantic state is owned by `ProgramModule`,
+- and staged files expose that state through a compact `program.py` / `stage.json` / `state.json` contract.
 
 This is the implemented answer to a common compiler failure mode: when semantic facts live only in pass-local memory, the compiler becomes difficult to debug, retarget, or evolve. HTP instead emits the important semantic state into artifacts so both humans and tools can inspect it.
 
@@ -21,15 +22,11 @@ This is the implemented answer to a common compiler failure mode: when semantic 
 Python source / authoring surface
             |
             v
-   canonical Python stage program
+      ProgramModule
             |
-            +--> kernel_ir.json
-            +--> workload_ir.json
-            +--> types.json
-            +--> layout.json
-            +--> effects.json
-            +--> schedule.json
-            +--> ids/*.json, maps/*.json
+            +--> program.py
+            +--> state.json
+            `--> stage.json
 ```
 
 ## Implemented semantic contracts
@@ -37,20 +34,53 @@ Python source / authoring surface
 ### Canonical form
 
 The canonical compiler form today is:
-- a staged Python program (`program.py`), plus
-- explicit semantic payloads and analysis sidecars.
+- a staged Python program (`program.py`) that reconstructs `ProgramModule`,
+- a machine-readable `state.json` export of that same semantic object graph,
+- a typed execution path rooted at `ProgramModule.run(...)` and interpreter
+  registration,
+- and analysis artifacts referenced from `stage.json`.
+
+The public frontend path now feeds that same owner directly. The implemented
+`to_program_module()` path exists on:
+- `htp.kernel.KernelSpec`
+- `htp.routine.ProgramSpec`
+- `htp.wsp.WSPProgramSpec`
+- `htp.csp.CSPProgramSpec`
+
+`htp.compile_program(...)` prefers that path over `to_program()`, so authored
+surface objects can enter the pipeline without first collapsing back to a raw
+program dict.
 
 A stage is therefore not just “an AST snapshot”. It is a small evidence package describing both executable behavior and compiler understanding.
 
-### Semantic payloads
+`ProgramModule` is now the semantic owner for committed stages. The normalized
+`program.py` artifact rebuilds that typed object graph directly, and replay
+executes the stage through `ProgramModule.run(...)` rather than treating staged
+Python as a bag of payload constants.
 
-The current implementation emits and consumes these sidecars as first-class compiler state:
-- `kernel_ir.json`
-- `workload_ir.json`
-- `types.json`
-- `layout.json`
-- `effects.json`
-- `schedule.json`
+The committed-stage core is now object-owned in two places that previously
+leaked dict-first semantics:
+- `items.kernel_ir` and `items.workload_ir` are typed semantic dataclasses
+- `aspects.types`, `aspects.layout`, `aspects.effects`, and
+  `aspects.schedule` are typed aspect wrappers
+- `identity.entities`, `identity.bindings`, `identity.entity_map`, and
+  `identity.binding_map` are typed identity wrappers
+
+### Staged state bundle
+
+The current implementation emits and consumes a compact staged state bundle:
+- `program.py`
+- `state.json`
+- `stage.json`
+
+Inside `state.json`, the semantic model is still explicit:
+- `items.kernel_ir`
+- `items.workload_ir`
+- `aspects.types`
+- `aspects.layout`
+- `aspects.effects`
+- `aspects.schedule`
+- `identity.*`
 
 These are not decorative. Backends, replay tools, diagnostics, and semantic diffs all rely on them.
 
@@ -60,7 +90,7 @@ HTP now treats identity as explicit compiler data rather than Python object iden
 - `node_id` for stage-local blame
 - `entity_id` for semantic identity across stages
 - `binding_id` for scoped variable/binding identity
-- `maps/*.json` for before/after provenance across non-trivial rewrites
+- `state.json#/identity/entity_map` and `state.json#/identity/binding_map` for before/after provenance across non-trivial rewrites
 
 This is part of the reason semantic diff and agent-oriented replay can work without heuristic AST matching.
 
@@ -72,7 +102,7 @@ The implemented substrate already covers:
 - buffers, tensors, tiles, views, channels, and token-like value kinds
 - alias validation for view/buffer relationships
 - layout payloads using a facet-product structure
-- explicit async-token, barrier, event, collective, and protocol obligations in `effects.json`
+- explicit async-token, barrier, event, collective, and protocol obligations in `state.json#/aspects/effects`
 - schedule payloads for mapping, specialization, pipelining, and launch structure
 - a public `htp.types` surface that lets user code describe dtypes, symbolic
   dimensions, tensor shapes, distribution facts, and channel types without
@@ -110,7 +140,7 @@ The op registry in `htp/ir/op_specs.py` now provides explicit semantics for oper
 The slice/view story is now stronger than a generic “view op exists” claim:
 - native Python slicing on `KernelValue` lowers into explicit `slice` ops;
 - loop-carried indices are preserved as symbolic index expressions instead of collapsing to ad-hoc strings;
-- staged semantic payloads carry both concrete replay offsets/sizes and human-readable `offset_exprs` / `size_exprs` so replay, codegen, and debugging all see the same tile/view intent.
+- staged state carries both concrete replay offsets/sizes and human-readable `offset_exprs` / `size_exprs` so replay, codegen, and debugging all see the same tile/view intent.
 
 That registry is the bridge between front-end authoring, legality checks, passes, and backend discharge.
 
@@ -128,7 +158,7 @@ The compiler already enforces real legality checks instead of only packaging wha
 
 Serving routines are now first-class semantic objects instead of only example
 conventions. When workload tasks carry serving attrs such as `phase`, `state`,
-`stream`, and `batch`, `workload_ir.json` emits a `routine` summary with:
+`stream`, and `batch`, `state.json#/items/workload_ir` emits a `routine` summary with:
 - serving phases and the tasks in each phase
 - state-transition edges derived from workload dependencies
 - channel-flow summaries for serving streams
@@ -139,7 +169,11 @@ future passes instead of hiding them in Python helper code alone.
 ## Coding pointers
 
 If you are working in this layer, start here:
+- `htp/ir/aspects.py` — typed aspect wrappers for committed-stage semantic state
 - `htp/ir/semantics.py` — core staged semantic dataclasses
+- `htp/ir/module.py` — `ProgramModule`, entrypoints, and typed stage ownership
+- `htp/ir/interpreter.py` — interpreter registry for committed stage execution
+- `htp/ir/render.py` — normalized staged Python rendering
 - `htp/ir/types.py` — structured type/value payloads
 - `htp/ir/layout.py` — layout helpers and payload structure
 - `htp/ir/op_specs.py` — operation semantics and metadata
@@ -155,6 +189,6 @@ Then inspect stage artifacts under `ir/stages/<id>/` from a compiled example to 
 
 ## Current limits
 
-The compiler-model topic is now closed at the architecture level. Remaining
-future work lives in backend-depth and agent-product topics, not in a missing
-core semantic substrate.
+The compiler-model topic is now closed at the stage-contract level. Remaining
+future work lives mainly in frontend ergonomics, flagship example realism, and
+backend depth rather than in a missing committed-stage semantic owner.

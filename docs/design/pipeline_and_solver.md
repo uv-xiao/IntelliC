@@ -54,7 +54,9 @@ The pass system now records:
 - evolving capability state
 - state deltas across passes
 - staged analysis payloads
-- stage summaries and sidecars
+- `stage.json` summaries and `state.json` bundles
+- explicit `runnable_py` preservation claims for Python renderability and
+  executability at committed stage boundaries
 
 This is why replay and semantic diff can reason about “what changed where” instead of only comparing end states.
 

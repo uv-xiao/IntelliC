@@ -22,7 +22,7 @@ Python DSL body
 
 HTP
 Python-authored program
-    -> canonical runnable Python AST + staged semantic payloads
+    -> canonical runnable Python + staged ProgramModule state
     -> passes / analyses / optional islands
     -> backend package + replayable stage programs
 ```
@@ -41,11 +41,9 @@ the authored Python program anymore.
 
 HTP makes a different choice:
 
-- the canonical form remains staged runnable Python plus attached semantic
-  payloads
-- semantic state such as `kernel_ir.json`, `workload_ir.json`, `types.json`,
-  `layout.json`, `effects.json`, and `schedule.json` is staged beside that
-  runnable Python
+- the canonical form remains staged runnable Python plus attached typed state
+- semantic state such as kernel/workload/type/layout/effect/schedule facts now
+  lives in `state.json` beside that runnable Python
 - optional extensions may round-trip through other IRs, but ownership returns
   to Python-space before the next global stage boundary
 
@@ -116,8 +114,7 @@ LittleKernel has rich IR and codegen, but its main intermediate evidence is its
 custom IR and generated CUDA. HTP stages a broader set of inspectable artifacts:
 
 - runnable `ir/stages/<id>/program.py`
-- semantic payloads (`kernel_ir.json`, `workload_ir.json`, `types.json`,
-  `layout.json`, `effects.json`, `schedule.json`)
+- staged semantic state (`state.json`)
 - analysis artifacts
 - explicit rewrite maps and stage trace
 

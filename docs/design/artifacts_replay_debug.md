@@ -8,7 +8,7 @@ HTP is artifact-first. That phrase is easy to say and easy to water down. In the
 - the compiler emits packages whose file layout matters,
 - replay is a real execution surface over staged Python,
 - backend execution is a separate binding-owned surface,
-- and diagnostics, traces, maps, and sidecars are meant to be consumed by both humans and tools.
+- and diagnostics, traces, identity state, and compact stage bundles are meant to be consumed by both humans and tools.
 
 Without this layer, the rest of the framework would be much harder to verify or evolve.
 
@@ -47,13 +47,16 @@ Replay executes `ir/stages/<id>/program.py` through the runtime surface. This is
 
 The staged `program.py` surface is intentionally readable now. The compiler
 does not emit a single opaque payload blob anymore; it emits pretty-printed
-top-level bindings such as `ENTRY`, `KERNEL`, `WORKLOAD`, and `TARGET`, then
-reassembles `PROGRAM_STATE` from those bindings. The result is still fully
-runnable Python, but it is also a practical debugging artifact a human can
-read, diff, and execute directly.
+top-level bindings that reconstruct `ProgramModule`, then exposes both:
+- `program_module()` for typed inspection,
+- `program_state()` for compatibility snapshot export,
+- and `run(...)` for interpreter-driven replay.
+
+The result is still fully runnable Python, but it is also a practical
+debugging artifact a human can read, diff, and execute directly.
 
 That readability now extends to staged tile/view programs:
-- loop-derived slice offsets survive as readable symbolic expressions in staged sidecars;
+- loop-derived slice offsets survive as readable symbolic expressions in staged state;
 - replay still uses concretely replayable offsets/sizes, so the same package remains executable in `sim`;
 - when an extent is intentionally “full axis”, replay derives the concrete size from the runtime array shape instead of discarding the original symbolic intent.
 
@@ -74,12 +77,12 @@ and reserves explicit stub diagnostics mainly for genuine external boundaries.
 The current implementation already has:
 - structured replay diagnostics
 - binding validation diagnostics
-- uniform `artifact_ref` evidence for generic malformed/invalid sidecars
-- generic schema validation for backend-owned output sidecars across PTO,
+- uniform `artifact_ref` evidence for generic malformed/invalid stage and backend artifacts
+- generic schema validation for backend-owned output artifacts across PTO,
   NV-GPU, and AIE package manifests
 - adapter traces
 - binding logs
-- semantic diff evidence that includes stage sidecars, ids, maps, and pass traces
+- semantic diff evidence that includes `state.json`, identity maps, and pass traces
 - a diagnostic catalog with family and exact-code lookup
 
 ### Tool surface
@@ -95,7 +98,7 @@ The tool layer already includes:
 
 ## Rationale
 
-This topic is central to the HTP claim that retargetability and agent-friendliness require explicit intermediate evidence. Replay, semantic sidecars, logs, traces, and fix-hint references are part of the framework contract, not only debugging conveniences.
+This topic is central to the HTP claim that retargetability and agent-friendliness require explicit intermediate evidence. Replay, staged state bundles, logs, traces, and fix-hint references are part of the framework contract, not only debugging conveniences.
 
 ## Coding pointers
 

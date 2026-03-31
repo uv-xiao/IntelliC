@@ -12,7 +12,6 @@ that “checklist complete” and “product complete” are not the same thing.
 
 The reopened work falls into four broad buckets:
 
-- AST-all-the-way redesign,
 - programming-surface quality,
 - flagship example realism,
 - backend depth,
@@ -22,18 +21,18 @@ The reopened work falls into four broad buckets:
 
 ### AST-all-the-way redesign
 
-- [ ] define the end-to-end invariant that every global stage artifact must be
+- [x] define the end-to-end invariant that every global stage artifact must be
       unparseable into native Python code for reading and human manipulation
-- [ ] define the companion invariant that every mutated stage artifact must also
+- [x] define the companion invariant that every mutated stage artifact must also
       be runnable through a Python executor/interpreter path
-- [ ] redesign extension-island and MLIR participation around “return to
+- [x] redesign extension-island and MLIR participation around “return to
       Python-owned artifact at every global boundary”, not only “emit sidecars”
-- [ ] audit the current compiler model, pass contracts, artifact model, and
+- [x] audit the current compiler model, pass contracts, artifact model, and
       backend discharge story against that stricter invariant
-- [ ] reopen any design document that currently treats the compiler model topic
+- [x] reopen any design document that currently treats the compiler model topic
       as fully closed even though the end-to-end AST-all-the-way target is not
       yet satisfied
-- [ ] make “human-friendly and LLM-friendly compiler stack” the primary design
+- [x] make “human-friendly and LLM-friendly compiler stack” the primary design
       metric across examples, passes, and extension integration
 
 ### Programming surfaces
@@ -66,7 +65,7 @@ The reopened work falls into four broad buckets:
 
 ### Pipeline and solver
 
-- [ ] ensure pass and extension contracts state whether they preserve
+- [x] ensure pass and extension contracts state whether they preserve
       Python-unparseable staged artifacts and runnable replay semantics at the
       next global boundary
 
@@ -96,16 +95,6 @@ Backend-depth gaps are visible in:
 - `htp/bindings/pto_runtime_adapter.py`
 - `htp/bindings/aie_toolchain_adapter.py`
 - `docs/design/backends_and_extensions.md`
-
-AST-all-the-way redesign gaps are visible in:
-
-- `AGENTS.md`
-- `README.md`
-- `docs/story.md`
-- `docs/design/compiler_model.md`
-- `docs/design/pipeline_and_solver.md`
-- `docs/design/artifacts_replay_debug.md`
-- `docs/design/status_and_alignment.md`
 
 Documentation-alignment gaps are visible in:
 

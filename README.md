@@ -22,7 +22,9 @@ That top-level goal has two strict consequences:
 
 Implemented today:
 - staged replayable compilation artifacts under `ir/stages/`
-- shared semantic payloads for kernel/workload/types/layout/effects/schedule
+- compact staged state bundles rooted at `program.py`, `stage.json`, and `state.json`
+- `ProgramModule`-first lowering from the current public frontend set (`kernel`,
+  `routine`, `wsp`, and `csp`)
 - registry-driven passes, pipeline templates, solver preflight, and machine-visible pass traces
 - human-first programming surfaces for kernels, WSP, CSP, and Arknife-style NV-GPU annotation
 - MLIR CSE and AIE extension participation
@@ -33,8 +35,11 @@ Implemented today:
 Current TODO status:
 - `docs/todo/README.md` is authoritative for future work
 - the currently reopened topic is `docs/todo/alignment_and_product_gaps.md`
-- that TODO explicitly includes the end-to-end redesign work needed to satisfy
-  the stronger AST-all-the-way goal
+- the remaining open work is now mainly:
+  - programming-surface quality,
+  - flagship example realism,
+  - backend-depth widening,
+  - and keeping top-level docs/status claims honest
 
 ## Documentation layout
 

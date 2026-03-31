@@ -12,7 +12,7 @@ For every feature-sized change:
 2. choose a feature-sized gap from `docs/todo/README.md`
 3. create a branch named `htp/feat-<topic>`
 4. create a task file under `docs/in_progress/` using `docs/in_progress/TEMPLATE.md`
-5. create a design document under `docs/in_progress/design/` before implementation when the feature changes architecture, IR shape, programming surfaces, passes, artifacts, or extension boundaries
+5. create a design document collection under `docs/in_progress/design/` before implementation when the feature changes architecture, IR shape, programming surfaces, passes, artifacts, or extension boundaries
 6. make task-file creation and design-doc creation the first commit(s) on the branch
 7. open a PR from the feature branch to `htp/dev`
 8. land implementation as additional commits on that PR
@@ -40,6 +40,17 @@ Before editing:
 5. if the feature is architectural, confirm that a design doc exists under `docs/in_progress/design/` and reflects the current intended implementation before touching code
 
 Do not begin with speculative edits.
+
+For design-first features, do not stop at a vague design note. Interactively
+confirm the major architecture decisions with the user and record those
+confirmed decisions in the active design file(s) under `docs/in_progress/design/`
+before implementation starts.
+
+For redesign and migration work, legacy parallel systems are not allowed to
+survive. Transitional adapters may exist only inside the feature branch while
+migrating, but they must be deleted before merge. Do not preserve replaced
+legacy contracts “for compatibility” if the redesign is supposed to supersede
+them.
 
 ## 3. Documentation structure
 
@@ -188,6 +199,13 @@ Specific requirements:
 - use explicit, semantic names; avoid opaque abbreviations and single-letter names unless mathematically standard
 - examples and tests should read top-to-bottom without forcing the reader to reconstruct hidden state from globals
 - `examples/` is part of the allowed feature-work corridor; public example changes are expected when they are part of the contract proof surface.
+- avoid stringly-typed semantic references in new architecture code when a
+  typed id or object reference is viable
+- avoid writing new program-facing logic around dict-shaped payload assembly
+  when a Python class or dataclass can own the contract instead
+- avoid flat, monolithic procedural code in new architecture work; prefer
+  object-oriented decomposition and explicit software-architecture patterns
+  when they make ownership, invariants, and extension points clearer
 
 ## 9. Testing and CI discipline
 

@@ -44,6 +44,14 @@ These helpers deliberately lower into the same canonical program payload used by
 the compiler passes. They exist to keep public code readable without creating a
 second semantic ownership path.
 
+That path is now direct as well as readable. The public surface objects expose
+`to_program_module()`, and `htp.compile_program(...)` prefers that entry path
+over `to_program()`. In the current implementation this is true for:
+- `htp.kernel.KernelSpec`
+- `htp.routine.ProgramSpec`
+- `htp.wsp.WSPProgramSpec`
+- `htp.csp.CSPProgramSpec`
+
 The important implementation decision is that public authoring is now traced
 from ordinary Python functions. A flagship example can therefore read like:
 
@@ -176,7 +184,7 @@ The current proof points include:
 - schedule helpers such as `.tile(...)`, `.bind(...)`, `.pipeline(...)`,
   `.resources(...)`, and `.specialize(...)`
 - workload evidence that now carries task-level `attrs.role`,
-  `attrs.schedule`, and `attrs.stages` into `workload_ir.json`
+  `attrs.schedule`, and `attrs.stages` into `state.json#/items/workload_ir`
 
 The important change is that WSP is no longer only a global schedule wrapper.
 Public examples can now express a producer/mainloop/epilogue task graph in
@@ -274,7 +282,7 @@ values and routines instead of inventing parallel semantic roots.
 - bound kernel arguments via `p.args.<name>`
 - default kernel/argument capture for `p.process(...)`
 - fluent process builders such as `.process(...).role(...).compute_step(...).get(...).put(...)`
-- process-local step traces that survive into `workload_ir.json`
+- process-local step traces that survive into `state.json#/items/workload_ir`
 - public examples that now describe named dispatch/combine/writeback roles and
   protocol-local steps instead of assembling process dicts by hand
 - a richer four-process flagship pipeline (`dispatch`, `combine`, `finalize`,
@@ -317,6 +325,11 @@ anonymous nested dicts just to reach the workload semantic model.
 This is intentionally closer to the public feel of the `references/pypto/`,
 `references/arknife/`, and LittleKernel authoring examples, while still
 lowering into the shared HTP semantic substrate.
+
+The same is now true for the schedule- and protocol-facing surfaces. WSP and
+CSP no longer enter the pipeline only through raw payload dicts; they also
+lower through `ProgramModule` so the shared staged-object contract applies
+uniformly across the current public frontend set.
 
 ## Implemented testing baseline
 
