@@ -260,58 +260,58 @@ class KernelSpec:
         }
 
     def to_program_module(self) -> ProgramModule:
-        authored_program = self.to_program()
-        runtime_args = tuple(argument for argument in self.args if argument.name is not None)
-        kernel_ir = KernelIR(
-            entry=self.name,
-            args=tuple(_semantic_kernel_arg(argument) for argument in runtime_args),
-            buffers=tuple(
-                _semantic_kernel_arg(argument) for argument in runtime_args if argument.kind == "buffer"
+        return build_kernel_program_module(self)
+
+
+def build_kernel_program_module(spec: KernelSpec) -> ProgramModule:
+    authored_program = spec.to_program()
+    runtime_args = tuple(argument for argument in spec.args if argument.name is not None)
+    kernel_ir = KernelIR(
+        entry=spec.name,
+        args=tuple(_semantic_kernel_arg(argument) for argument in runtime_args),
+        buffers=tuple(_semantic_kernel_arg(argument) for argument in runtime_args if argument.kind == "buffer"),
+        ops=tuple(_semantic_kernel_op(spec.name, index=index, op=op) for index, op in enumerate(spec.ops)),
+    )
+    workload_ir = WorkloadIR(
+        entry=spec.name,
+        tasks=(
+            WorkloadTask(
+                task_id="task0",
+                kind="kernel_call",
+                kernel=spec.name,
+                args=tuple(argument.name for argument in runtime_args if argument.name is not None),
+                entity_id=f"{spec.name}:task0",
             ),
-            ops=tuple(
-                _semantic_kernel_op(self.name, index=index, op=op) for index, op in enumerate(self.ops)
-            ),
-        )
-        workload_ir = WorkloadIR(
-            entry=self.name,
-            tasks=(
-                WorkloadTask(
-                    task_id="task0",
-                    kind="kernel_call",
-                    kernel=self.name,
-                    args=tuple(argument.name for argument in runtime_args if argument.name is not None),
-                    entity_id=f"{self.name}:task0",
-                ),
-            ),
-            channels=(),
-            dependencies=(),
-        )
-        return ProgramModule(
-            items=ProgramItems(
-                canonical_ast={
-                    "schema": "htp.program_ast.v1",
-                    "program": authored_program,
-                },
-                kernel_ir=kernel_ir,
-                workload_ir=workload_ir,
-            ),
-            aspects=ProgramAspects(
-                types=TypesAspect(schema="htp.types.v1"),
-                layout=LayoutAspect(schema="htp.layout.v1"),
-                effects=EffectsAspect(schema="htp.effects.v1"),
-                schedule=ScheduleAspect(schema="htp.schedule.v1"),
-            ),
-            identity=ProgramIdentity(
-                entities={"schema": "htp.ids.entities.v1", "entities": [], "node_to_entity": []},
-                bindings={"schema": "htp.ids.bindings.v1", "scopes": [], "bindings": [], "name_uses": []},
-            ),
-            entrypoints=(ProgramEntrypoint("run"),),
-            meta={
-                "source_surface": "htp.kernel.KernelSpec",
-                **dialect_activation_payload("htp.core", "htp.kernel"),
-                "program_extras": authored_program,
+        ),
+        channels=(),
+        dependencies=(),
+    )
+    return ProgramModule(
+        items=ProgramItems(
+            canonical_ast={
+                "schema": "htp.program_ast.v1",
+                "program": authored_program,
             },
-        )
+            kernel_ir=kernel_ir,
+            workload_ir=workload_ir,
+        ),
+        aspects=ProgramAspects(
+            types=TypesAspect(schema="htp.types.v1"),
+            layout=LayoutAspect(schema="htp.layout.v1"),
+            effects=EffectsAspect(schema="htp.effects.v1"),
+            schedule=ScheduleAspect(schema="htp.schedule.v1"),
+        ),
+        identity=ProgramIdentity(
+            entities={"schema": "htp.ids.entities.v1", "entities": [], "node_to_entity": []},
+            bindings={"schema": "htp.ids.bindings.v1", "scopes": [], "bindings": [], "name_uses": []},
+        ),
+        entrypoints=(ProgramEntrypoint("run"),),
+        meta={
+            "source_surface": "htp.kernel.KernelSpec",
+            **dialect_activation_payload("htp.core", "htp.kernel"),
+            "program_extras": authored_program,
+        },
+    )
 
 
 _TRACE_RECORDER: ContextVar[_KernelTrace | None] = ContextVar("htp_kernel_trace_recorder", default=None)

@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from .frontend_rules import FrontendBuildContext, FrontendRule
+from .frontend_rules import FrontendBuildContext, FrontendRule, FrontendRuleResult
 from .module import ProgramModule
 
 
@@ -52,7 +52,7 @@ def frontend_registry_snapshot() -> dict[str, FrontendSpec]:
 
 def ensure_builtin_frontends() -> tuple[FrontendSpec, ...]:
     from htp.csp import CSPProgramSpec
-    from htp.kernel import KernelSpec
+    from htp.kernel import KernelSpec, build_kernel_program_module
     from htp.routine import ProgramSpec
     from htp.wsp import WSPProgramSpec
 
@@ -61,7 +61,10 @@ def ensure_builtin_frontends() -> tuple[FrontendSpec, ...]:
             frontend_id="htp.kernel.KernelSpec",
             dialect_id="htp.kernel",
             surface_type=KernelSpec,
-            build_program_module=lambda surface: surface.to_program_module(),
+            rule=FrontendRule(
+                name="kernel_spec_to_program_module",
+                build=lambda context: FrontendRuleResult(module=build_kernel_program_module(context.surface)),
+            ),
         ),
         FrontendSpec(
             frontend_id="htp.routine.ProgramSpec",

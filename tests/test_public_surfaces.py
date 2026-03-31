@@ -5,9 +5,11 @@ import pytest
 import htp
 from htp import ark
 from htp.csp import program as csp_program
+from htp.ir.frontends import resolve_frontend
 from htp.ir.module import ProgramModule
 from htp.ir.semantics import KernelIR, WorkloadIR
 from htp.kernel import (
+    KernelSpec,
     KernelValue,
     async_copy,
     barrier,
@@ -91,6 +93,15 @@ def test_kernel_surface_exposes_program_module_and_compiler_prefers_it(tmp_path)
 
     assert compiled.manifest["inputs"]["entry"] == "affine_mix"
     assert compiled.manifest["target"]["backend"] == "pto"
+
+
+def test_kernel_surface_is_built_through_registered_frontend_rule() -> None:
+    spec = resolve_frontend(KernelSpec(name="affine", args=(), ops=()))
+
+    assert spec is not None
+    assert spec.frontend_id == "htp.kernel.KernelSpec"
+    assert spec.rule is not None
+    assert spec.build_program_module is None
 
 
 def test_public_type_surface_drives_kernel_and_channel_annotations(tmp_path):
