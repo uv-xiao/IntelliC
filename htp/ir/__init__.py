@@ -1,6 +1,7 @@
 """IR package."""
 
 from . import (
+    analysis_state,
     aspects,
     build,
     identity_state,
@@ -18,6 +19,7 @@ from . import (
 
 __all__ = [
     "aspects",
+    "analysis_state",
     "build",
     "identity_state",
     "ids",

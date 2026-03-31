@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from htp.ir.analysis_state import AnalysisRecord
 from htp.ir.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
 from htp.ir.identity_state import BindingTable, EntityTable, RewriteMap
 from htp.ir.interpreter import register_interpreter
@@ -48,6 +49,7 @@ def test_program_module_definition_execution_and_transformation(tmp_path: Path) 
     assert isinstance(transformed.aspects.schedule, ScheduleAspect)
     assert isinstance(transformed.identity.entities, EntityTable)
     assert isinstance(transformed.identity.bindings, BindingTable)
+    assert isinstance(transformed.analyses["transform.demo"], AnalysisRecord)
     assert transformed.aspects.schedule["pipeline_depth"] == 3
     assert transformed.analyses["transform.demo"]["pipeline_depth"] == 3
 
@@ -157,6 +159,30 @@ def test_program_module_identity_round_trip_typed_wrappers() -> None:
     assert module.identity.entities["entities"][0]["entity_id"] == "E0"
     assert module.identity.binding_map["stage_after"] == "s01"
     assert module.to_state_dict()["entity_map_payload"]["entities"][0]["after"] == ["E1"]
+
+
+def test_program_module_analysis_round_trip_typed_wrappers() -> None:
+    module = ProgramModule.from_program_dict(
+        {
+            "entry": "run",
+            "canonical_ast": {"schema": "htp.program_ast.v1", "program": {"entry": "run"}},
+            "kernel_ir": {},
+            "workload_ir": {},
+            "analysis": {
+                "schedule": {
+                    "schema": "htp.analysis.schedule.v1",
+                    "ticks": [{"tick": 0, "op_id": "op0"}],
+                    "pipeline_depth": 2,
+                }
+            },
+        }
+    )
+
+    schedule_analysis = module.analyses["schedule"]
+
+    assert isinstance(schedule_analysis, AnalysisRecord)
+    assert schedule_analysis["pipeline_depth"] == 2
+    assert module.to_state_dict()["analysis"]["schedule"]["schema"] == "htp.analysis.schedule.v1"
 
 
 def _demo_module(*, interpreter_id: str, kernel_entry: str, pipeline_depth: int) -> ProgramModule:

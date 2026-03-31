@@ -146,6 +146,8 @@ end state.
   - entity tables
   - binding tables
   - rewrite maps
+- committed-stage analyses now use typed `AnalysisRecord` wrappers instead of
+  raw dict ownership
 - `htp.kernel.KernelSpec`, `htp.routine.ProgramSpec`,
   `htp.wsp.WSPProgramSpec`, and `htp.csp.CSPProgramSpec` now lower to
   `ProgramModule` directly through `to_program_module()`, and
@@ -163,9 +165,8 @@ end state.
 
 ### Partial
 
-- `ProgramModule` still stores dict-shaped analyses
-  instead of the fully typed analysis substrate planned in
-  `02_ir_structure.md`
+- `ProgramModule` now uses typed analysis records, but not the fuller
+  typed/dialect-aware analysis substrate planned in `02_ir_structure.md`
 - the first typed-node slice now exists under:
   - `htp.ir.nodes`
   - `htp.ir.node_exec`

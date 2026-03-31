@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from .analysis_state import AnalysisRecord, analysis_record_from_payload
 from .aspects import (
     EffectsAspect,
     LayoutAspect,
@@ -115,10 +116,24 @@ class ProgramEntrypoint:
 class ProgramModule:
     items: ProgramItems
     aspects: ProgramAspects
-    analyses: dict[str, dict[str, Any]] = field(default_factory=dict)
+    analyses: dict[str, AnalysisRecord | Mapping[str, Any]] = field(default_factory=dict)
     identity: ProgramIdentity = field(default_factory=lambda: ProgramIdentity(entities={}, bindings={}))
     entrypoints: tuple[ProgramEntrypoint, ...] = (ProgramEntrypoint("run"),)
     meta: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.analyses and not all(isinstance(value, AnalysisRecord) for value in self.analyses.values()):
+            object.__setattr__(
+                self,
+                "analyses",
+                {
+                    str(key): (
+                        value if isinstance(value, AnalysisRecord) else analysis_record_from_payload(value)
+                    )
+                    for key, value in self.analyses.items()
+                    if isinstance(value, Mapping) or isinstance(value, AnalysisRecord)
+                },
+            )
 
     def to_payload(self) -> dict[str, Any]:
         from .nodes import to_payload
@@ -139,7 +154,7 @@ class ProgramModule:
                 "effects": self.aspects.effects.to_payload(),
                 "schedule": self.aspects.schedule.to_payload(),
             },
-            "analyses": {key: dict(value) for key, value in self.analyses.items()},
+            "analyses": {key: value.to_payload() for key, value in self.analyses.items()},
             "identity": {
                 "entities": self.identity.entities.to_payload(),
                 "bindings": self.identity.bindings.to_payload(),
@@ -211,7 +226,7 @@ class ProgramModule:
         program["layout"] = self.aspects.layout.to_payload()
         program["effects"] = self.aspects.effects.to_payload()
         program["schedule"] = self.aspects.schedule.to_payload()
-        program["analysis"] = {key: dict(value) for key, value in self.analyses.items()}
+        program["analysis"] = {key: value.to_payload() for key, value in self.analyses.items()}
         program["entities_payload"] = self.identity.entities.to_payload()
         program["bindings_payload"] = self.identity.bindings.to_payload()
         if self.identity.entity_map is not None:
@@ -231,7 +246,7 @@ class ProgramModule:
         cls,
         program: Mapping[str, Any],
         *,
-        analyses: Mapping[str, dict[str, Any]] | None = None,
+        analyses: Mapping[str, Mapping[str, Any]] | None = None,
         meta: Mapping[str, Any] | None = None,
     ) -> ProgramModule:
         from .nodes import from_payload
@@ -280,7 +295,7 @@ class ProgramModule:
                 effects=dict(program.get("effects", {})),
                 schedule=dict(program.get("schedule", {})),
             ),
-            analyses={key: dict(value) for key, value in analysis_payload.items()},
+            analyses={key: analysis_record_from_payload(value) for key, value in analysis_payload.items()},
             identity=ProgramIdentity(
                 entities=dict(program.get("entities_payload", {})),
                 bindings=dict(program.get("bindings_payload", {})),

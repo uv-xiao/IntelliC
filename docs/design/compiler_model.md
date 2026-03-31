@@ -65,6 +65,7 @@ leaked dict-first semantics:
   `aspects.schedule` are typed aspect wrappers
 - `identity.entities`, `identity.bindings`, `identity.entity_map`, and
   `identity.binding_map` are typed identity wrappers
+- `analyses.*` are typed analysis-record wrappers
 
 ### Staged state bundle
 

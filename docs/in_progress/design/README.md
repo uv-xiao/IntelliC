@@ -64,6 +64,7 @@ Implemented on this branch:
 - committed-stage aspects now use typed wrappers instead of raw dict ownership
 - committed-stage identity payloads now use typed wrappers instead of raw dict
   ownership
+- committed-stage analyses now use typed records instead of raw dict ownership
 - `htp.kernel.KernelSpec`, `htp.routine.ProgramSpec`,
   `htp.wsp.WSPProgramSpec`, and `htp.csp.CSPProgramSpec` now expose
   `to_program_module()`, and `compile_program()` prefers the `ProgramModule`
@@ -76,6 +77,7 @@ Still design-only or partial:
 - the full typed node hierarchy in `02_ir_structure.md`
 - the uniform dialect registry/frontends substrate in
   `03_dialects_and_frontends.md`
+- the full typed analysis substrate beyond the current generic record wrapper
 - extension and dialect migration beyond the current public frontend set
 
 So the redesign is not fully finished yet. The stage/execution contract slice
