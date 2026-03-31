@@ -27,7 +27,6 @@ from inspect import signature
 from typing import Any
 
 from htp.compiler import parse_target
-from htp.ir.frontend import kernel_spec_from_payload
 from htp.ir.frontends import resolve_frontend
 from htp.ir.module import ProgramModule
 from htp.kernel import KernelSpec, KernelValue
@@ -134,8 +133,7 @@ def workload(
         "tasks": [item.to_payload() if isinstance(item, WSPTaskSpec) else dict(item) for item in tasks],
         "channels": [dict(item) for item in channels],
         "dependencies": [
-            item.to_payload() if isinstance(item, WSPDependencySpec) else dict(item)
-            for item in dependencies
+            item.to_payload() if isinstance(item, WSPDependencySpec) else dict(item) for item in dependencies
         ],
     }
 

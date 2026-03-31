@@ -8,7 +8,6 @@ from inspect import signature
 from typing import Any
 
 from htp.compiler import parse_target
-from htp.ir.frontend import kernel_spec_from_payload
 from htp.ir.frontends import resolve_frontend
 from htp.ir.module import ProgramModule
 from htp.kernel import KernelSpec, KernelValue
@@ -317,7 +316,8 @@ def program(
             "kernel": kernel.to_payload() if isinstance(kernel, KernelSpec) else dict(kernel),
             "csp": {
                 "channels": [
-                    item.to_payload() if isinstance(item, ChannelRef) else dict(item) for item in (channels or ())
+                    item.to_payload() if isinstance(item, ChannelRef) else dict(item)
+                    for item in (channels or ())
                 ],
                 "processes": [
                     item.to_payload() if isinstance(item, CSPProcessSpec) else dict(item)
