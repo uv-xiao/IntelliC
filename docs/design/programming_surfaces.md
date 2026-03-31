@@ -62,6 +62,11 @@ record a dependency-closed active dialect list plus a manifest-style activation
 payload, so staged artifacts can explain not only which dialects are active but
 also which frontend request produced that closure.
 
+Compiler ingress is now slightly more formal as well. Builtin public surfaces
+are registered in `htp/ir/frontends.py`, and `htp.compile_program(...)`
+resolves them through frontend specs before falling back to older
+`to_program_module()` / `to_program()` probing.
+
 The important implementation decision is that public authoring is now traced
 from ordinary Python functions. A flagship example can therefore read like:
 

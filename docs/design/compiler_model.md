@@ -51,6 +51,11 @@ The public frontend path now feeds that same owner directly. The implemented
 surface objects can enter the pipeline without first collapsing back to a raw
 program dict.
 
+That ingress is now also registered rather than only inferred. Builtin public
+surfaces are resolved through `htp.ir.frontends`, which gives the compiler an
+explicit frontend-definition substrate for surface-to-`ProgramModule`
+construction.
+
 The current frontend set also records explicit dialect activation metadata into
 `ProgramModule.meta`, so committed-stage state now carries both:
 - the dependency-closed active dialect list

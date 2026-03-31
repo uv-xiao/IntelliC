@@ -38,6 +38,7 @@ extension boundaries.
 - [x] migrate `htp.routine`, `htp.wsp`, and `htp.csp` onto the `ProgramModule` intake path
 - [x] factor the public frontend `to_program_module()` path through a shared frontend-definition substrate instead of duplicating `ProgramModule` assembly per surface
 - [x] replace the flat builtin dialect list with manifest-style builtin dialect activation metadata and dependency closure
+- [x] formalize builtin public-surface ingress through a frontend registry substrate instead of only ad hoc `to_program_module()` probing
 
 ## Code Surfaces
 

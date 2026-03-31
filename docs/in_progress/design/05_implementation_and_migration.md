@@ -155,6 +155,8 @@ end state.
 - those public frontends now share a common frontend-definition substrate in
   `htp.ir.frontend` for rebuilding `KernelSpec`, assembling `FrontendWorkload`,
   and constructing `ProgramModule` with consistent metadata/dialect ownership
+- a first frontend registry substrate now exists in `htp.ir.frontends`, and the
+  compiler resolves builtin public surfaces through registered frontend specs
 - a manifest-style dialect activation slice now exists for builtin frontend
   dialects, and the public frontends now record both active dialect closure and
   activation payloads in `ProgramModule.meta`
@@ -187,6 +189,9 @@ end state.
   workload/process/channel structure from legacy payload-shaped fields instead
   of the final typed frontend-definition API described in
   `03_dialects_and_frontends.md`
+- the frontend registry exists only for builtin public surfaces and still
+  resolves by Python surface type rather than the fuller rule/combinator API
+  described in `03_dialects_and_frontends.md`
 - dialect activation now handles dependency closure and activation payloads, but
   builtin and extension dialects have not yet been migrated onto the full
   node/aspect/intrinsic registration substrate described in

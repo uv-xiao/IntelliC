@@ -7,6 +7,7 @@ from typing import Any, Protocol
 
 from htp.bindings.api import bind
 from htp.ir.dialects import activate_dialects, ensure_builtin_dialects
+from htp.ir.frontends import ensure_builtin_frontends, resolve_frontend
 from htp.ir.module import ProgramModule
 from htp.pipeline.defaults import DefaultPipelineResult, run_default_pipeline
 from htp.solver import solve_default_pipeline, validate_final_artifacts
@@ -50,6 +51,7 @@ def compile_program(
     program: dict[str, Any] | ProgramSurface | None = None,
 ) -> CompiledPackage:
     ensure_builtin_dialects()
+    ensure_builtin_frontends()
     target_spec = parse_target(target)
     package_path = Path(package_dir)
     pipeline_program = _normalize_program_input(program)
@@ -114,6 +116,12 @@ def _normalize_program_input(
         return program.to_state_dict()
     if isinstance(program, dict):
         return dict(program)
+    frontend = resolve_frontend(program)
+    if frontend is not None:
+        module = frontend.build_program_module(program)
+        if not isinstance(module, ProgramModule):
+            raise TypeError(f"{frontend.frontend_id} must build a ProgramModule")
+        return module.to_state_dict()
     to_program_module = getattr(program, "to_program_module", None)
     if callable(to_program_module):
         module = to_program_module()

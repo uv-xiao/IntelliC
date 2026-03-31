@@ -72,6 +72,8 @@ Implemented on this branch:
   path over `to_program()`
 - those public frontends now share the first common frontend-definition
   substrate in `htp.ir.frontend`
+- a first frontend registry substrate now exists in `htp.ir.frontends`, and the
+  compiler resolves builtin public surfaces through registered frontend specs
 - a first dialect registry slice now exists for builtin frontend dialects, and
   public frontends record their active dialect set and activation manifest into
   `ProgramModule.meta`
@@ -83,6 +85,7 @@ Still design-only or partial:
 - the full typed node hierarchy in `02_ir_structure.md` beyond the current
   kernel/task-graph/process-graph slice
 - the final node-first frontend substrate in `03_dialects_and_frontends.md`
+  beyond the current builtin frontend registry slice
 - the full typed analysis substrate beyond the current generic record wrapper
 - full dialect migration beyond the current builtin frontend set
 - extension and dialect migration beyond the current public frontend set
