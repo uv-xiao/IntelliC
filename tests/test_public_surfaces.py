@@ -181,14 +181,16 @@ def test_public_surface_program_modules_delegate_to_registered_frontend_builders
     wsp_spec = wsp_module.WSPProgramSpec(
         entry="wsp_frontend_probe",
         target={},
-        kernel={"name": "affine", "args": [], "ops": []},
-        workload={"entry": "wsp_frontend_probe", "tasks": [], "channels": [], "dependencies": []},
-        schedule={"tile": {}, "bind": {}, "pipeline": {}, "resources": {}, "specialize": {}},
+        kernel=KernelSpec(name="affine", args=(), ops=()),
+        tasks=(),
+        channels=(),
+        dependencies=(),
+        schedule=wsp_module.WSPScheduleSpec(),
     )
     csp_spec = csp_module.CSPProgramSpec(
         entry="csp_frontend_probe",
         target={},
-        kernel={"name": "affine", "args": [], "ops": []},
+        kernel=KernelSpec(name="affine", args=(), ops=()),
         channels=(),
         processes=(),
     )

@@ -33,38 +33,110 @@ from htp.ir.module import ProgramModule
 from htp.kernel import KernelSpec, KernelValue
 
 
+@dataclass
+class WSPTaskSpec:
+    task_id: str
+    kind: str
+    kernel: str
+    args: tuple[str, ...]
+    attrs: dict[str, Any] = field(default_factory=dict)
+
+    def to_payload(self) -> dict[str, Any]:
+        payload = {
+            "task_id": self.task_id,
+            "kind": self.kind,
+            "kernel": self.kernel,
+            "args": list(self.args),
+        }
+        if self.attrs:
+            payload["attrs"] = dict(self.attrs)
+        return payload
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> WSPTaskSpec:
+        return cls(
+            task_id=str(payload["task_id"]),
+            kind=str(payload["kind"]),
+            kernel=str(payload["kernel"]),
+            args=tuple(str(arg) for arg in payload.get("args", ())),
+            attrs=dict(payload.get("attrs", {})),
+        )
+
+
+@dataclass(frozen=True)
+class WSPDependencySpec:
+    src: str
+    dst: str
+
+    def to_payload(self) -> dict[str, str]:
+        return {"src": self.src, "dst": self.dst}
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> WSPDependencySpec:
+        return cls(src=str(payload["src"]), dst=str(payload["dst"]))
+
+
+@dataclass(frozen=True)
+class WSPScheduleSpec:
+    tile: dict[str, Any] = field(default_factory=dict)
+    bind: dict[str, Any] = field(default_factory=dict)
+    pipeline: dict[str, Any] = field(default_factory=dict)
+    resources: dict[str, Any] = field(default_factory=dict)
+    specialize: dict[str, Any] = field(default_factory=dict)
+
+    def to_payload(self) -> dict[str, dict[str, Any]]:
+        return {
+            "tile": dict(self.tile),
+            "bind": dict(self.bind),
+            "pipeline": dict(self.pipeline),
+            "resources": dict(self.resources),
+            "specialize": dict(self.specialize),
+        }
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> WSPScheduleSpec:
+        return cls(
+            tile=dict(payload.get("tile", {})),
+            bind=dict(payload.get("bind", {})),
+            pipeline=dict(payload.get("pipeline", {})),
+            resources=dict(payload.get("resources", {})),
+            specialize=dict(payload.get("specialize", {})),
+        )
+
+
 def task(
     kernel: KernelSpec | str,
     *args: str | KernelValue,
     task_id: str | None = None,
     kind: str = "kernel_call",
     attrs: Mapping[str, Any] | None = None,
-) -> dict[str, Any]:
+) -> WSPTaskSpec:
     kernel_name = kernel.name if isinstance(kernel, KernelSpec) else str(kernel)
     resolved_task_id = task_id or f"{kernel_name}_0"
-    payload = {
-        "task_id": resolved_task_id,
-        "kind": kind,
-        "kernel": kernel_name,
-        "args": [_ref(arg) for arg in args],
-    }
-    if attrs:
-        payload["attrs"] = dict(attrs)
-    return payload
+    return WSPTaskSpec(
+        task_id=resolved_task_id,
+        kind=kind,
+        kernel=kernel_name,
+        args=tuple(_ref(arg) for arg in args),
+        attrs={} if attrs is None else dict(attrs),
+    )
 
 
 def workload(
     *,
     entry: str,
-    tasks: Sequence[Mapping[str, Any]],
+    tasks: Sequence[WSPTaskSpec | Mapping[str, Any]],
     channels: Sequence[Mapping[str, Any]] = (),
-    dependencies: Sequence[Mapping[str, Any]] = (),
+    dependencies: Sequence[WSPDependencySpec | Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     return {
         "entry": entry,
-        "tasks": [dict(item) for item in tasks],
+        "tasks": [item.to_payload() if isinstance(item, WSPTaskSpec) else dict(item) for item in tasks],
         "channels": [dict(item) for item in channels],
-        "dependencies": [dict(item) for item in dependencies],
+        "dependencies": [
+            item.to_payload() if isinstance(item, WSPDependencySpec) else dict(item)
+            for item in dependencies
+        ],
     }
 
 
@@ -116,31 +188,30 @@ class WSPProgramSpec:
 
     entry: str
     target: dict[str, Any]
-    kernel: dict[str, Any]
-    workload: dict[str, Any]
-    schedule: dict[str, Any]
+    kernel: KernelSpec
+    tasks: tuple[WSPTaskSpec, ...]
+    channels: tuple[dict[str, Any], ...]
+    dependencies: tuple[WSPDependencySpec, ...]
+    schedule: WSPScheduleSpec
 
     def to_program(self) -> dict[str, Any]:
         return {
             "entry": self.entry,
             "target": dict(self.target),
-            "kernel": dict(self.kernel),
+            "kernel": self.kernel.to_payload(),
             "wsp": {
-                "workload": {
-                    "entry": str(self.workload["entry"]),
-                    "tasks": [dict(item) for item in self.workload.get("tasks", ())],
-                    "channels": [dict(item) for item in self.workload.get("channels", ())],
-                    "dependencies": [dict(item) for item in self.workload.get("dependencies", ())],
-                },
-                "schedule": {
-                    key: dict(value) if isinstance(value, Mapping) else value
-                    for key, value in self.schedule.items()
-                },
+                "workload": workload(
+                    entry=self.entry,
+                    tasks=self.tasks,
+                    channels=self.channels,
+                    dependencies=self.dependencies,
+                ),
+                "schedule": self.schedule.to_payload(),
             },
         }
 
     def kernel_spec(self) -> KernelSpec:
-        return kernel_spec_from_payload(self.kernel)
+        return self.kernel
 
     def to_program_module(self) -> ProgramModule:
         frontend = resolve_frontend(self)
@@ -174,9 +245,9 @@ class WSPBuilder:
     entry: str
     kernel_spec: KernelSpec
     target: dict[str, Any]
-    tasks: list[dict[str, Any]] = field(default_factory=list)
+    tasks: list[WSPTaskSpec] = field(default_factory=list)
     channels: list[dict[str, Any]] = field(default_factory=list)
-    dependencies: list[dict[str, Any]] = field(default_factory=list)
+    dependencies: list[WSPDependencySpec] = field(default_factory=list)
     schedule_state: dict[str, dict[str, Any]] = field(
         default_factory=lambda: {
             "tile": {},
@@ -294,14 +365,11 @@ class WSPBuilder:
         return WSPProgramSpec(
             entry=self.entry,
             target=self.target,
-            kernel=self.kernel_spec.to_payload(),
-            workload=workload(
-                entry=self.entry,
-                tasks=self.tasks,
-                channels=self.channels,
-                dependencies=self.dependencies,
-            ),
-            schedule=self.schedule_state,
+            kernel=self.kernel_spec,
+            tasks=tuple(self.tasks),
+            channels=tuple(self.channels),
+            dependencies=tuple(self.dependencies),
+            schedule=WSPScheduleSpec.from_payload(self.schedule_state),
         ).to_program()
 
     def _default_args_for(self, kernel: KernelSpec | str) -> tuple[KernelValue, ...]:
@@ -340,11 +408,11 @@ class WSPTaskBuilder:
     """
 
     owner: WSPBuilder
-    spec: dict[str, Any]
+    spec: WSPTaskSpec
 
     @property
     def task_id(self) -> str:
-        return str(self.spec["task_id"])
+        return self.spec.task_id
 
     def tile(self, *, block: tuple[int, int, int] | list[int]) -> WSPTaskBuilder:
         tile_payload = tile(block=block)
@@ -382,7 +450,7 @@ class WSPTaskBuilder:
 
     def after(self, other: str | WSPTaskBuilder) -> WSPTaskBuilder:
         src = other if isinstance(other, str) else other.task_id
-        dependency = {"src": str(src), "dst": self.task_id}
+        dependency = WSPDependencySpec(src=str(src), dst=self.task_id)
         if dependency not in self.owner.dependencies:
             self.owner.dependencies.append(dependency)
         return self
@@ -409,11 +477,7 @@ class WSPTaskBuilder:
                 task_schedule.setdefault(key, dict(value))
 
     def _attrs(self) -> dict[str, Any]:
-        attrs = self.spec.setdefault("attrs", {})
-        if not isinstance(attrs, dict):
-            attrs = {}
-            self.spec["attrs"] = attrs
-        return attrs
+        return self.spec.attrs
 
     def _task_schedule(self) -> dict[str, Any]:
         return self._attrs().setdefault("schedule", {})
@@ -421,7 +485,7 @@ class WSPTaskBuilder:
     def _stage_spec(self, name: str) -> dict[str, Any]:
         stages = self._attrs().setdefault("stages", [])
         for stage in stages:
-            if stage.get("name") == str(name):
+            if isinstance(stage, dict) and stage.get("name") == str(name):
                 stage.setdefault("steps", [])
                 return stage
         stage = {"name": str(name), "steps": []}
@@ -487,14 +551,11 @@ def program(
         return WSPProgramSpec(
             entry=builder.entry,
             target=builder.target,
-            kernel=builder.kernel_spec.to_payload(),
-            workload={
-                "entry": builder.entry,
-                "tasks": [dict(item) for item in builder.tasks],
-                "channels": [dict(item) for item in builder.channels],
-                "dependencies": [dict(item) for item in builder.dependencies],
-            },
-            schedule=builder.schedule_state,
+            kernel=builder.kernel_spec,
+            tasks=tuple(builder.tasks),
+            channels=tuple(builder.channels),
+            dependencies=tuple(builder.dependencies),
+            schedule=WSPScheduleSpec.from_payload(builder.schedule_state),
         )
 
     return decorator
@@ -543,8 +604,11 @@ def _stage_attr_value(value: Any) -> Any:
 
 __all__ = [
     "WSPBuilder",
+    "WSPDependencySpec",
+    "WSPTaskSpec",
     "WSPTaskBuilder",
     "WSPProgramSpec",
+    "WSPScheduleSpec",
     "bind",
     "pipeline",
     "program",

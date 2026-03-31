@@ -70,21 +70,21 @@ def _wsp_frontend_workload(surface: Any) -> FrontendWorkload:
         entry=surface.entry,
         tasks=tuple(
             WorkloadTask(
-                task_id=str(task["task_id"]),
-                kind=str(task["kind"]),
-                kernel=str(task["kernel"]),
-                args=tuple(str(arg) for arg in task.get("args", ())),
-                entity_id=f"{surface.entry}:{task['task_id']}",
-                attrs=dict(task.get("attrs", {})),
+                task_id=task.task_id,
+                kind=task.kind,
+                kernel=task.kernel,
+                args=task.args,
+                entity_id=f"{surface.entry}:{task.task_id}",
+                attrs=dict(task.attrs),
             )
-            for task in surface.workload.get("tasks", ())
+            for task in surface.tasks
         ),
-        channels=tuple(dict(item) for item in surface.workload.get("channels", ())),
-        dependencies=tuple(dict(item) for item in surface.workload.get("dependencies", ())),
+        channels=tuple(dict(item) for item in surface.channels),
+        dependencies=tuple(dependency.to_payload() for dependency in surface.dependencies),
         routine={
             "kind": "wsp",
             "entry": surface.entry,
-            "schedule": {key: dict(value) for key, value in surface.schedule.items()},
+            "schedule": surface.schedule.to_payload(),
             "target": dict(surface.target),
         },
     )
@@ -95,21 +95,21 @@ def _csp_frontend_workload(surface: Any) -> FrontendWorkload:
         entry=surface.entry,
         tasks=tuple(
             WorkloadTask(
-                task_id=str(process["task_id"]),
+                task_id=process.task_id,
                 kind="process",
-                kernel=str(process["kernel"]),
-                args=tuple(str(arg) for arg in process.get("args", ())),
-                entity_id=f"{surface.entry}:{process['task_id']}",
+                kernel=process.kernel,
+                args=process.args,
+                entity_id=f"{surface.entry}:{process.task_id}",
                 attrs={
-                    "name": str(process["name"]),
-                    **({"role": str(process["role"])} if process.get("role") is not None else {}),
+                    "name": process.name,
+                    **({"role": process.role} if process.role is not None else {}),
                 },
             )
             for process in surface.processes
         ),
-        channels=tuple(dict(item) for item in surface.channels),
+        channels=tuple(channel.to_payload() for channel in surface.channels),
         dependencies=(),
-        processes=tuple(dict(item) for item in surface.processes),
+        processes=tuple(process.to_payload() for process in surface.processes),
         routine={
             "kind": "csp",
             "entry": surface.entry,

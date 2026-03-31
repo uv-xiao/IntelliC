@@ -48,6 +48,65 @@ class ChannelRef:
         }
 
 
+@dataclass(frozen=True)
+class CSPProcessStep:
+    kind: str
+    attrs: dict[str, Any] = field(default_factory=dict)
+
+    def to_payload(self) -> dict[str, Any]:
+        return {"kind": self.kind, **dict(self.attrs)}
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> CSPProcessStep:
+        attrs = {key: value for key, value in payload.items() if key != "kind"}
+        return cls(kind=str(payload["kind"]), attrs=attrs)
+
+
+@dataclass
+class CSPProcessSpec:
+    name: str
+    task_id: str
+    kernel: str
+    args: tuple[str, ...]
+    steps: list[CSPProcessStep] = field(default_factory=list)
+    role: str | None = None
+
+    def to_payload(self) -> dict[str, Any]:
+        normalized_steps = [step.to_payload() for step in self.steps]
+        puts = [dict(item) for item in normalized_steps if str(item.get("kind")) == "put"]
+        gets = [dict(item) for item in normalized_steps if str(item.get("kind")) == "get"]
+        payload = {
+            "name": self.name,
+            "task_id": self.task_id,
+            "kernel": self.kernel,
+            "args": list(self.args),
+            "puts": puts,
+            "gets": gets,
+        }
+        if normalized_steps:
+            payload["steps"] = normalized_steps
+        if self.role is not None:
+            payload["role"] = self.role
+        return payload
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> CSPProcessSpec:
+        normalized_steps = [CSPProcessStep.from_payload(item) for item in payload.get("steps", ())]
+        if not normalized_steps:
+            normalized_steps = [
+                *(CSPProcessStep.from_payload(item) for item in payload.get("gets", ())),
+                *(CSPProcessStep.from_payload(item) for item in payload.get("puts", ())),
+            ]
+        return cls(
+            name=str(payload["name"]),
+            task_id=str(payload["task_id"]),
+            kernel=str(payload["kernel"]),
+            args=tuple(str(arg) for arg in payload.get("args", ())),
+            steps=list(normalized_steps),
+            role=str(payload["role"]) if payload.get("role") is not None else None,
+        )
+
+
 def channel(name: str, *, dtype: str, capacity: int, protocol: str = "fifo") -> dict[str, Any]:
     return {
         "name": str(name),
@@ -79,49 +138,58 @@ def process(
     gets: Sequence[Mapping[str, Any]] = (),
     steps: Sequence[Mapping[str, Any]] = (),
     role: str | None = None,
-) -> dict[str, Any]:
+) -> CSPProcessSpec:
     normalized_steps = [dict(item) for item in steps]
     if normalized_steps:
-        derived_puts = [dict(item) for item in normalized_steps if str(item.get("kind")) == "put"]
-        derived_gets = [dict(item) for item in normalized_steps if str(item.get("kind")) == "get"]
+        derived_steps = [CSPProcessStep.from_payload(item) for item in normalized_steps]
     else:
-        derived_puts = [dict(item) for item in puts]
-        derived_gets = [dict(item) for item in gets]
-    payload = {
-        "name": str(name),
-        "task_id": str(task_id),
-        "kernel": kernel.name if isinstance(kernel, KernelSpec) else str(kernel),
-        "args": [_ref(arg) for arg in args],
-        "puts": derived_puts,
-        "gets": derived_gets,
-        **({"steps": normalized_steps} if normalized_steps else {}),
-    }
-    if role is not None:
-        payload["role"] = str(role)
-    return payload
+        derived_steps = [
+            *(
+                CSPProcessStep(
+                    kind="get",
+                    attrs={key: _step_value(value) for key, value in item.items()},
+                )
+                for item in gets
+            ),
+            *(
+                CSPProcessStep(
+                    kind="put",
+                    attrs={key: _step_value(value) for key, value in item.items()},
+                )
+                for item in puts
+            ),
+        ]
+    return CSPProcessSpec(
+        name=str(name),
+        task_id=str(task_id),
+        kernel=kernel.name if isinstance(kernel, KernelSpec) else str(kernel),
+        args=tuple(_ref(arg) for arg in args),
+        steps=list(derived_steps),
+        role=str(role) if role is not None else None,
+    )
 
 
 @dataclass(frozen=True)
 class CSPProgramSpec:
     entry: str
     target: dict[str, Any]
-    kernel: dict[str, Any]
-    channels: tuple[dict[str, Any], ...]
-    processes: tuple[dict[str, Any], ...]
+    kernel: KernelSpec
+    channels: tuple[ChannelRef, ...]
+    processes: tuple[CSPProcessSpec, ...]
 
     def to_program(self) -> dict[str, Any]:
         return {
             "entry": self.entry,
             "target": dict(self.target),
-            "kernel": dict(self.kernel),
+            "kernel": self.kernel.to_payload(),
             "csp": {
-                "channels": [dict(item) for item in self.channels],
-                "processes": [dict(item) for item in self.processes],
+                "channels": [item.to_payload() for item in self.channels],
+                "processes": [item.to_payload() for item in self.processes],
             },
         }
 
     def kernel_spec(self) -> KernelSpec:
-        return kernel_spec_from_payload(self.kernel)
+        return self.kernel
 
     def to_program_module(self) -> ProgramModule:
         frontend = resolve_frontend(self)
@@ -132,39 +200,35 @@ class CSPProgramSpec:
 
 @dataclass
 class CSPProcessBuilder:
-    spec: dict[str, Any]
+    spec: CSPProcessSpec
 
     def role(self, name: str) -> CSPProcessBuilder:
-        self.spec["role"] = str(name)
+        self.spec.role = str(name)
         return self
 
     def put(self, channel: str | ChannelRef, *, count: int = 1) -> CSPProcessBuilder:
-        self.spec.setdefault("steps", []).append(put(channel, count=count))
-        self.spec["puts"] = [dict(item) for item in self.spec["steps"] if str(item.get("kind")) == "put"]
+        self.spec.steps.append(CSPProcessStep.from_payload(put(channel, count=count)))
         return self
 
     def get(self, channel: str | ChannelRef, *, count: int = 1) -> CSPProcessBuilder:
-        self.spec.setdefault("steps", []).append(get(channel, count=count))
-        self.spec["gets"] = [dict(item) for item in self.spec["steps"] if str(item.get("kind")) == "get"]
+        self.spec.steps.append(CSPProcessStep.from_payload(get(channel, count=count)))
         return self
 
     def compute(self, name: str, **attrs: Any) -> CSPProcessBuilder:
-        self.spec.setdefault("steps", []).append(
-            {
-                "kind": "compute",
-                "name": str(name),
-                **{key: _step_value(value) for key, value in attrs.items()},
-            }
+        self.spec.steps.append(
+            CSPProcessStep(
+                kind="compute",
+                attrs={"name": str(name), **{key: _step_value(value) for key, value in attrs.items()}},
+            )
         )
         return self
 
     def compute_step(self, op: str, /, **attrs: Any) -> CSPProcessBuilder:
-        self.spec.setdefault("steps", []).append(
-            {
-                "kind": "compute",
-                "op": str(op),
-                **{key: _step_value(value) for key, value in attrs.items()},
-            }
+        self.spec.steps.append(
+            CSPProcessStep(
+                kind="compute",
+                attrs={"op": str(op), **{key: _step_value(value) for key, value in attrs.items()}},
+            )
         )
         return self
 
@@ -174,8 +238,8 @@ class CSPBuilder:
     entry: str
     kernel_spec: KernelSpec
     target: dict[str, Any]
-    channels: list[dict[str, Any]] = field(default_factory=list)
-    processes: list[dict[str, Any]] = field(default_factory=list)
+    channels: list[ChannelRef] = field(default_factory=list)
+    processes: list[CSPProcessSpec] = field(default_factory=list)
     args: CSPBoundArgs = field(init=False)
 
     def __post_init__(self) -> None:
@@ -198,7 +262,7 @@ class CSPBuilder:
 
     def channel(self, name: str, *, dtype: str, capacity: int, protocol: str = "fifo") -> ChannelRef:
         ref = ChannelRef(name=str(name), dtype=str(dtype), capacity=int(capacity), protocol=str(protocol))
-        self.channels.append(ref.to_payload())
+        self.channels.append(ref)
         return ref
 
     def fifo(self, name: str, *, dtype: str, capacity: int) -> ChannelRef:
@@ -222,7 +286,7 @@ class CSPBuilder:
         return CSPProgramSpec(
             entry=self.entry,
             target=self.target,
-            kernel=self.kernel_spec.to_payload(),
+            kernel=self.kernel_spec,
             channels=tuple(self.channels),
             processes=tuple(self.processes),
         ).to_program()
@@ -238,8 +302,8 @@ def program(
     *,
     entry: str | None = None,
     kernel: Mapping[str, Any] | KernelSpec,
-    channels: Sequence[Mapping[str, Any]] | None = None,
-    processes: Sequence[Mapping[str, Any]] | None = None,
+    channels: Sequence[Mapping[str, Any] | ChannelRef] | None = None,
+    processes: Sequence[Mapping[str, Any] | CSPProcessSpec] | None = None,
     target: Mapping[str, Any] | str | None = None,
 ) -> dict[str, Any] | Callable[[Callable[..., Any]], CSPProgramSpec]:
     if channels is not None or processes is not None or entry is not None and isinstance(kernel, Mapping):
@@ -252,8 +316,13 @@ def program(
             "target": _normalize_target(target),
             "kernel": kernel.to_payload() if isinstance(kernel, KernelSpec) else dict(kernel),
             "csp": {
-                "channels": [dict(item) for item in (channels or ())],
-                "processes": [dict(item) for item in (processes or ())],
+                "channels": [
+                    item.to_payload() if isinstance(item, ChannelRef) else dict(item) for item in (channels or ())
+                ],
+                "processes": [
+                    item.to_payload() if isinstance(item, CSPProcessSpec) else dict(item)
+                    for item in (processes or ())
+                ],
             },
         }
 
@@ -271,7 +340,7 @@ def program(
         return CSPProgramSpec(
             entry=builder.entry,
             target=builder.target,
-            kernel=builder.kernel_spec.to_payload(),
+            kernel=builder.kernel_spec,
             channels=tuple(builder.channels),
             processes=tuple(builder.processes),
         )
@@ -313,6 +382,8 @@ def _step_value(value: Any) -> Any:
 
 __all__ = [
     "CSPBuilder",
+    "CSPProcessSpec",
+    "CSPProcessStep",
     "CSPProcessBuilder",
     "CSPProgramSpec",
     "ChannelRef",
