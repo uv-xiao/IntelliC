@@ -53,6 +53,11 @@ def test_shared_frontend_builder_reuses_kernel_module_semantics() -> None:
     assert module.items.workload_ir.tasks[0].task_id == "add0"
     assert module.meta["source_surface"] == "htp.test.frontend"
     assert module.meta["active_dialects"] == ["htp.core", "htp.kernel", "htp.routine"]
+    assert module.meta["dialect_activation"]["requested"] == [
+        "htp.core",
+        "htp.kernel",
+        "htp.routine",
+    ]
 
 
 def test_kernel_spec_from_payload_round_trips_public_kernel_shape() -> None:

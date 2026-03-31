@@ -51,10 +51,11 @@ The public frontend path now feeds that same owner directly. The implemented
 surface objects can enter the pipeline without first collapsing back to a raw
 program dict.
 
-The current frontend set also records an explicit active-dialect list into
-`ProgramModule.meta`, so committed-stage state now carries a machine-readable
-declaration of which builtin frontend dialects were responsible for the
-authored program surface.
+The current frontend set also records explicit dialect activation metadata into
+`ProgramModule.meta`, so committed-stage state now carries both:
+- the dependency-closed active dialect list
+- and a manifest-style activation payload describing the requested dialects and
+  resolved builtin dialect specs responsible for the authored program surface
 
 That ingress path is now shared as well as direct. The public authoring
 surfaces reuse the common frontend-definition substrate in `htp/ir/frontend.py`

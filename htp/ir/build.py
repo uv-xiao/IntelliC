@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
-from .dialects import normalize_active_dialects
+from .dialects import dialect_activation_payload
 from .module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
 from .node_exec import NODE_KERNEL_INTERPRETER_ID
 from .nodes import Kernel, to_payload
@@ -71,7 +71,7 @@ def program_module_from_kernels(
         ),
         entrypoints=(ProgramEntrypoint(name=entry, interpreter_id=interpreter_id),),
         meta={
-            "active_dialects": list(normalize_active_dialects("htp.core")),
+            **dialect_activation_payload("htp.core"),
             **dict(meta or {}),
         },
     )

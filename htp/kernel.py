@@ -19,7 +19,7 @@ from inspect import getclosurevars, signature
 from typing import Any
 
 from htp.ir.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
-from htp.ir.dialects import normalize_active_dialects
+from htp.ir.dialects import dialect_activation_payload
 from htp.ir.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
 from htp.ir.semantics import KernelArg, KernelIR, KernelOp, WorkloadIR, WorkloadTask
 from htp.types import (
@@ -308,7 +308,7 @@ class KernelSpec:
             entrypoints=(ProgramEntrypoint("run"),),
             meta={
                 "source_surface": "htp.kernel.KernelSpec",
-                "active_dialects": list(normalize_active_dialects("htp.core", "htp.kernel")),
+                **dialect_activation_payload("htp.core", "htp.kernel"),
                 "program_extras": authored_program,
             },
         )

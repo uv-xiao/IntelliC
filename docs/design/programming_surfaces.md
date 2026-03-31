@@ -57,6 +57,11 @@ Those frontend surfaces now share one common ingress helper in
 `ProgramModule`; they rebuild workload/process structure and dialect metadata
 through the same frontend-definition substrate.
 
+That metadata is now richer than a flat dialect name list. Public surfaces
+record a dependency-closed active dialect list plus a manifest-style activation
+payload, so staged artifacts can explain not only which dialects are active but
+also which frontend request produced that closure.
+
 The important implementation decision is that public authoring is now traced
 from ordinary Python functions. A flagship example can therefore read like:
 

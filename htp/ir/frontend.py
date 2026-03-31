@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
-from .dialects import normalize_active_dialects
+from .dialects import dialect_activation_payload
 from .module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
 from .semantics import WorkloadIR, WorkloadTask
 
@@ -62,7 +62,7 @@ def build_frontend_program_module(
         entrypoints=(ProgramEntrypoint("run"),),
         meta={
             "source_surface": source_surface,
-            "active_dialects": list(normalize_active_dialects(*active_dialects)),
+            **dialect_activation_payload(*active_dialects),
             "program_extras": authored_program,
         },
     )

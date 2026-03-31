@@ -125,6 +125,7 @@ def _stage_summary_payload(package_dir: Path, stage: StageSpec) -> dict[str, Any
         "stage_id": stage.stage_id,
         "pass_id": stage.pass_id,
         "entrypoints": list(state_payload.get("entrypoints", [])),
+        "dialects": _dialect_summary(_as_mapping(state_payload.get("meta", {}))),
         "executability": {
             "status": stage.runnable_py.status,
             "modes": list(stage.runnable_py.modes),
@@ -190,6 +191,15 @@ def _as_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
+
+
+def _dialect_summary(meta: dict[str, Any]) -> dict[str, Any]:
+    active = meta.get("active_dialects")
+    activation = meta.get("dialect_activation")
+    return {
+        "active": list(active) if isinstance(active, list) else [],
+        "activation": dict(activation) if isinstance(activation, dict) else {},
+    }
 
 
 __all__ = [

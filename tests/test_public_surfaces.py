@@ -74,6 +74,7 @@ def test_kernel_surface_exposes_program_module_and_compiler_prefers_it(tmp_path)
     assert module.items.kernel_ir.entry == "affine_mix"
     assert module.items.workload_ir.tasks[0].kernel == "affine_mix"
     assert module.meta["active_dialects"] == ["htp.core", "htp.kernel"]
+    assert module.meta["dialect_activation"]["requested"] == ["htp.core", "htp.kernel"]
 
     class ModuleOnlySurface:
         def to_program_module(self) -> ProgramModule:
@@ -861,6 +862,11 @@ def test_csp_program_surface_exposes_program_module(tmp_path):
 
     assert isinstance(module, ProgramModule)
     assert module.meta["active_dialects"] == ["htp.core", "htp.kernel", "htp.csp"]
+    assert [item["dialect_id"] for item in module.meta["dialect_activation"]["resolved"]] == [
+        "htp.core",
+        "htp.kernel",
+        "htp.csp",
+    ]
     assert module.items.workload_ir.routine == {
         "kind": "csp",
         "entry": "pipeline_demo",

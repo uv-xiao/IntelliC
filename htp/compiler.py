@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from htp.bindings.api import bind
-from htp.ir.dialects import ensure_builtin_dialects, resolve_dialects
+from htp.ir.dialects import activate_dialects, ensure_builtin_dialects
 from htp.ir.module import ProgramModule
 from htp.pipeline.defaults import DefaultPipelineResult, run_default_pipeline
 from htp.solver import solve_default_pipeline, validate_final_artifacts
@@ -55,7 +55,10 @@ def compile_program(
     pipeline_program = _normalize_program_input(program)
     active_dialects = pipeline_program.get("meta", {}).get("active_dialects")
     if isinstance(active_dialects, list):
-        resolve_dialects([str(item) for item in active_dialects])
+        activation = activate_dialects(*(str(item) for item in active_dialects))
+        pipeline_program.setdefault("meta", {})
+        pipeline_program["meta"]["active_dialects"] = list(activation.dialect_ids())
+        pipeline_program["meta"]["dialect_activation"] = activation.to_payload()
     target_payload = pipeline_program.get("target")
     if not isinstance(target_payload, dict) or not target_payload:
         target_payload = {}

@@ -72,17 +72,17 @@ Implemented on this branch:
 - those public frontends now share the first common frontend-definition
   substrate in `htp.ir.frontend`
 - a first dialect registry slice now exists for builtin frontend dialects, and
-  public frontends record their active dialect set into `ProgramModule.meta`
+  public frontends record their active dialect set and activation manifest into
+  `ProgramModule.meta`
 - a human-facing IR definition / execution / transformation example under
   `examples/ir_program_module_flow/`
 
 Still design-only or partial:
 
 - the full typed node hierarchy in `02_ir_structure.md`
-- the fuller dialect packaging/activation and final node-first frontend
-  substrate in `03_dialects_and_frontends.md`
+- the final node-first frontend substrate in `03_dialects_and_frontends.md`
 - the full typed analysis substrate beyond the current generic record wrapper
-- full dialect packaging/activation beyond the current builtin frontend set
+- full dialect migration beyond the current builtin frontend set
 - extension and dialect migration beyond the current public frontend set
 
 So the redesign is not fully finished yet. The stage/execution contract slice
