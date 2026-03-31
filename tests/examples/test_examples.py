@@ -281,7 +281,14 @@ def test_ir_program_module_example_defines_executes_and_transforms():
         "rendered_has_program_module": True,
         "process_graph": "affine_pipeline",
         "process_roles": ["producer", "reducer"],
+        "frontend_rule_demo": True,
     }
+
+
+def test_ir_program_module_example_reports_frontend_rule_proof() -> None:
+    summary = run_ir_program_module_demo()
+
+    assert summary["frontend_rule_demo"] is True
 
 
 def test_aie_example_compiles_and_replays(tmp_path):

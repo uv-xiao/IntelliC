@@ -10,6 +10,7 @@ It demonstrates five things with explicit typed IR objects:
 3. transform it into a rewritten IR program
 4. define and execute a typed process-graph IR program
 5. render the transformed module into staged `program.py` and rebuild it
+6. prove a public surface can be resolved through a registered frontend rule
 
 This example is intentionally small, but it is not a payload-dump test. The
 point is to show how a person can author and inspect typed IR objects before

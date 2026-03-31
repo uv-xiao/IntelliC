@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from htp.ir.build import program_module_from_items, program_module_from_kernels
+from htp.ir.frontends import resolve_frontend
 from htp.ir.node_exec import NODE_KERNEL_INTERPRETER_ID, NODE_PROCESS_GRAPH_INTERPRETER_ID
 from htp.ir.nodes import (
     BinaryExpr,
@@ -26,6 +27,7 @@ from htp.ir.nodes import (
 )
 from htp.ir.render import render_program_module_payload
 from htp.ir.semantics import KernelIR, WorkloadIR, WorkloadTask
+from htp.kernel import KernelSpec
 
 
 def define_program() -> Any:
@@ -262,6 +264,11 @@ def define_process_program() -> Any:
     )
 
 
+def frontend_rule_demo() -> bool:
+    spec = resolve_frontend(KernelSpec(name="affine_demo", args=(), ops=()))
+    return bool(spec is not None and spec.rule is not None)
+
+
 def run_demo() -> dict[str, Any]:
     base = define_program()
     base_result = base.run(3, 4, bias=5, scale=2)
@@ -283,6 +290,7 @@ def run_demo() -> dict[str, Any]:
         "rendered_has_program_module": "ProgramModule(" in rendered_program,
         "process_graph": process_result["graph"],
         "process_roles": [process["attrs"]["role"] for process in process_result["processes"]],
+        "frontend_rule_demo": frontend_rule_demo(),
     }
 
 
