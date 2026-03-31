@@ -27,7 +27,7 @@ def test_resolve_frontend_returns_none_for_unregistered_surface() -> None:
 
 def test_builtin_frontend_builds_program_module() -> None:
     spec = ensure_builtin_frontends()[0]
-    module = spec.build_program_module(KernelSpec(name="affine", args=(), ops=()))
+    module = spec.build(KernelSpec(name="affine", args=(), ops=()))
 
     assert module.items.kernel_ir.entry == "affine"
     assert module.meta["source_surface"] == "htp.kernel.KernelSpec"
