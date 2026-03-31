@@ -104,6 +104,47 @@ def test_kernel_surface_is_built_through_registered_frontend_rule() -> None:
     assert spec.build_program_module is None
 
 
+def test_routine_wsp_and_csp_surfaces_are_built_through_registered_frontend_rules() -> None:
+    @kernel
+    def affine_mix(
+        lhs: buffer(dtype="f32", shape=("size",), role="input"),
+        rhs: buffer(dtype="f32", shape=("size",), role="input"),
+        out: buffer(dtype="f32", shape=("size",), role="output"),
+        size: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(out, lhs + rhs)
+
+    @program(target="nvgpu-ampere")
+    def serving_routine(
+        lhs: buffer(dtype="f32", shape=("size",), role="input"),
+        rhs: buffer(dtype="f32", shape=("size",), role="input"),
+        out: buffer(dtype="f32", shape=("size",), role="output"),
+        size: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        call(affine_mix, lhs, rhs, out, size, task="run")
+
+    @wsp_program(target="nvgpu-ampere", kernel=affine_mix)
+    def tiled_workload(w) -> None:
+        w.launch(task_id="run").tile(block=(64, 64, 16)).resources(num_warps=4)
+
+    @csp_program(kernel=affine_mix, target="nvgpu-ampere")
+    def streaming_workload(p) -> None:
+        tiles = p.fifo("tiles", dtype="f32", capacity=1)
+        p.process("dispatch", task_id="dispatch").put(tiles).compute("pack_tile", source=p.args.lhs)
+
+    for surface, frontend_id in (
+        (serving_routine, "htp.routine.ProgramSpec"),
+        (tiled_workload, "htp.wsp.WSPProgramSpec"),
+        (streaming_workload, "htp.csp.CSPProgramSpec"),
+    ):
+        spec = resolve_frontend(surface)
+
+        assert spec is not None
+        assert spec.frontend_id == frontend_id
+        assert spec.rule is not None
+        assert spec.build_program_module is None
+
+
 def test_public_type_surface_drives_kernel_and_channel_annotations(tmp_path):
     @kernel
     def typed_decode(

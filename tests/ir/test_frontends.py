@@ -32,3 +32,10 @@ def test_builtin_frontend_builds_program_module() -> None:
     assert module.items.kernel_ir.entry == "affine"
     assert module.meta["source_surface"] == "htp.kernel.KernelSpec"
     assert module.meta["active_dialects"] == ["htp.core", "htp.kernel"]
+
+
+def test_builtin_frontends_use_rule_backed_builders() -> None:
+    builtin = ensure_builtin_frontends()
+
+    assert all(spec.rule is not None for spec in builtin)
+    assert all(spec.build_program_module is None for spec in builtin)

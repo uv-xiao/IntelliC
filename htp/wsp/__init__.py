@@ -140,38 +140,42 @@ class WSPProgramSpec:
         }
 
     def to_program_module(self) -> ProgramModule:
-        authored_program = self.to_program()
-        kernel_spec = kernel_spec_from_payload(self.kernel)
-        kernel_module = kernel_spec.to_program_module()
-        workload = FrontendWorkload(
-            entry=self.entry,
-            tasks=tuple(
-                WorkloadTask(
-                    task_id=str(task["task_id"]),
-                    kind=str(task["kind"]),
-                    kernel=str(task["kernel"]),
-                    args=tuple(str(arg) for arg in task.get("args", ())),
-                    entity_id=f"{self.entry}:{task['task_id']}",
-                    attrs=dict(task.get("attrs", {})),
-                )
-                for task in self.workload.get("tasks", ())
-            ),
-            channels=tuple(dict(item) for item in self.workload.get("channels", ())),
-            dependencies=tuple(dict(item) for item in self.workload.get("dependencies", ())),
-            routine={
-                "kind": "wsp",
-                "entry": self.entry,
-                "schedule": {key: dict(value) for key, value in self.schedule.items()},
-                "target": dict(self.target),
-            },
-        )
-        return build_frontend_program_module(
-            kernel_module=kernel_module,
-            authored_program=authored_program,
-            workload=workload,
-            source_surface="htp.wsp.WSPProgramSpec",
-            active_dialects=("htp.core", "htp.kernel", "htp.wsp"),
-        )
+        return build_wsp_program_module(self)
+
+
+def build_wsp_program_module(spec: WSPProgramSpec) -> ProgramModule:
+    authored_program = spec.to_program()
+    kernel_spec = kernel_spec_from_payload(spec.kernel)
+    kernel_module = kernel_spec.to_program_module()
+    workload = FrontendWorkload(
+        entry=spec.entry,
+        tasks=tuple(
+            WorkloadTask(
+                task_id=str(task["task_id"]),
+                kind=str(task["kind"]),
+                kernel=str(task["kernel"]),
+                args=tuple(str(arg) for arg in task.get("args", ())),
+                entity_id=f"{spec.entry}:{task['task_id']}",
+                attrs=dict(task.get("attrs", {})),
+            )
+            for task in spec.workload.get("tasks", ())
+        ),
+        channels=tuple(dict(item) for item in spec.workload.get("channels", ())),
+        dependencies=tuple(dict(item) for item in spec.workload.get("dependencies", ())),
+        routine={
+            "kind": "wsp",
+            "entry": spec.entry,
+            "schedule": {key: dict(value) for key, value in spec.schedule.items()},
+            "target": dict(spec.target),
+        },
+    )
+    return build_frontend_program_module(
+        kernel_module=kernel_module,
+        authored_program=authored_program,
+        workload=workload,
+        source_surface="htp.wsp.WSPProgramSpec",
+        active_dialects=("htp.core", "htp.kernel", "htp.wsp"),
+    )
 
 
 class WSPBoundArgs:
@@ -570,6 +574,7 @@ __all__ = [
     "WSPBuilder",
     "WSPTaskBuilder",
     "WSPProgramSpec",
+    "build_wsp_program_module",
     "bind",
     "pipeline",
     "program",

@@ -121,41 +121,45 @@ class CSPProgramSpec:
         }
 
     def to_program_module(self) -> ProgramModule:
-        authored_program = self.to_program()
-        kernel_spec = kernel_spec_from_payload(self.kernel)
-        kernel_module = kernel_spec.to_program_module()
-        workload = FrontendWorkload(
-            entry=self.entry,
-            tasks=tuple(
-                WorkloadTask(
-                    task_id=str(process["task_id"]),
-                    kind="process",
-                    kernel=str(process["kernel"]),
-                    args=tuple(str(arg) for arg in process.get("args", ())),
-                    entity_id=f"{self.entry}:{process['task_id']}",
-                    attrs={
-                        "name": str(process["name"]),
-                        **({"role": str(process["role"])} if process.get("role") is not None else {}),
-                    },
-                )
-                for process in self.processes
-            ),
-            channels=tuple(dict(item) for item in self.channels),
-            dependencies=(),
-            processes=tuple(dict(item) for item in self.processes),
-            routine={
-                "kind": "csp",
-                "entry": self.entry,
-                "target": dict(self.target),
-            },
-        )
-        return build_frontend_program_module(
-            kernel_module=kernel_module,
-            authored_program=authored_program,
-            workload=workload,
-            source_surface="htp.csp.CSPProgramSpec",
-            active_dialects=("htp.core", "htp.kernel", "htp.csp"),
-        )
+        return build_csp_program_module(self)
+
+
+def build_csp_program_module(spec: CSPProgramSpec) -> ProgramModule:
+    authored_program = spec.to_program()
+    kernel_spec = kernel_spec_from_payload(spec.kernel)
+    kernel_module = kernel_spec.to_program_module()
+    workload = FrontendWorkload(
+        entry=spec.entry,
+        tasks=tuple(
+            WorkloadTask(
+                task_id=str(process["task_id"]),
+                kind="process",
+                kernel=str(process["kernel"]),
+                args=tuple(str(arg) for arg in process.get("args", ())),
+                entity_id=f"{spec.entry}:{process['task_id']}",
+                attrs={
+                    "name": str(process["name"]),
+                    **({"role": str(process["role"])} if process.get("role") is not None else {}),
+                },
+            )
+            for process in spec.processes
+        ),
+        channels=tuple(dict(item) for item in spec.channels),
+        dependencies=(),
+        processes=tuple(dict(item) for item in spec.processes),
+        routine={
+            "kind": "csp",
+            "entry": spec.entry,
+            "target": dict(spec.target),
+        },
+    )
+    return build_frontend_program_module(
+        kernel_module=kernel_module,
+        authored_program=authored_program,
+        workload=workload,
+        source_surface="htp.csp.CSPProgramSpec",
+        active_dialects=("htp.core", "htp.kernel", "htp.csp"),
+    )
 
 
 @dataclass
@@ -344,6 +348,7 @@ __all__ = [
     "CSPProcessBuilder",
     "CSPProgramSpec",
     "ChannelRef",
+    "build_csp_program_module",
     "channel",
     "fifo",
     "get",

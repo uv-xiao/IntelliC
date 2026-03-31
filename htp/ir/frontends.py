@@ -51,10 +51,10 @@ def frontend_registry_snapshot() -> dict[str, FrontendSpec]:
 
 
 def ensure_builtin_frontends() -> tuple[FrontendSpec, ...]:
-    from htp.csp import CSPProgramSpec
+    from htp.csp import CSPProgramSpec, build_csp_program_module
     from htp.kernel import KernelSpec, build_kernel_program_module
-    from htp.routine import ProgramSpec
-    from htp.wsp import WSPProgramSpec
+    from htp.routine import ProgramSpec, build_routine_program_module
+    from htp.wsp import WSPProgramSpec, build_wsp_program_module
 
     builtin = (
         FrontendSpec(
@@ -70,19 +70,28 @@ def ensure_builtin_frontends() -> tuple[FrontendSpec, ...]:
             frontend_id="htp.routine.ProgramSpec",
             dialect_id="htp.routine",
             surface_type=ProgramSpec,
-            build_program_module=lambda surface: surface.to_program_module(),
+            rule=FrontendRule(
+                name="routine_spec_to_program_module",
+                build=lambda context: FrontendRuleResult(module=build_routine_program_module(context.surface)),
+            ),
         ),
         FrontendSpec(
             frontend_id="htp.wsp.WSPProgramSpec",
             dialect_id="htp.wsp",
             surface_type=WSPProgramSpec,
-            build_program_module=lambda surface: surface.to_program_module(),
+            rule=FrontendRule(
+                name="wsp_spec_to_program_module",
+                build=lambda context: FrontendRuleResult(module=build_wsp_program_module(context.surface)),
+            ),
         ),
         FrontendSpec(
             frontend_id="htp.csp.CSPProgramSpec",
             dialect_id="htp.csp",
             surface_type=CSPProgramSpec,
-            build_program_module=lambda surface: surface.to_program_module(),
+            rule=FrontendRule(
+                name="csp_spec_to_program_module",
+                build=lambda context: FrontendRuleResult(module=build_csp_program_module(context.surface)),
+            ),
         ),
     )
     for spec in builtin:
