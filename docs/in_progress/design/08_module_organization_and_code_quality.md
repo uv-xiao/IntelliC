@@ -196,6 +196,31 @@ extensible.
 should be treated as public façades. Lowering/building/serialization helpers
 should migrate out of them whenever they are not purely public-surface logic.
 
+## Refactor progress on this branch
+
+Implemented now:
+
+- `htp/ir/module.py` is reduced to the public `ProgramModule` façade, while
+  program component ownership and payload/state conversion are split into:
+  - `htp/ir/program_components.py`
+  - `htp/ir/program_serialization.py`
+- `htp/ir/frontends.py` is reduced to the public frontend API surface, while
+  registry ownership and builtin-registration ownership are split into:
+  - `htp/ir/frontend_registry.py`
+  - `htp/ir/builtin_frontends.py`
+- `htp/ir/node_exec.py` is reduced to the interpreter-registration façade,
+  while runtime helpers and object-owned interpreter units are split into:
+  - `htp/ir/node_runtime.py`
+  - `htp/ir/node_interpreters.py`
+- kernel-to-`ProgramModule` lowering is no longer owned directly by
+  `htp/kernel.py`; it now lives in `htp/ir/kernel_frontend.py`
+
+Still open:
+
+- further public-surface façade cleanup for routine/WSP/CSP
+- pass-side cleanup for the remaining large pass modules, especially where
+  payload-oriented helper logic still sits beside typed-object pass behavior
+
 ## Merge bar for this refactor
 
 PR `#67` must not close with the current “works but messy” structure.

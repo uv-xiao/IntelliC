@@ -40,10 +40,7 @@ class WSPStageSpec:
     def to_payload(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "steps": [
-                step if isinstance(step, str) else step.to_payload()
-                for step in self.steps
-            ],
+            "steps": [step if isinstance(step, str) else step.to_payload() for step in self.steps],
         }
 
     @classmethod

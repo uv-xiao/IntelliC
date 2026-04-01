@@ -8,10 +8,10 @@ import htp.routine as routine_module
 import htp.wsp as wsp_module
 from htp import ark
 from htp.csp import program as csp_program
+from htp.ir.csp_nodes import CSPProcessStep as TypedCSPProcessStep
 from htp.ir.frontends import resolve_frontend
 from htp.ir.module import ProgramModule
 from htp.ir.semantics import KernelIR, WorkloadIR
-from htp.ir.csp_nodes import CSPProcessStep as TypedCSPProcessStep
 from htp.ir.wsp_nodes import WSPStageSpec, WSPStageStep
 from htp.kernel import (
     KernelSpec,

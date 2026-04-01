@@ -43,8 +43,8 @@ extension boundaries.
 - [ ] implement the PR-closing canonical tile-streamed GEMM proof with explicit committed variants
 - [ ] complete the typed pass chain required for that proof
 - [ ] complete the object-oriented interpreter structure required for that proof
-- [ ] refactor the current codebase to follow an explicit module-ownership design before landing the remaining proof-path development
-- [ ] encode strict agent rules against stringly semantic refs, dict-owned semantics, and multi-role monolithic architecture modules
+- [x] refactor the current codebase to follow an explicit module-ownership design before landing the remaining proof-path development
+- [x] encode strict agent rules against stringly semantic refs, dict-owned semantics, and multi-role monolithic architecture modules
 
 Code pointers for the implemented frontend-definition slice:
 
@@ -66,6 +66,9 @@ Remaining gap:
 - the branch also needs the refactor-first cleanup defined in
   `docs/in_progress/design/08_module_organization_and_code_quality.md` before
   the remaining proof-path work should be considered mergeable.
+- that cleanup has started concretely with the `ProgramModule`, frontend, and
+  typed-interpreter module splits plus kernel-lowering extraction; additional
+  public-surface and pass-module cleanup is still open.
 
 ## Code Surfaces
 
