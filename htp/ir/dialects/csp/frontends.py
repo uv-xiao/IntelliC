@@ -4,12 +4,29 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from htp.ir.core.nodes import channel, item_ref, process, process_graph, process_step
 from htp.ir.core.semantics import WorkloadChannel, WorkloadProcess, WorkloadProcessStep, WorkloadTask
-from htp.ir.frontends import ASTFrontendVisitor, handles, load_function_ast
+from htp.ir.frontends import (
+    ASTFrontendVisitor,
+    default_kernel_args,
+    handles,
+    keyword_or_default,
+    load_function_ast,
+    ordered_resolved_values,
+    resolve_name,
+    resolve_surface_value,
+    resolved_keyword_map,
+    sequence_values,
+    surface_ref,
+)
 from htp.ir.frontends.shared import FrontendWorkload, build_frontend_program_module
+
+if TYPE_CHECKING:
+    from htp.csp import CSPProgramSpec, ChannelRef, CSPProcessSpec
+    from htp.ir.program.module import ProgramModule
+    from htp.kernel import KernelSpec
 
 
 def csp_frontend_workload(surface: object) -> FrontendWorkload:
@@ -59,7 +76,7 @@ def csp_frontend_workload(surface: object) -> FrontendWorkload:
 
 @dataclass(frozen=True)
 class _PendingProcess:
-    spec: Any
+    spec: CSPProcessSpec
 
 
 class CSPASTFrontendVisitor(ASTFrontendVisitor):
@@ -69,10 +86,10 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
         self,
         *,
         function: Any,
-        kernel_spec: Any,
+        kernel_spec: KernelSpec,
         target: dict[str, Any],
         entry: str,
-    ) -> Any:
+    ) -> CSPProgramSpec | None:
         from htp.csp import CSPProgramSpec
 
         function_ast = load_function_ast(function)
@@ -134,11 +151,11 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
         if self.call_name(call) == "fifo":
             protocol = "fifo"
         else:
-            protocol = str(_resolve_surface_value(keyword_map.get("protocol"), context))
+            protocol = str(resolve_surface_value(keyword_map.get("protocol"), context))
         context.symbols[node.targets[0].id] = ChannelRef(
             name=node.targets[0].id,
-            dtype=str(_resolve_surface_value(keyword_map["dtype"], context)),
-            capacity=int(_resolve_surface_value(keyword_map["capacity"], context)),
+            dtype=str(resolve_surface_value(keyword_map["dtype"], context)),
+            capacity=int(resolve_surface_value(keyword_map["capacity"], context)),
             protocol=protocol,
         )
 
@@ -150,10 +167,10 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
         if not isinstance(decorator, ast.Call):
             raise context.fail(node, "CSP nested process decorators must be calls")
         keyword_map = {item.arg: item.value for item in decorator.keywords if item.arg is not None}
-        process_args = tuple(
-            _resolve_surface_value(item, context) for item in _sequence_values(keyword_map.get("args"))
-        ) or _default_kernel_args(context.kernel_spec)
-        role = _resolve_surface_value(keyword_map.get("role"), context) if "role" in keyword_map else None
+        process_args = ordered_resolved_values(sequence_values(keyword_map.get("args")), context) or default_kernel_args(
+            context.kernel_spec
+        )
+        role = resolve_surface_value(keyword_map.get("role"), context) if "role" in keyword_map else None
         steps = []
         context.locals = {}
         for statement in node.body:
@@ -165,7 +182,7 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
         return _PendingProcess(
             spec=CSPProcessSpec(
                 name=node.name,
-                task_id=str(_resolve_surface_value(keyword_map.get("task_id"), context) or node.name),
+                task_id=str(resolve_surface_value(keyword_map.get("task_id"), context) or node.name),
                 kernel=context.kernel_spec.name,
                 args=tuple(str(item) for item in process_args),
                 steps=steps,
@@ -182,8 +199,12 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
         call = node.value
         if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
             raise context.fail(node, "CSP get step requires one simple binding target")
-        channel_name = _resolve_channel_name(call.args[0], context)
-        count = _keyword_or_default(call, "count", 1, context)
+        channel_name = resolve_name(
+            call.args[0],
+            context,
+            failure="CSP get step channel must be a channel ref or identifier",
+        )
+        count = keyword_or_default(call, "count", 1, context)
         context.locals[node.targets[0].id] = node.targets[0].id
         return CSPProcessStep(kind="get", attrs={"channel": channel_name, "count": count})
 
@@ -194,8 +215,12 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
         if not isinstance(node.value, ast.Call):
             raise context.fail(node, "CSP put step must be a call")
         call = node.value
-        channel_name = _resolve_channel_name(call.args[0], context)
-        count = _keyword_or_default(call, "count", 1, context)
+        channel_name = resolve_name(
+            call.args[0],
+            context,
+            failure="CSP put step channel must be a channel ref or identifier",
+        )
+        count = keyword_or_default(call, "count", 1, context)
         return CSPProcessStep(kind="put", attrs={"channel": channel_name, "count": count})
 
     @handles(ast.Expr, call="compute")
@@ -207,8 +232,8 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
         call = node.value
         if not call.args:
             raise context.fail(node, "c.compute(...) requires a step name")
-        attrs = {"name": _resolve_surface_value(call.args[0], context)}
-        attrs.update(_resolved_keyword_map(call, context))
+        attrs = {"name": resolve_surface_value(call.args[0], context)}
+        attrs.update(resolved_keyword_map(call, context))
         return CSPProcessStep(kind="compute", attrs=attrs)
 
     @handles(ast.Expr, call="compute_step")
@@ -220,18 +245,18 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
         call = node.value
         if not call.args:
             raise context.fail(node, "c.compute_step(...) requires an op name")
-        attrs = {"op": _resolve_surface_value(call.args[0], context)}
-        attrs.update(_resolved_keyword_map(call, context))
+        attrs = {"op": resolve_surface_value(call.args[0], context)}
+        attrs.update(resolved_keyword_map(call, context))
         return CSPProcessStep(kind="compute", attrs=attrs)
 
 
 def build_csp_ast_program_spec(
     *,
     function: Any,
-    kernel_spec: Any,
+    kernel_spec: KernelSpec,
     target: dict[str, Any],
     entry: str,
-) -> Any:
+) -> CSPProgramSpec | None:
     return CSPASTFrontendVisitor().build_program(
         function=function,
         kernel_spec=kernel_spec,
@@ -246,9 +271,9 @@ def _build_csp_ast_program_module(
     target: dict[str, Any],
     kernel_spec: Any,
     payload: dict[str, Any],
-    channels: tuple[Any, ...],
-    process_specs: tuple[Any, ...],
-) -> Any:
+    channels: tuple[ChannelRef, ...],
+    process_specs: tuple[CSPProcessSpec, ...],
+) -> ProgramModule:
     kernel_module = kernel_spec.to_program_module()
     kernel_handle = item_ref(
         f"itemref.{entry}.kernel",
@@ -300,13 +325,46 @@ def _build_csp_ast_program_module(
         channels=channel_nodes,
         processes=process_nodes,
     )
-    workload = csp_frontend_workload(
-        _SurfaceCSPProxy(
-            entry=entry,
-            target=target,
-            channels=channels,
-            processes=process_specs,
-        )
+    workload = FrontendWorkload(
+        entry=entry,
+        tasks=tuple(
+            WorkloadTask(
+                task_id=process_spec.task_id,
+                kind="process",
+                kernel=process_spec.kernel,
+                args=process_spec.args,
+                entity_id=f"{entry}:{process_spec.task_id}",
+                attrs={
+                    "name": process_spec.name,
+                    **({"role": process_spec.role} if process_spec.role is not None else {}),
+                },
+            )
+            for process_spec in process_specs
+        ),
+        channels=tuple(
+            WorkloadChannel(
+                name=channel_ref.name,
+                dtype=channel_ref.dtype,
+                capacity=channel_ref.capacity,
+                protocol=channel_ref.protocol,
+            )
+            for channel_ref in channels
+        ),
+        processes=tuple(
+            WorkloadProcess(
+                name=process_spec.name,
+                task_id=process_spec.task_id,
+                kernel=process_spec.kernel,
+                args=process_spec.args,
+                role=process_spec.role,
+                steps=tuple(
+                    WorkloadProcessStep(kind=step.kind, attrs=dict(step.attrs))
+                    for step in process_spec.steps
+                ),
+            )
+            for process_spec in process_specs
+        ),
+        routine={"kind": "csp", "entry": entry, "target": dict(target)},
     )
     module = build_frontend_program_module(
         kernel_module=kernel_module,
@@ -317,14 +375,6 @@ def _build_csp_ast_program_module(
         typed_items=(graph,),
     )
     return replace(module, meta={**module.meta, "frontend_capture": "ast"})
-
-
-@dataclass(frozen=True)
-class _SurfaceCSPProxy:
-    entry: str
-    target: dict[str, Any]
-    channels: tuple[Any, ...]
-    processes: tuple[Any, ...]
 
 
 def _csp_program_payload(
@@ -346,69 +396,8 @@ def _csp_program_payload(
     }
 
 
-def _default_kernel_args(kernel_spec: Any) -> tuple[str, ...]:
-    return tuple(argument.name for argument in kernel_spec.args if argument.name is not None)
-
-
-def _sequence_values(node: ast.AST | None) -> tuple[ast.AST, ...]:
-    if node is None:
-        return ()
-    if isinstance(node, (ast.Tuple, ast.List)):
-        return tuple(node.elts)
-    return (node,)
-
-
-def _resolve_channel_name(node: ast.AST, context) -> str:
-    value = _resolve_surface_value(node, context)
-    return str(getattr(value, "name", value))
-
-
-def _resolved_keyword_map(call: ast.Call, context) -> dict[str, Any]:
-    return {
-        item.arg: _resolve_surface_value(item.value, context)
-        for item in call.keywords
-        if item.arg is not None
-    }
-
-
-def _keyword_or_default(call: ast.Call, key: str, default: Any, context) -> Any:
-    for item in call.keywords:
-        if item.arg == key:
-            return _resolve_surface_value(item.value, context)
-    return default
-
-
-def _resolve_surface_value(node: ast.AST | None, context) -> Any:
-    if node is None:
-        return None
-    path = ASTFrontendVisitor.attribute_path(node)
-    if len(path) == 3 and path[1] == "args":
-        return path[2]
-    if isinstance(node, ast.Name):
-        if node.id in context.symbols:
-            return context.symbols[node.id]
-        if node.id in context.locals:
-            return context.locals[node.id]
-        return node.id
-    if isinstance(node, ast.Constant):
-        return node.value
-    if isinstance(node, (ast.List, ast.Tuple)):
-        return [_resolve_surface_value(item, context) for item in node.elts]
-    if isinstance(node, ast.Dict):
-        return {
-            _resolve_surface_value(key, context): _resolve_surface_value(value, context)
-            for key, value in zip(node.keys, node.values, strict=False)
-        }
-    try:
-        return ast.literal_eval(node)
-    except (ValueError, SyntaxError) as exc:
-        raise context.fail(node, "Unsupported CSP frontend expression") from exc
-
-
 def _surface_ref(*, node_id: str, name: str):
-    from htp.ir.core.nodes import ref
-
-    return ref(node_id, f"sym.{name}", name)
+    return surface_ref(node_id=node_id, name=name)
 
 
 __all__ = ["CSPASTFrontendVisitor", "build_csp_ast_program_spec", "csp_frontend_workload"]

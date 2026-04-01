@@ -3,10 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from htp.csp import program as csp_program
-from htp.ir.core.semantics import WorkloadIR
 from htp.ir.frontends import FrontendSyntaxError
 from htp.ir.interpreters.entrypoints import NODE_PROGRAM_INTERPRETER_ID
-from htp.ir.program.module import ProgramEntrypoint, ProgramItems, ProgramModule
+from htp.ir.program import ProgramModule
 from htp.kernel import buffer, kernel, scalar, store
 from htp.wsp import program as wsp_program
 
@@ -67,43 +66,24 @@ def streamed_tiles(c) -> None:
 def build_composed_module() -> ProgramModule:
     wsp_module = scheduled_tiles.to_program_module()
     csp_module = streamed_tiles.to_program_module()
-    return ProgramModule(
-        items=ProgramItems(
-            canonical_ast={
-                "schema": "htp.program_ast.v1",
-                "program": {
-                    "entry": "run",
-                    "wsp": scheduled_tiles.to_program(),
-                    "csp": streamed_tiles.to_program(),
-                },
-            },
-            kernel_ir=wsp_module.items.kernel_ir,
-            workload_ir=WorkloadIR(
-                entry="run",
-                tasks=wsp_module.items.workload_ir.tasks + csp_module.items.workload_ir.tasks,
-                channels=csp_module.items.workload_ir.channels,
-                dependencies=wsp_module.items.workload_ir.dependencies,
-                processes=csp_module.items.workload_ir.processes,
-                routine={"kind": "composed", "entry": "run"},
-            ),
-            typed_items=wsp_module.items.typed_items + csp_module.items.typed_items,
-        ),
-        aspects=wsp_module.aspects,
-        analyses=wsp_module.analyses,
-        identity=wsp_module.identity,
-        entrypoints=(ProgramEntrypoint(name="run", interpreter_id=NODE_PROGRAM_INTERPRETER_ID),),
+    return ProgramModule.compose(
+        wsp_module,
+        csp_module,
+        canonical_program={
+            "entry": "run",
+            "wsp": scheduled_tiles.to_program(),
+            "csp": streamed_tiles.to_program(),
+        },
+        source_surface="examples.ast_frontend_composability",
+        entry="run",
+        routine={"kind": "composed", "entry": "run"},
+        interpreter_id=NODE_PROGRAM_INTERPRETER_ID,
         meta={
             "source_surface": "examples.ast_frontend_composability",
             "frontend_capture_modes": {
                 "wsp": wsp_module.meta.get("frontend_capture"),
                 "csp": csp_module.meta.get("frontend_capture"),
             },
-            "active_dialects": [
-                "htp.core",
-                "htp.kernel",
-                "htp.wsp",
-                "htp.csp",
-            ],
         },
     )
 

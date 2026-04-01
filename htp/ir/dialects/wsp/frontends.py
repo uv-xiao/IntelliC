@@ -5,12 +5,30 @@ from __future__ import annotations
 import ast
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from htp.ir.core.nodes import dependency, item_ref, task, task_graph
 from htp.ir.core.semantics import WorkloadDependency, WorkloadTask
-from htp.ir.frontends import ASTFrontendVisitor, FrontendSyntaxError, handles, load_function_ast
+from htp.ir.frontends import (
+    ASTFrontendVisitor,
+    FrontendSyntaxError,
+    default_kernel_args,
+    handles,
+    literal_or_default,
+    literal_or_none,
+    load_function_ast,
+    ordered_resolved_values,
+    resolve_name,
+    resolve_surface_value,
+    sequence_values,
+    surface_ref,
+)
 from htp.ir.frontends.shared import FrontendWorkload, build_frontend_program_module
+
+if TYPE_CHECKING:
+    from htp.ir.program.module import ProgramModule
+    from htp.kernel import KernelSpec
+    from htp.wsp import WSPScheduleSpec, WSPDependencySpec, WSPProgramSpec, WSPStageStep, WSPTaskSpec
 
 
 def wsp_frontend_workload(surface: object) -> FrontendWorkload:
@@ -44,7 +62,7 @@ def wsp_frontend_workload(surface: object) -> FrontendWorkload:
 @dataclass(frozen=True)
 class _PendingWSPTask:
     function_name: str
-    spec: Any
+    spec: WSPTaskSpec
     after: tuple[str, ...]
 
 
@@ -55,10 +73,10 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
         self,
         *,
         function: Any,
-        kernel_spec: Any,
+        kernel_spec: KernelSpec,
         target: dict[str, Any],
         entry: str,
-    ) -> Any:
+    ) -> WSPProgramSpec | None:
         from htp.wsp import WSPDependencySpec, WSPProgramSpec
 
         function_ast = load_function_ast(function)
@@ -121,19 +139,19 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
         if not isinstance(decorator, ast.Call):
             raise context.fail(node, "WSP nested task decorators must be calls")
         keyword_map = {item.arg: item.value for item in decorator.keywords if item.arg is not None}
-        task_id = _literal_or_default(keyword_map.get("task_id"), default=node.name)
+        task_id = literal_or_default(keyword_map.get("task_id"), default=node.name)
         kind = (
             "wsp_mainloop"
             if self.decorator_name(node) == "mainloop"
-            else _literal_or_default(
+            else literal_or_default(
                 keyword_map.get("kind"),
                 default="kernel_call",
             )
         )
-        role = _literal_or_none(keyword_map.get("role"))
-        task_args = tuple(
-            _resolve_surface_value(item, context) for item in _sequence_values(keyword_map.get("args"))
-        ) or _default_kernel_args(context.kernel_spec)
+        role = literal_or_none(keyword_map.get("role"))
+        task_args = ordered_resolved_values(sequence_values(keyword_map.get("args")), context) or default_kernel_args(
+            context.kernel_spec
+        )
         stages: dict[str, list[WSPStageStep]] = {}
         for statement in node.body:
             if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Constant):
@@ -144,7 +162,7 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
         if role is not None:
             attrs["role"] = role
         schedule_payload = {
-            name: _resolve_surface_value(value, context)
+            name: resolve_surface_value(value, context)
             for name, value in keyword_map.items()
             if name in {"tile", "bind", "pipeline", "resources", "specialize"}
         }
@@ -153,7 +171,8 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
         if stages:
             attrs["stages"] = [WSPStageSpec(name=name, steps=list(values)) for name, values in stages.items()]
         after_names = tuple(
-            _resolve_dependency_name(item) for item in _sequence_values(keyword_map.get("after"))
+            resolve_name(item, context, failure="WSP dependency references must be nested task names")
+            for item in sequence_values(keyword_map.get("after"))
         )
         return _PendingWSPTask(
             function_name=node.name,
@@ -168,28 +187,28 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
         )
 
     @handles(ast.Expr, call="step")
-    def build_stage_step(self, node: ast.Expr, context) -> tuple[str, Any]:
+    def build_stage_step(self, node: ast.Expr, context) -> tuple[str, WSPStageStep]:
         from htp.wsp import WSPStageStep
 
         if not isinstance(node.value, ast.Call):
             raise context.fail(node, "WSP step expression must be a call")
         call = node.value
         keyword_map = {item.arg: item.value for item in call.keywords if item.arg is not None}
-        stage_name = _literal_or_default(keyword_map.pop("stage", None), default="steady")
+        stage_name = literal_or_default(keyword_map.pop("stage", None), default="steady")
         if not call.args:
             raise context.fail(node, "w.step(...) requires an op name")
-        op_name = _resolve_surface_value(call.args[0], context)
-        attrs = {name: _resolve_surface_value(value, context) for name, value in keyword_map.items()}
+        op_name = resolve_surface_value(call.args[0], context)
+        attrs = {name: resolve_surface_value(value, context) for name, value in keyword_map.items()}
         return str(stage_name), WSPStageStep(op=str(op_name), attrs=attrs)
 
 
 def build_wsp_ast_program_spec(
     *,
     function: Any,
-    kernel_spec: Any,
+    kernel_spec: KernelSpec,
     target: dict[str, Any],
     entry: str,
-) -> Any:
+) -> WSPProgramSpec | None:
     return WSPASTFrontendVisitor().build_program(
         function=function,
         kernel_spec=kernel_spec,
@@ -198,7 +217,7 @@ def build_wsp_ast_program_spec(
     )
 
 
-def _aggregate_schedule(task_specs: tuple[Any, ...]) -> Any:
+def _aggregate_schedule(task_specs: tuple[WSPTaskSpec, ...]) -> WSPScheduleSpec:
     from htp.wsp import WSPScheduleSpec
 
     for task_spec in task_specs:
@@ -212,11 +231,11 @@ def _build_wsp_ast_program_module(
     *,
     entry: str,
     target: dict[str, Any],
-    kernel_spec: Any,
+    kernel_spec: KernelSpec,
     payload: dict[str, Any],
-    task_specs: tuple[Any, ...],
-    dependency_specs: tuple[Any, ...],
-) -> Any:
+    task_specs: tuple[WSPTaskSpec, ...],
+    dependency_specs: tuple[WSPDependencySpec, ...],
+) -> ProgramModule:
     kernel_module = kernel_spec.to_program_module()
     task_handle = item_ref(
         f"itemref.{entry}.kernel",
@@ -236,8 +255,8 @@ def _build_wsp_ast_program_module(
                 for index, arg in enumerate(task_spec.args)
             ),
             attrs=_task_attrs_payload(task_spec.attrs),
-        )
-        for task_spec in task_specs
+            )
+            for task_spec in task_specs
     )
     graph = task_graph(
         f"item.task_graph.{entry}",
@@ -252,13 +271,29 @@ def _build_wsp_ast_program_module(
             for index, dependency_spec in enumerate(dependency_specs)
         ),
     )
-    workload = wsp_frontend_workload(
-        replace(
-            payload_proxy_wsp(
-                task_specs=task_specs, dependency_specs=dependency_specs, entry=entry, target=target
-            ),
-            schedule=_aggregate_schedule(task_specs),
-        )
+    workload = FrontendWorkload(
+        entry=entry,
+        tasks=tuple(
+            WorkloadTask(
+                task_id=task_spec.task_id,
+                kind=task_spec.kind,
+                kernel=task_spec.kernel,
+                args=task_spec.args,
+                entity_id=f"{entry}:{task_spec.task_id}",
+                attrs=dict(task_spec.attrs),
+            )
+            for task_spec in task_specs
+        ),
+        dependencies=tuple(
+            WorkloadDependency(src=dependency_spec.src, dst=dependency_spec.dst)
+            for dependency_spec in dependency_specs
+        ),
+        routine={
+            "kind": "wsp",
+            "entry": entry,
+            "schedule": _aggregate_schedule(task_specs).to_payload(),
+            "target": dict(target),
+        },
     )
     module = build_frontend_program_module(
         kernel_module=kernel_module,
@@ -269,27 +304,6 @@ def _build_wsp_ast_program_module(
         typed_items=(graph,),
     )
     return replace(module, meta={**module.meta, "frontend_capture": "ast"})
-
-
-@dataclass(frozen=True)
-class payload_proxy_wsp:
-    task_specs: tuple[Any, ...]
-    dependency_specs: tuple[Any, ...]
-    entry: str
-    target: dict[str, Any]
-    schedule: Any | None = None
-
-    @property
-    def tasks(self) -> tuple[Any, ...]:
-        return self.task_specs
-
-    @property
-    def channels(self) -> tuple[dict[str, Any], ...]:
-        return ()
-
-    @property
-    def dependencies(self) -> tuple[Any, ...]:
-        return self.dependency_specs
 
 
 def _wsp_program_payload(
@@ -317,61 +331,8 @@ def _wsp_program_payload(
     }
 
 
-def _default_kernel_args(kernel_spec: Any) -> tuple[str, ...]:
-    return tuple(argument.name for argument in kernel_spec.args if argument.name is not None)
-
-
-def _sequence_values(node: ast.AST | None) -> tuple[ast.AST, ...]:
-    if node is None:
-        return ()
-    if isinstance(node, (ast.List, ast.Tuple)):
-        return tuple(node.elts)
-    return (node,)
-
-
-def _literal_or_default(node: ast.AST | None, *, default: Any) -> Any:
-    if node is None:
-        return default
-    return ast.literal_eval(node)
-
-
-def _literal_or_none(node: ast.AST | None) -> Any:
-    if node is None:
-        return None
-    return ast.literal_eval(node)
-
-
-def _resolve_dependency_name(node: ast.AST) -> str:
-    if isinstance(node, ast.Name):
-        return node.id
-    raise FrontendSyntaxError("WSP dependency references must be nested task names")
-
-
-def _resolve_surface_value(node: ast.AST, context) -> Any:
-    path = ASTFrontendVisitor.attribute_path(node)
-    if len(path) == 3 and path[1] == "args":
-        return path[2]
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Constant):
-        return node.value
-    if isinstance(node, (ast.List, ast.Tuple)):
-        return [_resolve_surface_value(item, context) for item in node.elts]
-    if isinstance(node, ast.Dict):
-        return {
-            _resolve_surface_value(key, context): _resolve_surface_value(value, context)
-            for key, value in zip(node.keys, node.values, strict=False)
-        }
-    try:
-        return ast.literal_eval(node)
-    except (ValueError, SyntaxError) as exc:
-        raise context.fail(node, "Unsupported WSP frontend expression") from exc
-
-
 def _surface_ref(*, node_id: str, name: str):
-    from htp.ir.core.nodes import ref
-
-    return ref(node_id, f"sym.{name}", name)
+    return surface_ref(node_id=node_id, name=name)
 
 
 def _task_attrs_payload(attrs: Mapping[str, Any]) -> dict[str, Any]:

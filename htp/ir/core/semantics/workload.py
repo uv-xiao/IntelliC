@@ -122,6 +122,38 @@ class WorkloadIR:
     processes: tuple[WorkloadProcess, ...] = ()
     routine: dict[str, Any] | None = None
 
+    def __post_init__(self) -> None:
+        if self.channels and isinstance(self.channels[0], Mapping):
+            object.__setattr__(
+                self,
+                "channels",
+                tuple(
+                    workload_channel_from_payload(dict(item))
+                    for item in self.channels
+                    if isinstance(item, Mapping)
+                ),
+            )
+        if self.dependencies and isinstance(self.dependencies[0], Mapping):
+            object.__setattr__(
+                self,
+                "dependencies",
+                tuple(
+                    workload_dependency_from_payload(dict(item))
+                    for item in self.dependencies
+                    if isinstance(item, Mapping)
+                ),
+            )
+        if self.processes and isinstance(self.processes[0], Mapping):
+            object.__setattr__(
+                self,
+                "processes",
+                tuple(
+                    workload_process_from_payload(dict(item))
+                    for item in self.processes
+                    if isinstance(item, Mapping)
+                ),
+            )
+
 
 def workload_task_from_payload(payload: dict[str, Any]) -> WorkloadTask:
     return WorkloadTask(

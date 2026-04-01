@@ -89,6 +89,38 @@ class ProgramModule:
     def from_payload(cls, payload: Mapping[str, Any]) -> ProgramModule:
         return program_module_from_payload(payload)
 
+    @classmethod
+    def compose(
+        cls,
+        *modules: ProgramModule,
+        canonical_program: Mapping[str, Any],
+        source_surface: str,
+        entry: str = "run",
+        routine: Mapping[str, Any] | None = None,
+        interpreter_id: str | None = None,
+        meta: Mapping[str, Any] | None = None,
+    ) -> ProgramModule:
+        from .compose import compose_program_modules
+
+        if interpreter_id is None:
+            return compose_program_modules(
+                *modules,
+                canonical_program=canonical_program,
+                source_surface=source_surface,
+                entry=entry,
+                routine=routine,
+                meta=meta,
+            )
+        return compose_program_modules(
+            *modules,
+            canonical_program=canonical_program,
+            source_surface=source_surface,
+            entry=entry,
+            routine=routine,
+            interpreter_id=interpreter_id,
+            meta=meta,
+        )
+
 
 __all__ = [
     "PROGRAM_MODULE_SCHEMA_ID",

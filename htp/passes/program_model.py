@@ -16,7 +16,15 @@ from htp.ir.core.layout import (
     layout_to_payload,
 )
 from htp.ir.core.op_specs import get_op_spec, op_effects
-from htp.ir.core.semantics import KernelArg, KernelIR, KernelOp, WorkloadIR, WorkloadTask, to_payload
+from htp.ir.core.semantics import (
+    KernelArg,
+    KernelIR,
+    KernelOp,
+    WorkloadIR,
+    WorkloadTask,
+    to_payload,
+    workload_ir_payload,
+)
 from htp.ir.core.types import (
     BufferType,
     ChannelType,
@@ -153,12 +161,7 @@ def build_semantic_model(
         if isinstance(workload.get("routine"), Mapping)
         else _routine_summary(workload),
     )
-    workload_payload = {"schema": WORKLOAD_IR_SCHEMA_ID, **to_payload(workload_ir)}
-    for task in workload_payload.get("tasks", ()):
-        if isinstance(task, dict) and task.get("attrs") == {}:
-            task.pop("attrs", None)
-    if workload_payload.get("routine") is None:
-        workload_payload.pop("routine", None)
+    workload_payload = workload_ir_payload(workload_ir)
     return (
         {"schema": KERNEL_IR_SCHEMA_ID, **to_payload(kernel_ir)},
         workload_payload,
