@@ -11,6 +11,7 @@ from htp.csp import program as csp_program
 from htp.ir.frontends import resolve_frontend
 from htp.ir.module import ProgramModule
 from htp.ir.semantics import KernelIR, WorkloadIR
+from htp.ir.wsp_nodes import WSPStageSpec, WSPStageStep
 from htp.kernel import (
     KernelSpec,
     KernelValue,
@@ -927,6 +928,36 @@ def test_wsp_surface_supports_defaults_bound_args_and_structured_stage_bodies():
         "name": "epilogue",
         "steps": [{"kind": "step", "op": "store", "target": "C"}],
     }
+
+
+def test_wsp_program_spec_uses_typed_stage_objects() -> None:
+    @kernel
+    def affine_mix(
+        lhs: buffer(dtype="f32", shape=("M", "K"), role="input"),
+        rhs: buffer(dtype="f32", shape=("K", "N"), role="input"),
+        out: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(out, lhs @ rhs)
+
+    @wsp_program(target="nvgpu-ampere", kernel=affine_mix)
+    def tiled(w) -> None:
+        (
+            w.mainloop(task_id="main")
+            .role("consumer")
+            .prologue()
+            .step("cp_async", source=w.args.lhs, target="a_stage")
+            .step("cp_async", source=w.args.rhs, target="b_stage")
+        )
+
+    stages = tiled.tasks[0].attrs["stages"]
+
+    assert isinstance(stages[0], WSPStageSpec)
+    assert isinstance(stages[0].steps[0], WSPStageStep)
+    assert stages[0].steps[0].op == "cp_async"
+    assert stages[0].steps[0].attrs == {"source": "lhs", "target": "a_stage"}
 
 
 def test_csp_program_surface_accepts_kernel_specs_and_step_helpers():

@@ -29,6 +29,7 @@ from typing import Any
 from htp.compiler import parse_target
 from htp.ir.frontends import resolve_frontend
 from htp.ir.module import ProgramModule
+from htp.ir.wsp_nodes import WSPStageSpec, WSPStageStep, stages_from_payload, stages_to_payload
 from htp.kernel import KernelSpec, KernelValue
 
 
@@ -48,17 +49,20 @@ class WSPTaskSpec:
             "args": list(self.args),
         }
         if self.attrs:
-            payload["attrs"] = dict(self.attrs)
+            payload["attrs"] = _task_attrs_payload(self.attrs)
         return payload
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> WSPTaskSpec:
+        attrs = dict(payload.get("attrs", {}))
+        if "stages" in attrs:
+            attrs["stages"] = stages_from_payload(attrs["stages"])
         return cls(
             task_id=str(payload["task_id"]),
             kind=str(payload["kind"]),
             kernel=str(payload["kernel"]),
             args=tuple(str(arg) for arg in payload.get("args", ())),
-            attrs=dict(payload.get("attrs", {})),
+            attrs=attrs,
         )
 
 
@@ -387,12 +391,15 @@ class WSPBuilder:
 @dataclass
 class WSPStageBuilder:
     task: WSPTaskBuilder
-    stage_spec: dict[str, Any]
+    stage_spec: WSPStageSpec
 
     def step(self, op: str, /, **attrs: Any) -> WSPStageBuilder:
-        payload = {"kind": "step", "op": str(op)}
-        payload.update({key: _stage_attr_value(value) for key, value in attrs.items()})
-        self.stage_spec.setdefault("steps", []).append(payload)
+        self.stage_spec.steps.append(
+            WSPStageStep(
+                op=str(op),
+                attrs={key: _stage_attr_value(value) for key, value in attrs.items()},
+            )
+        )
         return self
 
 
@@ -455,7 +462,7 @@ class WSPTaskBuilder:
 
     def stage(self, name: str, *steps: str) -> WSPTaskBuilder:
         if steps:
-            self._stage_spec(name)["steps"].extend(str(step) for step in steps)
+            self._stage_spec(name).steps.extend(str(step) for step in steps)
             return self
         return WSPStageBuilder(task=self, stage_spec=self._stage_spec(name))
 
@@ -480,13 +487,19 @@ class WSPTaskBuilder:
     def _task_schedule(self) -> dict[str, Any]:
         return self._attrs().setdefault("schedule", {})
 
-    def _stage_spec(self, name: str) -> dict[str, Any]:
-        stages = self._attrs().setdefault("stages", [])
+    def _stage_spec(self, name: str) -> WSPStageSpec:
+        attrs = self._attrs()
+        stages = attrs.get("stages")
+        if stages is None:
+            stages = []
+            attrs["stages"] = stages
+        elif stages and isinstance(stages[0], Mapping):
+            stages = stages_from_payload(stages)
+            attrs["stages"] = stages
         for stage in stages:
-            if isinstance(stage, dict) and stage.get("name") == str(name):
-                stage.setdefault("steps", [])
+            if stage.name == str(name):
                 return stage
-        stage = {"name": str(name), "steps": []}
+        stage = WSPStageSpec(name=str(name))
         stages.append(stage)
         return stage
 
@@ -600,6 +613,14 @@ def _stage_attr_value(value: Any) -> Any:
     return value
 
 
+def _task_attrs_payload(attrs: Mapping[str, Any]) -> dict[str, Any]:
+    payload = dict(attrs)
+    stages = payload.get("stages")
+    if isinstance(stages, list) and stages and isinstance(stages[0], WSPStageSpec):
+        payload["stages"] = stages_to_payload(stages)
+    return payload
+
+
 __all__ = [
     "WSPBuilder",
     "WSPDependencySpec",
@@ -607,6 +628,8 @@ __all__ = [
     "WSPTaskBuilder",
     "WSPProgramSpec",
     "WSPScheduleSpec",
+    "WSPStageSpec",
+    "WSPStageStep",
     "bind",
     "pipeline",
     "program",
