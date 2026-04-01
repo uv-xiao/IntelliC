@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ..core.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
-from ..core.semantics import WorkloadIR, WorkloadTask
+from ..core.semantics import (
+    WorkloadChannel,
+    WorkloadDependency,
+    WorkloadIR,
+    WorkloadProcess,
+    WorkloadTask,
+)
 from ..dialects.registry import dialect_activation_payload
 from ..program.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
 
@@ -18,9 +24,9 @@ if TYPE_CHECKING:
 class FrontendWorkload:
     entry: str
     tasks: tuple[WorkloadTask, ...]
-    channels: tuple[dict[str, Any], ...] = ()
-    dependencies: tuple[dict[str, Any], ...] = ()
-    processes: tuple[dict[str, Any], ...] = ()
+    channels: tuple[WorkloadChannel, ...] = ()
+    dependencies: tuple[WorkloadDependency, ...] = ()
+    processes: tuple[WorkloadProcess, ...] = ()
     routine: dict[str, Any] | None = None
 
     def to_workload_ir(self) -> WorkloadIR:

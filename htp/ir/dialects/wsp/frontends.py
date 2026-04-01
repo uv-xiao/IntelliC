@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from htp.ir.core.nodes import dependency, item_ref, task, task_graph
-from htp.ir.core.semantics import WorkloadTask
+from htp.ir.core.semantics import WorkloadDependency, WorkloadTask
 from htp.ir.frontends import ASTFrontendVisitor, FrontendSyntaxError, handles, load_function_ast
 from htp.ir.frontends.shared import FrontendWorkload, build_frontend_program_module
 
@@ -27,8 +27,11 @@ def wsp_frontend_workload(surface: object) -> FrontendWorkload:
             )
             for task_spec in surface.tasks
         ),
-        channels=tuple(dict(item) for item in surface.channels),
-        dependencies=tuple(dependency_spec.to_payload() for dependency_spec in surface.dependencies),
+        channels=(),
+        dependencies=tuple(
+            WorkloadDependency(src=dependency_spec.src, dst=dependency_spec.dst)
+            for dependency_spec in surface.dependencies
+        ),
         routine={
             "kind": "wsp",
             "entry": surface.entry,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..core.semantics import WorkloadTask
+from ..core.semantics import WorkloadChannel, WorkloadDependency, WorkloadTask
 from ..dialects.csp import csp_frontend_workload
 from ..dialects.wsp import wsp_frontend_workload
 from .registry import FrontendSpec, frontend_registry_snapshot, register_frontend
@@ -45,8 +45,19 @@ def _routine_frontend_workload(surface: Any) -> FrontendWorkload:
             )
             for task in surface.tasks
         ),
-        channels=tuple(channel.to_payload() for channel in surface.channels),
-        dependencies=tuple(dependency.to_payload() for dependency in surface.dependencies),
+        channels=tuple(
+            WorkloadChannel(
+                name=channel.name,
+                dtype=channel.dtype,
+                capacity=channel.capacity,
+                protocol=channel.protocol,
+            )
+            for channel in surface.channels
+        ),
+        dependencies=tuple(
+            WorkloadDependency(src=dependency.src, dst=dependency.dst)
+            for dependency in surface.dependencies
+        ),
         routine={
             "kind": "routine",
             "entry": surface.entry,

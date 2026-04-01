@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from htp.ir.core.nodes import channel, item_ref, process, process_graph, process_step
-from htp.ir.core.semantics import WorkloadTask
+from htp.ir.core.semantics import WorkloadChannel, WorkloadProcess, WorkloadProcessStep, WorkloadTask
 from htp.ir.frontends import ASTFrontendVisitor, handles, load_function_ast
 from htp.ir.frontends.shared import FrontendWorkload, build_frontend_program_module
 
@@ -29,9 +29,30 @@ def csp_frontend_workload(surface: object) -> FrontendWorkload:
             )
             for process_spec in surface.processes
         ),
-        channels=tuple(channel_ref.to_payload() for channel_ref in surface.channels),
+        channels=tuple(
+            WorkloadChannel(
+                name=channel_ref.name,
+                dtype=channel_ref.dtype,
+                capacity=channel_ref.capacity,
+                protocol=channel_ref.protocol,
+            )
+            for channel_ref in surface.channels
+        ),
         dependencies=(),
-        processes=tuple(process_spec.to_payload() for process_spec in surface.processes),
+        processes=tuple(
+            WorkloadProcess(
+                name=process_spec.name,
+                task_id=process_spec.task_id,
+                kernel=process_spec.kernel,
+                args=process_spec.args,
+                role=process_spec.role,
+                steps=tuple(
+                    WorkloadProcessStep(kind=step.kind, attrs=dict(step.attrs))
+                    for step in process_spec.steps
+                ),
+            )
+            for process_spec in surface.processes
+        ),
         routine={"kind": "csp", "entry": surface.entry, "target": dict(surface.target)},
     )
 

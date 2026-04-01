@@ -419,7 +419,9 @@ def test_public_routine_surface_exposes_program_module(tmp_path):
     assert isinstance(module.items.workload_ir, WorkloadIR)
     assert module.items.workload_ir.entry == "serving_routine"
     assert [task.task_id for task in module.items.workload_ir.tasks] == ["prefill", "decode"]
-    assert module.items.workload_ir.dependencies == ({"src": "prefill", "dst": "decode"},)
+    assert [(item.src, item.dst) for item in module.items.workload_ir.dependencies] == [
+        ("prefill", "decode")
+    ]
     assert module.meta["active_dialects"] == ["htp.core", "htp.kernel", "htp.routine"]
     assert module.items.workload_ir.routine == {
         "kind": "routine",
@@ -1110,7 +1112,7 @@ def test_csp_program_surface_exposes_program_module(tmp_path):
         "entry": "pipeline_demo",
         "target": {"backend": "nvgpu", "option": "ampere"},
     }
-    assert [process["name"] for process in module.items.workload_ir.processes] == ["dispatch", "consume"]
+    assert [process.name for process in module.items.workload_ir.processes] == ["dispatch", "consume"]
     assert module.items.workload_ir.tasks[0].attrs == {"name": "dispatch", "role": "producer"}
 
     compiled = htp.compile_program(
