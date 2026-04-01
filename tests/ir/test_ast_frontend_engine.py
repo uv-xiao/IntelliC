@@ -16,6 +16,18 @@ class DemoASTVisitor(ASTFrontendVisitor):
 
 
 def test_ast_frontend_dispatch_matches_decorator_and_call_handlers() -> None:
+    class Surface:
+        def worker(self, **kwargs):
+            def decorator(function):
+                return function
+
+            return decorator
+
+        def emit(self, *_args, **_kwargs):
+            return None
+
+    surface = Surface()
+
     def demo_surface():
         @surface.worker(role="producer")
         def worker():

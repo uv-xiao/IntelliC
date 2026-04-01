@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any
 
 from htp.csp import program as csp_program
@@ -56,7 +55,9 @@ def streamed_tiles(c) -> None:
         c.compute("pack_tile", source=c.args.A, tile=tile)
         c.put(partials)
 
-    @c.process(task_id="combine", role="consumer", args=(c.args.A, c.args.B, c.args.C, c.args.M, c.args.N, c.args.K))
+    @c.process(
+        task_id="combine", role="consumer", args=(c.args.A, c.args.B, c.args.C, c.args.M, c.args.N, c.args.K)
+    )
     def combine() -> None:
         partial = c.get(partials)
         c.compute_step("reduce_partials", value=partial)

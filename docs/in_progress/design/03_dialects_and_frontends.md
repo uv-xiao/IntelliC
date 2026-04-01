@@ -86,11 +86,15 @@ recognize one local syntax form and lower one local construct.
 
 ## Implemented status (frontend-definition substrate)
 
-The initial frontend-definition substrate is now implemented in code:
+The frontend-definition substrate is now implemented in code:
 
 - a rule-backed frontend-definition substrate now exists in `htp/ir/frontends/rules.py`
   (`FrontendBuildContext`, `FrontendRule`, `FrontendRuleResult`,
   `ProgramSurfaceRule`)
+- a shared AST capture substrate now exists in:
+  - `htp/ir/frontends/ast_context.py`
+  - `htp/ir/frontends/ast_handlers.py`
+  - `htp/ir/frontends/ast_visitor.py`
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
   in `htp/ir/frontends/__init__.py` (`resolve_frontend(...)`, `FrontendSpec.build(...)`)
 - builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
@@ -100,18 +104,28 @@ The initial frontend-definition substrate is now implemented in code:
   registered frontend rule instead of owning a parallel lowering body
 - WSP and CSP public specs now expose typed top-level surface objects rather
   than raw dict payload fields before serialization
+- WSP and CSP now also support AST-backed nested-function authoring through:
+  - nested `@w.task(...)` / `@w.mainloop(...)` local functions with local
+    `w.step(...)` bodies
+  - nested `@c.process(...)` local functions with local `c.get(...)`,
+    `c.put(...)`, `c.compute(...)`, and `c.compute_step(...)` bodies
+- AST-backed WSP/CSP modules now record `meta["frontend_capture"] == "ast"`
 
-Remaining gap relative to this design document:
+Remaining gap relative to this design document is now narrower:
 
-- the current rules still rebuild nested stage/process-step structure from
-  payload-shaped attrs; the final node-first rule/combinator API described
-  above is not implemented yet
+- richer typed schedule/stage/process local state still needs to migrate out of
+  generic attr payloads in some emitted task/process records
+- broader dialect/extension migration onto this frontend substrate is still open
 
 Code pointers for the implemented substrate:
 
 - `htp/ir/frontends/rules.py`
 - `htp/ir/frontends/__init__.py`
-- `htp/ir/frontend.py`
+- `htp/ir/frontends/ast_context.py`
+- `htp/ir/frontends/ast_handlers.py`
+- `htp/ir/frontends/ast_visitor.py`
+- `htp/ir/dialects/wsp/frontends.py`
+- `htp/ir/dialects/csp/frontends.py`
 - `htp/kernel.py`
 - `htp/compiler.py`
 

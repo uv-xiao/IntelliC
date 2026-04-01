@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -23,7 +22,10 @@ def csp_frontend_workload(surface: object) -> FrontendWorkload:
                 kernel=process_spec.kernel,
                 args=process_spec.args,
                 entity_id=f"{surface.entry}:{process_spec.task_id}",
-                attrs={"name": process_spec.name, **({"role": process_spec.role} if process_spec.role is not None else {})},
+                attrs={
+                    "name": process_spec.name,
+                    **({"role": process_spec.role} if process_spec.role is not None else {}),
+                },
             )
             for process_spec in surface.processes
         ),
@@ -128,8 +130,7 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
             raise context.fail(node, "CSP nested process decorators must be calls")
         keyword_map = {item.arg: item.value for item in decorator.keywords if item.arg is not None}
         process_args = tuple(
-            _resolve_surface_value(item, context)
-            for item in _sequence_values(keyword_map.get("args"))
+            _resolve_surface_value(item, context) for item in _sequence_values(keyword_map.get("args"))
         ) or _default_kernel_args(context.kernel_spec)
         role = _resolve_surface_value(keyword_map.get("role"), context) if "role" in keyword_map else None
         steps = []
@@ -261,7 +262,9 @@ def _build_csp_ast_program_module(
                 process_step(
                     f"processstep.{entry}.{process_spec.task_id}.{index}",
                     kind=step.kind,
-                    channel_id=channel_ids.get(step.attrs.get("channel")) if step.attrs.get("channel") else None,
+                    channel_id=channel_ids.get(step.attrs.get("channel"))
+                    if step.attrs.get("channel")
+                    else None,
                     attrs=dict(step.attrs),
                 )
                 for index, step in enumerate(process_spec.steps)

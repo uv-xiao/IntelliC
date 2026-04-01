@@ -94,25 +94,30 @@ Implemented on this branch:
   registered frontend rule instead of owning a parallel lowering path
 - WSP and CSP public specs now use typed top-level surface objects rather than
   raw dict payload fields before serialization
-- remaining gap: those rules still rebuild nested stage/process-step attrs
-  rather than the final node-first rule/combinator frontend API
+- a shared AST capture substrate now exists in:
+  - `htp/ir/frontends/ast_context.py`
+  - `htp/ir/frontends/ast_handlers.py`
+  - `htp/ir/frontends/ast_visitor.py`
+- WSP and CSP now support AST-backed nested-function authoring that lowers
+  directly into final `ProgramModule` state for the recognized surface
 - a first dialect registry slice now exists for builtin frontend dialects, and
   public frontends record their active dialect set and activation manifest into
   `ProgramModule.meta`
 - a human-facing IR definition / execution / transformation example under
   `examples/ir_program_module_flow/`
+- a human-facing frontend composability example under
+  `examples/ast_frontend_composability/`
 
 Still design-only or partial:
 
 - the full typed node hierarchy in `02_ir_structure.md` beyond the current
   kernel/task-graph/process-graph slice
-- the final node-first frontend substrate in `03_dialects_and_frontends.md`
-  beyond the current `FrontendRule` / `FrontendSpec.build(...)` substrate
+- richer typed nested schedule/stage/process-local state beyond the current
+  AST-backed WSP/CSP frontend slice
 - the full typed analysis substrate beyond the current generic record wrapper
 - full dialect migration beyond the current builtin frontend set
 - extension and dialect migration beyond the current public frontend set
-- the PR-closing tile-streamed GEMM proof directory and its four committed
-  variant modules described in `06_pr_closure_proof.md`
+- final PR-close sync and merge hygiene for the tile-streamed GEMM closure proof
 
 So the redesign is not fully finished yet. The stage/execution contract slice
 is implemented; the full IR-definition and dialect-definition substrate is not.

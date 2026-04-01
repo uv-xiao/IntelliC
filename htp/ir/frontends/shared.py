@@ -41,7 +41,7 @@ def build_frontend_program_module(
     workload: FrontendWorkload,
     source_surface: str,
     active_dialects: tuple[str, ...],
-    typed_items: tuple["Node", ...] = (),
+    typed_items: tuple[Node, ...] = (),
 ) -> ProgramModule:
     return ProgramModule(
         items=ProgramItems(

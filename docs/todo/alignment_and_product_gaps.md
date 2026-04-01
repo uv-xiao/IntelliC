@@ -37,9 +37,9 @@ The reopened work falls into four broad buckets:
 
 ### Programming surfaces
 
-- [ ] replace WSP stage-step metadata strings with more authored task-local body
+- [x] replace WSP stage-step metadata strings with more authored task-local body
       surfaces where possible
-- [ ] replace CSP `compute_step(...)` metadata with a more native process-body
+- [x] replace CSP `compute_step(...)` metadata with a more native process-body
       surface
 - [ ] reduce remaining builder ceremony in flagship WSP/CSP examples without
       reintroducing raw payload assembly

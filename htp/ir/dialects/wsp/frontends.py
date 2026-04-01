@@ -56,10 +56,12 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
         target: dict[str, Any],
         entry: str,
     ) -> Any:
-        from htp.wsp import WSPDependencySpec, WSPProgramSpec, WSPScheduleSpec
+        from htp.wsp import WSPDependencySpec, WSPProgramSpec
 
         function_ast = load_function_ast(function)
-        nested_tasks = [node for node in function_ast.root.body if self.decorator_name(node) in {"task", "mainloop"}]
+        nested_tasks = [
+            node for node in function_ast.root.body if self.decorator_name(node) in {"task", "mainloop"}
+        ]
         if not nested_tasks:
             return None
         context = self.build_context(
@@ -117,14 +119,17 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
             raise context.fail(node, "WSP nested task decorators must be calls")
         keyword_map = {item.arg: item.value for item in decorator.keywords if item.arg is not None}
         task_id = _literal_or_default(keyword_map.get("task_id"), default=node.name)
-        kind = "wsp_mainloop" if self.decorator_name(node) == "mainloop" else _literal_or_default(
-            keyword_map.get("kind"),
-            default="kernel_call",
+        kind = (
+            "wsp_mainloop"
+            if self.decorator_name(node) == "mainloop"
+            else _literal_or_default(
+                keyword_map.get("kind"),
+                default="kernel_call",
+            )
         )
         role = _literal_or_none(keyword_map.get("role"))
         task_args = tuple(
-            _resolve_surface_value(item, context)
-            for item in _sequence_values(keyword_map.get("args"))
+            _resolve_surface_value(item, context) for item in _sequence_values(keyword_map.get("args"))
         ) or _default_kernel_args(context.kernel_spec)
         stages: dict[str, list[WSPStageStep]] = {}
         for statement in node.body:
@@ -144,7 +149,9 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
             attrs["schedule"] = schedule_payload
         if stages:
             attrs["stages"] = [WSPStageSpec(name=name, steps=list(values)) for name, values in stages.items()]
-        after_names = tuple(_resolve_dependency_name(item) for item in _sequence_values(keyword_map.get("after")))
+        after_names = tuple(
+            _resolve_dependency_name(item) for item in _sequence_values(keyword_map.get("after"))
+        )
         return _PendingWSPTask(
             function_name=node.name,
             spec=WSPTaskSpec(
@@ -244,7 +251,9 @@ def _build_wsp_ast_program_module(
     )
     workload = wsp_frontend_workload(
         replace(
-            payload_proxy_wsp(task_specs=task_specs, dependency_specs=dependency_specs, entry=entry, target=target),
+            payload_proxy_wsp(
+                task_specs=task_specs, dependency_specs=dependency_specs, entry=entry, target=target
+            ),
             schedule=_aggregate_schedule(task_specs),
         )
     )

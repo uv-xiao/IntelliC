@@ -17,17 +17,17 @@ realism, backend depth, and documentation discipline.
 ### Overall
 
 - total tracked TODO checklist items: 81
-- complete: 72
+- complete: 74
 - partial: 0
-- open: 9
-- completion ratio: 88.9%
+- open: 7
+- completion ratio: 91.4%
 
 ### By topic
 
 | Topic | Complete | Partial | Open | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Compiler model, semantics, typing | 13 | 0 | 0 | 13 |
-| Programming surfaces and examples | 19 | 0 | 8 | 27 |
+| Programming surfaces and examples | 21 | 0 | 6 | 27 |
 | Pipeline and solver | 10 | 0 | 0 | 10 |
 | Artifacts, replay, debug | 8 | 0 | 0 | 8 |
 | Backends and extensions | 11 | 0 | 3 | 14 |

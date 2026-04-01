@@ -71,6 +71,10 @@ That frontend registry now has a rule-backed frontend-definition substrate:
 
 - a rule-backed frontend-definition substrate now exists in
   `htp/ir/frontends/rules.py` (`FrontendRule`, `ProgramSurfaceRule`)
+- a shared AST capture substrate now exists in:
+  - `htp/ir/frontends/ast_context.py`
+  - `htp/ir/frontends/ast_handlers.py`
+  - `htp/ir/frontends/ast_visitor.py`
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
   in `htp/ir/frontends/__init__.py`
 - builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
@@ -81,14 +85,22 @@ That frontend registry now has a rule-backed frontend-definition substrate:
   raw dict payload fields:
   - `WSPTaskSpec`, `WSPDependencySpec`, `WSPScheduleSpec`
   - `ChannelRef`, `CSPProcessSpec`, `CSPProcessStep`
-- remaining gap: those rules still rebuild nested stage/process-step structure
-  from payload-shaped attrs rather than the final node-first rule/combinator API
+- WSP and CSP now also support AST-backed nested-function authoring:
+  - nested `@w.task(...)` / `@w.mainloop(...)` functions with local
+    `w.step(...)` bodies
+  - nested `@c.process(...)` functions with local `c.get(...)`, `c.put(...)`,
+    `c.compute(...)`, and `c.compute_step(...)` bodies
+- AST-backed WSP/CSP modules now mark `meta["frontend_capture"] == "ast"`
 
 Code pointers for the implemented ingress path:
 
 - `htp/ir/frontends/rules.py`
 - `htp/ir/frontends/__init__.py`
-- `htp/ir/frontend.py`
+- `htp/ir/frontends/ast_context.py`
+- `htp/ir/frontends/ast_handlers.py`
+- `htp/ir/frontends/ast_visitor.py`
+- `htp/ir/dialects/wsp/frontends.py`
+- `htp/ir/dialects/csp/frontends.py`
 - `htp/kernel.py`
 - `htp/compiler.py`
 
@@ -218,6 +230,7 @@ The current proof points include:
 - software-pipeline planning
 - shared lowering through the same pass manager and artifact model
 - decorator/builder authoring through `@wsp.program(...)`
+- AST-backed nested task authoring through `@wsp.program(...)`
 
 The current AST-all-the-way closure proof also now has one explicit checked-in
 example at `examples/tile_streamed_gemm_closure/`. It is intentionally not a
@@ -256,6 +269,19 @@ with w.defaults(...):
 
 That structure survives into the staged workload artifacts instead of being
 only a comment in the example.
+
+WSP now also supports nested local task definitions as the human-first surface:
+
+```text
+@wsp.program(...)
+def tiled(w):
+    @w.task(task_id="load_tiles", role="producer")
+    def load_tiles():
+        w.step("cp_async", stage="prologue", source=w.args.A, target="a_tile")
+```
+
+The AST frontend captures these nested task functions directly and lowers them
+into the same `WSPProgramSpec` / `ProgramModule` contract as the builder path.
 
 Three concrete surface upgrades matter here:
 
@@ -332,6 +358,7 @@ values and routines instead of inventing parallel semantic roots.
 - deadlock/progress evidence
 - lowering into shared workload/effect state
 - decorator/builder authoring through `@csp.program(...)`
+- AST-backed nested process authoring through `@csp.program(...)`
 - bound kernel arguments via `p.args.<name>`
 - default kernel/argument capture for `p.process(...)`
 - fluent process builders such as `.process(...).role(...).compute_step(...).get(...).put(...)`
@@ -359,6 +386,23 @@ finalize.put(ready_rows)
 Those authored process steps are not a second compiler substrate. They are
 process-level evidence attached to the shared workload model so replay,
 legality, and diagnostics can all point at the same structure.
+
+The same surface now also accepts nested local process definitions:
+
+```text
+@csp.program(...)
+def pipeline(c):
+    tiles = c.fifo("tiles", dtype="f32", capacity=2)
+
+    @c.process(task_id="dispatch", role="producer")
+    def dispatch():
+        tile = c.get(tiles)
+        c.compute("pack_tile", source=c.args.X, tile=tile)
+        c.put(tiles)
+```
+
+This path is parsed by the shared AST frontend substrate and lowered directly
+into the final `ProgramModule` for the recognized CSP authoring surface.
 
 ### Workload-level routines
 

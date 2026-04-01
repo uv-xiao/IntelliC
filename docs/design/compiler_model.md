@@ -60,6 +60,10 @@ That substrate is now rule-backed in code:
 
 - a rule-backed frontend-definition substrate now exists in
   `htp/ir/frontends/rules.py` (`FrontendRule`, `ProgramSurfaceRule`)
+- a shared AST capture substrate now exists in:
+  - `htp/ir/frontends/ast_context.py`
+  - `htp/ir/frontends/ast_handlers.py`
+  - `htp/ir/frontends/ast_visitor.py`
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
   in `htp/ir/frontends/__init__.py`, and compiler ingress routes through
   `FrontendSpec.build(...)` in `htp/compiler.py`
@@ -69,9 +73,9 @@ That substrate is now rule-backed in code:
   registered frontend rule instead of owning a separate lowering path
 - WSP and CSP public specs now carry typed top-level surface objects rather than
   raw dict payload fields before serialization into `state.json`
-- remaining gap: those rules still rebuild nested stage/process-step structure
-  from payload-shaped attrs rather than the final node-first
-  rule/combinator frontend API
+- WSP and CSP now also support AST-backed nested-function authoring that lowers
+  directly into final `ProgramModule` state for the recognized authored form
+- AST-backed WSP/CSP modules now mark `meta["frontend_capture"] == "ast"`
 
 The current frontend set also records explicit dialect activation metadata into
 `ProgramModule.meta`, so committed-stage state now carries both:
@@ -84,6 +88,11 @@ surfaces reuse the common frontend-definition substrate in `htp/ir/frontend.py`
 to rebuild `KernelSpec`, assemble frontend workload/process structure, and
 construct `ProgramModule` with consistent dialect metadata rather than each
 surface hand-assembling its own module wrapper.
+
+The AST-backed frontend slice also now proves that dialect-specific parse
+features can stay within one substrate. WSP task functions and CSP process
+functions use the same handler metadata and visitor dispatch model, then lower
+into the same `ProgramModule` owner and interpreter entry.
 
 A stage is therefore not just “an AST snapshot”. It is a small evidence package describing both executable behavior and compiler understanding.
 

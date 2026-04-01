@@ -166,6 +166,14 @@ end state.
   construction, and they still rebuild nested stage/process-step structure from
   payload-shaped attrs rather than the final node-first
   rule/combinator API
+- a shared AST capture substrate now exists in:
+  - `htp/ir/frontends/ast_context.py`
+  - `htp/ir/frontends/ast_handlers.py`
+  - `htp/ir/frontends/ast_visitor.py`
+- WSP and CSP now support AST-backed nested-function authoring that lowers
+  directly into final `ProgramModule` state for the recognized authored form
+- an explicit composability proof example now exists at
+  `examples/ast_frontend_composability/`
 - a manifest-style dialect activation slice now exists for builtin frontend
   dialects, and the public frontends now record both active dialect closure and
   activation payloads in `ProgramModule.meta`
@@ -195,8 +203,8 @@ end state.
   registry-and-payload-oriented rather than the final typed-node interpreter
   substrate
 - the shared frontend-definition substrate now exists, but it still rebuilds
-  nested workload/process stage attrs from payload-shaped fields instead of the
-  final typed frontend-definition API described in
+  some nested workload/process stage attrs from payload-shaped fields instead of
+  the fuller typed frontend-definition envelope described in
   `03_dialects_and_frontends.md`
 - the frontend registry exists only for builtin public surfaces and still
   resolves primarily by Python surface type; the builtin public surfaces are
@@ -218,8 +226,8 @@ end state.
 ### Not implemented yet
 
 - the common typed `Node` / `Item` / `Expr` / `Stmt` / `Region` hierarchy
-- the final node-first rule/combinator frontend-definition API described in
-  `03_dialects_and_frontends.md`
+- richer typed nested schedule/stage/process-local state beyond the current
+  AST-backed WSP/CSP capture slice
 - full extension migration onto dialect-owned nodes/aspects/intrinsics
 
 ## Code pointers (frontend-definition substrate)

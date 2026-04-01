@@ -58,8 +58,10 @@ Remaining gap:
 - builtin public surfaces are now rule-backed through `FrontendSpec.build(...)`,
   and routine/WSP/CSP now delegate `to_program_module()` back through that
   registry; WSP/CSP public specs now also use typed top-level surface objects,
-  but the rules still rebuild nested stage/process-step attrs rather than the
-  final node-first rule/combinator frontend-definition API.
+  and WSP/CSP now support AST-backed nested-function authoring through the
+  shared AST frontend substrate; the remaining frontend gap is now richer typed
+  nested schedule/stage/process-local state rather than the absence of the AST
+  frontend-definition API itself.
 - the final frontend-definition substrate must enforce dialect composability
   across parse/capture, typed IR ownership, passes, interpreters, and artifact
   rendering, and frontend AST handlers must stay small and single-purpose.
