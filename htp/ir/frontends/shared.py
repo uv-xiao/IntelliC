@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
 from ..core.semantics import WorkloadIR, WorkloadTask
 from ..dialects.registry import dialect_activation_payload
 from ..program.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
+
+if TYPE_CHECKING:
+    from ..core.nodes import Node
 
 
 @dataclass(frozen=True)
@@ -38,13 +41,14 @@ def build_frontend_program_module(
     workload: FrontendWorkload,
     source_surface: str,
     active_dialects: tuple[str, ...],
+    typed_items: tuple["Node", ...] = (),
 ) -> ProgramModule:
     return ProgramModule(
         items=ProgramItems(
             canonical_ast={"schema": "htp.program_ast.v1", "program": authored_program},
             kernel_ir=kernel_module.items.kernel_ir,
             workload_ir=workload.to_workload_ir(),
-            typed_items=kernel_module.items.typed_items,
+            typed_items=kernel_module.items.typed_items + tuple(typed_items),
         ),
         aspects=ProgramAspects(
             types=TypesAspect(schema="htp.types.v1"),

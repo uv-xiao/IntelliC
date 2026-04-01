@@ -1002,6 +1002,48 @@ def test_wsp_program_spec_uses_typed_stage_objects() -> None:
     assert stages[0].steps[0].attrs == {"source": "lhs", "target": "a_stage"}
 
 
+def test_wsp_ast_frontend_supports_nested_task_functions() -> None:
+    @kernel
+    def affine_mix(
+        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(C, A @ B)
+
+    @wsp_program(target="nvgpu-ampere", kernel=affine_mix)
+    def tiled(w) -> None:
+        @w.task(task_id="load_tiles", role="producer")
+        def load_tiles() -> None:
+            w.step("cp_async", stage="prologue", source=w.args.A, target="a_tile")
+            w.step("cp_async", stage="prologue", source=w.args.B, target="b_tile")
+
+        @w.mainloop(
+            task_id="mma_tiles",
+            role="consumer",
+            after=load_tiles,
+            tile={"block": (64, 128, 32)},
+            bind={"grid": "block", "lane": "warp"},
+            pipeline={"depth": 2, "buffering": "double"},
+            resources={"num_warps": 4},
+        )
+        def mma_tiles() -> None:
+            w.step("barrier", stage="steady")
+            w.step("mma_sync", stage="steady", accum="acc")
+
+    payload = tiled.to_program()
+    module = tiled.to_program_module()
+
+    assert payload["wsp"]["workload"]["dependencies"] == [{"src": "load_tiles", "dst": "mma_tiles"}]
+    assert payload["wsp"]["workload"]["tasks"][0]["attrs"]["stages"][0]["steps"][0]["op"] == "cp_async"
+    assert payload["wsp"]["workload"]["tasks"][1]["kind"] == "wsp_mainloop"
+    assert module.meta["frontend_capture"] == "ast"
+    assert module.items.typed_items[0].name == "tiled"
+
+
 def test_csp_program_surface_accepts_kernel_specs_and_step_helpers():
     @kernel
     def gemm_tile(
@@ -1124,6 +1166,52 @@ def test_csp_process_surface_carries_role_and_compute_steps():
         "name": "reduce_partials",
         "channel": "tiles",
     }
+
+
+def test_csp_ast_frontend_supports_nested_process_functions() -> None:
+    @kernel
+    def pipeline_stage(
+        X: buffer(dtype="f32", shape=("M", "N"), role="input"),
+        Y: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(Y, X + X)
+
+    @csp_program(target="nvgpu-ampere", kernel=pipeline_stage)
+    def pipeline_demo(c) -> None:
+        tiles = c.fifo("tiles", dtype="f32", capacity=2)
+        partials = c.fifo("partials", dtype="f32", capacity=1)
+
+        @c.process(task_id="dispatch", role="producer")
+        def dispatch() -> None:
+            tile = c.get(tiles)
+            c.compute("pack_tile", source=c.args.X, tile=tile)
+            c.put(partials)
+
+        @c.process(task_id="combine", role="consumer", args=(c.args.X, c.args.Y, c.args.M, c.args.N))
+        def combine() -> None:
+            payload = c.get(partials)
+            c.compute_step("reduce_partials", value=payload)
+            c.put(tiles)
+
+    payload = pipeline_demo.to_program()
+    module = pipeline_demo.to_program_module()
+
+    assert [channel["name"] for channel in payload["csp"]["channels"]] == ["tiles", "partials"]
+    assert payload["csp"]["processes"][0]["steps"][1] == {
+        "kind": "compute",
+        "name": "pack_tile",
+        "source": "X",
+        "tile": "tile",
+    }
+    assert payload["csp"]["processes"][1]["steps"][1] == {
+        "kind": "compute",
+        "op": "reduce_partials",
+        "value": "payload",
+    }
+    assert module.meta["frontend_capture"] == "ast"
+    assert module.items.typed_items[0].name == "pipeline_demo"
 
 
 def test_csp_surface_supports_bound_args_and_structured_process_bodies():

@@ -160,8 +160,12 @@ class CSPProgramSpec:
     kernel: KernelSpec
     channels: tuple[ChannelRef, ...]
     processes: tuple[CSPProcessSpec, ...]
+    authored_program: dict[str, Any] | None = None
+    prebuilt_program_module: ProgramModule | None = None
 
     def to_program(self) -> dict[str, Any]:
+        if self.authored_program is not None:
+            return dict(self.authored_program)
         return {
             "entry": self.entry,
             "target": dict(self.target),
@@ -176,6 +180,8 @@ class CSPProgramSpec:
         return self.kernel
 
     def to_program_module(self) -> ProgramModule:
+        if self.prebuilt_program_module is not None:
+            return self.prebuilt_program_module
         frontend = resolve_frontend(self)
         if frontend is None:  # pragma: no cover - defensive registry failure
             raise TypeError("No registered frontend for htp.csp.CSPProgramSpec")
@@ -315,6 +321,16 @@ def program(
         raise TypeError("Decorator-form csp.program(...) requires kernel=<KernelSpec>.")
 
     def decorator(function: Callable[..., Any]) -> CSPProgramSpec:
+        from htp.ir.dialects.csp import build_csp_ast_program_spec
+
+        ast_spec = build_csp_ast_program_spec(
+            function=function,
+            kernel_spec=kernel,
+            target=_normalize_target(target),
+            entry=entry or function.__name__,
+        )
+        if ast_spec is not None:
+            return ast_spec
         builder = CSPBuilder(
             entry=entry or function.__name__, kernel_spec=kernel, target=_normalize_target(target)
         )
