@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..core.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
+from ..core.semantics import WorkloadIR, WorkloadTask
 from ..dialects.registry import dialect_activation_payload
 from ..program.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
-from ..core.semantics import WorkloadIR, WorkloadTask
 
 
 @dataclass(frozen=True)

@@ -25,8 +25,8 @@ from ..core.identity import (
     entities_from_payload,
     rewrite_map_from_payload,
 )
-from ..interpreters.registry import SNAPSHOT_INTERPRETER_ID
 from ..core.semantics import KernelIR, WorkloadIR, kernel_ir_from_payload, workload_ir_from_payload
+from ..interpreters.registry import SNAPSHOT_INTERPRETER_ID
 
 if TYPE_CHECKING:
     from ..core.nodes import Node

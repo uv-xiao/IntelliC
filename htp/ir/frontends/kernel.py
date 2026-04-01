@@ -5,9 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 from htp.ir.core.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
-from htp.ir.dialects.registry import dialect_activation_payload
-from htp.ir.program.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
 from htp.ir.core.semantics import KernelArg, KernelIR, KernelOp, WorkloadIR, WorkloadTask
+from htp.ir.dialects.registry import dialect_activation_payload
+from htp.ir.program.module import (
+    ProgramAspects,
+    ProgramEntrypoint,
+    ProgramIdentity,
+    ProgramItems,
+    ProgramModule,
+)
 from htp.kernel import KernelArgSpec, KernelSpec
 
 

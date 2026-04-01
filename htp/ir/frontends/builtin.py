@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .shared import FrontendWorkload
+from ..core.semantics import WorkloadTask
 from .registry import FrontendSpec, frontend_registry_snapshot, register_frontend
 from .rules import FrontendRule, FrontendRuleResult, ProgramSurfaceRule
-from ..core.semantics import WorkloadTask
+from .shared import FrontendWorkload
 
 
 @dataclass(frozen=True)

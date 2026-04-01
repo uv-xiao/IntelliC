@@ -6,8 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from .rules import FrontendBuildContext, FrontendRule
 from ..program.module import ProgramModule
+from .rules import FrontendBuildContext, FrontendRule
 
 
 @dataclass(frozen=True)

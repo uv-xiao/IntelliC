@@ -3,9 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from ..core.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
-from ..dialects.registry import dialect_activation_payload
-from .module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
-from ..interpreters.entrypoints import NODE_KERNEL_INTERPRETER_ID
 from ..core.nodes import (
     BinaryExpr,
     Item,
@@ -32,6 +29,9 @@ from ..core.nodes import (
     to_payload,
 )
 from ..core.semantics import KernelArg, KernelIR, WorkloadIR, WorkloadTask
+from ..dialects.registry import dialect_activation_payload
+from ..interpreters.entrypoints import NODE_KERNEL_INTERPRETER_ID
+from .module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
 
 
 def program_module_from_items(

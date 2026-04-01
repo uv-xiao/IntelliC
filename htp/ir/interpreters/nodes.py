@@ -6,9 +6,9 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..core.nodes import Channel, Dependency, Kernel, Process, ProcessGraph, ProcessStep, Task, TaskGraph
 from ..program.module import ProgramModule
 from .runtime import ExecutionEnv, ExprEvaluator, ReturnSignal, StmtExecutor
-from ..core.nodes import Channel, Dependency, Kernel, Process, ProcessGraph, ProcessStep, Task, TaskGraph
 
 
 @dataclass

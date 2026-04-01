@@ -4,8 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from .shared import FrontendWorkload, build_frontend_program_module
 from ..program.module import ProgramModule
+from .shared import FrontendWorkload, build_frontend_program_module
 
 
 @dataclass(frozen=True)

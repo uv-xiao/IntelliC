@@ -7,9 +7,9 @@ from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
 from ..core.analysis import analysis_record_from_payload
+from ..core.semantics import kernel_ir_payload, workload_ir_payload
 from ..interpreters.registry import SNAPSHOT_INTERPRETER_ID
 from .components import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems
-from ..core.semantics import kernel_ir_payload, workload_ir_payload
 
 if TYPE_CHECKING:
     from .module import ProgramModule
@@ -104,8 +104,8 @@ def program_module_from_program_dict(
     analyses: Mapping[str, Mapping[str, Any]] | None = None,
     meta: Mapping[str, Any] | None = None,
 ) -> ProgramModule:
-    from .module import ProgramModule
     from ..core.nodes import from_payload
+    from .module import ProgramModule
 
     analysis_payload = dict(analyses or program.get("analysis", {}))
     entry = str(program.get("entry", "run"))
@@ -181,8 +181,8 @@ def program_module_from_program_dict(
 
 
 def program_module_from_payload(payload: Mapping[str, Any]) -> ProgramModule:
-    from .module import ProgramModule
     from ..core.nodes import from_payload
+    from .module import ProgramModule
 
     items_payload = dict(payload.get("items", {}))
     aspects_payload = dict(payload.get("aspects", {}))
