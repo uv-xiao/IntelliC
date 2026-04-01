@@ -8,6 +8,7 @@ import pytest
 
 from examples.aie_channel_pipeline.demo import compile_example as compile_aie_example
 from examples.aie_channel_pipeline.demo import replay_latest_stage as replay_aie_stage
+from examples.ast_frontend_composability.demo import run_demo as run_ast_frontend_composability_demo
 from examples.csp_channel_pipeline.demo import compile_example as compile_csp_example
 from examples.csp_channel_pipeline.demo import replay_latest_stage as replay_csp_stage
 from examples.extensions.cpu_ref_vector_add.demo import compile_example as compile_cpu_ref_example
@@ -290,6 +291,19 @@ def test_ir_program_module_example_reports_frontend_rule_proof() -> None:
     summary = run_ir_program_module_demo()
 
     assert summary["frontend_rule_demo"] is True
+
+
+def test_ast_frontend_composability_example_runs() -> None:
+    summary = run_ast_frontend_composability_demo()
+
+    assert summary["wsp_capture"] == "ast"
+    assert summary["csp_capture"] == "ast"
+    assert summary["task_ids"] == ["load_tiles", "mma_tiles"]
+    assert summary["process_ids"] == ["dispatch", "combine"]
+    assert summary["composed_interpreters"] == {
+        "task_graph": "TaskGraphInterpreter",
+        "process_graph": "ProcessGraphInterpreter",
+    }
 
 
 def test_aie_example_compiles_and_replays(tmp_path):
