@@ -21,10 +21,13 @@ class ProgramModuleInterpreter(Protocol):
     ) -> Any: ...
 
 
+RunnerLike = ProgramModuleInterpreter | Callable[..., Any]
+
+
 @dataclass(frozen=True)
 class InterpreterSpec:
     interpreter_id: str
-    runner: Callable[..., Any]
+    runner: RunnerLike
 
     def run(
         self,
@@ -37,6 +40,16 @@ class InterpreterSpec:
         runtime: Runtime | None,
         trace: Any | None,
     ) -> Any:
+        if hasattr(self.runner, "run"):
+            return self.runner.run(
+                module,
+                entry=entry,
+                args=args,
+                kwargs=kwargs,
+                mode=mode,
+                runtime=runtime,
+                trace=trace,
+            )
         return self.runner(
             module,
             entry=entry,
@@ -72,7 +85,7 @@ _REGISTRY: dict[str, InterpreterSpec] = {
 }
 
 
-def register_interpreter(interpreter_id: str, runner: Callable[..., Any]) -> None:
+def register_interpreter(interpreter_id: str, runner: RunnerLike) -> None:
     _REGISTRY[str(interpreter_id)] = InterpreterSpec(interpreter_id=str(interpreter_id), runner=runner)
 
 

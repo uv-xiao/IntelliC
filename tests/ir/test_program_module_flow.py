@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import importlib.util
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from htp.ir.analysis_state import AnalysisRecord
 from htp.ir.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
+from htp.ir.build import build_tile_streamed_gemm_core_module
 from htp.ir.identity_state import BindingTable, EntityTable, RewriteMap
 from htp.ir.interpreter import register_interpreter
 from htp.ir.module import (
@@ -16,6 +18,7 @@ from htp.ir.module import (
     ProgramItems,
     ProgramModule,
 )
+from htp.ir.node_exec import NODE_PROGRAM_INTERPRETER_ID
 from htp.ir.render import render_program_module_payload
 
 
@@ -183,6 +186,21 @@ def test_program_module_analysis_round_trip_typed_wrappers() -> None:
     assert isinstance(schedule_analysis, AnalysisRecord)
     assert schedule_analysis["pipeline_depth"] == 2
     assert module.to_state_dict()["analysis"]["schedule"]["schema"] == "htp.analysis.schedule.v1"
+
+
+def test_program_module_run_dispatches_through_object_owned_interpreters() -> None:
+    module = replace(
+        build_tile_streamed_gemm_core_module(),
+        entrypoints=(ProgramEntrypoint(name="run", interpreter_id=NODE_PROGRAM_INTERPRETER_ID),),
+    )
+
+    result = module.run(mode="sim")
+
+    assert result["interpreter_units"] == {
+        "kernel": "KernelInterpreter",
+        "task_graph": "TaskGraphInterpreter",
+        "process_graph": "ProcessGraphInterpreter",
+    }
 
 
 def _demo_module(*, interpreter_id: str, kernel_entry: str, pipeline_depth: int) -> ProgramModule:
