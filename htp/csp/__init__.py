@@ -8,6 +8,7 @@ from inspect import signature
 from typing import Any
 
 from htp.compiler import parse_target
+from htp.ir.csp_nodes import CSPProcessStep, steps_from_payload, steps_to_payload
 from htp.ir.frontends import resolve_frontend
 from htp.ir.module import ProgramModule
 from htp.kernel import KernelSpec, KernelValue
@@ -47,20 +48,6 @@ class ChannelRef:
         }
 
 
-@dataclass(frozen=True)
-class CSPProcessStep:
-    kind: str
-    attrs: dict[str, Any] = field(default_factory=dict)
-
-    def to_payload(self) -> dict[str, Any]:
-        return {"kind": self.kind, **dict(self.attrs)}
-
-    @classmethod
-    def from_payload(cls, payload: Mapping[str, Any]) -> CSPProcessStep:
-        attrs = {key: value for key, value in payload.items() if key != "kind"}
-        return cls(kind=str(payload["kind"]), attrs=attrs)
-
-
 @dataclass
 class CSPProcessSpec:
     name: str
@@ -71,7 +58,7 @@ class CSPProcessSpec:
     role: str | None = None
 
     def to_payload(self) -> dict[str, Any]:
-        normalized_steps = [step.to_payload() for step in self.steps]
+        normalized_steps = steps_to_payload(self.steps)
         puts = [dict(item) for item in normalized_steps if str(item.get("kind")) == "put"]
         gets = [dict(item) for item in normalized_steps if str(item.get("kind")) == "get"]
         payload = {
@@ -90,11 +77,11 @@ class CSPProcessSpec:
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> CSPProcessSpec:
-        normalized_steps = [CSPProcessStep.from_payload(item) for item in payload.get("steps", ())]
+        normalized_steps = steps_from_payload(payload.get("steps", ()))
         if not normalized_steps:
             normalized_steps = [
-                *(CSPProcessStep.from_payload(item) for item in payload.get("gets", ())),
-                *(CSPProcessStep.from_payload(item) for item in payload.get("puts", ())),
+                *steps_from_payload(payload.get("gets", ())),
+                *steps_from_payload(payload.get("puts", ())),
             ]
         return cls(
             name=str(payload["name"]),
@@ -138,10 +125,8 @@ def process(
     steps: Sequence[Mapping[str, Any]] = (),
     role: str | None = None,
 ) -> CSPProcessSpec:
-    normalized_steps = [dict(item) for item in steps]
-    if normalized_steps:
-        derived_steps = [CSPProcessStep.from_payload(item) for item in normalized_steps]
-    else:
+    derived_steps = steps_from_payload(steps)
+    if not derived_steps:
         derived_steps = [
             *(
                 CSPProcessStep(

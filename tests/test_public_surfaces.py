@@ -11,6 +11,7 @@ from htp.csp import program as csp_program
 from htp.ir.frontends import resolve_frontend
 from htp.ir.module import ProgramModule
 from htp.ir.semantics import KernelIR, WorkloadIR
+from htp.ir.csp_nodes import CSPProcessStep as TypedCSPProcessStep
 from htp.ir.wsp_nodes import WSPStageSpec, WSPStageStep
 from htp.kernel import (
     KernelSpec,
@@ -928,6 +929,47 @@ def test_wsp_surface_supports_defaults_bound_args_and_structured_stage_bodies():
         "name": "epilogue",
         "steps": [{"kind": "step", "op": "store", "target": "C"}],
     }
+
+
+def test_csp_program_spec_uses_typed_process_steps() -> None:
+    @kernel
+    def affine_mix(
+        lhs: buffer(dtype="f32", shape=("size",), role="input"),
+        rhs: buffer(dtype="f32", shape=("size",), role="input"),
+        out: buffer(dtype="f32", shape=("size",), role="output"),
+        size: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(out, lhs + rhs)
+
+    @csp_program(kernel=affine_mix, target="nvgpu-ampere")
+    def streaming_workload(p) -> None:
+        tiles = p.fifo("tiles", dtype="f32", capacity=2)
+        partials = p.fifo("partials", dtype="f32", capacity=2)
+        p.process("dispatch", task_id="dispatch").role("source").get(tiles).compute_step(
+            "prepare_tile", source=p.args.lhs, count=2
+        ).put(partials)
+
+    process_spec = streaming_workload.processes[0]
+
+    assert process_spec.steps
+    assert all(isinstance(step, TypedCSPProcessStep) for step in process_spec.steps)
+    assert process_spec.steps[0].kind == "get"
+    assert process_spec.steps[1].kind == "compute"
+    assert process_spec.steps[1].attrs == {"op": "prepare_tile", "source": "lhs", "count": 2}
+    assert process_spec.steps[2].kind == "put"
+
+    payload = process_spec.to_payload()
+
+    assert payload["steps"] == [
+        {"kind": "get", "channel": "tiles", "count": 1},
+        {"kind": "compute", "op": "prepare_tile", "source": "lhs", "count": 2},
+        {"kind": "put", "channel": "partials", "count": 1},
+    ]
+
+    rebuilt = csp_module.CSPProcessSpec.from_payload(payload)
+
+    assert all(isinstance(step, TypedCSPProcessStep) for step in rebuilt.steps)
+    assert rebuilt.steps[1].attrs == {"op": "prepare_tile", "source": "lhs", "count": 2}
 
 
 def test_wsp_program_spec_uses_typed_stage_objects() -> None:
