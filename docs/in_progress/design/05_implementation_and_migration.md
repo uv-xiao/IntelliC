@@ -206,6 +206,14 @@ end state.
   builtin and extension dialects have not yet been migrated onto the full
   node/aspect/intrinsic registration substrate described in
   `03_dialects_and_frontends.md`
+- the closure-proof example and pass chain now exist:
+  - `examples/tile_streamed_gemm_closure/`
+  - `htp/passes/surface_to_core.py`
+  - `htp/passes/tile_and_stage.py`
+  - `htp/passes/enrich_protocol.py`
+  - `htp/passes/backend_ready.py`
+  but staged-artifact alignment against those checked-in committed variants is
+  not yet validated end-to-end
 
 ### Not implemented yet
 

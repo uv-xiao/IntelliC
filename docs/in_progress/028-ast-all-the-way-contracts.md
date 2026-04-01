@@ -40,9 +40,9 @@ extension boundaries.
 - [x] replace the flat builtin dialect list with manifest-style builtin dialect activation metadata and dependency closure
 - [x] formalize builtin public-surface ingress through a frontend registry substrate instead of only ad hoc `to_program_module()` probing
 - [x] implement a rule-backed frontend-definition substrate (`htp/ir/frontends/rules.py`) and migrate `htp.kernel` as the first rule-backed public surface
-- [ ] implement the PR-closing canonical tile-streamed GEMM proof with explicit committed variants
-- [ ] complete the typed pass chain required for that proof
-- [ ] complete the object-oriented interpreter structure required for that proof
+- [x] implement the PR-closing canonical tile-streamed GEMM proof with explicit committed variants
+- [x] complete the typed pass chain required for that proof
+- [x] complete the object-oriented interpreter structure required for that proof
 - [x] refactor the current codebase to follow an explicit module-ownership design before landing the remaining proof-path development
 - [x] encode strict agent rules against stringly semantic refs, dict-owned semantics, and multi-role monolithic architecture modules
 
@@ -60,15 +60,17 @@ Remaining gap:
   registry; WSP/CSP public specs now also use typed top-level surface objects,
   but the rules still rebuild nested stage/process-step attrs rather than the
   final node-first rule/combinator frontend-definition API.
-- PR closure is now defined by `docs/in_progress/design/06_pr_closure_proof.md`,
-  and the canonical tile-streamed GEMM proof plus its typed pass/interpreter
-  chain are still open.
+- PR closure is now defined by `docs/in_progress/design/06_pr_closure_proof.md`.
+  The canonical tile-streamed GEMM proof now exists under
+  `examples/tile_streamed_gemm_closure/`, and the typed pass/interpreter chain
+  now exists under `htp/passes/` plus `htp/ir/interpreters/`.
 - the branch also needs the refactor-first cleanup defined in
   `docs/in_progress/design/08_module_organization_and_code_quality.md` before
   the remaining proof-path work should be considered mergeable.
-- that cleanup has started concretely with the `ProgramModule`, frontend, and
-  typed-interpreter module splits plus kernel-lowering extraction; additional
-  public-surface and pass-module cleanup is still open.
+- that cleanup now includes the deeper `htp/ir/core/` and `htp/ir/dialects/`
+  package hierarchy. The remaining proof-path work is narrower: align the
+  checked-in committed variants with emitted staged artifacts and finish the
+  final doc/TODO cleanup before merge.
 
 ## Code Surfaces
 

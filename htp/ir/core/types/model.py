@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, fields, is_dataclass
-from typing import Any
+from dataclasses import dataclass
 
 _SCALAR_DTYPES = {
     "bool",
@@ -107,7 +106,6 @@ def dim_from_value(value: object) -> DimExpr:
 
 def shape_from_sequence(values: list[object] | tuple[object, ...]) -> ShapeExpr:
     return ShapeExpr(tuple(dim_from_value(value) for value in values))
-
 
 
 __all__ = [

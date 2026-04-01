@@ -8,6 +8,7 @@ from .model import (
     Channel,
     ChannelId,
     Dependency,
+    Expr,
     ForStmt,
     ItemId,
     ItemRef,
@@ -26,12 +27,12 @@ from .model import (
     RegionId,
     ScopeId,
     SendStmt,
+    Stmt,
     SymbolId,
     Task,
     TaskGraph,
     TaskId,
 )
-from .model import Expr, Stmt
 
 
 def literal(node_id: str, value: int | float | bool) -> LiteralExpr:

@@ -54,7 +54,6 @@ class WSPStageSpec:
         return cls(name=str(payload["name"]), steps=steps)
 
 
-
 def stages_from_payload(payload: Any) -> list[WSPStageSpec]:
     if not isinstance(payload, list):
         return []

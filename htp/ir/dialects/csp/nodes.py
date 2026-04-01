@@ -44,4 +44,3 @@ def steps_to_payload(steps: Sequence[CSPProcessStep]) -> list[dict[str, Any]]:
 
 
 __all__ = ["CSPProcessStep", "steps_from_payload", "steps_to_payload"]
-
