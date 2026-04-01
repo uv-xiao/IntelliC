@@ -60,6 +60,9 @@ Remaining gap:
   registry; WSP/CSP public specs now also use typed top-level surface objects,
   but the rules still rebuild nested stage/process-step attrs rather than the
   final node-first rule/combinator frontend-definition API.
+- the final frontend-definition substrate must enforce dialect composability
+  across parse/capture, typed IR ownership, passes, interpreters, and artifact
+  rendering, and frontend AST handlers must stay small and single-purpose.
 - PR closure is now defined by `docs/in_progress/design/06_pr_closure_proof.md`.
   The canonical tile-streamed GEMM proof now exists under
   `examples/tile_streamed_gemm_closure/`, and the typed pass/interpreter chain

@@ -98,6 +98,9 @@ Do not leave stale duplicates across `design`, `todo`, and `in_progress`.
   Python-owned stage artifact before the next global stage boundary.
 - Extension-owned functionality belongs under `htp_ext/` unless the design explicitly places it in core.
 - Ampere and Blackwell are profiles of the same `nvgpu` backend.
+- Dialect features must compose across parse/capture, typed IR ownership, pass
+  execution, interpreter execution, and artifact rendering. A feature that
+  works only in dialect isolation does not clear review.
 
 If a requested change weakens one of these rules, stop and resolve the conflict before coding.
 
@@ -146,6 +149,11 @@ Strict rules:
   registry, and serialization logic should live in dedicated substrate modules
 - keep interpreter code object-oriented and decomposed; do not collapse
   execution back into one large procedural dispatcher
+- keep frontend AST handlers small and single-purpose; one handler should
+  recognize one local syntax form and lower one local construct
+- keep cross-dialect cooperation on explicit typed interfaces; do not couple
+  dialects through ad hoc payload conventions or knowledge of private helper
+  layouts from another dialect
 
 ## 6. Contract-first development
 

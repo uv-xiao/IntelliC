@@ -46,3 +46,17 @@ def test_todo_tree_has_only_supported_top_level_entries():
     todo_root = Path("docs/todo")
     entries = {path.name for path in todo_root.iterdir()}
     assert entries == {"README.md", "alignment_and_product_gaps.md"}
+
+
+def test_agent_and_design_docs_record_frontend_composability_rules():
+    agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
+    core_rules_text = Path(".agent/rules/core-development.md").read_text(encoding="utf-8")
+    frontend_design_text = Path("docs/in_progress/design/03_dialects_and_frontends.md").read_text(
+        encoding="utf-8"
+    )
+    task_text = Path("docs/in_progress/028-ast-all-the-way-contracts.md").read_text(encoding="utf-8")
+
+    assert "Dialect features must compose across parse/capture" in agents_text
+    assert "Keep frontend AST handlers small and single-purpose" in core_rules_text
+    assert "## Frontend composability rules" in frontend_design_text
+    assert "the final frontend-definition substrate must enforce dialect composability" in task_text

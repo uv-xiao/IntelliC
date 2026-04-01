@@ -62,6 +62,28 @@ The frontend mechanism should support:
 This is effectively an object-oriented parser-combinator API for authoring
 sugar and JIT capture.
 
+## Frontend composability rules
+
+Dialect frontend features must compose through the same substrate.
+
+Every new capture feature must be reviewable against these checks:
+
+- parse/capture: it coexists with other active dialect handlers in one module
+- typed IR: it lowers into the shared `ProgramModule` instead of creating a
+  private semantic owner
+- passes: pass logic sees one typed IR/aspect space rather than parallel
+  payloads
+- execution: interpreter dispatch composes through the shared object-oriented
+  interpreter substrate
+- artifacts: the composed result still renders to one normalized Python module
+
+Cross-dialect cooperation is allowed only through explicit typed interfaces.
+Dialects must not couple themselves through ad hoc payload conventions or by
+depending on another dialect's private helper layout.
+
+Frontend AST handlers must stay small and single-purpose. One handler should
+recognize one local syntax form and lower one local construct.
+
 ## Implemented status (frontend-definition substrate)
 
 The initial frontend-definition substrate is now implemented in code:

@@ -42,6 +42,13 @@
 - Avoid monolithic procedural code in new substrate work; prefer object-owned
   behavior and explicit extension seams when they improve invariants and
   composability.
+- Keep frontend AST handlers small and single-purpose; one handler should
+  recognize one local syntax form and lower one local construct.
+- Require dialect composability across parse/capture, typed IR ownership,
+  passes, interpreters, and artifact rendering. Features that only work in one
+  isolated dialect path do not clear review.
+- Allow cross-dialect cooperation only through explicit typed interfaces, not
+  ad hoc payload coupling or knowledge of another dialect's private helpers.
 
 ## Module organization
 
