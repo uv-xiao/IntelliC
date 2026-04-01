@@ -218,6 +218,19 @@ The current proof points include:
 - software-pipeline planning
 - shared lowering through the same pass manager and artifact model
 - decorator/builder authoring through `@wsp.program(...)`
+
+The current AST-all-the-way closure proof also now has one explicit checked-in
+example at `examples/tile_streamed_gemm_closure/`. It is intentionally not a
+generated artifact dump. The directory contains readable committed Python
+modules for:
+- the surface-authored module
+- the core IR module
+- the scheduled/protocol-enriched module
+- the backend-ready module
+
+This gives reviewers one stable place to inspect how public authoring,
+typed `ProgramModule` state, passes, and interpreter-driven execution fit
+together without digging through temporary stage directories.
 - task-oriented builders such as `.launch(...)`, `.mainloop(...)`, and `.after(...)`
 - per-task role and stage-plan helpers such as `.role(...)`, `.prologue(...)`,
   `.steady(...)`, and `.epilogue(...)`

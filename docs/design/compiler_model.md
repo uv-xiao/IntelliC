@@ -111,6 +111,20 @@ Those node families already execute through typed interpreter paths instead of
 raw payload walkers, which is an important proof point for the AST-all-the-way
 redesign.
 
+The canonical closure-proof flow now exists in code rather than only in design
+docs. `examples/tile_streamed_gemm_closure/` plus:
+- `htp/passes/surface_to_core.py`
+- `htp/passes/tile_and_stage.py`
+- `htp/passes/enrich_protocol.py`
+- `htp/passes/backend_ready.py`
+prove one end-to-end `ProgramModule` path across:
+- surface-authored committed state
+- normalized core IR
+- scheduled/protocol-enriched IR
+- backend-ready committed IR
+
+Each committed variant remains runnable through `ProgramModule.run(...)`.
+
 ### Staged state bundle
 
 The current implementation emits and consumes a compact staged state bundle:

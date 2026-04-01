@@ -68,9 +68,8 @@ Remaining gap:
   `docs/in_progress/design/08_module_organization_and_code_quality.md` before
   the remaining proof-path work should be considered mergeable.
 - that cleanup now includes the deeper `htp/ir/core/` and `htp/ir/dialects/`
-  package hierarchy. The remaining proof-path work is narrower: align the
-  checked-in committed variants with emitted staged artifacts and finish the
-  final doc/TODO cleanup before merge.
+  package hierarchy. The remaining proof-path work is now mostly repository
+  integration: final doc/TODO sync, review, and merge hygiene.
 
 ## Code Surfaces
 

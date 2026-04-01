@@ -55,6 +55,12 @@ top-level bindings that reconstruct `ProgramModule`, then exposes both:
 The result is still fully runnable Python, but it is also a practical
 debugging artifact a human can read, diff, and execute directly.
 
+That staged contract is now checked against an explicit human-facing example
+surface as well. `tests/examples/test_tile_streamed_gemm_closure_alignment.py`
+verifies that the checked-in committed variant modules under
+`examples/tile_streamed_gemm_closure/` re-render into equivalent staged
+`program.py` modules and stay runnable through replay.
+
 That readability now extends to staged tile/view programs:
 - loop-derived slice offsets survive as readable symbolic expressions in staged state;
 - replay still uses concretely replayable offsets/sizes, so the same package remains executable in `sim`;

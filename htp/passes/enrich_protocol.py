@@ -37,9 +37,7 @@ def enrich_schedule_and_protocol(program: ProgramModule | Mapping[str, Any]) -> 
             ),
         },
         effect_updates={
-            "protocols": (
-                {"channel": "tile_stream", "protocol": "fifo", "capacity": 2},
-            ),
+            "protocols": ({"channel": "tile_stream", "protocol": "fifo", "capacity": 2},),
         },
     )
 

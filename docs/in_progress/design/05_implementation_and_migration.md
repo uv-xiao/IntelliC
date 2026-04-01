@@ -212,8 +212,8 @@ end state.
   - `htp/passes/tile_and_stage.py`
   - `htp/passes/enrich_protocol.py`
   - `htp/passes/backend_ready.py`
-  but staged-artifact alignment against those checked-in committed variants is
-  not yet validated end-to-end
+- staged-artifact alignment against those checked-in committed variants is now
+  validated by `tests/examples/test_tile_streamed_gemm_closure_alignment.py`
 
 ### Not implemented yet
 
