@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from htp.ir.build import program_module_from_items, program_module_from_kernels
+from htp.ir.build import (
+    build_tile_streamed_gemm_core_module,
+    program_module_from_items,
+    program_module_from_kernels,
+)
 from htp.ir.node_exec import (
     NODE_KERNEL_INTERPRETER_ID,
     NODE_PROCESS_GRAPH_INTERPRETER_ID,
@@ -8,10 +12,12 @@ from htp.ir.node_exec import (
 )
 from htp.ir.nodes import (
     BinaryExpr,
+    ForStmt,
     Kernel,
     NodeId,
     ProcessGraph,
     Return,
+    SendStmt,
     TaskGraph,
     channel,
     dependency,
@@ -144,6 +150,17 @@ def test_process_graph_interpreter_runs_typed_process_module() -> None:
     assert execution["processes"][0]["steps"] == [
         {"kind": "put", "attrs": {"tile": "A"}, "channel_id": "chan.tiles"}
     ]
+
+
+def test_typed_nodes_cover_kernel_task_and_process_regions() -> None:
+    module = build_tile_streamed_gemm_core_module()
+
+    assert isinstance(module.items.typed_items[0], Kernel)
+    assert isinstance(module.items.typed_items[1], TaskGraph)
+    assert isinstance(module.items.typed_items[2], ProcessGraph)
+    assert any(isinstance(statement, ForStmt) for statement in module.items.typed_items[0].body.statements)
+    assert module.items.typed_items[2].body is not None
+    assert any(isinstance(statement, SendStmt) for statement in module.items.typed_items[2].body.statements)
 
 
 def _demo_kernel() -> Kernel:

@@ -29,6 +29,22 @@ class SymbolId:
 
 
 @dataclass(frozen=True)
+class BindingId:
+    value: str
+
+    def to_payload(self) -> str:
+        return self.value
+
+
+@dataclass(frozen=True)
+class ScopeId:
+    value: str
+
+    def to_payload(self) -> str:
+        return self.value
+
+
+@dataclass(frozen=True)
 class RegionId:
     value: str
 
@@ -96,6 +112,12 @@ class Parameter(Node):
 
 
 @dataclass(frozen=True)
+class BindingRef(Expr):
+    binding_id: BindingId
+    name: str
+
+
+@dataclass(frozen=True)
 class Ref(Expr):
     symbol_id: SymbolId
     name: str
@@ -114,6 +136,11 @@ class BinaryExpr(Expr):
 
 
 @dataclass(frozen=True)
+class ReceiveExpr(Expr):
+    channel_id: ChannelId
+
+
+@dataclass(frozen=True)
 class Let(Stmt):
     symbol_id: SymbolId
     name: str
@@ -129,6 +156,23 @@ class Return(Stmt):
 class Region(Node):
     region_id: RegionId
     statements: tuple[Stmt, ...]
+    scope_id: ScopeId | None = None
+
+
+@dataclass(frozen=True)
+class ForStmt(Stmt):
+    binding_id: BindingId
+    index_name: str
+    start: Expr
+    stop: Expr
+    step: Expr
+    body: Region
+
+
+@dataclass(frozen=True)
+class SendStmt(Stmt):
+    channel_id: ChannelId
+    value: Expr
 
 
 @dataclass(frozen=True)
@@ -155,6 +199,7 @@ class Dependency(Node):
 class TaskGraph(Item):
     tasks: tuple[Task, ...]
     dependencies: tuple[Dependency, ...] = ()
+    body: Region | None = None
 
 
 @dataclass(frozen=True)
@@ -185,6 +230,7 @@ class Process(Node):
 class ProcessGraph(Item):
     channels: tuple[Channel, ...]
     processes: tuple[Process, ...]
+    body: Region | None = None
 
 
 def literal(node_id: str, value: int | float | bool) -> LiteralExpr:
@@ -193,6 +239,10 @@ def literal(node_id: str, value: int | float | bool) -> LiteralExpr:
 
 def ref(node_id: str, symbol_id: str, name: str) -> Ref:
     return Ref(node_id=NodeId(node_id), symbol_id=SymbolId(symbol_id), name=name)
+
+
+def binding_ref(node_id: str, binding_id: str, name: str) -> BindingRef:
+    return BindingRef(node_id=NodeId(node_id), binding_id=BindingId(binding_id), name=name)
 
 
 def item_ref(node_id: str, item_id: str, name: str) -> ItemRef:
@@ -209,12 +259,47 @@ def let(node_id: str, symbol_id: str, name: str, value: Expr) -> Let:
     return Let(node_id=NodeId(node_id), symbol_id=SymbolId(symbol_id), name=name, value=value)
 
 
-def region(region_id: str, *statements: Stmt, node_id: str | None = None) -> Region:
+def region(
+    region_id: str,
+    *statements: Stmt,
+    node_id: str | None = None,
+    scope_id: str | None = None,
+) -> Region:
     return Region(
         node_id=NodeId(node_id or f"{region_id}:node"),
         region_id=RegionId(region_id),
         statements=tuple(statements),
+        scope_id=None if scope_id is None else ScopeId(scope_id),
     )
+
+
+def for_stmt(
+    node_id: str,
+    binding_id: str,
+    index_name: str,
+    *,
+    start: Expr,
+    stop: Expr,
+    step: Expr,
+    body: Region,
+) -> ForStmt:
+    return ForStmt(
+        node_id=NodeId(node_id),
+        binding_id=BindingId(binding_id),
+        index_name=index_name,
+        start=start,
+        stop=stop,
+        step=step,
+        body=body,
+    )
+
+
+def send_stmt(node_id: str, *, channel_id: str, value: Expr) -> SendStmt:
+    return SendStmt(node_id=NodeId(node_id), channel_id=ChannelId(channel_id), value=value)
+
+
+def receive_expr(node_id: str, *, channel_id: str) -> ReceiveExpr:
+    return ReceiveExpr(node_id=NodeId(node_id), channel_id=ChannelId(channel_id))
 
 
 def kernel(
@@ -261,6 +346,7 @@ def task_graph(
     *,
     tasks: tuple[Task, ...],
     dependencies: tuple[Dependency, ...] = (),
+    body: Region | None = None,
     node_id: str | None = None,
 ) -> TaskGraph:
     return TaskGraph(
@@ -269,6 +355,7 @@ def task_graph(
         name=name,
         tasks=tasks,
         dependencies=dependencies,
+        body=body,
     )
 
 
@@ -333,6 +420,7 @@ def process_graph(
     *,
     channels: tuple[Channel, ...],
     processes: tuple[Process, ...],
+    body: Region | None = None,
     node_id: str | None = None,
 ) -> ProcessGraph:
     return ProcessGraph(
@@ -341,6 +429,7 @@ def process_graph(
         name=name,
         channels=channels,
         processes=processes,
+        body=body,
     )
 
 
@@ -357,7 +446,7 @@ def to_payload(node: Node | tuple[Node, ...]) -> Any:
             "body": to_payload(node.body),
         }
     if isinstance(node, TaskGraph):
-        return {
+        payload = {
             "kind": "TaskGraph",
             "node_id": node.node_id.to_payload(),
             "item_id": node.item_id.to_payload(),
@@ -365,8 +454,11 @@ def to_payload(node: Node | tuple[Node, ...]) -> Any:
             "tasks": [to_payload(item) for item in node.tasks],
             "dependencies": [to_payload(item) for item in node.dependencies],
         }
+        if node.body is not None:
+            payload["body"] = to_payload(node.body)
+        return payload
     if isinstance(node, ProcessGraph):
-        return {
+        payload = {
             "kind": "ProcessGraph",
             "node_id": node.node_id.to_payload(),
             "item_id": node.item_id.to_payload(),
@@ -374,13 +466,19 @@ def to_payload(node: Node | tuple[Node, ...]) -> Any:
             "channels": [to_payload(item) for item in node.channels],
             "processes": [to_payload(item) for item in node.processes],
         }
+        if node.body is not None:
+            payload["body"] = to_payload(node.body)
+        return payload
     if isinstance(node, Region):
-        return {
+        payload = {
             "kind": "Region",
             "node_id": node.node_id.to_payload(),
             "region_id": node.region_id.to_payload(),
             "statements": [to_payload(item) for item in node.statements],
         }
+        if node.scope_id is not None:
+            payload["scope_id"] = node.scope_id.to_payload()
+        return payload
     if isinstance(node, Parameter):
         return {
             "kind": "Parameter",
@@ -389,6 +487,13 @@ def to_payload(node: Node | tuple[Node, ...]) -> Any:
             "name": node.name,
             "dtype": node.dtype,
             "kind_name": node.kind,
+        }
+    if isinstance(node, BindingRef):
+        return {
+            "kind": "BindingRef",
+            "node_id": node.node_id.to_payload(),
+            "binding_id": node.binding_id.to_payload(),
+            "name": node.name,
         }
     if isinstance(node, ItemRef):
         return {
@@ -418,6 +523,12 @@ def to_payload(node: Node | tuple[Node, ...]) -> Any:
             "lhs": to_payload(node.lhs),
             "rhs": to_payload(node.rhs),
         }
+    if isinstance(node, ReceiveExpr):
+        return {
+            "kind": "ReceiveExpr",
+            "node_id": node.node_id.to_payload(),
+            "channel_id": node.channel_id.to_payload(),
+        }
     if isinstance(node, Let):
         return {
             "kind": "Let",
@@ -430,6 +541,24 @@ def to_payload(node: Node | tuple[Node, ...]) -> Any:
         return {
             "kind": "Return",
             "node_id": node.node_id.to_payload(),
+            "value": to_payload(node.value),
+        }
+    if isinstance(node, ForStmt):
+        return {
+            "kind": "ForStmt",
+            "node_id": node.node_id.to_payload(),
+            "binding_id": node.binding_id.to_payload(),
+            "index_name": node.index_name,
+            "start": to_payload(node.start),
+            "stop": to_payload(node.stop),
+            "step": to_payload(node.step),
+            "body": to_payload(node.body),
+        }
+    if isinstance(node, SendStmt):
+        return {
+            "kind": "SendStmt",
+            "node_id": node.node_id.to_payload(),
+            "channel_id": node.channel_id.to_payload(),
             "value": to_payload(node.value),
         }
     if isinstance(node, Task):
@@ -497,6 +626,7 @@ def from_payload(payload: dict[str, Any]) -> Node:
             name=str(payload["name"]),
             tasks=tuple(from_payload(item) for item in payload.get("tasks", ())),  # type: ignore[arg-type]
             dependencies=tuple(from_payload(item) for item in payload.get("dependencies", ())),  # type: ignore[arg-type]
+            body=None if payload.get("body") is None else from_payload(dict(payload["body"])),  # type: ignore[arg-type]
         )
     if kind == "ProcessGraph":
         return ProcessGraph(
@@ -505,12 +635,14 @@ def from_payload(payload: dict[str, Any]) -> Node:
             name=str(payload["name"]),
             channels=tuple(from_payload(item) for item in payload.get("channels", ())),  # type: ignore[arg-type]
             processes=tuple(from_payload(item) for item in payload.get("processes", ())),  # type: ignore[arg-type]
+            body=None if payload.get("body") is None else from_payload(dict(payload["body"])),  # type: ignore[arg-type]
         )
     if kind == "Region":
         return Region(
             node_id=NodeId(str(payload["node_id"])),
             region_id=RegionId(str(payload["region_id"])),
             statements=tuple(from_payload(item) for item in payload.get("statements", ())),  # type: ignore[arg-type]
+            scope_id=None if payload.get("scope_id") is None else ScopeId(str(payload["scope_id"])),
         )
     if kind == "Parameter":
         return Parameter(
@@ -519,6 +651,12 @@ def from_payload(payload: dict[str, Any]) -> Node:
             name=str(payload["name"]),
             kind=str(payload["kind_name"]),
             dtype=str(payload["dtype"]),
+        )
+    if kind == "BindingRef":
+        return BindingRef(
+            node_id=NodeId(str(payload["node_id"])),
+            binding_id=BindingId(str(payload["binding_id"])),
+            name=str(payload["name"]),
         )
     if kind == "ItemRef":
         return ItemRef(
@@ -541,6 +679,11 @@ def from_payload(payload: dict[str, Any]) -> Node:
             lhs=from_payload(dict(payload["lhs"])),  # type: ignore[arg-type]
             rhs=from_payload(dict(payload["rhs"])),  # type: ignore[arg-type]
         )
+    if kind == "ReceiveExpr":
+        return ReceiveExpr(
+            node_id=NodeId(str(payload["node_id"])),
+            channel_id=ChannelId(str(payload["channel_id"])),
+        )
     if kind == "Let":
         return Let(
             node_id=NodeId(str(payload["node_id"])),
@@ -551,6 +694,22 @@ def from_payload(payload: dict[str, Any]) -> Node:
     if kind == "Return":
         return Return(
             node_id=NodeId(str(payload["node_id"])),
+            value=from_payload(dict(payload["value"])),  # type: ignore[arg-type]
+        )
+    if kind == "ForStmt":
+        return ForStmt(
+            node_id=NodeId(str(payload["node_id"])),
+            binding_id=BindingId(str(payload["binding_id"])),
+            index_name=str(payload["index_name"]),
+            start=from_payload(dict(payload["start"])),  # type: ignore[arg-type]
+            stop=from_payload(dict(payload["stop"])),  # type: ignore[arg-type]
+            step=from_payload(dict(payload["step"])),  # type: ignore[arg-type]
+            body=from_payload(dict(payload["body"])),  # type: ignore[arg-type]
+        )
+    if kind == "SendStmt":
+        return SendStmt(
+            node_id=NodeId(str(payload["node_id"])),
+            channel_id=ChannelId(str(payload["channel_id"])),
             value=from_payload(dict(payload["value"])),  # type: ignore[arg-type]
         )
     if kind == "Task":
@@ -599,10 +758,13 @@ def from_payload(payload: dict[str, Any]) -> Node:
 
 __all__ = [
     "BinaryExpr",
+    "BindingId",
+    "BindingRef",
     "Channel",
     "ChannelId",
     "Dependency",
     "Expr",
+    "ForStmt",
     "Item",
     "ItemId",
     "ItemRef",
@@ -616,17 +778,22 @@ __all__ = [
     "ProcessGraph",
     "ProcessId",
     "ProcessStep",
+    "ReceiveExpr",
     "Ref",
     "Region",
     "RegionId",
     "Return",
+    "ScopeId",
+    "SendStmt",
     "Stmt",
     "SymbolId",
     "Task",
     "TaskGraph",
     "TaskId",
+    "binding_ref",
     "channel",
     "dependency",
+    "for_stmt",
     "from_payload",
     "item_ref",
     "kernel",
@@ -636,8 +803,10 @@ __all__ = [
     "process",
     "process_graph",
     "process_step",
+    "receive_expr",
     "ref",
     "region",
+    "send_stmt",
     "task",
     "task_graph",
     "to_payload",
