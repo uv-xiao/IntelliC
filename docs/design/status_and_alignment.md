@@ -68,9 +68,9 @@ What is solid today:
 Main code anchors:
 
 - `htp/compiler.py`
-- `htp/ir/core/semantics.py`
-- `htp/ir/core/types.py`
-- `htp/ir/core/layout.py`
+- `htp/ir/core/semantics/`
+- `htp/ir/core/types/`
+- `htp/ir/core/layout/`
 - `htp/passes/program_model.py`
 - `htp/passes/typecheck_layout_effects.py`
 

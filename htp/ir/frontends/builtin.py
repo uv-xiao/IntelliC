@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..core.semantics import WorkloadTask
+from ..dialects.csp import csp_frontend_workload
+from ..dialects.wsp import wsp_frontend_workload
 from .registry import FrontendSpec, frontend_registry_snapshot, register_frontend
 from .rules import FrontendRule, FrontendRuleResult, ProgramSurfaceRule
 from .shared import FrontendWorkload
@@ -53,56 +55,6 @@ def _routine_frontend_workload(surface: Any) -> FrontendWorkload:
     )
 
 
-def _wsp_frontend_workload(surface: Any) -> FrontendWorkload:
-    return FrontendWorkload(
-        entry=surface.entry,
-        tasks=tuple(
-            WorkloadTask(
-                task_id=task.task_id,
-                kind=task.kind,
-                kernel=task.kernel,
-                args=task.args,
-                entity_id=f"{surface.entry}:{task.task_id}",
-                attrs=dict(task.attrs),
-            )
-            for task in surface.tasks
-        ),
-        channels=tuple(dict(item) for item in surface.channels),
-        dependencies=tuple(dependency.to_payload() for dependency in surface.dependencies),
-        routine={
-            "kind": "wsp",
-            "entry": surface.entry,
-            "schedule": surface.schedule.to_payload(),
-            "target": dict(surface.target),
-        },
-    )
-
-
-def _csp_frontend_workload(surface: Any) -> FrontendWorkload:
-    return FrontendWorkload(
-        entry=surface.entry,
-        tasks=tuple(
-            WorkloadTask(
-                task_id=process.task_id,
-                kind="process",
-                kernel=process.kernel,
-                args=process.args,
-                entity_id=f"{surface.entry}:{process.task_id}",
-                attrs={"name": process.name, **({"role": process.role} if process.role is not None else {})},
-            )
-            for process in surface.processes
-        ),
-        channels=tuple(channel.to_payload() for channel in surface.channels),
-        dependencies=(),
-        processes=tuple(process.to_payload() for process in surface.processes),
-        routine={
-            "kind": "csp",
-            "entry": surface.entry,
-            "target": dict(surface.target),
-        },
-    )
-
-
 def _builtin_registrations() -> tuple[BuiltinFrontendRegistration, ...]:
     from htp.csp import CSPProgramSpec
     from htp.kernel import KernelSpec, build_kernel_program_module
@@ -142,7 +94,7 @@ def _builtin_registrations() -> tuple[BuiltinFrontendRegistration, ...]:
                 active_dialects=("htp.core", "htp.kernel", "htp.wsp"),
                 kernel_spec=lambda surface: surface.kernel_spec(),
                 authored_program=lambda surface: surface.to_program(),
-                workload=_wsp_frontend_workload,
+                workload=wsp_frontend_workload,
             ),
         ),
         BuiltinFrontendRegistration(
@@ -155,7 +107,7 @@ def _builtin_registrations() -> tuple[BuiltinFrontendRegistration, ...]:
                 active_dialects=("htp.core", "htp.kernel", "htp.csp"),
                 kernel_spec=lambda surface: surface.kernel_spec(),
                 authored_program=lambda surface: surface.to_program(),
-                workload=_csp_frontend_workload,
+                workload=csp_frontend_workload,
             ),
         ),
     )

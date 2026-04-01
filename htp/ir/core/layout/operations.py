@@ -1,38 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, is_dataclass
 from typing import Any
 
-
-@dataclass(frozen=True)
-class DistributionPlacement:
-    kind: str
-    axis: str | None = None
-
-
-@dataclass(frozen=True)
-class DistributionFacet:
-    dims: tuple[DistributionPlacement, ...]
-
-
-@dataclass(frozen=True)
-class MemoryFacet:
-    space: str
-    layout: str
-    order: tuple[int, ...]
-
-
-@dataclass(frozen=True)
-class HardwareFacet:
-    scope: str
-    vector_width: int
-
-
-@dataclass(frozen=True)
-class LayoutFacetProduct:
-    distribution: DistributionFacet
-    memory: MemoryFacet
-    hardware: HardwareFacet
+from .model import DistributionFacet, DistributionPlacement
 
 
 def distribution_from_payload(
@@ -103,11 +74,6 @@ def layout_to_payload(value: Any) -> Any:
 
 
 __all__ = [
-    "DistributionFacet",
-    "DistributionPlacement",
-    "HardwareFacet",
-    "LayoutFacetProduct",
-    "MemoryFacet",
     "distribution_from_payload",
     "distribution_matches",
     "join_distribution_facets",

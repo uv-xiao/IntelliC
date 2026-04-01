@@ -49,15 +49,31 @@ Target layout:
   - `render.py`
   - `build.py`
 - `htp/ir/core/`
-  - `nodes.py`
-  - `types.py`
-  - `layout.py`
-  - `ids.py`
+  - `nodes/`
+    - `model.py`
+    - `builders.py`
+    - `serde.py`
+  - `types/`
+    - `model.py`
+    - `payloads.py`
+  - `layout/`
+    - `model.py`
+    - `operations.py`
+  - `ids/`
+    - `identifiers.py`
+    - `records.py`
+    - `registry.py`
   - `maps.py`
-  - `aspects.py`
-  - `analysis.py`
+  - `aspects/`
+    - `model.py`
+    - `payloads.py`
+  - `analysis/`
+    - `records.py`
   - `identity.py`
-  - `semantics.py`
+  - `semantics/`
+    - `kernel.py`
+    - `workload.py`
+    - `payloads.py`
   - `op_specs.py`
 - `htp/ir/frontends/`
   - `registry.py`
@@ -72,8 +88,16 @@ Target layout:
   - `entrypoints.py`
 - `htp/ir/dialects/`
   - `registry.py`
-  - `wsp.py`
-  - `csp.py`
+  - `wsp/`
+    - `nodes.py`
+    - `frontends.py`
+    - `interpreters.py`
+    - `passes.py`
+  - `csp/`
+    - `nodes.py`
+    - `frontends.py`
+    - `interpreters.py`
+    - `passes.py`
 
 This is not optional cleanup. It is part of the architecture contract.
 
@@ -83,8 +107,9 @@ This is not optional cleanup. It is part of the architecture contract.
 - `core/` isolates the typed IR substrate from authoring/runtime details
 - `frontends/` isolates lowering infrastructure from public-surface modules
 - `interpreters/` isolates execution machinery from the rest of the IR package
-- `dialects/` prevents framework-specific typed nodes from polluting the same
-  namespace as core nodes
+- `dialects/` gives each dialect one owned home for its nodes, frontend glue,
+  runtime hooks, and pass definitions instead of leaking them into shared
+  infrastructure
 
 ### 1. Public surface modules
 

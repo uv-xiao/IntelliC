@@ -54,6 +54,7 @@ class WSPStageSpec:
         return cls(name=str(payload["name"]), steps=steps)
 
 
+
 def stages_from_payload(payload: Any) -> list[WSPStageSpec]:
     if not isinstance(payload, list):
         return []
@@ -68,3 +69,6 @@ def stages_from_payload(payload: Any) -> list[WSPStageSpec]:
 
 def stages_to_payload(stages: list[WSPStageSpec] | tuple[WSPStageSpec, ...]) -> list[dict[str, Any]]:
     return [stage.to_payload() for stage in stages]
+
+
+__all__ = ["WSPStageSpec", "WSPStageStep", "stages_from_payload", "stages_to_payload"]

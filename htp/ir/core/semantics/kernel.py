@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field, is_dataclass
+from dataclasses import dataclass
 from typing import Any
 
+from .payloads import to_payload
+
 KERNEL_IR_SCHEMA_ID = "htp.kernel_ir.v1"
-WORKLOAD_IR_SCHEMA_ID = "htp.workload_ir.v1"
 
 
 @dataclass(frozen=True)
@@ -38,26 +39,6 @@ class KernelIR:
     args: tuple[KernelArg, ...]
     buffers: tuple[KernelArg, ...]
     ops: tuple[KernelOp, ...]
-
-
-@dataclass(frozen=True)
-class WorkloadTask:
-    task_id: str
-    kind: str
-    kernel: str
-    args: tuple[str, ...]
-    entity_id: str
-    attrs: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class WorkloadIR:
-    entry: str
-    tasks: tuple[WorkloadTask, ...]
-    channels: tuple[dict[str, Any], ...]
-    dependencies: tuple[dict[str, Any], ...]
-    processes: tuple[dict[str, Any], ...] = ()
-    routine: dict[str, Any] | None = None
 
 
 def kernel_arg_from_payload(payload: dict[str, Any]) -> KernelArg:
@@ -107,81 +88,19 @@ def kernel_ir_from_payload(payload: dict[str, Any]) -> KernelIR:
     )
 
 
-def workload_task_from_payload(payload: dict[str, Any]) -> WorkloadTask:
-    return WorkloadTask(
-        task_id=str(payload["task_id"]),
-        kind=str(payload["kind"]),
-        kernel=str(payload["kernel"]),
-        args=tuple(str(item) for item in payload.get("args", ())),
-        entity_id=str(payload.get("entity_id", "")),
-        attrs=dict(payload.get("attrs", {})),
-    )
-
-
-def workload_ir_from_payload(payload: dict[str, Any]) -> WorkloadIR:
-    return WorkloadIR(
-        entry=str(payload.get("entry", "")),
-        tasks=tuple(
-            workload_task_from_payload(dict(item))
-            for item in payload.get("tasks", ())
-            if isinstance(item, dict)
-        ),
-        channels=tuple(dict(item) for item in payload.get("channels", ()) if isinstance(item, dict)),
-        dependencies=tuple(dict(item) for item in payload.get("dependencies", ()) if isinstance(item, dict)),
-        processes=tuple(dict(item) for item in payload.get("processes", ()) if isinstance(item, dict)),
-        routine=dict(payload["routine"]) if isinstance(payload.get("routine"), dict) else None,
-    )
-
-
 def kernel_ir_payload(value: KernelIR) -> dict[str, Any]:
     if not value.entry and not value.args and not value.buffers and not value.ops:
         return {}
     return {"schema": KERNEL_IR_SCHEMA_ID, **to_payload(value)}
 
 
-def workload_ir_payload(value: WorkloadIR) -> dict[str, Any]:
-    if (
-        not value.entry
-        and not value.tasks
-        and not value.channels
-        and not value.dependencies
-        and not value.processes
-        and value.routine is None
-    ):
-        return {}
-    payload = {"schema": WORKLOAD_IR_SCHEMA_ID, **to_payload(value)}
-    for task in payload.get("tasks", ()):
-        if isinstance(task, dict) and task.get("attrs") == {}:
-            task.pop("attrs", None)
-    if payload.get("routine") is None:
-        payload.pop("routine", None)
-    return payload
-
-
-def to_payload(value: Any) -> Any:
-    if is_dataclass(value):
-        return to_payload(asdict(value))
-    if isinstance(value, dict):
-        return {str(key): to_payload(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [to_payload(item) for item in value]
-    return value
-
-
 __all__ = [
+    "KERNEL_IR_SCHEMA_ID",
     "KernelArg",
     "KernelIR",
     "KernelOp",
-    "KERNEL_IR_SCHEMA_ID",
-    "WorkloadIR",
-    "WorkloadTask",
     "kernel_arg_from_payload",
     "kernel_ir_from_payload",
     "kernel_ir_payload",
     "kernel_op_from_payload",
-    "to_payload",
-    "WORKLOAD_IR_SCHEMA_ID",
-    "workload_ir_from_payload",
-    "workload_ir_payload",
-    "workload_task_from_payload",
 ]

@@ -10,10 +10,7 @@ class EntityRecord:
     role: str | None = None
 
     def to_json(self) -> dict[str, str]:
-        payload = {
-            "entity_id": self.entity_id,
-            "kind": self.kind,
-        }
+        payload = {"entity_id": self.entity_id, "kind": self.kind}
         if self.role is not None:
             payload["role"] = self.role
         return payload
@@ -25,10 +22,7 @@ class NodeEntityRecord:
     entity_id: str
 
     def to_json(self) -> dict[str, str]:
-        return {
-            "node_id": self.node_id,
-            "entity_id": self.entity_id,
-        }
+        return {"node_id": self.node_id, "entity_id": self.entity_id}
 
 
 @dataclass(frozen=True)
@@ -38,11 +32,7 @@ class ScopeRecord:
     kind: str
 
     def to_json(self) -> dict[str, str | None]:
-        return {
-            "scope_id": self.scope_id,
-            "parent": self.parent,
-            "kind": self.kind,
-        }
+        return {"scope_id": self.scope_id, "parent": self.parent, "kind": self.kind}
 
 
 @dataclass(frozen=True)
@@ -52,10 +42,7 @@ class BindingRecord:
     site_entity_id: str | None = None
 
     def to_json(self) -> dict[str, str | None]:
-        payload = {
-            "binding_id": self.binding_id,
-            "name": self.name,
-        }
+        payload = {"binding_id": self.binding_id, "name": self.name}
         if self.site_entity_id is not None:
             payload["site_entity_id"] = self.site_entity_id
         return payload
@@ -67,10 +54,7 @@ class NameUseRecord:
     binding_id: str
 
     def to_json(self) -> dict[str, str]:
-        return {
-            "node_id": self.node_id,
-            "binding_id": self.binding_id,
-        }
+        return {"node_id": self.node_id, "binding_id": self.binding_id}
 
 
 __all__ = [

@@ -1,436 +1,39 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Literal
-
-
-@dataclass(frozen=True)
-class NodeId:
-    value: str
-
-    def to_payload(self) -> str:
-        return self.value
-
-
-@dataclass(frozen=True)
-class ItemId:
-    value: str
-
-    def to_payload(self) -> str:
-        return self.value
-
-
-@dataclass(frozen=True)
-class SymbolId:
-    value: str
-
-    def to_payload(self) -> str:
-        return self.value
-
-
-@dataclass(frozen=True)
-class BindingId:
-    value: str
-
-    def to_payload(self) -> str:
-        return self.value
-
-
-@dataclass(frozen=True)
-class ScopeId:
-    value: str
-
-    def to_payload(self) -> str:
-        return self.value
-
-
-@dataclass(frozen=True)
-class RegionId:
-    value: str
-
-    def to_payload(self) -> str:
-        return self.value
-
-
-@dataclass(frozen=True)
-class TaskId:
-    value: str
-
-    def to_payload(self) -> str:
-        return self.value
-
-
-@dataclass(frozen=True)
-class ProcessId:
-    value: str
-
-    def to_payload(self) -> str:
-        return self.value
-
-
-@dataclass(frozen=True)
-class ChannelId:
-    value: str
-
-    def to_payload(self) -> str:
-        return self.value
-
-
-@dataclass(frozen=True)
-class Node:
-    node_id: NodeId
-
-
-@dataclass(frozen=True)
-class Expr(Node):
-    pass
-
-
-@dataclass(frozen=True)
-class Stmt(Node):
-    pass
-
-
-@dataclass(frozen=True)
-class Item(Node):
-    item_id: ItemId
-    name: str
-
-
-@dataclass(frozen=True)
-class ItemRef(Node):
-    item_id: ItemId
-    name: str
-
-
-@dataclass(frozen=True)
-class Parameter(Node):
-    symbol_id: SymbolId
-    name: str
-    kind: str
-    dtype: str
-
-
-@dataclass(frozen=True)
-class BindingRef(Expr):
-    binding_id: BindingId
-    name: str
-
-
-@dataclass(frozen=True)
-class Ref(Expr):
-    symbol_id: SymbolId
-    name: str
-
-
-@dataclass(frozen=True)
-class LiteralExpr(Expr):
-    value: int | float | bool
-
-
-@dataclass(frozen=True)
-class BinaryExpr(Expr):
-    op: Literal["add", "sub", "mul", "div"]
-    lhs: Expr
-    rhs: Expr
-
-
-@dataclass(frozen=True)
-class ReceiveExpr(Expr):
-    channel_id: ChannelId
-
-
-@dataclass(frozen=True)
-class Let(Stmt):
-    symbol_id: SymbolId
-    name: str
-    value: Expr
-
-
-@dataclass(frozen=True)
-class Return(Stmt):
-    value: Expr
-
-
-@dataclass(frozen=True)
-class Region(Node):
-    region_id: RegionId
-    statements: tuple[Stmt, ...]
-    scope_id: ScopeId | None = None
-
-
-@dataclass(frozen=True)
-class ForStmt(Stmt):
-    binding_id: BindingId
-    index_name: str
-    start: Expr
-    stop: Expr
-    step: Expr
-    body: Region
-
-
-@dataclass(frozen=True)
-class SendStmt(Stmt):
-    channel_id: ChannelId
-    value: Expr
-
-
-@dataclass(frozen=True)
-class Kernel(Item):
-    params: tuple[Parameter, ...]
-    body: Region
-
-
-@dataclass(frozen=True)
-class Task(Node):
-    task_id: TaskId
-    kernel: ItemRef
-    args: tuple[Ref, ...] = ()
-    attrs: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class Dependency(Node):
-    src_task: TaskId
-    dst_task: TaskId
-
-
-@dataclass(frozen=True)
-class TaskGraph(Item):
-    tasks: tuple[Task, ...]
-    dependencies: tuple[Dependency, ...] = ()
-    body: Region | None = None
-
-
-@dataclass(frozen=True)
-class Channel(Item):
-    channel_id: ChannelId
-    dtype: str
-    capacity: int
-    protocol: str = "fifo"
-
-
-@dataclass(frozen=True)
-class ProcessStep(Node):
-    kind: str
-    channel_id: ChannelId | None = None
-    attrs: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class Process(Node):
-    process_id: ProcessId
-    kernel: ItemRef
-    args: tuple[Ref, ...] = ()
-    steps: tuple[ProcessStep, ...] = ()
-    attrs: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class ProcessGraph(Item):
-    channels: tuple[Channel, ...]
-    processes: tuple[Process, ...]
-    body: Region | None = None
-
-
-def literal(node_id: str, value: int | float | bool) -> LiteralExpr:
-    return LiteralExpr(node_id=NodeId(node_id), value=value)
-
-
-def ref(node_id: str, symbol_id: str, name: str) -> Ref:
-    return Ref(node_id=NodeId(node_id), symbol_id=SymbolId(symbol_id), name=name)
-
-
-def binding_ref(node_id: str, binding_id: str, name: str) -> BindingRef:
-    return BindingRef(node_id=NodeId(node_id), binding_id=BindingId(binding_id), name=name)
-
-
-def item_ref(node_id: str, item_id: str, name: str) -> ItemRef:
-    return ItemRef(node_id=NodeId(node_id), item_id=ItemId(item_id), name=name)
-
-
-def param(node_id: str, symbol_id: str, name: str, *, kind: str, dtype: str) -> Parameter:
-    return Parameter(
-        node_id=NodeId(node_id), symbol_id=SymbolId(symbol_id), name=name, kind=kind, dtype=dtype
-    )
-
-
-def let(node_id: str, symbol_id: str, name: str, value: Expr) -> Let:
-    return Let(node_id=NodeId(node_id), symbol_id=SymbolId(symbol_id), name=name, value=value)
-
-
-def region(
-    region_id: str,
-    *statements: Stmt,
-    node_id: str | None = None,
-    scope_id: str | None = None,
-) -> Region:
-    return Region(
-        node_id=NodeId(node_id or f"{region_id}:node"),
-        region_id=RegionId(region_id),
-        statements=tuple(statements),
-        scope_id=None if scope_id is None else ScopeId(scope_id),
-    )
-
-
-def for_stmt(
-    node_id: str,
-    binding_id: str,
-    index_name: str,
-    *,
-    start: Expr,
-    stop: Expr,
-    step: Expr,
-    body: Region,
-) -> ForStmt:
-    return ForStmt(
-        node_id=NodeId(node_id),
-        binding_id=BindingId(binding_id),
-        index_name=index_name,
-        start=start,
-        stop=stop,
-        step=step,
-        body=body,
-    )
-
-
-def send_stmt(node_id: str, *, channel_id: str, value: Expr) -> SendStmt:
-    return SendStmt(node_id=NodeId(node_id), channel_id=ChannelId(channel_id), value=value)
-
-
-def receive_expr(node_id: str, *, channel_id: str) -> ReceiveExpr:
-    return ReceiveExpr(node_id=NodeId(node_id), channel_id=ChannelId(channel_id))
-
-
-def kernel(
-    item_id: str,
-    name: str,
-    *,
-    params: tuple[Parameter, ...],
-    body: Region,
-    node_id: str | None = None,
-) -> Kernel:
-    return Kernel(
-        node_id=NodeId(node_id or f"{item_id}:node"),
-        item_id=ItemId(item_id),
-        name=name,
-        params=params,
-        body=body,
-    )
-
-
-def task(
-    node_id: str,
-    task_id: str,
-    *,
-    kernel: ItemRef,
-    args: tuple[Ref, ...] = (),
-    attrs: dict[str, Any] | None = None,
-) -> Task:
-    return Task(
-        node_id=NodeId(node_id),
-        task_id=TaskId(task_id),
-        kernel=kernel,
-        args=args,
-        attrs={} if attrs is None else dict(attrs),
-    )
-
-
-def dependency(node_id: str, *, src_task: str, dst_task: str) -> Dependency:
-    return Dependency(node_id=NodeId(node_id), src_task=TaskId(src_task), dst_task=TaskId(dst_task))
-
-
-def task_graph(
-    item_id: str,
-    name: str,
-    *,
-    tasks: tuple[Task, ...],
-    dependencies: tuple[Dependency, ...] = (),
-    body: Region | None = None,
-    node_id: str | None = None,
-) -> TaskGraph:
-    return TaskGraph(
-        node_id=NodeId(node_id or f"{item_id}:node"),
-        item_id=ItemId(item_id),
-        name=name,
-        tasks=tasks,
-        dependencies=dependencies,
-        body=body,
-    )
-
-
-def channel(
-    item_id: str,
-    name: str,
-    *,
-    channel_id: str,
-    dtype: str,
-    capacity: int,
-    protocol: str = "fifo",
-    node_id: str | None = None,
-) -> Channel:
-    return Channel(
-        node_id=NodeId(node_id or f"{item_id}:node"),
-        item_id=ItemId(item_id),
-        name=name,
-        channel_id=ChannelId(channel_id),
-        dtype=dtype,
-        capacity=capacity,
-        protocol=protocol,
-    )
-
-
-def process_step(
-    node_id: str,
-    *,
-    kind: str,
-    channel_id: str | None = None,
-    attrs: dict[str, Any] | None = None,
-) -> ProcessStep:
-    return ProcessStep(
-        node_id=NodeId(node_id),
-        kind=kind,
-        channel_id=None if channel_id is None else ChannelId(channel_id),
-        attrs={} if attrs is None else dict(attrs),
-    )
-
-
-def process(
-    node_id: str,
-    process_id: str,
-    *,
-    kernel: ItemRef,
-    args: tuple[Ref, ...] = (),
-    steps: tuple[ProcessStep, ...] = (),
-    attrs: dict[str, Any] | None = None,
-) -> Process:
-    return Process(
-        node_id=NodeId(node_id),
-        process_id=ProcessId(process_id),
-        kernel=kernel,
-        args=args,
-        steps=steps,
-        attrs={} if attrs is None else dict(attrs),
-    )
-
-
-def process_graph(
-    item_id: str,
-    name: str,
-    *,
-    channels: tuple[Channel, ...],
-    processes: tuple[Process, ...],
-    body: Region | None = None,
-    node_id: str | None = None,
-) -> ProcessGraph:
-    return ProcessGraph(
-        node_id=NodeId(node_id or f"{item_id}:node"),
-        item_id=ItemId(item_id),
-        name=name,
-        channels=channels,
-        processes=processes,
-        body=body,
-    )
+from typing import Any
+
+from .model import (
+    BinaryExpr,
+    BindingId,
+    BindingRef,
+    Channel,
+    ChannelId,
+    Dependency,
+    ForStmt,
+    ItemId,
+    ItemRef,
+    Kernel,
+    Let,
+    LiteralExpr,
+    Node,
+    NodeId,
+    Parameter,
+    Process,
+    ProcessGraph,
+    ProcessId,
+    ProcessStep,
+    ReceiveExpr,
+    Ref,
+    Region,
+    RegionId,
+    Return,
+    ScopeId,
+    SendStmt,
+    SymbolId,
+    Task,
+    TaskGraph,
+    TaskId,
+)
 
 
 def to_payload(node: Node | tuple[Node, ...]) -> Any:
@@ -510,11 +113,7 @@ def to_payload(node: Node | tuple[Node, ...]) -> Any:
             "name": node.name,
         }
     if isinstance(node, LiteralExpr):
-        return {
-            "kind": "LiteralExpr",
-            "node_id": node.node_id.to_payload(),
-            "value": node.value,
-        }
+        return {"kind": "LiteralExpr", "node_id": node.node_id.to_payload(), "value": node.value}
     if isinstance(node, BinaryExpr):
         return {
             "kind": "BinaryExpr",
@@ -538,11 +137,7 @@ def to_payload(node: Node | tuple[Node, ...]) -> Any:
             "value": to_payload(node.value),
         }
     if isinstance(node, Return):
-        return {
-            "kind": "Return",
-            "node_id": node.node_id.to_payload(),
-            "value": to_payload(node.value),
-        }
+        return {"kind": "Return", "node_id": node.node_id.to_payload(), "value": to_payload(node.value)}
     if isinstance(node, ForStmt):
         return {
             "kind": "ForStmt",
@@ -692,10 +287,7 @@ def from_payload(payload: dict[str, Any]) -> Node:
             value=from_payload(dict(payload["value"])),  # type: ignore[arg-type]
         )
     if kind == "Return":
-        return Return(
-            node_id=NodeId(str(payload["node_id"])),
-            value=from_payload(dict(payload["value"])),  # type: ignore[arg-type]
-        )
+        return Return(node_id=NodeId(str(payload["node_id"])), value=from_payload(dict(payload["value"])))  # type: ignore[arg-type]
     if kind == "ForStmt":
         return ForStmt(
             node_id=NodeId(str(payload["node_id"])),
@@ -756,58 +348,4 @@ def from_payload(payload: dict[str, Any]) -> Node:
     raise ValueError(f"Unsupported IR node kind: {kind}")
 
 
-__all__ = [
-    "BinaryExpr",
-    "BindingId",
-    "BindingRef",
-    "Channel",
-    "ChannelId",
-    "Dependency",
-    "Expr",
-    "ForStmt",
-    "Item",
-    "ItemId",
-    "ItemRef",
-    "Kernel",
-    "Let",
-    "LiteralExpr",
-    "Node",
-    "NodeId",
-    "Parameter",
-    "Process",
-    "ProcessGraph",
-    "ProcessId",
-    "ProcessStep",
-    "ReceiveExpr",
-    "Ref",
-    "Region",
-    "RegionId",
-    "Return",
-    "ScopeId",
-    "SendStmt",
-    "Stmt",
-    "SymbolId",
-    "Task",
-    "TaskGraph",
-    "TaskId",
-    "binding_ref",
-    "channel",
-    "dependency",
-    "for_stmt",
-    "from_payload",
-    "item_ref",
-    "kernel",
-    "let",
-    "literal",
-    "param",
-    "process",
-    "process_graph",
-    "process_step",
-    "receive_expr",
-    "ref",
-    "region",
-    "send_stmt",
-    "task",
-    "task_graph",
-    "to_payload",
-]
+__all__ = ["from_payload", "to_payload"]

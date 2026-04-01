@@ -36,9 +36,9 @@
   - Tile-and-stage rewrite and schedule/protocol enrichment helpers for the proof path.
 - `htp/passes/backend_ready.py`
   - Backend-ready rewrite pass for the canonical path.
-- `htp/ir/dialects/wsp.py`
+- `htp/ir/dialects/wsp/`
   - Typed nested WSP stage/schedule node classes.
-- `htp/ir/dialects/csp.py`
+- `htp/ir/dialects/csp/`
   - Typed nested CSP process-step/channel node classes.
 
 ### Modify
@@ -47,7 +47,7 @@
   - Replace remaining nested stage metadata payloads with typed stage/schedule objects.
 - `htp/csp/__init__.py`
   - Replace remaining nested process-step payloads with typed step objects.
-- `htp/ir/core/nodes.py`
+- `htp/ir/core/nodes/`
   - Extend the common typed node hierarchy to cover the canonical example.
 - `htp/ir/interpreters/entrypoints.py`
   - Split or extend object-oriented interpreters for kernel/task/process items and nested stmt/expr execution.
@@ -86,7 +86,7 @@
 ### Task 1: Type nested WSP stage structure
 
 **Files:**
-- Create: `htp/ir/dialects/wsp.py`
+- Create: `htp/ir/dialects/wsp/`
 - Modify: `htp/wsp/__init__.py`
 - Test: `tests/test_public_surfaces.py`
 
@@ -128,7 +128,7 @@ Expected: FAIL with `NameError` / `AttributeError` because `WSPStageSpec` and ty
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `htp/ir/dialects/wsp.py`:
+Create `htp/ir/dialects/wsp/`:
 
 ```python
 from __future__ import annotations
@@ -166,14 +166,14 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add htp/ir/dialects/wsp.py htp/wsp/__init__.py tests/test_public_surfaces.py
+git add htp/ir/dialects/wsp/ htp/wsp/__init__.py tests/test_public_surfaces.py
 git commit -m "feat: type nested wsp stage structure"
 ```
 
 ### Task 2: Type nested CSP process-step structure
 
 **Files:**
-- Create: `htp/ir/dialects/csp.py`
+- Create: `htp/ir/dialects/csp/`
 - Modify: `htp/csp/__init__.py`
 - Test: `tests/test_public_surfaces.py`
 
@@ -208,7 +208,7 @@ Expected: FAIL because nested process steps are still payload-shaped.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `htp/ir/dialects/csp.py`:
+Create `htp/ir/dialects/csp/`:
 
 ```python
 from __future__ import annotations
@@ -237,14 +237,14 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add htp/ir/dialects/csp.py htp/csp/__init__.py tests/test_public_surfaces.py
+git add htp/ir/dialects/csp/ htp/csp/__init__.py tests/test_public_surfaces.py
 git commit -m "feat: type nested csp process steps"
 ```
 
 ### Task 3: Extend the common typed node hierarchy for the canonical example
 
 **Files:**
-- Modify: `htp/ir/core/nodes.py`
+- Modify: `htp/ir/core/nodes/`
 - Modify: `htp/ir/program/build.py`
 - Test: `tests/ir/test_nodes.py`
 
@@ -270,7 +270,7 @@ Expected: FAIL because the common hierarchy does not yet cover the canonical exa
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `htp/ir/core/nodes.py`, introduce the missing common node classes:
+In `htp/ir/core/nodes/`, introduce the missing common node classes:
 
 ```python
 @dataclass
@@ -308,7 +308,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add htp/ir/core/nodes.py htp/ir/program/build.py tests/ir/test_nodes.py
+git add htp/ir/core/nodes/ htp/ir/program/build.py tests/ir/test_nodes.py
 git commit -m "feat: extend typed nodes for closure proof"
 ```
 

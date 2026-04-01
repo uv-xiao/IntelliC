@@ -214,13 +214,13 @@ future passes instead of hiding them in Python helper code alone.
 ## Coding pointers
 
 If you are working in this layer, start here:
-- `htp/ir/core/aspects.py` — typed aspect wrappers for committed-stage semantic state
-- `htp/ir/core/semantics.py` — core staged semantic dataclasses
+- `htp/ir/core/aspects/` — typed aspect wrappers for committed-stage semantic state
+- `htp/ir/core/semantics/` — core staged semantic dataclasses
 - `htp/ir/program/module.py` — `ProgramModule`, entrypoints, and typed stage ownership
 - `htp/ir/interpreters/registry.py` — interpreter registry for committed stage execution
 - `htp/ir/program/render.py` — normalized staged Python rendering
-- `htp/ir/core/types.py` — structured type/value payloads
-- `htp/ir/core/layout.py` — layout helpers and payload structure
+- `htp/ir/core/types/` — structured type/value payloads
+- `htp/ir/core/layout/` — layout helpers and payload structure
 - `htp/ir/core/op_specs.py` — operation semantics and metadata
 - `htp/types.py` — public structured dtype/shape/distribution/channel surface
 - `htp/intrinsics.py` — intrinsic declarations and handler registration
