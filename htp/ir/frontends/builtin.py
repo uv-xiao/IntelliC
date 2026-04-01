@@ -55,8 +55,7 @@ def _routine_frontend_workload(surface: Any) -> FrontendWorkload:
             for channel in surface.channels
         ),
         dependencies=tuple(
-            WorkloadDependency(src=dependency.src, dst=dependency.dst)
-            for dependency in surface.dependencies
+            WorkloadDependency(src=dependency.src, dst=dependency.dst) for dependency in surface.dependencies
         ),
         routine={
             "kind": "routine",

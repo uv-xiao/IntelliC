@@ -78,8 +78,13 @@ Implemented on this branch:
   `htp.wsp.WSPProgramSpec`, and `htp.csp.CSPProgramSpec` now expose
   `to_program_module()`, and `compile_program()` prefers the `ProgramModule`
   path over `to_program()`
+- the shared AST frontend substrate now includes `htp.ir.frontends.ast_lowering`
+  so dialect handlers stay small instead of duplicating AST decoding
+- workload semantic records now stay typed for channels, dependencies, and
+  processes
+- composed dialect examples now use `ProgramModule.compose(...)`
 - those public frontends now share common frontend builder helpers in
-  `htp/ir/frontend.py` (workload assembly, dialect activation metadata, and
+  `htp/ir/frontends/shared.py` (workload assembly, dialect activation metadata, and
   `ProgramModule` construction)
 - a rule-backed frontend-definition substrate now exists in
   `htp/ir/frontends/rules.py`

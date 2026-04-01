@@ -24,7 +24,7 @@ from htp.ir.frontends import (
 from htp.ir.frontends.shared import FrontendWorkload, build_frontend_program_module
 
 if TYPE_CHECKING:
-    from htp.csp import CSPProgramSpec, ChannelRef, CSPProcessSpec
+    from htp.csp import ChannelRef, CSPProcessSpec, CSPProgramSpec
     from htp.ir.program.module import ProgramModule
     from htp.kernel import KernelSpec
 
@@ -64,8 +64,7 @@ def csp_frontend_workload(surface: object) -> FrontendWorkload:
                 args=process_spec.args,
                 role=process_spec.role,
                 steps=tuple(
-                    WorkloadProcessStep(kind=step.kind, attrs=dict(step.attrs))
-                    for step in process_spec.steps
+                    WorkloadProcessStep(kind=step.kind, attrs=dict(step.attrs)) for step in process_spec.steps
                 ),
             )
             for process_spec in surface.processes
@@ -167,9 +166,9 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
         if not isinstance(decorator, ast.Call):
             raise context.fail(node, "CSP nested process decorators must be calls")
         keyword_map = {item.arg: item.value for item in decorator.keywords if item.arg is not None}
-        process_args = ordered_resolved_values(sequence_values(keyword_map.get("args")), context) or default_kernel_args(
-            context.kernel_spec
-        )
+        process_args = ordered_resolved_values(
+            sequence_values(keyword_map.get("args")), context
+        ) or default_kernel_args(context.kernel_spec)
         role = resolve_surface_value(keyword_map.get("role"), context) if "role" in keyword_map else None
         steps = []
         context.locals = {}
@@ -358,8 +357,7 @@ def _build_csp_ast_program_module(
                 args=process_spec.args,
                 role=process_spec.role,
                 steps=tuple(
-                    WorkloadProcessStep(kind=step.kind, attrs=dict(step.attrs))
-                    for step in process_spec.steps
+                    WorkloadProcessStep(kind=step.kind, attrs=dict(step.attrs)) for step in process_spec.steps
                 ),
             )
             for process_spec in process_specs

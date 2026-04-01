@@ -82,9 +82,12 @@ Programming-surface and example gaps are visible in:
 
 - `htp/wsp/__init__.py`
 - `htp/csp/__init__.py`
+- `htp/ir/frontends/ast_lowering.py`
+- `htp/ir/program/compose.py`
 - `examples/wsp_warp_gemm/demo.py`
 - `examples/wsp_littlekernel_pipelined_gemm/demo.py`
 - `examples/csp_channel_pipeline/demo.py`
+- `examples/ast_frontend_composability/demo.py`
 - `docs/design/programming_surfaces.md`
 - `docs/design/littlekernel_ast_comparison.md`
 - `docs/story.md`

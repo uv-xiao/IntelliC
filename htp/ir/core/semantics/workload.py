@@ -23,24 +23,26 @@ class WorkloadTask:
 class WorkloadChannel:
     name: str
     dtype: str
-    capacity: int
+    capacity: int | None = None
     protocol: str = "fifo"
 
     def to_payload(self) -> dict[str, Any]:
-        return {
+        payload = {
             "name": self.name,
             "dtype": self.dtype,
-            "capacity": self.capacity,
             "protocol": self.protocol,
         }
+        if self.capacity is not None:
+            payload["capacity"] = self.capacity
+        return payload
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> WorkloadChannel:
         return cls(
             name=str(payload["name"]),
             dtype=str(payload["dtype"]),
-            capacity=int(payload["capacity"]),
-            protocol=str(payload.get("protocol", "fifo")),
+            capacity=(int(payload["capacity"]) if payload.get("capacity") is not None else None),
+            protocol=str(payload.get("protocol", payload.get("kind", "fifo"))),
         )
 
 
@@ -93,12 +95,8 @@ class WorkloadProcess:
             payload["role"] = self.role
         if self.steps:
             payload["steps"] = [step.to_payload() for step in self.steps]
-            payload["puts"] = [
-                step.to_payload() for step in self.steps if step.kind == "put"
-            ]
-            payload["gets"] = [
-                step.to_payload() for step in self.steps if step.kind == "get"
-            ]
+            payload["puts"] = [step.to_payload() for step in self.steps if step.kind == "put"]
+            payload["gets"] = [step.to_payload() for step in self.steps if step.kind == "get"]
         return payload
 
     @classmethod
@@ -123,34 +121,33 @@ class WorkloadIR:
     routine: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
-        if self.channels and isinstance(self.channels[0], Mapping):
+        if any(isinstance(item, Mapping) for item in self.channels):
             object.__setattr__(
                 self,
                 "channels",
                 tuple(
-                    workload_channel_from_payload(dict(item))
+                    item if isinstance(item, WorkloadChannel) else workload_channel_from_payload(dict(item))
                     for item in self.channels
-                    if isinstance(item, Mapping)
                 ),
             )
-        if self.dependencies and isinstance(self.dependencies[0], Mapping):
+        if any(isinstance(item, Mapping) for item in self.dependencies):
             object.__setattr__(
                 self,
                 "dependencies",
                 tuple(
-                    workload_dependency_from_payload(dict(item))
+                    item
+                    if isinstance(item, WorkloadDependency)
+                    else workload_dependency_from_payload(dict(item))
                     for item in self.dependencies
-                    if isinstance(item, Mapping)
                 ),
             )
-        if self.processes and isinstance(self.processes[0], Mapping):
+        if any(isinstance(item, Mapping) for item in self.processes):
             object.__setattr__(
                 self,
                 "processes",
                 tuple(
-                    workload_process_from_payload(dict(item))
+                    item if isinstance(item, WorkloadProcess) else workload_process_from_payload(dict(item))
                     for item in self.processes
-                    if isinstance(item, Mapping)
                 ),
             )
 
@@ -179,7 +176,7 @@ def process_steps_from_payload(payload: Sequence[Any]) -> tuple[WorkloadProcessS
     for item in payload:
         if isinstance(item, WorkloadProcessStep):
             steps.append(item)
-        elif isinstance(item, Mapping):
+        elif isinstance(item, Mapping) and "kind" in item:
             steps.append(WorkloadProcessStep.from_payload(item))
     return tuple(steps)
 
@@ -187,7 +184,21 @@ def process_steps_from_payload(payload: Sequence[Any]) -> tuple[WorkloadProcessS
 def workload_process_from_payload(payload: dict[str, Any]) -> WorkloadProcess:
     steps = process_steps_from_payload(payload.get("steps", ()))
     if not steps:
-        steps = process_steps_from_payload((*payload.get("gets", ()), *payload.get("puts", ())))
+        steps = tuple(
+            WorkloadProcessStep(
+                kind="get",
+                attrs={key: value for key, value in item.items()},
+            )
+            for item in payload.get("gets", ())
+            if isinstance(item, Mapping)
+        ) + tuple(
+            WorkloadProcessStep(
+                kind="put",
+                attrs={key: value for key, value in item.items()},
+            )
+            for item in payload.get("puts", ())
+            if isinstance(item, Mapping)
+        )
     return WorkloadProcess.from_payload({**payload, "steps": steps})
 
 

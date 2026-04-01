@@ -63,6 +63,7 @@ That substrate is now rule-backed in code:
 - a shared AST capture substrate now exists in:
   - `htp/ir/frontends/ast_context.py`
   - `htp/ir/frontends/ast_handlers.py`
+  - `htp/ir/frontends/ast_lowering.py`
   - `htp/ir/frontends/ast_visitor.py`
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
   in `htp/ir/frontends/__init__.py`, and compiler ingress routes through
@@ -73,9 +74,15 @@ That substrate is now rule-backed in code:
   registered frontend rule instead of owning a separate lowering path
 - WSP and CSP public specs now carry typed top-level surface objects rather than
   raw dict payload fields before serialization into `state.json`
+- workload semantic records are now also typed at the committed-stage boundary:
+  `WorkloadChannel`, `WorkloadDependency`, `WorkloadProcess`, and
+  `WorkloadProcessStep`
 - WSP and CSP now also support AST-backed nested-function authoring that lowers
   directly into final `ProgramModule` state for the recognized authored form
 - AST-backed WSP/CSP modules now mark `meta["frontend_capture"] == "ast"`
+- composed dialect modules can now be merged through
+  `htp/ir/program/compose.py` instead of manual `ProgramItems` surgery in
+  examples or tests
 
 The current frontend set also records explicit dialect activation metadata into
 `ProgramModule.meta`, so committed-stage state now carries both:
@@ -84,15 +91,17 @@ The current frontend set also records explicit dialect activation metadata into
   resolved builtin dialect specs responsible for the authored program surface
 
 That ingress path is now shared as well as direct. The public authoring
-surfaces reuse the common frontend-definition substrate in `htp/ir/frontend.py`
-to rebuild `KernelSpec`, assemble frontend workload/process structure, and
+surfaces reuse the common frontend-definition substrate in
+`htp/ir/frontends/shared.py` to rebuild `KernelSpec`, assemble frontend
+workload/process structure, and
 construct `ProgramModule` with consistent dialect metadata rather than each
 surface hand-assembling its own module wrapper.
 
 The AST-backed frontend slice also now proves that dialect-specific parse
 features can stay within one substrate. WSP task functions and CSP process
-functions use the same handler metadata and visitor dispatch model, then lower
-into the same `ProgramModule` owner and interpreter entry.
+functions use the same handler metadata, shared AST-lowering helpers, and
+visitor dispatch model, then lower into the same `ProgramModule` owner and
+interpreter entry.
 
 A stage is therefore not just “an AST snapshot”. It is a small evidence package describing both executable behavior and compiler understanding.
 

@@ -53,7 +53,7 @@ over `to_program()`. In the current implementation this is true for:
 - `htp.csp.CSPProgramSpec`
 
 Those frontend surfaces now share one common ingress helper in
-`htp/ir/frontend.py`. Routine, WSP, and CSP no longer each hand-assemble a
+`htp/ir/frontends/shared.py`. Routine, WSP, and CSP no longer each hand-assemble a
 `ProgramModule`; they rebuild workload/process structure and dialect metadata
 through the same frontend-definition substrate.
 
@@ -74,6 +74,7 @@ That frontend registry now has a rule-backed frontend-definition substrate:
 - a shared AST capture substrate now exists in:
   - `htp/ir/frontends/ast_context.py`
   - `htp/ir/frontends/ast_handlers.py`
+  - `htp/ir/frontends/ast_lowering.py`
   - `htp/ir/frontends/ast_visitor.py`
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
   in `htp/ir/frontends/__init__.py`
@@ -85,12 +86,17 @@ That frontend registry now has a rule-backed frontend-definition substrate:
   raw dict payload fields:
   - `WSPTaskSpec`, `WSPDependencySpec`, `WSPScheduleSpec`
   - `ChannelRef`, `CSPProcessSpec`, `CSPProcessStep`
+- the shared workload semantic layer is now typed as well:
+  - `WorkloadChannel`, `WorkloadDependency`, `WorkloadProcess`,
+    `WorkloadProcessStep`
 - WSP and CSP now also support AST-backed nested-function authoring:
   - nested `@w.task(...)` / `@w.mainloop(...)` functions with local
     `w.step(...)` bodies
   - nested `@c.process(...)` functions with local `c.get(...)`, `c.put(...)`,
     `c.compute(...)`, and `c.compute_step(...)` bodies
 - AST-backed WSP/CSP modules now mark `meta["frontend_capture"] == "ast"`
+- dialect-composed modules now go through `ProgramModule.compose(...)` and
+  `htp/ir/program/compose.py` instead of ad hoc `ProgramItems` rebuilding
 
 Code pointers for the implemented ingress path:
 
@@ -98,9 +104,11 @@ Code pointers for the implemented ingress path:
 - `htp/ir/frontends/__init__.py`
 - `htp/ir/frontends/ast_context.py`
 - `htp/ir/frontends/ast_handlers.py`
+- `htp/ir/frontends/ast_lowering.py`
 - `htp/ir/frontends/ast_visitor.py`
 - `htp/ir/dialects/wsp/frontends.py`
 - `htp/ir/dialects/csp/frontends.py`
+- `htp/ir/program/compose.py`
 - `htp/kernel.py`
 - `htp/compiler.py`
 
@@ -402,7 +410,10 @@ def pipeline(c):
 ```
 
 This path is parsed by the shared AST frontend substrate and lowered directly
-into the final `ProgramModule` for the recognized CSP authoring surface.
+into the final `ProgramModule` for the recognized CSP authoring surface. The
+shared lowering helpers in `htp/ir/frontends/ast_lowering.py` now keep WSP/CSP
+handler methods small and single-purpose instead of duplicating AST decoding in
+each dialect frontend.
 
 ### Workload-level routines
 

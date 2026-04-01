@@ -135,13 +135,15 @@ final “native Python first” answer.
 
 One real improvement is now in place: the current public frontend set
 (`kernel`, `routine`, `wsp`, and `csp`) lowers through `ProgramModule`
-entrypoints instead of dict-only compiler ingestion.
+entrypoints instead of dict-only compiler ingestion, WSP/CSP AST lowering now
+shares one helper substrate, and composed frontend modules no longer require
+manual `ProgramItems` surgery in examples.
 
 Current narrow points:
 
 - WSP still expresses stage plans through builder calls and symbolic step names.
-- CSP still relies on `compute_step("...")` metadata instead of authored
-  process-local program bodies.
+- CSP still relies too much on `compute_step("...")` metadata instead of richer
+  authored process-local program bodies.
 - flagship examples are now meaningful, but they still read more like
   structured schedule assembly than the best reference-calibrated Python DSL
   bodies.
@@ -152,9 +154,12 @@ Main code anchors:
 - `htp/routine.py`
 - `htp/wsp/__init__.py`
 - `htp/csp/__init__.py`
+- `htp/ir/frontends/ast_lowering.py`
+- `htp/ir/program/compose.py`
 - `examples/wsp_warp_gemm/demo.py`
 - `examples/wsp_littlekernel_pipelined_gemm/demo.py`
 - `examples/csp_channel_pipeline/demo.py`
+- `examples/ast_frontend_composability/demo.py`
 
 ### Backend depth
 

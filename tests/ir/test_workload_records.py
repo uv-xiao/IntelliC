@@ -25,9 +25,7 @@ def test_workload_ir_round_trips_typed_records() -> None:
                 attrs={"role": "producer"},
             ),
         ),
-        channels=(
-            WorkloadChannel(name="tiles", dtype="f32", capacity=2, protocol="fifo"),
-        ),
+        channels=(WorkloadChannel(name="tiles", dtype="f32", capacity=2, protocol="fifo"),),
         dependencies=(WorkloadDependency(src="dispatch", dst="combine"),),
         processes=(
             WorkloadProcess(
@@ -49,9 +47,7 @@ def test_workload_ir_round_trips_typed_records() -> None:
     rebuilt = workload_ir_from_payload(payload)
 
     assert rebuilt == workload
-    assert payload["channels"] == [
-        {"name": "tiles", "dtype": "f32", "capacity": 2, "protocol": "fifo"}
-    ]
+    assert payload["channels"] == [{"name": "tiles", "dtype": "f32", "capacity": 2, "protocol": "fifo"}]
     assert payload["dependencies"] == [{"src": "dispatch", "dst": "combine"}]
     assert payload["processes"][0]["steps"] == [
         {"kind": "compute", "name": "pack_tile"},

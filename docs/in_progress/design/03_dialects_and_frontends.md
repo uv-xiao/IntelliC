@@ -94,6 +94,7 @@ The frontend-definition substrate is now implemented in code:
 - a shared AST capture substrate now exists in:
   - `htp/ir/frontends/ast_context.py`
   - `htp/ir/frontends/ast_handlers.py`
+  - `htp/ir/frontends/ast_lowering.py`
   - `htp/ir/frontends/ast_visitor.py`
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
   in `htp/ir/frontends/__init__.py` (`resolve_frontend(...)`, `FrontendSpec.build(...)`)
@@ -110,11 +111,16 @@ The frontend-definition substrate is now implemented in code:
   - nested `@c.process(...)` local functions with local `c.get(...)`,
     `c.put(...)`, `c.compute(...)`, and `c.compute_step(...)` bodies
 - AST-backed WSP/CSP modules now record `meta["frontend_capture"] == "ast"`
+- workload semantic records now stay typed through this path:
+  `WorkloadChannel`, `WorkloadDependency`, `WorkloadProcess`,
+  `WorkloadProcessStep`
+- composed frontend modules now go through `ProgramModule.compose(...)` /
+  `htp/ir/program/compose.py` instead of manual `ProgramItems` rebuilding
 
 Remaining gap relative to this design document is now narrower:
 
-- richer typed schedule/stage/process local state still needs to migrate out of
-  generic attr payloads in some emitted task/process records
+- richer typed schedule/stage local state still needs to migrate out of
+  generic attr payloads in some emitted WSP task records
 - broader dialect/extension migration onto this frontend substrate is still open
 
 Code pointers for the implemented substrate:
@@ -123,6 +129,7 @@ Code pointers for the implemented substrate:
 - `htp/ir/frontends/__init__.py`
 - `htp/ir/frontends/ast_context.py`
 - `htp/ir/frontends/ast_handlers.py`
+- `htp/ir/frontends/ast_lowering.py`
 - `htp/ir/frontends/ast_visitor.py`
 - `htp/ir/dialects/wsp/frontends.py`
 - `htp/ir/dialects/csp/frontends.py`

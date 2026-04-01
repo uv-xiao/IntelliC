@@ -69,9 +69,7 @@ def resolve_surface_value(
 
 def resolved_keyword_map(call: ast.Call, context: ASTFrontendContext) -> dict[str, Any]:
     return {
-        item.arg: resolve_surface_value(item.value, context)
-        for item in call.keywords
-        if item.arg is not None
+        item.arg: resolve_surface_value(item.value, context) for item in call.keywords if item.arg is not None
     }
 
 

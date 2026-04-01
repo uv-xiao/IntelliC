@@ -161,7 +161,7 @@ end state.
   registered frontend rule instead of owning a parallel lowering body
 - WSP and CSP public specs now use typed top-level surface objects instead of
   raw dict payload fields before serialization
-- public frontend rules still reuse shared helpers in `htp/ir/frontend.py` for
+- public frontend rules still reuse shared helpers in `htp/ir/frontends/shared.py` for
   workload assembly, dialect activation metadata, and `ProgramModule`
   construction, and they still rebuild nested stage/process-step structure from
   payload-shaped attrs rather than the final node-first
@@ -169,9 +169,15 @@ end state.
 - a shared AST capture substrate now exists in:
   - `htp/ir/frontends/ast_context.py`
   - `htp/ir/frontends/ast_handlers.py`
+  - `htp/ir/frontends/ast_lowering.py`
   - `htp/ir/frontends/ast_visitor.py`
 - WSP and CSP now support AST-backed nested-function authoring that lowers
   directly into final `ProgramModule` state for the recognized authored form
+- workload semantic records are now typed for channels, dependencies,
+  processes, and process steps instead of remaining dict-owned inside
+  `WorkloadIR`
+- composed dialect examples now use `ProgramModule.compose(...)` /
+  `htp/ir/program/compose.py` instead of manual `ProgramItems` surgery
 - an explicit composability proof example now exists at
   `examples/ast_frontend_composability/`
 - a manifest-style dialect activation slice now exists for builtin frontend
@@ -234,7 +240,7 @@ end state.
 
 - `htp/ir/frontends/rules.py` — `FrontendBuildContext`, `FrontendRule`, `FrontendRuleResult`
 - `htp/ir/frontends/__init__.py` — `FrontendSpec`, registry, `resolve_frontend(...)`
-- `htp/ir/frontend.py` — shared builder helpers for routine/WSP/CSP
+- `htp/ir/frontends/shared.py` — shared builder helpers for routine/WSP/CSP
 - `htp/kernel.py` — first public surface with `rule=`-backed ingress
 - `htp/compiler.py` — compiler ingress routes through `FrontendSpec.build(...)`
 

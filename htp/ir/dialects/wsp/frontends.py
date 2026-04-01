@@ -11,7 +11,6 @@ from htp.ir.core.nodes import dependency, item_ref, task, task_graph
 from htp.ir.core.semantics import WorkloadDependency, WorkloadTask
 from htp.ir.frontends import (
     ASTFrontendVisitor,
-    FrontendSyntaxError,
     default_kernel_args,
     handles,
     literal_or_default,
@@ -28,7 +27,7 @@ from htp.ir.frontends.shared import FrontendWorkload, build_frontend_program_mod
 if TYPE_CHECKING:
     from htp.ir.program.module import ProgramModule
     from htp.kernel import KernelSpec
-    from htp.wsp import WSPScheduleSpec, WSPDependencySpec, WSPProgramSpec, WSPStageStep, WSPTaskSpec
+    from htp.wsp import WSPDependencySpec, WSPProgramSpec, WSPScheduleSpec, WSPStageStep, WSPTaskSpec
 
 
 def wsp_frontend_workload(surface: object) -> FrontendWorkload:
@@ -133,7 +132,7 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
     @handles(ast.FunctionDef, decorator="task")
     @handles(ast.FunctionDef, decorator="mainloop")
     def build_task(self, node: ast.FunctionDef, context) -> _PendingWSPTask:
-        from htp.wsp import WSPStageSpec, WSPStageStep, WSPTaskSpec
+        from htp.wsp import WSPStageSpec, WSPTaskSpec
 
         decorator = node.decorator_list[0]
         if not isinstance(decorator, ast.Call):
@@ -149,9 +148,9 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
             )
         )
         role = literal_or_none(keyword_map.get("role"))
-        task_args = ordered_resolved_values(sequence_values(keyword_map.get("args")), context) or default_kernel_args(
-            context.kernel_spec
-        )
+        task_args = ordered_resolved_values(
+            sequence_values(keyword_map.get("args")), context
+        ) or default_kernel_args(context.kernel_spec)
         stages: dict[str, list[WSPStageStep]] = {}
         for statement in node.body:
             if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Constant):
@@ -255,8 +254,8 @@ def _build_wsp_ast_program_module(
                 for index, arg in enumerate(task_spec.args)
             ),
             attrs=_task_attrs_payload(task_spec.attrs),
-            )
-            for task_spec in task_specs
+        )
+        for task_spec in task_specs
     )
     graph = task_graph(
         f"item.task_graph.{entry}",
