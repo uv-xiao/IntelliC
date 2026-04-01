@@ -30,6 +30,9 @@ documents. Together they define the joint redesign of:
 - `06_pr_closure_proof.md`
   - canonical proof example, pass chain, interpreter requirements, and the
     concrete merge bar for closing PR `#67`
+- `08_module_organization_and_code_quality.md`
+  - repository-wide ownership model, code-quality rules, and the refactor-first
+    module-organization contract for this branch
 
 ## Frozen principles
 
@@ -40,6 +43,8 @@ documents. Together they define the joint redesign of:
   executable or fail via structured replay diagnostics.
 - Builtin and extension features are both dialects using the same substrate.
 - Legacy parallel systems are not allowed to survive the migration.
+- Module ownership must be explicit; stringly semantic linkage and dict-owned
+  semantics are not acceptable end states for the redesigned substrate.
 
 ## Implementation rule
 

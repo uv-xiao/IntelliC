@@ -115,6 +115,38 @@ Keep responsibilities separated:
 
 Do not move backend-specific or MLIR-specific logic into unrelated layers.
 
+### Module organization is a contract
+
+For architecture work, file/module organization is not cleanup after the fact.
+It is part of the implementation contract.
+
+Before extending a subsystem, identify which layer owns each concern:
+
+- public authoring surface
+- typed semantics
+- serialization / payload conversion
+- registry / discovery
+- interpretation / execution
+- pass transformation
+- artifact emission / validation
+
+If one file owns multiple unrelated concerns, split it before adding more logic.
+Do not keep growing a monolithic module because it already exists.
+
+Strict rules:
+
+- do not implement semantic ownership with string refs when typed ids or typed
+  reference objects are viable
+- do not implement new semantic contracts as nested `dict[str, Any]` payloads
+  when a class or dataclass can own the contract
+- keep payload conversion at explicit serialization boundaries rather than
+  scattering `to_payload()` / `from_payload()` logic through public-surface and
+  pass code
+- keep public-surface modules focused on human authoring APIs; lowering,
+  registry, and serialization logic should live in dedicated substrate modules
+- keep interpreter code object-oriented and decomposed; do not collapse
+  execution back into one large procedural dispatcher
+
 ## 6. Contract-first development
 
 When changing a contract surface, update all of these together:

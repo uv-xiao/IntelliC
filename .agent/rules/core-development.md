@@ -42,3 +42,20 @@
 - Avoid monolithic procedural code in new substrate work; prefer object-owned
   behavior and explicit extension seams when they improve invariants and
   composability.
+
+## Module organization
+
+- Treat file/module organization as part of the contract in architecture work,
+  not as optional cleanup.
+- Before adding new logic, identify which module owns:
+  - public authoring
+  - typed semantics
+  - serialization
+  - registry/discovery
+  - interpretation
+  - pass logic
+  - artifact emission
+- If a file mixes several of those concerns, split it before extending it.
+- Do not keep growing a large existing module just because it already exists.
+- Keep payload conversion at explicit boundaries; do not scatter payload-shaped
+  semantic logic through public surfaces and passes.
