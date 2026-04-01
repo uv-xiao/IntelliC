@@ -6,7 +6,7 @@
 
 **Architecture:** Finish the redesign substrate first, then prove it with one canonical example. The remaining work is centered on four seams: (1) replace remaining nested WSP/CSP payload-owned structure with typed objects, (2) finish the common typed node/interpreter substrate required by the example, (3) implement the fixed pass chain over `ProgramModule`, and (4) add explicit checked-in normalized variant modules that match the staged artifacts.
 
-**Tech Stack:** Python dataclasses, `ProgramModule`, `htp.ir.nodes`, `htp.ir.node_exec`, `htp.ir.frontend_rules`, existing pass manager and artifact emitter, pytest, pre-commit, Pixi.
+**Tech Stack:** Python dataclasses, `ProgramModule`, `htp.ir.core.nodes`, `htp.ir.interpreters.entrypoints`, `htp.ir.frontends.rules`, existing pass manager and artifact emitter, pytest, pre-commit, Pixi.
 
 ---
 
@@ -36,9 +36,9 @@
   - Tile-and-stage rewrite and schedule/protocol enrichment helpers for the proof path.
 - `htp/passes/backend_ready.py`
   - Backend-ready rewrite pass for the canonical path.
-- `htp/ir/wsp_nodes.py`
+- `htp/ir/dialects/wsp.py`
   - Typed nested WSP stage/schedule node classes.
-- `htp/ir/csp_nodes.py`
+- `htp/ir/dialects/csp.py`
   - Typed nested CSP process-step/channel node classes.
 
 ### Modify
@@ -47,13 +47,13 @@
   - Replace remaining nested stage metadata payloads with typed stage/schedule objects.
 - `htp/csp/__init__.py`
   - Replace remaining nested process-step payloads with typed step objects.
-- `htp/ir/nodes.py`
+- `htp/ir/core/nodes.py`
   - Extend the common typed node hierarchy to cover the canonical example.
-- `htp/ir/node_exec.py`
+- `htp/ir/interpreters/entrypoints.py`
   - Split or extend object-oriented interpreters for kernel/task/process items and nested stmt/expr execution.
-- `htp/ir/interpreter.py`
+- `htp/ir/interpreters/registry.py`
   - Register and dispatch the new interpreter units instead of relying on broader payload-oriented paths.
-- `htp/ir/frontends.py`
+- `htp/ir/frontends/__init__.py`
   - Route canonical example frontend lowering into typed nested WSP/CSP objects.
 - `htp/passes/contracts.py`
   - Declare the new pass contracts and preservation/invalidation behavior.
@@ -61,7 +61,7 @@
   - Register the new pass chain for the canonical proof path.
 - `htp/passes/replay_program.py`
   - Ensure staged `program.py` emission for the canonical path matches the checked-in normalized modules closely enough for equivalence.
-- `htp/ir/render.py`
+- `htp/ir/program/render.py`
   - Render typed nested WSP/CSP and backend-ready structures into normalized Python.
 - `docs/design/compiler_model.md`
   - Sync final implemented object model and pass chain.
@@ -86,7 +86,7 @@
 ### Task 1: Type nested WSP stage structure
 
 **Files:**
-- Create: `htp/ir/wsp_nodes.py`
+- Create: `htp/ir/dialects/wsp.py`
 - Modify: `htp/wsp/__init__.py`
 - Test: `tests/test_public_surfaces.py`
 
@@ -128,7 +128,7 @@ Expected: FAIL with `NameError` / `AttributeError` because `WSPStageSpec` and ty
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `htp/ir/wsp_nodes.py`:
+Create `htp/ir/dialects/wsp.py`:
 
 ```python
 from __future__ import annotations
@@ -166,14 +166,14 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add htp/ir/wsp_nodes.py htp/wsp/__init__.py tests/test_public_surfaces.py
+git add htp/ir/dialects/wsp.py htp/wsp/__init__.py tests/test_public_surfaces.py
 git commit -m "feat: type nested wsp stage structure"
 ```
 
 ### Task 2: Type nested CSP process-step structure
 
 **Files:**
-- Create: `htp/ir/csp_nodes.py`
+- Create: `htp/ir/dialects/csp.py`
 - Modify: `htp/csp/__init__.py`
 - Test: `tests/test_public_surfaces.py`
 
@@ -208,7 +208,7 @@ Expected: FAIL because nested process steps are still payload-shaped.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `htp/ir/csp_nodes.py`:
+Create `htp/ir/dialects/csp.py`:
 
 ```python
 from __future__ import annotations
@@ -237,15 +237,15 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add htp/ir/csp_nodes.py htp/csp/__init__.py tests/test_public_surfaces.py
+git add htp/ir/dialects/csp.py htp/csp/__init__.py tests/test_public_surfaces.py
 git commit -m "feat: type nested csp process steps"
 ```
 
 ### Task 3: Extend the common typed node hierarchy for the canonical example
 
 **Files:**
-- Modify: `htp/ir/nodes.py`
-- Modify: `htp/ir/build.py`
+- Modify: `htp/ir/core/nodes.py`
+- Modify: `htp/ir/program/build.py`
 - Test: `tests/ir/test_nodes.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -270,7 +270,7 @@ Expected: FAIL because the common hierarchy does not yet cover the canonical exa
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `htp/ir/nodes.py`, introduce the missing common node classes:
+In `htp/ir/core/nodes.py`, introduce the missing common node classes:
 
 ```python
 @dataclass
@@ -308,15 +308,15 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add htp/ir/nodes.py htp/ir/build.py tests/ir/test_nodes.py
+git add htp/ir/core/nodes.py htp/ir/program/build.py tests/ir/test_nodes.py
 git commit -m "feat: extend typed nodes for closure proof"
 ```
 
 ### Task 4: Split the interpreter into object-owned units
 
 **Files:**
-- Modify: `htp/ir/node_exec.py`
-- Modify: `htp/ir/interpreter.py`
+- Modify: `htp/ir/interpreters/entrypoints.py`
+- Modify: `htp/ir/interpreters/registry.py`
 - Test: `tests/ir/test_program_module_flow.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -342,7 +342,7 @@ Expected: FAIL because interpreter provenance is not exposed and/or execution is
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `htp/ir/node_exec.py`, split execution into explicit units:
+In `htp/ir/interpreters/entrypoints.py`, split execution into explicit units:
 
 ```python
 class ExprEvaluator:
@@ -381,7 +381,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add htp/ir/node_exec.py htp/ir/interpreter.py tests/ir/test_program_module_flow.py
+git add htp/ir/interpreters/entrypoints.py htp/ir/interpreters/registry.py tests/ir/test_program_module_flow.py
 git commit -m "feat: split object-owned interpreter units"
 ```
 
@@ -420,7 +420,7 @@ Create `htp/passes/core_normalize.py`:
 ```python
 from __future__ import annotations
 
-from htp.ir.module import ProgramModule
+from htp.ir.program.module import ProgramModule
 
 
 def surface_to_core_normalize(module: ProgramModule) -> ProgramModule:
@@ -483,7 +483,7 @@ Create `htp/passes/tile_streamed_gemm.py` with narrowly-scoped helpers:
 ```python
 from __future__ import annotations
 
-from htp.ir.module import ProgramModule
+from htp.ir.program.module import ProgramModule
 
 
 def tile_and_stage_rewrite(module: ProgramModule) -> ProgramModule:
@@ -517,8 +517,8 @@ git commit -m "feat: add tile-streamed gemm rewrite passes"
 
 **Files:**
 - Create: `htp/passes/backend_ready.py`
-- Modify: `htp/ir/node_exec.py`
-- Modify: `htp/ir/interpreter.py`
+- Modify: `htp/ir/interpreters/entrypoints.py`
+- Modify: `htp/ir/interpreters/registry.py`
 - Test: `tests/passes/test_tile_streamed_gemm_pass_chain.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -546,7 +546,7 @@ Create `htp/passes/backend_ready.py`:
 ```python
 from __future__ import annotations
 
-from htp.ir.module import ProgramModule
+from htp.ir.program.module import ProgramModule
 
 
 def backend_ready_rewrite(module: ProgramModule) -> ProgramModule:
@@ -567,7 +567,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add htp/passes/backend_ready.py htp/ir/node_exec.py htp/ir/interpreter.py tests/passes/test_tile_streamed_gemm_pass_chain.py
+git add htp/passes/backend_ready.py htp/ir/interpreters/entrypoints.py htp/ir/interpreters/registry.py tests/passes/test_tile_streamed_gemm_pass_chain.py
 git commit -m "feat: add backend-ready rewrite path"
 ```
 
@@ -637,7 +637,7 @@ git commit -m "feat: add tile-streamed gemm closure proof example"
 
 **Files:**
 - Modify: `htp/passes/replay_program.py`
-- Modify: `htp/ir/render.py`
+- Modify: `htp/ir/program/render.py`
 - Test: `tests/ir/test_tile_streamed_gemm_flow.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -661,7 +661,7 @@ Expected: FAIL because staged rendering does not yet align with the checked-in v
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `htp/ir/render.py` and `htp/passes/replay_program.py`, normalize:
+In `htp/ir/program/render.py` and `htp/passes/replay_program.py`, normalize:
 
 - import ordering
 - constructor ordering
@@ -678,7 +678,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add htp/ir/render.py htp/passes/replay_program.py tests/ir/test_tile_streamed_gemm_flow.py
+git add htp/ir/program/render.py htp/passes/replay_program.py tests/ir/test_tile_streamed_gemm_flow.py
 git commit -m "feat: align staged variants with closure proof modules"
 ```
 

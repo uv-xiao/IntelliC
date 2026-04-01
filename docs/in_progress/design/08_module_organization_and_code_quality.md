@@ -11,11 +11,11 @@ Current quality problems are structural, not cosmetic:
 
 - `htp/kernel.py` owns public authoring, traced capture, payload assembly,
   IR/lowering glue, and helper logic in one large module.
-- `htp/ir/module.py` mixes typed semantic ownership with payload/state
+- `htp/ir/program/module.py` mixes typed semantic ownership with payload/state
   serialization and compatibility rebuilding.
-- `htp/ir/frontends.py` mixes registry concerns, builtin registrations, and
+- `htp/ir/frontends/__init__.py` mixes registry concerns, builtin registrations, and
   surface-specific lowering logic.
-- `htp/ir/node_exec.py` mixes execution environment, expression evaluation,
+- `htp/ir/interpreters/entrypoints.py` mixes execution environment, expression evaluation,
   statement execution, top-level interpreters, and report shaping.
 - several public-surface and IR modules still let dict payloads and string refs
   leak into semantic ownership instead of confining them to explicit
@@ -27,6 +27,64 @@ remain hard to extend, review, and safely modify.
 ## Required module ownership model
 
 HTP must be organized around explicit ownership, not convenience imports.
+
+## Required `htp/ir/` package layout
+
+The flat `htp/ir/` namespace is itself a defect. It mixes:
+
+- core substrate files
+- program-container files
+- frontend infrastructure
+- interpreter infrastructure
+- dialect-specific node files
+
+These must be split into subpackages.
+
+Target layout:
+
+- `htp/ir/program/`
+  - `module.py`
+  - `components.py`
+  - `serialization.py`
+  - `render.py`
+  - `build.py`
+- `htp/ir/core/`
+  - `nodes.py`
+  - `types.py`
+  - `layout.py`
+  - `ids.py`
+  - `maps.py`
+  - `aspects.py`
+  - `analysis.py`
+  - `identity.py`
+  - `semantics.py`
+  - `op_specs.py`
+- `htp/ir/frontends/`
+  - `registry.py`
+  - `builtin.py`
+  - `rules.py`
+  - `shared.py`
+  - `kernel.py`
+- `htp/ir/interpreters/`
+  - `registry.py`
+  - `runtime.py`
+  - `nodes.py`
+  - `entrypoints.py`
+- `htp/ir/dialects/`
+  - `registry.py`
+  - `wsp.py`
+  - `csp.py`
+
+This is not optional cleanup. It is part of the architecture contract.
+
+### Why this layout
+
+- `program/` isolates `ProgramModule` and staged-artifact ownership
+- `core/` isolates the typed IR substrate from authoring/runtime details
+- `frontends/` isolates lowering infrastructure from public-surface modules
+- `interpreters/` isolates execution machinery from the rest of the IR package
+- `dialects/` prevents framework-specific typed nodes from polluting the same
+  namespace as core nodes
 
 ### 1. Public surface modules
 
@@ -55,7 +113,8 @@ They must not own:
 
 ### 2. IR substrate modules
 
-Files under `htp/ir/` own:
+Files under `htp/ir/core/`, `htp/ir/program/`, `htp/ir/frontends/`,
+`htp/ir/interpreters/`, and `htp/ir/dialects/` own:
 
 - typed semantic objects
 - identities / bindings / scopes / maps
@@ -155,7 +214,7 @@ implementation to match this ownership model.
 
 ### A. ProgramModule split
 
-`htp/ir/module.py` should stop owning every concern directly.
+`htp/ir/program/module.py` should stop owning every concern directly.
 
 Target split:
 
@@ -168,7 +227,7 @@ factored internally.
 
 ### B. Frontend registry split
 
-`htp/ir/frontends.py` should separate:
+`htp/ir/frontends/` should separate:
 
 - frontend registry
 - builtin frontend registration
@@ -179,7 +238,7 @@ payloads locally.
 
 ### C. Interpreter split
 
-`htp/ir/node_exec.py` should separate:
+`htp/ir/interpreters/` should separate:
 
 - execution environment
 - expression evaluation
@@ -200,23 +259,26 @@ should migrate out of them whenever they are not purely public-surface logic.
 
 Implemented now:
 
-- `htp/ir/module.py` is reduced to the public `ProgramModule` façade, while
+- the old flat modules have already been internally split by responsibility,
+  but not yet fully moved into the target subpackage hierarchy
+- `htp/ir/program/module.py` is reduced to the public `ProgramModule` façade, while
   program component ownership and payload/state conversion are split into:
   - `htp/ir/program_components.py`
   - `htp/ir/program_serialization.py`
-- `htp/ir/frontends.py` is reduced to the public frontend API surface, while
+- `htp/ir/frontends/__init__.py` is reduced to the public frontend API surface, while
   registry ownership and builtin-registration ownership are split into:
   - `htp/ir/frontend_registry.py`
   - `htp/ir/builtin_frontends.py`
-- `htp/ir/node_exec.py` is reduced to the interpreter-registration façade,
+- `htp/ir/interpreters/entrypoints.py` is reduced to the interpreter-registration façade,
   while runtime helpers and object-owned interpreter units are split into:
   - `htp/ir/node_runtime.py`
   - `htp/ir/node_interpreters.py`
 - kernel-to-`ProgramModule` lowering is no longer owned directly by
-  `htp/kernel.py`; it now lives in `htp/ir/kernel_frontend.py`
+  `htp/kernel.py`; it now lives in `htp/ir/frontends/kernel.py`
 
 Still open:
 
+- physical move from the flat namespace into the target subpackage hierarchy
 - further public-surface façade cleanup for routine/WSP/CSP
 - pass-side cleanup for the remaining large pass modules, especially where
   payload-oriented helper logic still sits beside typed-object pass behavior

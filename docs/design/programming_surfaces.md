@@ -63,16 +63,16 @@ payload, so staged artifacts can explain not only which dialects are active but
 also which frontend request produced that closure.
 
 Compiler ingress is now slightly more formal as well. Builtin public surfaces
-are registered in `htp/ir/frontends.py`, and `htp.compile_program(...)`
+are registered in `htp/ir/frontends/__init__.py`, and `htp.compile_program(...)`
 resolves them through frontend specs before falling back to older
 `to_program_module()` / `to_program()` probing.
 
 That frontend registry now has a rule-backed frontend-definition substrate:
 
 - a rule-backed frontend-definition substrate now exists in
-  `htp/ir/frontend_rules.py` (`FrontendRule`, `ProgramSurfaceRule`)
+  `htp/ir/frontends/rules.py` (`FrontendRule`, `ProgramSurfaceRule`)
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
-  in `htp/ir/frontends.py`
+  in `htp/ir/frontends/__init__.py`
 - builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
   surfaces now all use `rule=`-backed `FrontendSpec` registration
 - `to_program_module()` on routine/WSP/CSP now delegates back through that
@@ -86,8 +86,8 @@ That frontend registry now has a rule-backed frontend-definition substrate:
 
 Code pointers for the implemented ingress path:
 
-- `htp/ir/frontend_rules.py`
-- `htp/ir/frontends.py`
+- `htp/ir/frontends/rules.py`
+- `htp/ir/frontends/__init__.py`
 - `htp/ir/frontend.py`
 - `htp/kernel.py`
 - `htp/compiler.py`

@@ -1,41 +1,10 @@
-"""IR package."""
+"""HTP IR package.
 
-from . import (
-    analysis_state,
-    aspects,
-    build,
-    dialects,
-    frontend,
-    frontends,
-    identity_state,
-    ids,
-    interpreter,
-    layout,
-    maps,
-    module,
-    node_exec,
-    nodes,
-    semantics,
-    state,
-    types,
-)
+Subpackages:
 
-__all__ = [
-    "aspects",
-    "analysis_state",
-    "build",
-    "dialects",
-    "frontend",
-    "frontends",
-    "identity_state",
-    "ids",
-    "interpreter",
-    "layout",
-    "maps",
-    "module",
-    "node_exec",
-    "nodes",
-    "semantics",
-    "state",
-    "types",
-]
+- `core/` typed IR substrate
+- `program/` ProgramModule container and staged-program serialization
+- `frontends/` frontend registry and lowering substrate
+- `interpreters/` typed execution substrate
+- `dialects/` dialect registry and dialect-specific typed structures
+"""

@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from htp.ir.module import PROGRAM_MODULE_SCHEMA_ID, ProgramModule
-from htp.ir.render import render_program_module_payload
+from htp.ir.program.module import PROGRAM_MODULE_SCHEMA_ID, ProgramModule
+from htp.ir.program.render import render_program_module_payload
 from htp.schemas import REPLAY_STUBS_SCHEMA_ID
 
 from .validate import validate_path_component, validate_runnable_py

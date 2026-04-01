@@ -64,9 +64,9 @@ Implemented on this branch:
 - pass-contract preservation flags for Python renderability/executability
 - `ProgramModule`-backed in-memory pipeline state at committed pass boundaries
 - first typed IR-node slice:
-  - `htp.ir.nodes`
-  - `htp.ir.node_exec`
-  - `htp.ir.build`
+  - `htp.ir.core.nodes`
+  - `htp.ir.interpreters.entrypoints`
+  - `htp.ir.program.build`
   - now covering kernel, task-graph, and process-graph items with typed ids
 - `ProgramModule` now owns typed `KernelIR` / `WorkloadIR` objects rather than
   raw dicts for those semantic surfaces
@@ -82,9 +82,9 @@ Implemented on this branch:
   `htp/ir/frontend.py` (workload assembly, dialect activation metadata, and
   `ProgramModule` construction)
 - a rule-backed frontend-definition substrate now exists in
-  `htp/ir/frontend_rules.py`
+  `htp/ir/frontends/rules.py`
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
-  in `htp/ir/frontends.py` (`resolve_frontend(...)`, `ensure_builtin_frontends()`)
+  in `htp/ir/frontends/__init__.py` (`resolve_frontend(...)`, `ensure_builtin_frontends()`)
   and compiler ingress routes through `FrontendSpec.build(...)` in
   `htp/compiler.py`
 - builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public

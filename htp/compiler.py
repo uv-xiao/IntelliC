@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from htp.bindings.api import bind
-from htp.ir.dialects import activate_dialects, ensure_builtin_dialects
+from htp.ir.dialects.registry import activate_dialects, ensure_builtin_dialects
 from htp.ir.frontends import ensure_builtin_frontends, resolve_frontend
-from htp.ir.module import ProgramModule
+from htp.ir.program.module import ProgramModule
 from htp.pipeline.defaults import DefaultPipelineResult, run_default_pipeline
 from htp.solver import solve_default_pipeline, validate_final_artifacts
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from htp.ir.dialects import (
+from htp.ir.dialects.registry import (
     DialectActivation,
     DialectExports,
     DialectSpec,

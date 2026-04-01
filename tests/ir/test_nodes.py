@@ -1,16 +1,6 @@
 from __future__ import annotations
 
-from htp.ir.build import (
-    build_tile_streamed_gemm_core_module,
-    program_module_from_items,
-    program_module_from_kernels,
-)
-from htp.ir.node_exec import (
-    NODE_KERNEL_INTERPRETER_ID,
-    NODE_PROCESS_GRAPH_INTERPRETER_ID,
-    NODE_TASK_GRAPH_INTERPRETER_ID,
-)
-from htp.ir.nodes import (
+from htp.ir.core.nodes import (
     BinaryExpr,
     ForStmt,
     Kernel,
@@ -35,7 +25,17 @@ from htp.ir.nodes import (
     task_graph,
     to_payload,
 )
-from htp.ir.semantics import KernelIR, WorkloadIR, WorkloadTask
+from htp.ir.core.semantics import KernelIR, WorkloadIR, WorkloadTask
+from htp.ir.interpreters.entrypoints import (
+    NODE_KERNEL_INTERPRETER_ID,
+    NODE_PROCESS_GRAPH_INTERPRETER_ID,
+    NODE_TASK_GRAPH_INTERPRETER_ID,
+)
+from htp.ir.program.build import (
+    build_tile_streamed_gemm_core_module,
+    program_module_from_items,
+    program_module_from_kernels,
+)
 
 
 def test_kernel_node_payload_round_trip() -> None:

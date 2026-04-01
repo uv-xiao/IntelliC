@@ -39,7 +39,7 @@ extension boundaries.
 - [x] factor the public frontend `to_program_module()` path through a shared frontend-definition substrate instead of duplicating `ProgramModule` assembly per surface
 - [x] replace the flat builtin dialect list with manifest-style builtin dialect activation metadata and dependency closure
 - [x] formalize builtin public-surface ingress through a frontend registry substrate instead of only ad hoc `to_program_module()` probing
-- [x] implement a rule-backed frontend-definition substrate (`htp/ir/frontend_rules.py`) and migrate `htp.kernel` as the first rule-backed public surface
+- [x] implement a rule-backed frontend-definition substrate (`htp/ir/frontends/rules.py`) and migrate `htp.kernel` as the first rule-backed public surface
 - [ ] implement the PR-closing canonical tile-streamed GEMM proof with explicit committed variants
 - [ ] complete the typed pass chain required for that proof
 - [ ] complete the object-oriented interpreter structure required for that proof
@@ -48,8 +48,8 @@ extension boundaries.
 
 Code pointers for the implemented frontend-definition slice:
 
-- `htp/ir/frontend_rules.py` — rule-backed substrate
-- `htp/ir/frontends.py` — builtin `FrontendSpec` registry and `resolve_frontend(...)`
+- `htp/ir/frontends/rules.py` — rule-backed substrate
+- `htp/ir/frontends/__init__.py` — builtin `FrontendSpec` registry and `resolve_frontend(...)`
 - `htp/kernel.py` — first rule-backed builtin public surface
 - `htp/compiler.py` — compiler ingress routes through `FrontendSpec.build(...)`
 

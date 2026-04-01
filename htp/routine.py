@@ -10,7 +10,7 @@ from typing import Any
 
 from htp.compiler import parse_target
 from htp.ir.frontends import resolve_frontend
-from htp.ir.module import ProgramModule
+from htp.ir.program.module import ProgramModule
 from htp.kernel import KernelArgSpec, KernelSpec, KernelValue
 from htp.types import ChannelType, DType, dtype_name
 

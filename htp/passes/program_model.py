@@ -5,7 +5,7 @@ from typing import Any
 
 from htp.compiler_errors import compiler_error
 from htp.intrinsics import get_intrinsic_decl
-from htp.ir.layout import (
+from htp.ir.core.layout import (
     DistributionFacet,
     HardwareFacet,
     LayoutFacetProduct,
@@ -15,10 +15,9 @@ from htp.ir.layout import (
     join_distribution_facets,
     layout_to_payload,
 )
-from htp.ir.module import ProgramModule, ensure_program_module, program_dict_view
-from htp.ir.op_specs import get_op_spec, op_effects
-from htp.ir.semantics import KernelArg, KernelIR, KernelOp, WorkloadIR, WorkloadTask, to_payload
-from htp.ir.types import (
+from htp.ir.core.op_specs import get_op_spec, op_effects
+from htp.ir.core.semantics import KernelArg, KernelIR, KernelOp, WorkloadIR, WorkloadTask, to_payload
+from htp.ir.core.types import (
     BufferType,
     ChannelType,
     TensorType,
@@ -29,6 +28,7 @@ from htp.ir.types import (
     shape_from_sequence,
     type_to_payload,
 )
+from htp.ir.program.module import ProgramModule, ensure_program_module, program_dict_view
 from htp.schemas import IDS_BINDINGS_SCHEMA_ID, IDS_ENTITIES_SCHEMA_ID
 
 PROGRAM_AST_SCHEMA_ID = "htp.program_ast.v1"

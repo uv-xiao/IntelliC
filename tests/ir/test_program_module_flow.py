@@ -6,20 +6,20 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from htp.ir.analysis_state import AnalysisRecord
-from htp.ir.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
-from htp.ir.build import build_tile_streamed_gemm_core_module
-from htp.ir.identity_state import BindingTable, EntityTable, RewriteMap
-from htp.ir.interpreter import register_interpreter
-from htp.ir.module import (
+from htp.ir.core.analysis import AnalysisRecord
+from htp.ir.core.aspects import EffectsAspect, LayoutAspect, ScheduleAspect, TypesAspect
+from htp.ir.core.identity import BindingTable, EntityTable, RewriteMap
+from htp.ir.interpreters.entrypoints import NODE_PROGRAM_INTERPRETER_ID
+from htp.ir.interpreters.registry import register_interpreter
+from htp.ir.program.build import build_tile_streamed_gemm_core_module
+from htp.ir.program.module import (
     ProgramAspects,
     ProgramEntrypoint,
     ProgramIdentity,
     ProgramItems,
     ProgramModule,
 )
-from htp.ir.node_exec import NODE_PROGRAM_INTERPRETER_ID
-from htp.ir.render import render_program_module_payload
+from htp.ir.program.render import render_program_module_payload
 
 
 def test_program_module_definition_execution_and_transformation(tmp_path: Path) -> None:

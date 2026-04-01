@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from htp.ir.frontend import FrontendWorkload, build_frontend_program_module, kernel_spec_from_payload
-from htp.ir.module import ProgramModule
-from htp.ir.semantics import KernelIR, WorkloadTask
+from htp.ir.core.semantics import KernelIR, WorkloadTask
+from htp.ir.frontends.shared import FrontendWorkload, build_frontend_program_module, kernel_spec_from_payload
+from htp.ir.program.module import ProgramModule
 from htp.kernel import KernelSpec
 
 

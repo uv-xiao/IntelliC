@@ -4,10 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from htp.ir.build import program_module_from_items, program_module_from_kernels
-from htp.ir.frontends import resolve_frontend
-from htp.ir.node_exec import NODE_KERNEL_INTERPRETER_ID, NODE_PROCESS_GRAPH_INTERPRETER_ID
-from htp.ir.nodes import (
+from htp.ir.core.nodes import (
     BinaryExpr,
     ItemId,
     Kernel,
@@ -25,8 +22,11 @@ from htp.ir.nodes import (
     ref,
     region,
 )
-from htp.ir.render import render_program_module_payload
-from htp.ir.semantics import KernelIR, WorkloadIR, WorkloadTask
+from htp.ir.core.semantics import KernelIR, WorkloadIR, WorkloadTask
+from htp.ir.frontends import resolve_frontend
+from htp.ir.interpreters.entrypoints import NODE_KERNEL_INTERPRETER_ID, NODE_PROCESS_GRAPH_INTERPRETER_ID
+from htp.ir.program.build import program_module_from_items, program_module_from_kernels
+from htp.ir.program.render import render_program_module_payload
 from htp.kernel import KernelSpec
 
 

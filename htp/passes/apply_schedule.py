@@ -5,7 +5,7 @@ from copy import deepcopy
 from typing import Any
 
 from htp.artifacts.stages import RunnablePySpec
-from htp.ir.module import ProgramModule, program_dict_view
+from htp.ir.program.module import ProgramModule, program_dict_view
 from htp.passes.contracts import PassContract
 from htp.passes.manager import PassResult
 from htp.passes.program_model import scheduled_ops_from_plan, stage_payloads_from_program

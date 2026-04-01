@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from htp.ir.frontend_rules import FrontendBuildContext, FrontendRule, FrontendRuleResult
 from htp.ir.frontends import FrontendSpec
-from htp.ir.module import ProgramModule
+from htp.ir.frontends.rules import FrontendBuildContext, FrontendRule, FrontendRuleResult
+from htp.ir.program.module import ProgramModule
 
 
 class DemoSurface:

@@ -8,7 +8,7 @@ from typing import Any
 from htp.artifacts.stages import RunnablePySpec
 from htp.artifacts.state import state_ref
 from htp.compiler_errors import CompilerDiagnosticError
-from htp.ir.module import ProgramModule, program_dict_view
+from htp.ir.program.module import ProgramModule, program_dict_view
 from htp.passes.contracts import PassContract
 from htp.passes.manager import PassResult
 from htp.passes.program_model import build_type_layout_effects, normalize_target, stage_payloads_from_program

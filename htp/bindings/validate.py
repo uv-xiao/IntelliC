@@ -5,7 +5,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-from htp.ir.module import PROGRAM_MODULE_SCHEMA_ID
+from htp.ir.program.module import PROGRAM_MODULE_SCHEMA_ID
 from htp.schemas import (
     MANIFEST_SCHEMA_ID,
     REPLAY_STUBS_SCHEMA_ID,

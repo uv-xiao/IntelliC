@@ -10,7 +10,7 @@ from typing import Any
 from htp.artifacts.manifest import write_manifest
 from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
 from htp.compiler_errors import CompilerDiagnosticError, failure_payload
-from htp.ir.module import ProgramModule, ensure_program_module, program_dict_view
+from htp.ir.program.module import ProgramModule, ensure_program_module, program_dict_view
 from htp.passes import PassManager, PassResult
 from htp.passes.contracts import PassContract
 from htp.passes.program_model import stage_payloads_from_program

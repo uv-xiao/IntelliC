@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from htp.ir.module import ProgramModule
+from htp.ir.program.module import ProgramModule
 from htp.passes.replay_program import render_program_state_module
 
 
@@ -9,7 +9,7 @@ def test_render_program_state_module_builds_program_module_surface():
     text = render_program_state_module(program)
 
     assert (
-        "from htp.ir.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule"
+        "from htp.ir.program.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule"
         in text
     )
     assert "PROGRAM_MODULE = ProgramModule(" in text

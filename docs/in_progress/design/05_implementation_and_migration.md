@@ -149,10 +149,10 @@ end state.
 - committed-stage analyses now use typed `AnalysisRecord` wrappers instead of
   raw dict ownership
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
-  in `htp/ir/frontends.py`, and `htp.compile_program(...)` routes ingress
+  in `htp/ir/frontends/__init__.py`, and `htp.compile_program(...)` routes ingress
   through `FrontendSpec.build(...)` in `htp/compiler.py`
 - a rule-backed frontend-definition substrate now exists in
-  `htp/ir/frontend_rules.py` and is used by `FrontendSpec.build(...)` to execute
+  `htp/ir/frontends/rules.py` and is used by `FrontendSpec.build(...)` to execute
   registered `FrontendRule` objects
 - builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
   surfaces are now all registered as `rule=`-backed frontend specs rather than
@@ -185,9 +185,9 @@ end state.
 - `ProgramModule` now uses typed analysis records, but not the fuller
   typed/dialect-aware analysis substrate planned in `02_ir_structure.md`
 - the first typed-node slice now exists under:
-  - `htp.ir.nodes`
-  - `htp.ir.node_exec`
-  - `htp.ir.build`
+  - `htp.ir.core.nodes`
+  - `htp.ir.interpreters.entrypoints`
+  - `htp.ir.program.build`
   and now covers kernel, task-graph, and process-graph items with typed ids and
   interpreter paths, but it still does not cover the fuller statement/control
   hierarchy planned in `02_ir_structure.md`
@@ -216,8 +216,8 @@ end state.
 
 ## Code pointers (frontend-definition substrate)
 
-- `htp/ir/frontend_rules.py` — `FrontendBuildContext`, `FrontendRule`, `FrontendRuleResult`
-- `htp/ir/frontends.py` — `FrontendSpec`, registry, `resolve_frontend(...)`
+- `htp/ir/frontends/rules.py` — `FrontendBuildContext`, `FrontendRule`, `FrontendRuleResult`
+- `htp/ir/frontends/__init__.py` — `FrontendSpec`, registry, `resolve_frontend(...)`
 - `htp/ir/frontend.py` — shared builder helpers for routine/WSP/CSP
 - `htp/kernel.py` — first public surface with `rule=`-backed ingress
 - `htp/compiler.py` — compiler ingress routes through `FrontendSpec.build(...)`

@@ -138,7 +138,7 @@ def test_replay_can_dispatch_to_program_module_entrypoint_without_module_level_f
     stage_record = _write_stage(
         package_dir,
         program_text="""
-from htp.ir.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
+from htp.ir.program.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule
 
 PROGRAM_MODULE = ProgramModule(
     items=ProgramItems(canonical_ast={}, kernel_ir={}, workload_ir={}),

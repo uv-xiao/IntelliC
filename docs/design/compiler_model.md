@@ -59,9 +59,9 @@ construction.
 That substrate is now rule-backed in code:
 
 - a rule-backed frontend-definition substrate now exists in
-  `htp/ir/frontend_rules.py` (`FrontendRule`, `ProgramSurfaceRule`)
+  `htp/ir/frontends/rules.py` (`FrontendRule`, `ProgramSurfaceRule`)
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
-  in `htp/ir/frontends.py`, and compiler ingress routes through
+  in `htp/ir/frontends/__init__.py`, and compiler ingress routes through
   `FrontendSpec.build(...)` in `htp/compiler.py`
 - builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
   surfaces now all use `rule=`-backed `FrontendSpec` registration
@@ -102,7 +102,7 @@ leaked dict-first semantics:
 - `analyses.*` are typed analysis-record wrappers
 
 The first typed-node substrate now also extends beyond a kernel-only proof
-case. `htp.ir.nodes` and `htp.ir.node_exec` cover:
+case. `htp.ir.core.nodes` and `htp.ir.interpreters.entrypoints` cover:
 - kernel items
 - task-graph items
 - process-graph items
@@ -169,7 +169,7 @@ This matters because the compiler is no longer relying on string encodings like 
 
 ### Op semantics
 
-The op registry in `htp/ir/op_specs.py` now provides explicit semantics for operations such as:
+The op registry in `htp/ir/core/op_specs.py` now provides explicit semantics for operations such as:
 - richer unary and binary elementwise operators
 - load/store
 - cast
@@ -214,14 +214,14 @@ future passes instead of hiding them in Python helper code alone.
 ## Coding pointers
 
 If you are working in this layer, start here:
-- `htp/ir/aspects.py` — typed aspect wrappers for committed-stage semantic state
-- `htp/ir/semantics.py` — core staged semantic dataclasses
-- `htp/ir/module.py` — `ProgramModule`, entrypoints, and typed stage ownership
-- `htp/ir/interpreter.py` — interpreter registry for committed stage execution
-- `htp/ir/render.py` — normalized staged Python rendering
-- `htp/ir/types.py` — structured type/value payloads
-- `htp/ir/layout.py` — layout helpers and payload structure
-- `htp/ir/op_specs.py` — operation semantics and metadata
+- `htp/ir/core/aspects.py` — typed aspect wrappers for committed-stage semantic state
+- `htp/ir/core/semantics.py` — core staged semantic dataclasses
+- `htp/ir/program/module.py` — `ProgramModule`, entrypoints, and typed stage ownership
+- `htp/ir/interpreters/registry.py` — interpreter registry for committed stage execution
+- `htp/ir/program/render.py` — normalized staged Python rendering
+- `htp/ir/core/types.py` — structured type/value payloads
+- `htp/ir/core/layout.py` — layout helpers and payload structure
+- `htp/ir/core/op_specs.py` — operation semantics and metadata
 - `htp/types.py` — public structured dtype/shape/distribution/channel surface
 - `htp/intrinsics.py` — intrinsic declarations and handler registration
 - `htp/passes/program_model.py` — semantic synthesis from the current frontend/program surface

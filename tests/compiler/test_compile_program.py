@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 
 import htp
-from htp.ir.frontend_rules import FrontendBuildContext, FrontendRule, FrontendRuleResult
 from htp.ir.frontends import FrontendSpec, register_frontend
-from htp.ir.module import ProgramModule
+from htp.ir.frontends.rules import FrontendBuildContext, FrontendRule, FrontendRuleResult
+from htp.ir.program.module import ProgramModule
 from htp.pipeline.defaults import MANDATORY_PASS_IDS
 from tests.programs import nvgpu_serving_program, portable_vector_add_program, pto_vector_dag_program
 

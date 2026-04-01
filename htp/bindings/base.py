@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from htp.ir.module import ProgramModule
+from htp.ir.program.module import ProgramModule
 from htp.runtime.errors import ReplayDiagnosticError
 from htp.schemas import BINDING_LOG_SCHEMA_ID
 

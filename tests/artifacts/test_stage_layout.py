@@ -5,7 +5,7 @@ import pytest
 from htp.artifacts.stages import AnalysisSpec, RunnablePySpec, StageSpec, write_stage
 from htp.artifacts.validate import ArtifactValidationError
 from htp.ir.dialects import dialect_activation_payload
-from htp.ir.module import ProgramModule
+from htp.ir.program.module import ProgramModule
 
 
 def test_stubbed_stage_requires_replay_stubs_path(tmp_path):

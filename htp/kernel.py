@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from inspect import getclosurevars, signature
 from typing import Any
 
-from htp.ir.module import ProgramModule
+from htp.ir.program.module import ProgramModule
 from htp.types import (
     DType,
     TensorType,
@@ -261,7 +261,7 @@ class KernelSpec:
 
 
 def build_kernel_program_module(spec: KernelSpec) -> ProgramModule:
-    from htp.ir.kernel_frontend import build_kernel_program_module as lower_kernel_spec
+    from htp.ir.frontends.kernel import build_kernel_program_module as lower_kernel_spec
 
     return lower_kernel_spec(spec)
 

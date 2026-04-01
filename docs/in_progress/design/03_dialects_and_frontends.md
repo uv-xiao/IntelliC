@@ -66,11 +66,11 @@ sugar and JIT capture.
 
 The initial frontend-definition substrate is now implemented in code:
 
-- a rule-backed frontend-definition substrate now exists in `htp/ir/frontend_rules.py`
+- a rule-backed frontend-definition substrate now exists in `htp/ir/frontends/rules.py`
   (`FrontendBuildContext`, `FrontendRule`, `FrontendRuleResult`,
   `ProgramSurfaceRule`)
 - builtin public surfaces are resolved through registered `FrontendSpec` objects
-  in `htp/ir/frontends.py` (`resolve_frontend(...)`, `FrontendSpec.build(...)`)
+  in `htp/ir/frontends/__init__.py` (`resolve_frontend(...)`, `FrontendSpec.build(...)`)
 - builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
   surfaces now all use `rule=`-backed `FrontendSpec` registration rather than
   direct `build_program_module=` callbacks
@@ -87,8 +87,8 @@ Remaining gap relative to this design document:
 
 Code pointers for the implemented substrate:
 
-- `htp/ir/frontend_rules.py`
-- `htp/ir/frontends.py`
+- `htp/ir/frontends/rules.py`
+- `htp/ir/frontends/__init__.py`
 - `htp/ir/frontend.py`
 - `htp/kernel.py`
 - `htp/compiler.py`
