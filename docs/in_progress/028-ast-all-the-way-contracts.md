@@ -40,6 +40,9 @@ extension boundaries.
 - [x] replace the flat builtin dialect list with manifest-style builtin dialect activation metadata and dependency closure
 - [x] formalize builtin public-surface ingress through a frontend registry substrate instead of only ad hoc `to_program_module()` probing
 - [x] implement a rule-backed frontend-definition substrate (`htp/ir/frontend_rules.py`) and migrate `htp.kernel` as the first rule-backed public surface
+- [ ] implement the PR-closing canonical tile-streamed GEMM proof with explicit committed variants
+- [ ] complete the typed pass chain required for that proof
+- [ ] complete the object-oriented interpreter structure required for that proof
 
 Code pointers for the implemented frontend-definition slice:
 
@@ -55,6 +58,9 @@ Remaining gap:
   registry; WSP/CSP public specs now also use typed top-level surface objects,
   but the rules still rebuild nested stage/process-step attrs rather than the
   final node-first rule/combinator frontend-definition API.
+- PR closure is now defined by `docs/in_progress/design/06_pr_closure_proof.md`,
+  and the canonical tile-streamed GEMM proof plus its typed pass/interpreter
+  chain are still open.
 
 ## Code Surfaces
 

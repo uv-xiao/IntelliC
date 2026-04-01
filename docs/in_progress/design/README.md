@@ -27,6 +27,9 @@ documents. Together they define the joint redesign of:
     layout
 - `05_implementation_and_migration.md`
   - implementation-facing targets, migration order, and the no-legacy law
+- `06_pr_closure_proof.md`
+  - canonical proof example, pass chain, interpreter requirements, and the
+    concrete merge bar for closing PR `#67`
 
 ## Frozen principles
 
@@ -103,6 +106,8 @@ Still design-only or partial:
 - the full typed analysis substrate beyond the current generic record wrapper
 - full dialect migration beyond the current builtin frontend set
 - extension and dialect migration beyond the current public frontend set
+- the PR-closing tile-streamed GEMM proof directory and its four committed
+  variant modules described in `06_pr_closure_proof.md`
 
 So the redesign is not fully finished yet. The stage/execution contract slice
 is implemented; the full IR-definition and dialect-definition substrate is not.
