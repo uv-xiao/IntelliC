@@ -89,6 +89,7 @@ def _load_or_seed_manifest(package_path: Path, state: Mapping[str, Any]) -> dict
                 modes=("sim",),
                 program_text=render_program_state_module(state),
             ),
+            program_module_payload=payloads["program_module_payload"],
             analyses=(
                 AnalysisSpec(
                     analysis_id="htp_ext.aie::MappingPlan@1",
@@ -103,15 +104,6 @@ def _load_or_seed_manifest(package_path: Path, state: Mapping[str, Any]) -> dict
                     payload=dict(state["analysis"]["aie_fifo"]),
                 ),
             ),
-            program_ast_payload=payloads["program_ast_payload"],
-            kernel_ir_payload=payloads["kernel_ir_payload"],
-            workload_ir_payload=payloads["workload_ir_payload"],
-            types_payload=payloads["types_payload"],
-            layout_payload=payloads["layout_payload"],
-            effects_payload=payloads["effects_payload"],
-            schedule_payload=payloads["schedule_payload"],
-            entities_payload=payloads["entities_payload"],
-            bindings_payload=payloads["bindings_payload"],
         ),
     )
     return write_manifest(package_path, current_stage=stage_id, stages=[*existing_stages, stage])

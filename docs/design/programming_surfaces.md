@@ -44,6 +44,74 @@ These helpers deliberately lower into the same canonical program payload used by
 the compiler passes. They exist to keep public code readable without creating a
 second semantic ownership path.
 
+That path is now direct as well as readable. The public surface objects expose
+`to_program_module()`, and `htp.compile_program(...)` prefers that entry path
+over `to_program()`. In the current implementation this is true for:
+- `htp.kernel.KernelSpec`
+- `htp.routine.ProgramSpec`
+- `htp.wsp.WSPProgramSpec`
+- `htp.csp.CSPProgramSpec`
+
+Those frontend surfaces now share one common ingress helper in
+`htp/ir/frontends/shared.py`. Routine, WSP, and CSP no longer each hand-assemble a
+`ProgramModule`; they rebuild workload/process structure and dialect metadata
+through the same frontend-definition substrate.
+
+That metadata is now richer than a flat dialect name list. Public surfaces
+record a dependency-closed active dialect list plus a manifest-style activation
+payload, so staged artifacts can explain not only which dialects are active but
+also which frontend request produced that closure.
+
+Compiler ingress is now slightly more formal as well. Builtin public surfaces
+are registered in `htp/ir/frontends/__init__.py`, and `htp.compile_program(...)`
+resolves them through frontend specs before falling back to older
+`to_program_module()` / `to_program()` probing.
+
+That frontend registry now has a rule-backed frontend-definition substrate:
+
+- a rule-backed frontend-definition substrate now exists in
+  `htp/ir/frontends/rules.py` (`FrontendRule`, `ProgramSurfaceRule`)
+- a shared AST capture substrate now exists in:
+  - `htp/ir/frontends/ast_context.py`
+  - `htp/ir/frontends/ast_handlers.py`
+  - `htp/ir/frontends/ast_lowering.py`
+  - `htp/ir/frontends/ast_visitor.py`
+- builtin public surfaces are resolved through registered `FrontendSpec` objects
+  in `htp/ir/frontends/__init__.py`
+- builtin `htp.kernel`, `htp.routine`, `htp.wsp`, and `htp.csp` public
+  surfaces now all use `rule=`-backed `FrontendSpec` registration
+- `to_program_module()` on routine/WSP/CSP now delegates back through that
+  registered frontend rule instead of owning a separate lowering path
+- WSP and CSP public specs now carry typed top-level surface objects rather than
+  raw dict payload fields:
+  - `WSPTaskSpec`, `WSPDependencySpec`, `WSPScheduleSpec`
+  - `ChannelRef`, `CSPProcessSpec`, `CSPProcessStep`
+- the shared workload semantic layer is now typed as well:
+  - `WorkloadChannel`, `WorkloadDependency`, `WorkloadProcess`,
+    `WorkloadProcessStep`
+- WSP and CSP now also support AST-backed nested-function authoring:
+  - nested `@w.task(...)` / `@w.mainloop(...)` functions with local
+    `w.step(...)` bodies
+  - nested `@c.process(...)` functions with local `c.get(...)`, `c.put(...)`,
+    `c.compute(...)`, and `c.compute_step(...)` bodies
+- AST-backed WSP/CSP modules now mark `meta["frontend_capture"] == "ast"`
+- dialect-composed modules now go through `ProgramModule.compose(...)` and
+  `htp/ir/program/compose.py` instead of ad hoc `ProgramItems` rebuilding
+
+Code pointers for the implemented ingress path:
+
+- `htp/ir/frontends/rules.py`
+- `htp/ir/frontends/__init__.py`
+- `htp/ir/frontends/ast_context.py`
+- `htp/ir/frontends/ast_handlers.py`
+- `htp/ir/frontends/ast_lowering.py`
+- `htp/ir/frontends/ast_visitor.py`
+- `htp/ir/dialects/wsp/frontends.py`
+- `htp/ir/dialects/csp/frontends.py`
+- `htp/ir/program/compose.py`
+- `htp/kernel.py`
+- `htp/compiler.py`
+
 The important implementation decision is that public authoring is now traced
 from ordinary Python functions. A flagship example can therefore read like:
 
@@ -170,13 +238,27 @@ The current proof points include:
 - software-pipeline planning
 - shared lowering through the same pass manager and artifact model
 - decorator/builder authoring through `@wsp.program(...)`
+- AST-backed nested task authoring through `@wsp.program(...)`
+
+The current AST-all-the-way closure proof also now has one explicit checked-in
+example at `examples/tile_streamed_gemm_closure/`. It is intentionally not a
+generated artifact dump. The directory contains readable committed Python
+modules for:
+- the surface-authored module
+- the core IR module
+- the scheduled/protocol-enriched module
+- the backend-ready module
+
+This gives reviewers one stable place to inspect how public authoring,
+typed `ProgramModule` state, passes, and interpreter-driven execution fit
+together without digging through temporary stage directories.
 - task-oriented builders such as `.launch(...)`, `.mainloop(...)`, and `.after(...)`
 - per-task role and stage-plan helpers such as `.role(...)`, `.prologue(...)`,
   `.steady(...)`, and `.epilogue(...)`
 - schedule helpers such as `.tile(...)`, `.bind(...)`, `.pipeline(...)`,
   `.resources(...)`, and `.specialize(...)`
 - workload evidence that now carries task-level `attrs.role`,
-  `attrs.schedule`, and `attrs.stages` into `workload_ir.json`
+  `attrs.schedule`, and `attrs.stages` into `state.json#/items/workload_ir`
 
 The important change is that WSP is no longer only a global schedule wrapper.
 Public examples can now express a producer/mainloop/epilogue task graph in
@@ -195,6 +277,19 @@ with w.defaults(...):
 
 That structure survives into the staged workload artifacts instead of being
 only a comment in the example.
+
+WSP now also supports nested local task definitions as the human-first surface:
+
+```text
+@wsp.program(...)
+def tiled(w):
+    @w.task(task_id="load_tiles", role="producer")
+    def load_tiles():
+        w.step("cp_async", stage="prologue", source=w.args.A, target="a_tile")
+```
+
+The AST frontend captures these nested task functions directly and lowers them
+into the same `WSPProgramSpec` / `ProgramModule` contract as the builder path.
 
 Three concrete surface upgrades matter here:
 
@@ -271,10 +366,11 @@ values and routines instead of inventing parallel semantic roots.
 - deadlock/progress evidence
 - lowering into shared workload/effect state
 - decorator/builder authoring through `@csp.program(...)`
+- AST-backed nested process authoring through `@csp.program(...)`
 - bound kernel arguments via `p.args.<name>`
 - default kernel/argument capture for `p.process(...)`
 - fluent process builders such as `.process(...).role(...).compute_step(...).get(...).put(...)`
-- process-local step traces that survive into `workload_ir.json`
+- process-local step traces that survive into `state.json#/items/workload_ir`
 - public examples that now describe named dispatch/combine/writeback roles and
   protocol-local steps instead of assembling process dicts by hand
 - a richer four-process flagship pipeline (`dispatch`, `combine`, `finalize`,
@@ -299,6 +395,26 @@ Those authored process steps are not a second compiler substrate. They are
 process-level evidence attached to the shared workload model so replay,
 legality, and diagnostics can all point at the same structure.
 
+The same surface now also accepts nested local process definitions:
+
+```text
+@csp.program(...)
+def pipeline(c):
+    tiles = c.fifo("tiles", dtype="f32", capacity=2)
+
+    @c.process(task_id="dispatch", role="producer")
+    def dispatch():
+        tile = c.get(tiles)
+        c.compute("pack_tile", source=c.args.X, tile=tile)
+        c.put(tiles)
+```
+
+This path is parsed by the shared AST frontend substrate and lowered directly
+into the final `ProgramModule` for the recognized CSP authoring surface. The
+shared lowering helpers in `htp/ir/frontends/ast_lowering.py` now keep WSP/CSP
+handler methods small and single-purpose instead of duplicating AST decoding in
+each dialect frontend.
+
 ### Workload-level routines
 
 The repository also includes a workload-level serving routine example, which
@@ -317,6 +433,11 @@ anonymous nested dicts just to reach the workload semantic model.
 This is intentionally closer to the public feel of the `references/pypto/`,
 `references/arknife/`, and LittleKernel authoring examples, while still
 lowering into the shared HTP semantic substrate.
+
+The same is now true for the schedule- and protocol-facing surfaces. WSP and
+CSP no longer enter the pipeline only through raw payload dicts; they also
+lower through `ProgramModule` so the shared staged-object contract applies
+uniformly across the current public frontend set.
 
 ## Implemented testing baseline
 

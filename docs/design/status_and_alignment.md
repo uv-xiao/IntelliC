@@ -37,7 +37,7 @@ The repository is real and coherent.
 The strongest parts today are:
 
 - the Python-canonical compiler model,
-- staged semantic sidecars and replayable packages,
+- staged `ProgramModule` state bundles and replayable packages,
 - pass / solver / artifact discipline,
 - and the shared backend / extension contract structure.
 
@@ -59,8 +59,8 @@ The compiler model is the most aligned part of the repository.
 What is solid today:
 
 - Python-space remains the canonical stage form.
-- compilation stages emit explicit semantic sidecars for kernel, workload,
-  types, layout, effects, and schedule state.
+- compilation stages emit compact `ProgramModule` state bundles with explicit
+  kernel, workload, type, layout, effect, and schedule state.
 - identity and mapping are first-class artifacts instead of implicit Python
   object identity.
 - replay and semantic diff consume those staged artifacts directly.
@@ -68,16 +68,16 @@ What is solid today:
 Main code anchors:
 
 - `htp/compiler.py`
-- `htp/ir/semantics.py`
-- `htp/ir/types.py`
-- `htp/ir/layout.py`
+- `htp/ir/core/semantics/`
+- `htp/ir/core/types/`
+- `htp/ir/core/layout/`
 - `htp/passes/program_model.py`
 - `htp/passes/typecheck_layout_effects.py`
 
 What is still not fully proved is the stronger end-to-end rule that every
-global stage boundary, including extension/MLIR participation, comes back to a
-native-Python unparseable artifact that remains suitable for direct human
-editing and LLM-driven execution.
+global stage boundary is also served by equally strong frontend ergonomics. The
+committed-stage contract is now Python-owned and interpreter-backed, but WSP
+and CSP surface quality still keep the broader product goal open.
 
 ### Pipeline and solver
 
@@ -133,11 +133,17 @@ The kernel surface is in good shape. The routine surface is usable. The WSP and
 CSP surfaces are better than raw payload assembly, but they are not yet the
 final “native Python first” answer.
 
+One real improvement is now in place: the current public frontend set
+(`kernel`, `routine`, `wsp`, and `csp`) lowers through `ProgramModule`
+entrypoints instead of dict-only compiler ingestion, WSP/CSP AST lowering now
+shares one helper substrate, and composed frontend modules no longer require
+manual `ProgramItems` surgery in examples.
+
 Current narrow points:
 
 - WSP still expresses stage plans through builder calls and symbolic step names.
-- CSP still relies on `compute_step("...")` metadata instead of authored
-  process-local program bodies.
+- CSP still relies too much on `compute_step("...")` metadata instead of richer
+  authored process-local program bodies.
 - flagship examples are now meaningful, but they still read more like
   structured schedule assembly than the best reference-calibrated Python DSL
   bodies.
@@ -148,9 +154,12 @@ Main code anchors:
 - `htp/routine.py`
 - `htp/wsp/__init__.py`
 - `htp/csp/__init__.py`
+- `htp/ir/frontends/ast_lowering.py`
+- `htp/ir/program/compose.py`
 - `examples/wsp_warp_gemm/demo.py`
 - `examples/wsp_littlekernel_pipelined_gemm/demo.py`
 - `examples/csp_channel_pipeline/demo.py`
+- `examples/ast_frontend_composability/demo.py`
 
 ### Backend depth
 
@@ -209,7 +218,6 @@ The current broad reopened topic is:
 
 That file is now the correct place to track:
 
-- AST-all-the-way redesign work,
 - programming-surface quality gaps,
 - example realism gaps,
 - backend-depth gaps,

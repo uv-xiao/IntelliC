@@ -273,9 +273,9 @@ def test_nvgpu_wsp_example_codegen_records_symbolic_slice_views(tmp_path):
             / "ir"
             / "stages"
             / json.loads((package_dir / "manifest.json").read_text())["stages"]["current"]
-            / "kernel_ir.json"
+            / "state.json"
         ).read_text()
-    )
+    )["items"]["kernel_ir"]
     assert kernel_ir["ops"][0]["op"] == "slice"
     assert kernel_ir["ops"][0]["attrs"]["offset_exprs"] == ["0", "warp_stage * 16"]
 

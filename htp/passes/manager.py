@@ -19,18 +19,9 @@ class PassResult:
     analyses: dict[str, dict[str, Any]] = field(default_factory=dict)
     islands: tuple[dict[str, str], ...] = ()
     diagnostics: tuple[dict[str, Any], ...] = ()
-    program_ast_payload: dict[str, Any] = field(default_factory=dict)
-    kernel_ir_payload: dict[str, Any] = field(default_factory=dict)
-    workload_ir_payload: dict[str, Any] = field(default_factory=dict)
-    types_payload: dict[str, Any] = field(default_factory=dict)
-    layout_payload: dict[str, Any] = field(default_factory=dict)
-    effects_payload: dict[str, Any] = field(default_factory=dict)
-    schedule_payload: dict[str, Any] = field(default_factory=dict)
-    entities_payload: dict[str, Any] = field(default_factory=dict)
-    bindings_payload: dict[str, Any] = field(default_factory=dict)
+    program_module_payload: dict[str, Any] = field(default_factory=dict)
     entity_map_payload: dict[str, Any] | None = None
     binding_map_payload: dict[str, Any] | None = None
-    summary_payload: dict[str, Any] | None = None
     digests: dict[str, str | None] = field(default_factory=dict)
     stage_files: tuple[StageFile, ...] = ()
     time_ms: float = 0.0
@@ -89,15 +80,7 @@ class PassManager:
                 runnable_py=result.runnable_py,
                 analyses=analyses,
                 islands=islands,
-                program_ast_payload=result.program_ast_payload,
-                kernel_ir_payload=result.kernel_ir_payload,
-                workload_ir_payload=result.workload_ir_payload,
-                types_payload=result.types_payload,
-                layout_payload=result.layout_payload,
-                effects_payload=result.effects_payload,
-                schedule_payload=result.schedule_payload,
-                entities_payload=result.entities_payload,
-                bindings_payload=result.bindings_payload,
+                program_module_payload=result.program_module_payload,
                 entity_map_payload=self._normalize_map_payload(
                     payload=result.entity_map_payload,
                     schema=ENTITY_MAP_SCHEMA_ID,
@@ -114,7 +97,6 @@ class PassManager:
                     pass_id=contract.pass_id,
                     field_name="bindings",
                 ),
-                summary_payload=result.summary_payload,
                 digests=result.digests,
             ),
         )

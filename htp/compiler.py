@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from htp.bindings.api import bind
+from htp.ir.dialects.registry import activate_dialects, ensure_builtin_dialects
+from htp.ir.frontends import ensure_builtin_frontends, resolve_frontend
+from htp.ir.program.module import ProgramModule
 from htp.pipeline.defaults import DefaultPipelineResult, run_default_pipeline
 from htp.solver import solve_default_pipeline, validate_final_artifacts
 
@@ -28,6 +31,10 @@ class ProgramSurface(Protocol):
     def to_program(self) -> dict[str, Any]: ...
 
 
+class ProgramModuleSurface(Protocol):
+    def to_program_module(self) -> ProgramModule: ...
+
+
 def parse_target(target: str) -> TargetSpec:
     if not target or not isinstance(target, str):
         raise ValueError("target must be a non-empty string")
@@ -43,9 +50,17 @@ def compile_program(
     target: str,
     program: dict[str, Any] | ProgramSurface | None = None,
 ) -> CompiledPackage:
+    ensure_builtin_dialects()
+    ensure_builtin_frontends()
     target_spec = parse_target(target)
     package_path = Path(package_dir)
     pipeline_program = _normalize_program_input(program)
+    active_dialects = pipeline_program.get("meta", {}).get("active_dialects")
+    if isinstance(active_dialects, list):
+        activation = activate_dialects(*(str(item) for item in active_dialects))
+        pipeline_program.setdefault("meta", {})
+        pipeline_program["meta"]["active_dialects"] = list(activation.dialect_ids())
+        pipeline_program["meta"]["dialect_activation"] = activation.to_payload()
     target_payload = pipeline_program.get("target")
     if not isinstance(target_payload, dict) or not target_payload:
         target_payload = {}
@@ -92,18 +107,32 @@ def compile_program(
     )
 
 
-def _normalize_program_input(program: dict[str, Any] | ProgramSurface | None) -> dict[str, Any]:
+def _normalize_program_input(
+    program: dict[str, Any] | ProgramSurface | ProgramModuleSurface | ProgramModule | None,
+) -> dict[str, Any]:
     if program is None:
         return {}
+    if isinstance(program, ProgramModule):
+        return program.to_state_dict()
     if isinstance(program, dict):
         return dict(program)
+    frontend = resolve_frontend(program)
+    if frontend is not None:
+        module = frontend.build(program)
+        return module.to_state_dict()
+    to_program_module = getattr(program, "to_program_module", None)
+    if callable(to_program_module):
+        module = to_program_module()
+        if not isinstance(module, ProgramModule):
+            raise TypeError("program.to_program_module() must return a ProgramModule")
+        return module.to_state_dict()
     to_program = getattr(program, "to_program", None)
     if callable(to_program):
         payload = to_program()
         if not isinstance(payload, dict):
             raise TypeError("program.to_program() must return a dict payload")
         return dict(payload)
-    raise TypeError("program must be a dict or expose to_program()")
+    raise TypeError("program must be a dict, ProgramModule, or expose to_program_module()/to_program()")
 
 
 def _write_solver_failure(package_dir: Path, solver_result: object) -> None:

@@ -42,7 +42,7 @@ Passes, pipelines, and optional extension islands should be selected through exp
 
 ### 4. Artifacts and debug
 
-Compiler state must stay inspectable. Replay, staged sidecars, diagnostics, maps, traces, and codegen indices are not debugging accidents; they are part of the framework contract.
+Compiler state must stay inspectable. Replay, staged state bundles, diagnostics, maps, traces, and codegen indices are not debugging accidents; they are part of the framework contract.
 
 The key artifact rule is that intermediate artifacts are not only machine data.
 They are supposed to be readable, native-looking Python snapshots that a human
@@ -84,9 +84,11 @@ human + agent development loop
 
 ## Current implication
 
-This final story is stricter than the current implementation. The repository
-already proves the core direction, but the stronger “human + LLM friendly via
-AST all the way” rule now reopens product work under `docs/todo/`.
+This final story is stricter than the current implementation, but the
+committed-stage substrate now follows the rule materially: global stages are
+typed `ProgramModule` artifacts rendered back to normalized Python and executed
+through interpreter-backed replay. The remaining product work is now mostly in
+frontend quality, example realism, and backend breadth.
 
 ## Repository split
 

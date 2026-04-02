@@ -56,17 +56,27 @@ class DiagnosticContract:
 class RunnablePyContract:
     status: str = "preserves"
     modes: tuple[str, ...] = ("sim",)
+    preserves_python_renderability: bool = True
+    preserves_python_executability: bool = True
 
     def __post_init__(self) -> None:
         if self.status not in {"preserves", "stubbed"}:
             raise ValueError(f"Unsupported runnable_py status: {self.status}")
         if "sim" not in self.modes:
             raise ValueError("Pass contracts must keep stages runnable in sim mode")
+        if not self.preserves_python_renderability:
+            raise ValueError(
+                "Pass contracts must preserve Python renderability at committed stage boundaries"
+            )
+        if self.status == "preserves" and not self.preserves_python_executability:
+            raise ValueError("Preserved runnable_py stages must also preserve Python executability")
 
     def to_json(self) -> dict[str, object]:
         return {
             "status": self.status,
             "modes": list(self.modes),
+            "preserves_python_renderability": self.preserves_python_renderability,
+            "preserves_python_executability": self.preserves_python_executability,
         }
 
 

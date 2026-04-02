@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from htp.ir.ids import BindingRegistry, EntityRegistry, binding_id, entity_id, node_id
+from htp.ir.core.ids import BindingRegistry, EntityRegistry, binding_id, entity_id, node_id
 
 
 def test_entities_registry_is_deterministic():

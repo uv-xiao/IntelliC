@@ -113,15 +113,7 @@ def _load_or_seed_manifest(package_path: Path, state: Mapping[str, Any]) -> dict
                 program_text=render_program_state_module(state),
             ),
             analyses=(),
-            program_ast_payload=payloads["program_ast_payload"],
-            kernel_ir_payload=payloads["kernel_ir_payload"],
-            workload_ir_payload=payloads["workload_ir_payload"],
-            types_payload=payloads["types_payload"],
-            layout_payload=payloads["layout_payload"],
-            effects_payload=payloads["effects_payload"],
-            schedule_payload=payloads["schedule_payload"],
-            entities_payload=payloads["entities_payload"],
-            bindings_payload=payloads["bindings_payload"],
+            program_module_payload=payloads["program_module_payload"],
         ),
     )
     return write_manifest(package_path, current_stage=stage_id, stages=[*existing_stages, stage])
@@ -141,7 +133,7 @@ def _write_codegen_tree(package_dir: Path, *, state: Mapping[str, Any]) -> None:
             "source": reference_relpath,
             "function_name": f"launch_{entry}",
         },
-        "kernel_ir": "ir/stages/s01/semantic/kernel_ir.json",
+        "kernel_ir": "ir/stages/s01/state.json#/items/kernel_ir",
     }
     toolchain = {
         "schema": CPU_REF_TOOLCHAIN_SCHEMA_ID,

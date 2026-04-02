@@ -8,11 +8,13 @@ import pytest
 
 from examples.aie_channel_pipeline.demo import compile_example as compile_aie_example
 from examples.aie_channel_pipeline.demo import replay_latest_stage as replay_aie_stage
+from examples.ast_frontend_composability.demo import run_demo as run_ast_frontend_composability_demo
 from examples.csp_channel_pipeline.demo import compile_example as compile_csp_example
 from examples.csp_channel_pipeline.demo import replay_latest_stage as replay_csp_stage
 from examples.extensions.cpu_ref_vector_add.demo import compile_example as compile_cpu_ref_example
 from examples.extensions.cpu_ref_vector_add.demo import replay_latest_stage as replay_cpu_ref_stage
 from examples.extensions.cpu_ref_vector_add.demo import run_demo as run_cpu_ref_demo
+from examples.ir_program_module_flow.demo import run_demo as run_ir_program_module_demo
 from examples.mlir_cse_extension.demo import compile_example as compile_mlir_cse_example
 from examples.mlir_cse_extension.demo import replay_latest_stage as replay_mlir_cse_stage
 from examples.nvgpu_arknife_blackwell.demo import compile_example as compile_nvgpu_blackwell_example
@@ -34,6 +36,7 @@ from examples.pto_pypto_vector_dag.demo import replay_latest_stage as replay_pto
 from examples.pto_pypto_vector_dag.demo import run_demo as run_pto_vector_dag_demo
 from examples.serving_routine.demo import compile_example as compile_serving_example
 from examples.serving_routine.demo import replay_latest_stage as replay_serving_stage
+from examples.tile_streamed_gemm_closure.demo import run_demo as run_tile_streamed_gemm_closure_demo
 from examples.wsp_littlekernel_pipelined_gemm.demo import compile_example as compile_littlekernel_example
 from examples.wsp_littlekernel_pipelined_gemm.demo import replay_latest_stage as replay_littlekernel_stage
 from examples.wsp_warp_gemm.demo import compile_example as compile_wsp_example
@@ -269,6 +272,40 @@ def test_csp_example_compiles_and_replays(tmp_path):
     ]
 
 
+def test_ir_program_module_example_defines_executes_and_transforms():
+    summary = run_ir_program_module_demo()
+
+    assert summary == {
+        "base_result": 24,
+        "transformed_result": 23,
+        "base_typed_items": 1,
+        "transformed_kernel": "affine_mix_fused",
+        "rendered_has_program_module": True,
+        "process_graph": "affine_pipeline",
+        "process_roles": ["producer", "reducer"],
+        "frontend_rule_demo": True,
+    }
+
+
+def test_ir_program_module_example_reports_frontend_rule_proof() -> None:
+    summary = run_ir_program_module_demo()
+
+    assert summary["frontend_rule_demo"] is True
+
+
+def test_ast_frontend_composability_example_runs() -> None:
+    summary = run_ast_frontend_composability_demo()
+
+    assert summary["wsp_capture"] == "ast"
+    assert summary["csp_capture"] == "ast"
+    assert summary["task_ids"] == ["load_tiles", "mma_tiles"]
+    assert summary["process_ids"] == ["dispatch", "combine"]
+    assert summary["composed_interpreters"] == {
+        "task_graph": "TaskGraphInterpreter",
+        "process_graph": "ProcessGraphInterpreter",
+    }
+
+
 def test_aie_example_compiles_and_replays(tmp_path):
     package_dir = tmp_path / "aie_example"
     compile_summary = compile_aie_example(package_dir)
@@ -276,7 +313,7 @@ def test_aie_example_compiles_and_replays(tmp_path):
 
     assert compile_summary["target"] == {"backend": "aie", "option": "xdna2-npu1"}
     assert replay_summary["ok"] is True
-    assert replay_summary["analysis_index"]["analyses"] == [
+    assert replay_summary["analysis_inventory"] == [
         {
             "analysis_id": "htp_ext.aie::MappingPlan@1",
             "schema": "htp.analysis.aie_mapping_plan.v1",
@@ -457,3 +494,13 @@ def test_nvgpu_example_runs_real_device_path(tmp_path):
     assert summary["device_run"] is not None
     assert summary["device_run"]["ok"] is True
     assert summary["device_run"]["max_abs_error"] == 0.0
+
+
+def test_tile_streamed_gemm_closure_demo_runs_all_committed_variants() -> None:
+    summary = run_tile_streamed_gemm_closure_demo()
+
+    assert summary["surface"]["ok"] is True
+    assert summary["core"]["ok"] is True
+    assert summary["scheduled"]["ok"] is True
+    assert summary["backend_ready"]["ok"] is True
+    assert summary["backend_ready"]["process_graph"]["channels"][0]["channel_id"] == "chan.tile_stream"

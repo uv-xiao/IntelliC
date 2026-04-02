@@ -10,6 +10,7 @@ from typing import Any
 from htp.artifacts.manifest import write_manifest
 from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
 from htp.compiler_errors import CompilerDiagnosticError, failure_payload
+from htp.ir.program.module import ProgramModule, ensure_program_module, program_dict_view
 from htp.passes import PassManager, PassResult
 from htp.passes.contracts import PassContract
 from htp.passes.program_model import stage_payloads_from_program
@@ -26,7 +27,9 @@ from htp.solver import (
 @dataclass(frozen=True)
 class _PipelinePass:
     contract: PassContract
-    run: Callable[[Mapping[str, Any], Mapping[str, object]], tuple[dict[str, Any], PassResult]]
+    run: Callable[
+        [Mapping[str, Any], Mapping[str, object]], tuple[ProgramModule | dict[str, Any], PassResult]
+    ]
 
 
 @dataclass(frozen=True)
@@ -50,7 +53,7 @@ def run_default_pipeline(
     package_path = Path(package_dir)
     package_path.mkdir(parents=True, exist_ok=True)
 
-    program_state = deepcopy(dict(program or _example_program()))
+    program_state = ProgramModule.from_program_dict(deepcopy(dict(program or _example_program())))
     initial_payloads = stage_payloads_from_program(program_state)
     initial_stage = write_stage(
         package_path,
@@ -58,15 +61,7 @@ def run_default_pipeline(
             stage_id="s00",
             pass_id=None,
             runnable_py=RunnablePySpec(status="preserves", modes=("sim",)),
-            program_ast_payload=initial_payloads["program_ast_payload"],
-            kernel_ir_payload=initial_payloads["kernel_ir_payload"],
-            workload_ir_payload=initial_payloads["workload_ir_payload"],
-            types_payload=initial_payloads["types_payload"],
-            layout_payload=initial_payloads["layout_payload"],
-            effects_payload=initial_payloads["effects_payload"],
-            schedule_payload=initial_payloads["schedule_payload"],
-            entities_payload=initial_payloads["entities_payload"],
-            bindings_payload=initial_payloads["bindings_payload"],
+            program_module_payload=initial_payloads["program_module_payload"],
         ),
     )
     write_manifest(package_path, current_stage="s00", stages=[initial_stage])
@@ -76,22 +71,23 @@ def run_default_pipeline(
         stages=[initial_stage],
         current_stage="s00",
     )
-    solver_result = solve_default_pipeline(program=program_state)
+    solver_result = solve_default_pipeline(program=program_dict_view(program_state))
     if not solver_result.ok:
         failure_path = package_path / "ir" / "solver_failure.json"
         failure_path.parent.mkdir(parents=True, exist_ok=True)
         failure_path.write_text(json.dumps(solver_result.failure.to_json(), indent=2) + "\n")
         raise RuntimeError(f"Default pipeline is unsatisfied: {solver_result.failure.to_json()}")
     capability_state = build_initial_capability_state(
-        program=program_state,
+        program=program_dict_view(program_state),
         extension_results=solver_result.extension_results,
     )
     selected_passes = tuple(
-        _to_pipeline_pass(item) for item in resolve_passes(solver_result.pass_ids, program=program_state)
+        _to_pipeline_pass(item)
+        for item in resolve_passes(solver_result.pass_ids, program=program_dict_view(program_state))
     )
 
     for pipeline_pass in selected_passes:
-        next_program: dict[str, Any] | None = None
+        next_program: ProgramModule | None = None
         satisfaction = evaluate_contract_satisfaction(
             contract=pipeline_pass.contract,
             state=capability_state,
@@ -104,7 +100,9 @@ def run_default_pipeline(
 
         def execute(stage_before: dict[str, object]) -> PassResult:
             nonlocal next_program
-            next_program, result = pipeline_pass.run(program_state, stage_before=stage_before)
+            next_program, result = pipeline_pass.run(
+                program_dict_view(program_state), stage_before=stage_before
+            )
             return result
 
         next_state = apply_contract_to_state(
@@ -132,14 +130,14 @@ def run_default_pipeline(
         if next_program is None:
             raise RuntimeError(f"Pass {pipeline_pass.contract.pass_id} did not produce program state")
 
-        program_state = next_program
+        program_state = ensure_program_module(next_program)
         capability_state = next_state
 
     return DefaultPipelineResult(
         package_dir=package_path,
         current_stage=manager.current_stage,
         pass_ids=list(solver_result.pass_ids),
-        program=program_state,
+        program=program_state.to_state_dict(),
         stages=list(manager.stages),
     )
 

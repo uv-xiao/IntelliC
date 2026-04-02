@@ -1,5 +1,10 @@
-"""IR package."""
+"""HTP IR package.
 
-from . import ids, layout, maps, semantics, state, types
+Subpackages:
 
-__all__ = ["ids", "layout", "maps", "semantics", "state", "types"]
+- `core/` typed IR substrate
+- `program/` ProgramModule container and staged-program serialization
+- `frontends/` frontend registry and lowering substrate
+- `interpreters/` typed execution substrate
+- `dialects/` dialect registry and dialect-specific typed structures
+"""

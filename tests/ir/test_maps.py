@@ -1,5 +1,5 @@
-from htp.ir.ids import BindingRegistry, EntityRegistry
-from htp.ir.maps import BindingMap, EntityMap
+from htp.ir.core.ids import BindingRegistry, EntityRegistry
+from htp.ir.core.maps import BindingMap, EntityMap
 
 
 def test_binding_map_records_split_and_introduced_bindings():

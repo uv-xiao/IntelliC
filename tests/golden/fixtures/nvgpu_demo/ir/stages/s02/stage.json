@@ -1,0 +1,33 @@
+{
+  "schema": "htp.stage.v2",
+  "stage_id": "s02",
+  "pass_id": "pkg::backend_stub@1",
+  "entrypoints": [
+    {
+      "name": "run",
+      "kind": "stage_run"
+    }
+  ],
+  "executability": {
+    "status": "stubbed",
+    "modes": [
+      "sim"
+    ]
+  },
+  "aspect_inventory": [
+    "effects",
+    "layout",
+    "schedule",
+    "types"
+  ],
+  "analysis_inventory": [],
+  "rewrite_maps": {
+    "entity_map": false,
+    "binding_map": false
+  },
+  "paths": {
+    "program": "ir/stages/s02/program.py",
+    "state": "ir/stages/s02/state.json"
+  },
+  "diagnostics": []
+}

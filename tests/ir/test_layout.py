@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from htp.ir.layout import (
+from htp.ir.core.layout import (
     DistributionFacet,
     DistributionPlacement,
     distribution_from_payload,

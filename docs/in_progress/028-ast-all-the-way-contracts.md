@@ -1,0 +1,122 @@
+# AST-All-the-Way Contracts
+
+- ID: `028-ast-all-the-way-contracts`
+- Branch: `htp/feat-ast-all-the-way-contracts`
+- PR: `#67`
+- Status: `implementing`
+- Status: `verified-local`
+- Owner: `Codex`
+
+## Goal
+
+Turn the newly stated project objective into real compiler contracts. This
+feature is now a joint redesign of programming surfaces and the IR/artifact
+system: it should formalize what it means for HTP to be human-friendly and
+LLM-friendly through AST all the way, then thread that rule through the
+compiler model, programming surfaces, pass contracts, artifact surfaces, and
+extension boundaries.
+
+## Why
+
+- contract gap: the repo now states AST all the way as the primary project rule, but the implementation contracts do not yet enforce or expose that requirement consistently across programming surfaces, IR representation, passes, and extension boundaries
+- user-facing impact: without a clear contract, stage artifacts may remain replayable while still drifting away from native Python readability and editability
+- architectural reason: this is the first gap reopened by the design review and it should drive a joint redesign rather than a narrow replay-only adjustment
+
+## Scope Checklist
+
+- [x] write the redesign collection under `docs/in_progress/design/`
+- [x] define the normative AST-all-the-way contract at global stage boundaries
+- [x] define the flattened IR protocol around Python-AST carriers, composable aspects, and interpreters
+- [x] thread that contract through programming surfaces, pass surfaces, and extension-island surfaces
+- [x] add tests and example evidence for readable runnable stage artifacts after non-trivial rewrites
+- [x] make committed-stage replay execute through `ProgramModule.run(...)` instead of payload-return wrappers
+- [x] make pass contracts state Python renderability/executability preservation at committed stage boundaries
+- [x] add a human-facing example under `examples/` that demonstrates IR definition, execution, and transformation without test-style payload assembly
+- [x] start the typed IR-node substrate so the human-facing example is built on real typed IR objects rather than only dict-shaped semantic payloads
+- [x] migrate one real public frontend (`htp.kernel`) onto the new `ProgramModule` intake path
+- [x] replace dict-shaped aspect ownership for the committed-stage core with typed aspect wrappers
+- [x] migrate `htp.routine`, `htp.wsp`, and `htp.csp` onto the `ProgramModule` intake path
+- [x] factor the public frontend `to_program_module()` path through a shared frontend-definition substrate instead of duplicating `ProgramModule` assembly per surface
+- [x] replace the flat builtin dialect list with manifest-style builtin dialect activation metadata and dependency closure
+- [x] formalize builtin public-surface ingress through a frontend registry substrate instead of only ad hoc `to_program_module()` probing
+- [x] implement a rule-backed frontend-definition substrate (`htp/ir/frontends/rules.py`) and migrate `htp.kernel` as the first rule-backed public surface
+- [x] implement the PR-closing canonical tile-streamed GEMM proof with explicit committed variants
+- [x] complete the typed pass chain required for that proof
+- [x] complete the object-oriented interpreter structure required for that proof
+- [x] refactor the current codebase to follow an explicit module-ownership design before landing the remaining proof-path development
+- [x] encode strict agent rules against stringly semantic refs, dict-owned semantics, and multi-role monolithic architecture modules
+
+Code pointers for the implemented frontend-definition slice:
+
+- `htp/ir/frontends/rules.py` — rule-backed substrate
+- `htp/ir/frontends/__init__.py` — builtin `FrontendSpec` registry and `resolve_frontend(...)`
+- `htp/kernel.py` — first rule-backed builtin public surface
+- `htp/compiler.py` — compiler ingress routes through `FrontendSpec.build(...)`
+
+Remaining gap:
+
+- builtin public surfaces are now rule-backed through `FrontendSpec.build(...)`,
+  and routine/WSP/CSP now delegate `to_program_module()` back through that
+  registry; WSP/CSP public specs now also use typed top-level surface objects,
+  and WSP/CSP now support AST-backed nested-function authoring through the
+  shared AST frontend substrate; workload semantic records are now typed, and
+  composed dialect examples now go through `ProgramModule.compose(...)` rather
+  than manual `ProgramItems` surgery; the remaining frontend gap is now richer
+  typed nested schedule/stage/process-local state rather than the absence of
+  the AST frontend-definition API itself.
+- the final frontend-definition substrate must enforce dialect composability
+  across parse/capture, typed IR ownership, passes, interpreters, and artifact
+  rendering, and frontend AST handlers must stay small and single-purpose.
+- PR closure is now defined by `docs/in_progress/design/06_pr_closure_proof.md`.
+  The canonical tile-streamed GEMM proof now exists under
+  `examples/tile_streamed_gemm_closure/`, and the typed pass/interpreter chain
+  now exists under `htp/passes/` plus `htp/ir/interpreters/`.
+- the branch also needs the refactor-first cleanup defined in
+  `docs/in_progress/design/08_module_organization_and_code_quality.md` before
+  the remaining proof-path work should be considered mergeable.
+- that cleanup now includes the deeper `htp/ir/core/` and `htp/ir/dialects/`
+  package hierarchy. The remaining proof-path work is now mostly repository
+  integration: final doc/TODO sync, review, and merge hygiene.
+
+## Code Surfaces
+
+- producer: `htp/kernel.py`, `htp/routine.py`, `htp/wsp/`, `htp/csp/`, `htp/passes/`, `htp/pipeline/`, `htp/artifacts/`, `htp_ext/mlir_cse/`
+- validator/binding: `htp/tools.py`, replay/package verification surfaces as needed
+- tests: pipeline, replay, docs/process consistency
+- docs: `docs/design/`, `docs/todo/`, `docs/in_progress/`, `docs/in_progress/design/`, `README.md` only if the contract wording needs refinement
+
+## Test and Verification Plan
+
+Required:
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating bug or gap
+- [x] human-friendly example updated or added
+- [x] human-friendly IR-definition / execution / transformation example added under `examples/`
+- [x] `pixi run verify` or documented fallback
+
+Do not add low-signal tests. Each added test must defend a concrete contract, failure mode, or regression.
+
+## Documentation Plan
+
+- [x] update `docs/design/` for implemented behavior
+- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] update `docs/todo/` to narrow the AST-all-the-way gap
+- [x] sync the validated redesign from `docs/in_progress/design/` into `docs/design/compiler_model.md`, `docs/design/programming_surfaces.md`, and `docs/design/artifacts_replay_debug.md`
+- [ ] remove this file from `docs/in_progress/` before merge
+
+## Commit Plan
+
+1. create task file and clear stale prior task file
+2. write redesign docs under `docs/in_progress/design/`
+3. land AST-all-the-way programming-surface and IR contract changes
+4. land tests and example evidence
+5. sync docs and TODO narrowing
+6. rebase, review, and merge
+
+## Review Notes
+
+Reviewers should focus on whether the implementation really sharpens the joint
+programming-surface and IR contract rather than only rephrasing docs, and
+whether extension/MLIR boundaries still return to Python-owned global stage
+artifacts.

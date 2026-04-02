@@ -10,8 +10,12 @@ from . import (
     apply_software_pipeline,
     apply_warp_specialization,
     ast_canonicalize,
+    backend_ready,
     emit_package,
+    enrich_protocol,
     semantic_model,
+    surface_to_core,
+    tile_and_stage,
     typecheck_layout_effects,
 )
 from .contracts import AnalysisOutput, DiagnosticContract, PassContract, RunnablePyContract
@@ -36,9 +40,13 @@ __all__ = [
     "apply_schedule",
     "apply_warp_specialization",
     "ast_canonicalize",
+    "backend_ready",
     "build_pass_trace_event",
+    "enrich_protocol",
     "emit_package",
     "emit_pass_trace_event",
     "semantic_model",
+    "surface_to_core",
+    "tile_and_stage",
     "typecheck_layout_effects",
 ]

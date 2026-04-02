@@ -49,23 +49,12 @@ def test_manifest_contains_normalized_stage_records(tmp_path):
                 "program_py": "ir/stages/s00/program.py",
                 "stubs": None,
             },
-            "analysis_index": "ir/stages/s00/analysis/index.json",
-            "program_pyast": "ir/stages/s00/program.pyast.json",
-            "semantic": {
-                "kernel_ir": "ir/stages/s00/kernel_ir.json",
-                "workload_ir": "ir/stages/s00/workload_ir.json",
-                "types": "ir/stages/s00/types.json",
-                "layout": "ir/stages/s00/layout.json",
-                "effects": "ir/stages/s00/effects.json",
-                "schedule": "ir/stages/s00/schedule.json",
-            },
-            "ids": {
-                "entities": "ir/stages/s00/ids/entities.json",
-                "bindings": "ir/stages/s00/ids/bindings.json",
-            },
-            "maps": {
-                "entity_map": None,
-                "binding_map": None,
+            "program": "ir/stages/s00/program.py",
+            "stage": "ir/stages/s00/stage.json",
+            "state": "ir/stages/s00/state.json",
+            "rewrite_maps": {
+                "entity_map": False,
+                "binding_map": False,
             },
             "islands": [],
             "digests": {
@@ -74,7 +63,6 @@ def test_manifest_contains_normalized_stage_records(tmp_path):
                 "effects_hash": None,
                 "analysis_hash": None,
             },
-            "summary": "ir/stages/s00/summary.json",
         },
         {
             "id": "s01",
@@ -86,23 +74,12 @@ def test_manifest_contains_normalized_stage_records(tmp_path):
                 "program_py": "ir/stages/s01/program.py",
                 "stubs": "ir/stages/s01/replay/stubs.json",
             },
-            "analysis_index": "ir/stages/s01/analysis/index.json",
-            "program_pyast": "ir/stages/s01/program.pyast.json",
-            "semantic": {
-                "kernel_ir": "ir/stages/s01/kernel_ir.json",
-                "workload_ir": "ir/stages/s01/workload_ir.json",
-                "types": "ir/stages/s01/types.json",
-                "layout": "ir/stages/s01/layout.json",
-                "effects": "ir/stages/s01/effects.json",
-                "schedule": "ir/stages/s01/schedule.json",
-            },
-            "ids": {
-                "entities": "ir/stages/s01/ids/entities.json",
-                "bindings": "ir/stages/s01/ids/bindings.json",
-            },
-            "maps": {
-                "entity_map": None,
-                "binding_map": None,
+            "program": "ir/stages/s01/program.py",
+            "stage": "ir/stages/s01/stage.json",
+            "state": "ir/stages/s01/state.json",
+            "rewrite_maps": {
+                "entity_map": False,
+                "binding_map": False,
             },
             "islands": [],
             "digests": {
@@ -111,7 +88,6 @@ def test_manifest_contains_normalized_stage_records(tmp_path):
                 "effects_hash": None,
                 "analysis_hash": None,
             },
-            "summary": "ir/stages/s01/summary.json",
         },
     ]
 

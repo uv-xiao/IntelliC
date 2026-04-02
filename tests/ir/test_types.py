@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from htp.ir.types import (
+from htp.ir.core.types import (
     BufferType,
     ChannelType,
     DimExpr,

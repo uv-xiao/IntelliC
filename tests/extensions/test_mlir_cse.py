@@ -54,8 +54,6 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
     assert (package_dir / "ir" / "stages" / "s01" / "islands" / "mlir_cse" / "ledger.json").is_file()
     assert (package_dir / "ir" / "stages" / "s02" / "islands" / "mlir_cse" / "output.mlir").is_file()
     assert (package_dir / "ir" / "stages" / "s02" / "islands" / "mlir_cse" / "import_summary.json").is_file()
-    assert (package_dir / "ir" / "stages" / "s02" / "islands" / "mlir_cse" / "entity_map.json").is_file()
-    assert (package_dir / "ir" / "stages" / "s02" / "islands" / "mlir_cse" / "binding_map.json").is_file()
 
     import_summary = json.loads((package_dir / "extensions" / "mlir_cse" / "import_summary.json").read_text())
     assert import_summary["rewrites"] == [
@@ -117,7 +115,9 @@ def test_mlir_cse_extension_round_trips_and_replays(tmp_path):
         ],
         "entry": "demo_kernel",
     }
-    kernel_ir = json.loads((package_dir / "ir" / "stages" / "s02" / "kernel_ir.json").read_text())
+    kernel_ir = json.loads((package_dir / "ir" / "stages" / "s02" / "state.json").read_text())["items"][
+        "kernel_ir"
+    ]
     assert kernel_ir["ops"] == [
         {
             "op_id": "op0",

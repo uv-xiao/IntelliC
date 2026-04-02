@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from inspect import getclosurevars, signature
 from typing import Any
 
+from htp.ir.program.module import ProgramModule
 from htp.types import (
     DType,
     TensorType,
@@ -254,6 +255,15 @@ class KernelSpec:
             "package": {"emitted": False},
             "entry_signature": {"shape_args": shape_args},
         }
+
+    def to_program_module(self) -> ProgramModule:
+        return build_kernel_program_module(self)
+
+
+def build_kernel_program_module(spec: KernelSpec) -> ProgramModule:
+    from htp.ir.frontends.kernel import build_kernel_program_module as lower_kernel_spec
+
+    return lower_kernel_spec(spec)
 
 
 _TRACE_RECORDER: ContextVar[_KernelTrace | None] = ContextVar("htp_kernel_trace_recorder", default=None)

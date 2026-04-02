@@ -3,6 +3,7 @@ import json
 import pytest
 
 from htp.artifacts.stages import RunnablePySpec, StageSpec, write_stage
+from htp.artifacts.state import load_stage_state
 from htp.passes.contracts import AnalysisOutput, PassContract
 from htp.passes.manager import PassManager, PassResult
 
@@ -98,23 +99,13 @@ def test_pass_trace_emits_normalized_event(tmp_path):
             "status": "preserves",
             "modes": ["sim"],
             "program_py": "ir/stages/s01/program.py",
+            "preserves_python_renderability": True,
+            "preserves_python_executability": True,
         },
         "dumps": {
-            "program_py": "ir/stages/s01/program.py",
-            "program_pyast": "ir/stages/s01/program.pyast.json",
-            "metadata": {
-                "kernel_ir": "ir/stages/s01/kernel_ir.json",
-                "workload_ir": "ir/stages/s01/workload_ir.json",
-                "types": "ir/stages/s01/types.json",
-                "layout": "ir/stages/s01/layout.json",
-                "effects": "ir/stages/s01/effects.json",
-                "schedule": "ir/stages/s01/schedule.json",
-            },
-            "ids": {
-                "entities": "ir/stages/s01/ids/entities.json",
-                "bindings": "ir/stages/s01/ids/bindings.json",
-            },
-            "analysis_index": "ir/stages/s01/analysis/index.json",
+            "program": "ir/stages/s01/program.py",
+            "stage": "ir/stages/s01/stage.json",
+            "state": "ir/stages/s01/state.json",
             "stubs": None,
         },
         "maps": {},
@@ -156,8 +147,14 @@ def test_pass_manager_normalizes_stage_maps(tmp_path):
         ),
     )
 
-    entity_map = json.loads((package_dir / stage_record["maps"]["entity_map"]).read_text())
-    binding_map = json.loads((package_dir / stage_record["maps"]["binding_map"]).read_text())
+    state_payload = load_stage_state(
+        package_dir,
+        {"stages": {"graph": [stage_record]}},
+        str(stage_record["id"]),
+    )
+    identity = state_payload["identity"]
+    entity_map = identity["entity_map"]
+    binding_map = identity["binding_map"]
 
     assert entity_map["pass_id"] == "pkg::mlir_import@1"
     assert entity_map["stage_before"] == "s00"

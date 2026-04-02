@@ -1,44 +1,71 @@
 from __future__ import annotations
 
-from htp.passes.program_model import snapshot_program
+from htp.ir.program.module import ProgramModule
 from htp.passes.replay_program import render_program_state_module
 
 
-def test_render_program_state_module_emits_readable_bindings():
-    program = {
-        "entry": "gemm_tile",
-        "kernel": {"name": "gemm_tile", "args": [], "ops": []},
-        "workload": {"entry": "gemm_tile", "tasks": [], "channels": [], "dependencies": []},
-        "target": {"backend": "nvgpu", "option": "ampere"},
+def test_render_program_state_module_builds_program_module_surface():
+    program = _demo_program()
+    text = render_program_state_module(program)
+
+    assert (
+        "from htp.ir.program.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule"
+        in text
+    )
+    assert "PROGRAM_MODULE = ProgramModule(" in text
+    assert "def program_state():" in text
+    assert "def program_module():" in text
+    assert "return PROGRAM_MODULE.run(" in text
+
+
+def test_program_module_snapshot_interpreter_keeps_program_dict_shape():
+    program = _demo_program()
+
+    module = ProgramModule.from_program_dict(program)
+
+    assert module.run() == module.to_program_dict()
+
+
+def _demo_program() -> dict[str, object]:
+    return {
+        "entry": "vector_add",
+        "canonical_ast": {"schema": "htp.program_ast.v1", "program": {"entry": "vector_add"}},
+        "kernel_ir": {
+            "schema": "htp.kernel_ir.v1",
+            "entry": "vector_add",
+            "args": [],
+            "buffers": [],
+            "ops": [],
+        },
+        "workload_ir": {
+            "schema": "htp.workload_ir.v1",
+            "entry": "vector_add",
+            "tasks": [],
+            "channels": [],
+            "dependencies": [],
+        },
+        "types": {"schema": "htp.types.v1", "values": {}, "buffers": {}},
+        "layout": {"schema": "htp.layout.v1", "memory_spaces": {}, "threading": {}, "tiling": {}},
+        "effects": {
+            "schema": "htp.effects.v1",
+            "reads": {},
+            "writes": {},
+            "barriers": [],
+            "channels": [],
+        },
+        "schedule": {"schema": "htp.schedule.v1", "ticks": [], "ordered_ops": [], "pipeline_depth": 0},
+        "analysis": {"schedule": {"schema": "htp.analysis.schedule_plan.v1", "ticks": []}},
+        "entities_payload": {
+            "schema": "htp.ids.entities.v1",
+            "def_id": "demo",
+            "entities": [],
+            "node_to_entity": [],
+        },
+        "bindings_payload": {
+            "schema": "htp.ids.bindings.v1",
+            "def_id": "demo",
+            "scopes": [],
+            "bindings": [],
+            "name_uses": [],
+        },
     }
-
-    rendered = render_program_state_module(program)
-
-    assert '"""Readable staged Python snapshot for HTP replay and debugging."""' in rendered
-    assert "ENTRY = 'gemm_tile'" in rendered
-    assert "KERNEL = " in rendered
-    assert "WORKLOAD = " in rendered
-    assert "TARGET = " in rendered
-    assert "def run(*args, **kwargs):" in rendered
-
-    namespace: dict[str, object] = {}
-    exec(rendered, namespace)
-    assert namespace["run"]() == snapshot_program(program)
-
-
-def test_render_program_state_module_handles_non_identifier_and_colliding_keys():
-    program = {
-        "a-b": {"value": 1},
-        "a_b": {"value": 2},
-        "123bad": {"value": 3},
-    }
-
-    rendered = render_program_state_module(program)
-
-    assert "A_B = {'value': 1}" in rendered
-    assert "A_B_1 = {'value': 2}" in rendered
-    assert "FIELD_123BAD = {'value': 3}" in rendered
-
-    namespace: dict[str, object] = {}
-    exec(rendered, namespace)
-    assert namespace["run"]() == snapshot_program(program)

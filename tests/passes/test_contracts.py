@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from htp.passes.contracts import AnalysisOutput, PassContract
+from htp.passes.contracts import AnalysisOutput, PassContract, RunnablePyContract
 
 
 def test_analysis_pass_declares_outputs_and_preserves_ast():
@@ -56,10 +56,17 @@ def test_analysis_pass_declares_outputs_and_preserves_ast():
         "runnable_py": {
             "status": "preserves",
             "modes": ["sim"],
+            "preserves_python_renderability": True,
+            "preserves_python_executability": True,
         },
         "deterministic": True,
         "diagnostics": [],
     }
+
+
+def test_runnable_py_contract_requires_renderable_executable_stage_boundaries():
+    with pytest.raises(ValueError, match="preserve Python renderability"):
+        RunnablePyContract(preserves_python_renderability=False)
 
 
 @pytest.mark.parametrize(

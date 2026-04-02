@@ -1,0 +1,33 @@
+{
+  "schema": "htp.stage.v2",
+  "stage_id": "s01",
+  "pass_id": "pkg::emit_package@1",
+  "entrypoints": [
+    {
+      "name": "run",
+      "kind": "stage_run"
+    }
+  ],
+  "executability": {
+    "status": "preserves",
+    "modes": [
+      "sim"
+    ]
+  },
+  "aspect_inventory": [
+    "effects",
+    "layout",
+    "schedule",
+    "types"
+  ],
+  "analysis_inventory": [],
+  "rewrite_maps": {
+    "entity_map": false,
+    "binding_map": false
+  },
+  "paths": {
+    "program": "ir/stages/s01/program.py",
+    "state": "ir/stages/s01/state.json"
+  },
+  "diagnostics": []
+}

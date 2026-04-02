@@ -9,6 +9,8 @@ from inspect import getclosurevars, signature
 from typing import Any
 
 from htp.compiler import parse_target
+from htp.ir.frontends import resolve_frontend
+from htp.ir.program.module import ProgramModule
 from htp.kernel import KernelArgSpec, KernelSpec, KernelValue
 from htp.types import ChannelType, DType, dtype_name
 
@@ -94,6 +96,12 @@ class ProgramSpec:
                 "dependencies": [dependency.to_payload() for dependency in self.dependencies],
             },
         }
+
+    def to_program_module(self) -> ProgramModule:
+        frontend = resolve_frontend(self)
+        if frontend is None:  # pragma: no cover - defensive registry failure
+            raise TypeError("No registered frontend for htp.routine.ProgramSpec")
+        return frontend.build(self)
 
 
 @dataclass

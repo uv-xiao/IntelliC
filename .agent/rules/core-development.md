@@ -12,6 +12,9 @@
 - Do not respond to failures by weakening tests or CI unless the repository contract intentionally changed.
 - Use Python 3.10+ idioms and explicit type annotations on public APIs.
 - Before merge, move landed behavior into `docs/design/`, update `docs/todo/README.md` plus any active `docs/todo/` feature file if one exists, and remove the corresponding file from `docs/in_progress/`.
+- For redesign work, do not keep legacy parallel systems alive after the new
+  substrate lands. Temporary migration shims are allowed only within the
+  feature branch and must be removed before merge.
 
 ## Example and test authoring
 
@@ -33,3 +36,33 @@
 - New public modules and public contract-facing APIs must be documented.
 - Add comments for invariants and non-obvious decisions, not for obvious lines.
 - Prefer explicit, human-readable names.
+- In architecture and IR work, avoid stringly-typed refs and dict-shaped
+  semantic programming when typed ids, classes, or dataclasses can own the
+  contract directly.
+- Avoid monolithic procedural code in new substrate work; prefer object-owned
+  behavior and explicit extension seams when they improve invariants and
+  composability.
+- Keep frontend AST handlers small and single-purpose; one handler should
+  recognize one local syntax form and lower one local construct.
+- Require dialect composability across parse/capture, typed IR ownership,
+  passes, interpreters, and artifact rendering. Features that only work in one
+  isolated dialect path do not clear review.
+- Allow cross-dialect cooperation only through explicit typed interfaces, not
+  ad hoc payload coupling or knowledge of another dialect's private helpers.
+
+## Module organization
+
+- Treat file/module organization as part of the contract in architecture work,
+  not as optional cleanup.
+- Before adding new logic, identify which module owns:
+  - public authoring
+  - typed semantics
+  - serialization
+  - registry/discovery
+  - interpretation
+  - pass logic
+  - artifact emission
+- If a file mixes several of those concerns, split it before extending it.
+- Do not keep growing a large existing module just because it already exists.
+- Keep payload conversion at explicit boundaries; do not scatter payload-shaped
+  semantic logic through public surfaces and passes.

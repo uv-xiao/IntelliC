@@ -15,14 +15,12 @@
           "program_py": "ir/stages/s01/program.py",
           "stubs": null
         },
-        "analysis_index": "ir/stages/s01/analysis/index.json",
-        "ids": {
-          "entities": "ir/stages/s01/ids/entities.json",
-          "bindings": "ir/stages/s01/ids/bindings.json"
-        },
-        "maps": {
-          "entity_map": null,
-          "binding_map": null
+        "program": "ir/stages/s01/program.py",
+        "stage": "ir/stages/s01/stage.json",
+        "state": "ir/stages/s01/state.json",
+        "rewrite_maps": {
+          "entity_map": false,
+          "binding_map": false
         },
         "islands": [],
         "digests": {
@@ -30,8 +28,7 @@
           "types_hash": null,
           "effects_hash": null,
           "analysis_hash": null
-        },
-        "summary": "ir/stages/s01/summary.json"
+        }
       }
     ]
   },

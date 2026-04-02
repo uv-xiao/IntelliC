@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Any
 
 from htp.artifacts.stages import RunnablePySpec
+from htp.ir.program.module import ProgramModule, program_dict_view
 from htp.passes.contracts import AnalysisOutput, PassContract
 from htp.passes.manager import PassResult
 from htp.passes.program_model import build_software_pipeline_plan, stage_payloads_from_program
@@ -32,11 +33,11 @@ CONTRACT = PassContract.analysis(
 
 
 def run(
-    program: Mapping[str, Any], *, stage_before: Mapping[str, object]
-) -> tuple[dict[str, Any], PassResult]:
+    program: ProgramModule | Mapping[str, Any], *, stage_before: Mapping[str, object]
+) -> tuple[ProgramModule, PassResult]:
     del stage_before
 
-    next_program = deepcopy(dict(program))
+    next_program = deepcopy(program_dict_view(program))
     pipeline_plan = build_software_pipeline_plan(
         entry=next_program["entry"],
         schedule_plan=next_program.get("analysis", {}).get("schedule", {}),
@@ -46,21 +47,14 @@ def run(
     analysis_state = dict(next_program.get("analysis", {}))
     analysis_state["software_pipeline"] = pipeline_plan
     next_program["analysis"] = analysis_state
-    stage_payloads = stage_payloads_from_program(next_program)
-    return next_program, PassResult(
+    next_module = ProgramModule.from_program_dict(next_program)
+    stage_payloads = stage_payloads_from_program(next_module)
+    return next_module, PassResult(
         runnable_py=RunnablePySpec(
-            status="preserves", modes=("sim",), program_text=render_program_state_module(next_program)
+            status="preserves", modes=("sim",), program_text=render_program_state_module(next_module)
         ),
         analyses={ANALYSIS_PATH: pipeline_plan},
-        entities_payload=stage_payloads["entities_payload"],
-        bindings_payload=stage_payloads["bindings_payload"],
-        program_ast_payload=stage_payloads["program_ast_payload"],
-        kernel_ir_payload=stage_payloads["kernel_ir_payload"],
-        workload_ir_payload=stage_payloads["workload_ir_payload"],
-        types_payload=stage_payloads["types_payload"],
-        layout_payload=stage_payloads["layout_payload"],
-        effects_payload=stage_payloads["effects_payload"],
-        schedule_payload=stage_payloads["schedule_payload"],
+        program_module_payload=stage_payloads["program_module_payload"],
         digests={"analysis_hash": "demo-software-pipeline-plan-v1"},
         time_ms=0.2,
     )

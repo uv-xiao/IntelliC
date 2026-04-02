@@ -72,11 +72,9 @@ class PassTraceEvent:
             },
             "runnable_py": dict(self.runnable_py),
             "dumps": {
-                "program_py": self.dumps.get("program_py"),
-                "program_pyast": self.dumps.get("program_pyast"),
-                "metadata": dict(self.dumps.get("metadata", {})),
-                "ids": dict(self.dumps.get("ids", {})),
-                "analysis_index": self.dumps.get("analysis_index"),
+                "program": self.dumps.get("program"),
+                "stage": self.dumps.get("stage"),
+                "state": self.dumps.get("state"),
                 "stubs": self.dumps.get("stubs"),
             },
             "maps": dict(self.maps),
@@ -95,14 +93,19 @@ def build_pass_trace_event(
     requires_satisfied: dict[str, Any] | None = None,
     state_delta: dict[str, list[str]] | None = None,
 ) -> PassTraceEvent:
-    maps_payload = {
-        key: value
-        for key, value in {
-            "entity_map": stage_after_record["maps"]["entity_map"],
-            "binding_map": stage_after_record["maps"]["binding_map"],
-        }.items()
-        if value is not None
-    }
+    state_path = str(stage_after_record["state"])
+    maps_payload = {}
+    rewrite_maps = stage_after_record.get("rewrite_maps", {})
+    if state_path and isinstance(rewrite_maps, dict):
+        if rewrite_maps.get("entity_map"):
+            maps_payload["entity_map"] = f"{state_path}#/identity/entity_map"
+        if rewrite_maps.get("binding_map"):
+            maps_payload["binding_map"] = f"{state_path}#/identity/binding_map"
+    elif state_path:
+        maps_payload = {
+            "entity_map": f"{state_path}#/identity/entity_map",
+            "binding_map": f"{state_path}#/identity/binding_map",
+        }
     return PassTraceEvent(
         pass_id=contract.pass_id,
         kind=contract.kind,
@@ -129,16 +132,13 @@ def build_pass_trace_event(
             "status": stage_after_record["runnable_py"]["status"],
             "modes": list(stage_after_record["runnable_py"]["modes"]),
             "program_py": stage_after_record["runnable_py"]["program_py"],
+            "preserves_python_renderability": contract.runnable_py.preserves_python_renderability,
+            "preserves_python_executability": contract.runnable_py.preserves_python_executability,
         },
         dumps={
-            "program_py": stage_after_record["runnable_py"]["program_py"],
-            "program_pyast": stage_after_record["program_pyast"],
-            "metadata": dict(stage_after_record.get("semantic", {})),
-            "ids": {
-                "entities": stage_after_record["ids"]["entities"],
-                "bindings": stage_after_record["ids"]["bindings"],
-            },
-            "analysis_index": stage_after_record["analysis_index"],
+            "program": stage_after_record["program"],
+            "stage": stage_after_record["stage"],
+            "state": stage_after_record["state"],
             "stubs": stage_after_record["runnable_py"]["stubs"],
         },
         maps=maps_payload,

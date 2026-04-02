@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from htp.artifacts.state import load_stage_state
 from htp.pipeline.defaults import run_default_pipeline
 from htp_ext.mlir_cse.import_ import import_program_from_module
 
@@ -101,8 +102,9 @@ def test_mlir_extension_writes_full_roundtrip_artifact_set(tmp_path: Path):
     assert (export_dir / "ledger.json").exists()
     assert (import_dir / "output.mlir").exists()
     assert (import_dir / "import_summary.json").exists()
-    assert (package_dir / "ir" / "stages" / import_stage["id"] / "maps" / "entity_map.json").exists()
-    assert (package_dir / "ir" / "stages" / import_stage["id"] / "maps" / "binding_map.json").exists()
+    import_state = load_stage_state(package_dir, manifest, str(import_stage["id"]))
+    assert import_state["identity"]["entity_map"]["schema"] == "htp.entity_map.v1"
+    assert import_state["identity"]["binding_map"]["schema"] == "htp.binding_map.v1"
 
 
 def test_mlir_extension_imports_transformed_output_mlir(tmp_path: Path):
@@ -112,12 +114,13 @@ def test_mlir_extension_imports_transformed_output_mlir(tmp_path: Path):
 
     export_stage = _stage_by_pass(manifest, "htp_ext.mlir_cse::export@1")
     import_stage = _stage_by_pass(manifest, "htp_ext.mlir_cse::import@1")
-    kernel_ir = json.loads((package_dir / import_stage["semantic"]["kernel_ir"]).read_text())
+    import_state = load_stage_state(package_dir, manifest, str(import_stage["id"]))
+    kernel_ir = import_state["items"]["kernel_ir"]
     import_summary = json.loads(
         (package_dir / import_stage["islands"][0]["dir"] / "import_summary.json").read_text()
     )
-    entity_map = json.loads((package_dir / import_stage["maps"]["entity_map"]).read_text())
-    binding_map = json.loads((package_dir / import_stage["maps"]["binding_map"]).read_text())
+    entity_map = import_state["identity"]["entity_map"]
+    binding_map = import_state["identity"]["binding_map"]
 
     assert len(kernel_ir["ops"]) == 2
     assert len(import_summary["rewrites"]) == 1
@@ -128,8 +131,8 @@ def test_mlir_extension_imports_transformed_output_mlir(tmp_path: Path):
     ]
     assert import_summary["identity_policy"]["entity"]["rebind"] == ["dup_expr_kernel:E1"]
     assert import_summary["map_refs"] == {
-        "entity_map": "maps/entity_map.json",
-        "binding_map": "maps/binding_map.json",
+        "entity_map": "state.json#/identity/entity_map",
+        "binding_map": "state.json#/identity/binding_map",
     }
     assert entity_map["schema"] == "htp.entity_map.v1"
     assert entity_map["pass_id"] == "htp_ext.mlir_cse::import@1"

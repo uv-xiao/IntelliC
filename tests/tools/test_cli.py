@@ -37,15 +37,15 @@ def test_cli_bisect_emits_json(tmp_path, capsys):
     compile_program(package_dir=right_dir, target="nvgpu-ampere", program=pto_vector_dag_program())
     manifest = json.loads((right_dir / "manifest.json").read_text())
     current_stage = manifest["stages"]["current"]
-    kernel_ir_path = (
+    state_path = (
         right_dir
-        / next(stage for stage in manifest["stages"]["graph"] if stage["id"] == current_stage)["semantic"][
-            "kernel_ir"
-        ]
+        / next(stage for stage in manifest["stages"]["graph"] if stage["id"] == current_stage)["state"]
     )
-    kernel_ir = json.loads(kernel_ir_path.read_text())
+    state = json.loads(state_path.read_text())
+    kernel_ir = state["items"]["kernel_ir"]
     kernel_ir["ops"][0]["attrs"]["operator"] = "mul"
-    kernel_ir_path.write_text(json.dumps(kernel_ir, indent=2) + "\n")
+    state["items"]["kernel_ir"] = kernel_ir
+    state_path.write_text(json.dumps(state, indent=2) + "\n")
 
     exit_code = main(["bisect", str(left_dir), str(right_dir)])
 

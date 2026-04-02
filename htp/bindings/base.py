@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from htp.ir.program.module import ProgramModule
 from htp.runtime.errors import ReplayDiagnosticError
 from htp.schemas import BINDING_LOG_SCHEMA_ID
 
@@ -324,7 +325,7 @@ class LoadResult:
                 ],
             )
 
-        if not hasattr(module, entry_name):
+        if not self._has_stage_entry(module, entry_name=entry_name):
             return (
                 False,
                 None,
@@ -340,7 +341,14 @@ class LoadResult:
             )
 
         try:
-            result = getattr(module, entry_name)(*args, **({} if kwargs is None else kwargs))
+            result = self._invoke_stage_entry(
+                module,
+                entry_name=entry_name,
+                args=args,
+                kwargs={} if kwargs is None else kwargs,
+                mode=mode,
+                trace=trace,
+            )
         except ReplayDiagnosticError as exc:
             diagnostic = dict(exc.payload)
             diagnostic["code"] = exc.code
@@ -364,6 +372,46 @@ class LoadResult:
             )
 
         return True, result, []
+
+    def _has_stage_entry(self, module: Any, *, entry_name: str) -> bool:
+        if hasattr(module, entry_name):
+            return True
+        program_module_fn = getattr(module, "program_module", None)
+        if not callable(program_module_fn):
+            return False
+        typed_module = program_module_fn()
+        if not isinstance(typed_module, ProgramModule):
+            return False
+        try:
+            typed_module.entrypoint(entry_name)
+        except KeyError:
+            return False
+        return True
+
+    def _invoke_stage_entry(
+        self,
+        module: Any,
+        *,
+        entry_name: str,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        mode: str,
+        trace: str,
+    ) -> Any:
+        if hasattr(module, entry_name):
+            return getattr(module, entry_name)(*args, **kwargs)
+        program_module_fn = getattr(module, "program_module", None)
+        if callable(program_module_fn):
+            typed_module = program_module_fn()
+            if isinstance(typed_module, ProgramModule):
+                return typed_module.run(
+                    *args,
+                    entry=entry_name,
+                    mode=mode,
+                    trace=trace,
+                    **kwargs,
+                )
+        raise AttributeError(f"Entrypoint {entry_name!r} is not defined")
 
     def _write_operation_log(
         self,

@@ -12,12 +12,14 @@ For every feature-sized change:
 2. choose a feature-sized gap from `docs/todo/README.md`
 3. create a branch named `htp/feat-<topic>`
 4. create a task file under `docs/in_progress/` using `docs/in_progress/TEMPLATE.md`
-5. make that task-file creation its own first commit
-6. open a PR from the feature branch to `htp/dev`
-7. land implementation as additional commits on that PR
-8. before merge:
+5. create a design document collection under `docs/in_progress/design/` before implementation when the feature changes architecture, IR shape, programming surfaces, passes, artifacts, or extension boundaries
+6. make task-file creation and design-doc creation the first commit(s) on the branch
+7. open a PR from the feature branch to `htp/dev`
+8. land implementation as additional commits on that PR
+9. before merge:
    - update `docs/design/` for what is now implemented
    - update `docs/todo/README.md` and any active `docs/todo/` feature file if one exists
+   - sync the final validated design from `docs/in_progress/design/` into the relevant `docs/design/` document(s)
    - remove the corresponding file from `docs/in_progress/`
    - rebase on current `htp/dev`
    - verify locally and wait for green CI
@@ -35,8 +37,20 @@ Before editing:
    - `.agent/rules/docs-and-artifacts.md`
    - `.agent/rules/testing-and-verification.md`
 4. if touching a backend, binding, runtime, replay path, artifact layout, or extension seam, read the corresponding doc in `docs/design/` and the relevant example-local `examples/**/README.md`
+5. if the feature is architectural, confirm that a design doc exists under `docs/in_progress/design/` and reflects the current intended implementation before touching code
 
 Do not begin with speculative edits.
+
+For design-first features, do not stop at a vague design note. Interactively
+confirm the major architecture decisions with the user and record those
+confirmed decisions in the active design file(s) under `docs/in_progress/design/`
+before implementation starts.
+
+For redesign and migration work, legacy parallel systems are not allowed to
+survive. Transitional adapters may exist only inside the feature branch while
+migrating, but they must be deleted before merge. Do not preserve replaced
+legacy contracts “for compatibility” if the redesign is supposed to supersede
+them.
 
 ## 3. Documentation structure
 
@@ -54,6 +68,7 @@ The `docs/` tree is strict.
 - `docs/in_progress/`
   - active feature-branch task files only
   - one file per feature PR
+  - `docs/in_progress/design/` holds active feature design docs that must be written before major architectural implementation
 - `docs/story.md`
   - the final intended framework story and target envelope
 - `docs/reference/`, `docs/research/`
@@ -83,6 +98,9 @@ Do not leave stale duplicates across `design`, `todo`, and `in_progress`.
   Python-owned stage artifact before the next global stage boundary.
 - Extension-owned functionality belongs under `htp_ext/` unless the design explicitly places it in core.
 - Ampere and Blackwell are profiles of the same `nvgpu` backend.
+- Dialect features must compose across parse/capture, typed IR ownership, pass
+  execution, interpreter execution, and artifact rendering. A feature that
+  works only in dialect isolation does not clear review.
 
 If a requested change weakens one of these rules, stop and resolve the conflict before coding.
 
@@ -99,6 +117,43 @@ Keep responsibilities separated:
 - `htp_ext/`: optional extension-owned functionality
 
 Do not move backend-specific or MLIR-specific logic into unrelated layers.
+
+### Module organization is a contract
+
+For architecture work, file/module organization is not cleanup after the fact.
+It is part of the implementation contract.
+
+Before extending a subsystem, identify which layer owns each concern:
+
+- public authoring surface
+- typed semantics
+- serialization / payload conversion
+- registry / discovery
+- interpretation / execution
+- pass transformation
+- artifact emission / validation
+
+If one file owns multiple unrelated concerns, split it before adding more logic.
+Do not keep growing a monolithic module because it already exists.
+
+Strict rules:
+
+- do not implement semantic ownership with string refs when typed ids or typed
+  reference objects are viable
+- do not implement new semantic contracts as nested `dict[str, Any]` payloads
+  when a class or dataclass can own the contract
+- keep payload conversion at explicit serialization boundaries rather than
+  scattering `to_payload()` / `from_payload()` logic through public-surface and
+  pass code
+- keep public-surface modules focused on human authoring APIs; lowering,
+  registry, and serialization logic should live in dedicated substrate modules
+- keep interpreter code object-oriented and decomposed; do not collapse
+  execution back into one large procedural dispatcher
+- keep frontend AST handlers small and single-purpose; one handler should
+  recognize one local syntax form and lower one local construct
+- keep cross-dialect cooperation on explicit typed interfaces; do not couple
+  dialects through ad hoc payload conventions or knowledge of private helper
+  layouts from another dialect
 
 ## 6. Contract-first development
 
@@ -184,6 +239,13 @@ Specific requirements:
 - use explicit, semantic names; avoid opaque abbreviations and single-letter names unless mathematically standard
 - examples and tests should read top-to-bottom without forcing the reader to reconstruct hidden state from globals
 - `examples/` is part of the allowed feature-work corridor; public example changes are expected when they are part of the contract proof surface.
+- avoid stringly-typed semantic references in new architecture code when a
+  typed id or object reference is viable
+- avoid writing new program-facing logic around dict-shaped payload assembly
+  when a Python class or dataclass can own the contract instead
+- avoid flat, monolithic procedural code in new architecture work; prefer
+  object-oriented decomposition and explicit software-architecture patterns
+  when they make ownership, invariants, and extension points clearer
 
 ## 9. Testing and CI discipline
 

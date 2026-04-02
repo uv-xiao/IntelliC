@@ -206,8 +206,8 @@ def import_program_from_module(
         },
     }
     map_refs = {
-        "entity_map": "maps/entity_map.json",
-        "binding_map": "maps/binding_map.json",
+        "entity_map": "state.json#/identity/entity_map",
+        "binding_map": "state.json#/identity/binding_map",
     }
     return (
         imported_program,
