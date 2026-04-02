@@ -1,11 +1,33 @@
 # IR Infrastructure Review
 
-This document reviews the current HTP IR infrastructure as the starting point
-for the next product-gap PR. The purpose is not only to describe the code. It
-is to identify the specific infrastructure decisions that still prevent WSP,
-CSP, and staged artifacts from reading like native Python programs.
+This document has two jobs.
 
-## Why this review exists
+First, it is a source-of-truth description of HTP's current IR and compiler
+infrastructure: what the major objects are, how they relate, why the design
+exists, and what is novel about it. Second, it is the review document for the
+current PR scope: it identifies the specific infrastructure limits that still
+block more native-Python WSP/CSP authoring and more readable staged artifacts.
+
+It should be readable in two ways:
+
+- by a beginner who wants to understand what HTP's compiler stack is trying to
+  do and why it matters
+- by a contributor who needs concrete fix targets for the remaining
+  programming-surface work
+
+## Why this document exists
+
+HTP is not trying to be only another payload-to-backend translator. Its stated
+goal is stricter:
+
+- human-friendly compiler artifacts
+- LLM-friendly compiler artifacts
+- AST all the way
+
+That goal forces the IR/compiler infrastructure to carry more responsibility
+than a traditional hidden internal compiler IR. It is not enough for the
+compiler to be correct internally. The intermediate forms must also be visible,
+readable, runnable, and editable in Python space.
 
 The AST-all-the-way redesign landed the main substrate:
 
@@ -18,6 +40,32 @@ That is necessary, but it is not enough. Current flagship examples still expose
 too much builder ceremony and too much metadata choreography. The remaining
 problem is therefore not only “write prettier examples”. It is “find the IR
 infrastructure decisions that force those examples to stay metadata-shaped”.
+
+## HTP compiler stack in one picture
+
+```text
+human-authored Python
+        |
+        v
+frontend capture
+        |
+        v
+typed ProgramModule
+  - items
+  - aspects
+  - analyses
+  - identity
+        |
+        +--> passes transform or enrich ProgramModule
+        |
+        +--> interpreters run ProgramModule
+        |
+        `--> renderer emits normalized Python + stage state
+```
+
+The key point is that HTP tries to keep one shared semantic owner at committed
+stage boundaries. Frontends, passes, interpreters, and artifacts all meet at
+`ProgramModule`.
 
 ## Review scope
 
@@ -33,6 +81,168 @@ authoring:
 
 This review deliberately excludes backend-depth questions. Those remain tracked
 under `docs/todo/alignment_and_product_gaps.md`.
+
+## Core design idea
+
+HTP's most important infrastructure decision is this:
+
+- the compiler should have one Python-owned semantic owner at committed stage
+  boundaries
+- frontends should lower into that owner
+- passes should transform that owner
+- interpreters should execute that owner
+- staged artifacts should reconstruct that owner
+
+That decision is the reason HTP can claim all of the following at once:
+
+- staged artifacts are not just debug dumps
+- replay is not a separate auxiliary tool
+- public surfaces and intermediate forms can stay close to each other
+- extension participation does not automatically become semantic ownership
+
+Without that decision, the project goal would collapse back into “nice
+documentation around hidden internal compiler state”.
+
+## Main infrastructure components
+
+### `htp/ir/core/`
+
+`htp/ir/core/` holds the shared substrate.
+
+It contains the types of things the compiler needs regardless of which frontend
+or dialect produced them:
+
+- ids and identity records
+- typed node models
+- semantic summaries such as `KernelIR` and `WorkloadIR`
+- aspect records for type/layout/effect/schedule
+- analysis records
+
+This is the part of the system that answers: “what are the common semantic
+shapes HTP understands no matter where they came from?”
+
+### `htp/ir/program/`
+
+`htp/ir/program/` owns the committed-stage program container:
+
+- `ProgramModule`
+- program components
+- rendering
+- serialization
+- composition helpers
+
+This is where HTP says: “here is the whole current program state, in a typed
+Python-owned form, ready for passes, interpretation, and staging”.
+
+### `htp/ir/frontends/`
+
+`htp/ir/frontends/` is the shared frontend-definition substrate.
+
+It owns:
+
+- frontend registration
+- frontend rules
+- AST capture context
+- AST handler registration
+- shared AST-lowering helpers
+- shared `ProgramModule` assembly helpers
+
+This is where HTP says: “different authored surfaces are allowed, but they must
+enter the compiler through one coherent frontend mechanism”.
+
+### `htp/ir/dialects/`
+
+Dialects are where feature-specific frontend and local semantic behavior lives.
+
+For the current review scope, the important dialects are:
+
+- `htp/ir/dialects/wsp/`
+- `htp/ir/dialects/csp/`
+
+The design intent is:
+
+- shared substrate in `core/`, `program/`, `frontends/`, `interpreters/`
+- dialect-specific local meaning in `dialects/<name>/`
+
+This is important because HTP should support dialect-specific syntax and local
+meaning without letting dialects become private compiler universes.
+
+### `htp/ir/interpreters/`
+
+`htp/ir/interpreters/` is the execution side of the contract.
+
+It proves that staged artifacts and typed IR are not only serializable; they are
+also runnable. That matters for both:
+
+- human debugging
+- LLM/tool replay
+
+The key design point is that interpretation is object-oriented and shared, not
+one monolithic giant switch.
+
+### `htp/passes/`
+
+Passes operate on the shared program owner and are responsible for preserving
+the stage boundary contract:
+
+- valid typed state
+- renderable staged Python
+- replayable execution
+
+This is where the compiler becomes more than a parser and renderer.
+
+## Why this design is important
+
+For a beginner, the novelty of HTP is not any single node type or surface
+syntax. The novelty is the combination of these properties:
+
+1. authored Python and intermediate Python are both first-class
+2. committed-stage semantic ownership stays in Python space
+3. replay is part of the compiler contract, not an afterthought
+4. extensions/dialects can participate without taking semantic ownership away
+
+Many compiler stacks can give you:
+
+- an internal IR
+- a frontend
+- a backend
+
+HTP is trying to give you something stricter:
+
+- a compiler whose visible intermediate forms remain part of the product
+  surface
+
+That is why the IR infrastructure matters so much. If the IR shape is wrong,
+every public surface will drift back toward encoded metadata.
+
+## Worked example: how one program flows through HTP
+
+At a high level, a program such as a tiled GEMM or process pipeline should flow
+like this:
+
+```text
+authored Python
+  -> frontend capture
+  -> ProgramModule
+  -> pass refinement
+  -> staged normalized Python
+  -> replay / interpretation
+```
+
+The same semantic owner should remain visible through that flow.
+
+For example:
+
+- WSP task-local structure should become real typed structure inside
+  `ProgramModule`
+- CSP process-local structure should become real typed structure inside
+  `ProgramModule`
+- staged Python should still read like the authored local structure, only in a
+  normalized form
+
+This is the point of AST all the way. It is not “use Python AST somewhere”.
+It is “make the compiler's public intermediate forms remain Python-owned,
+structured, and runnable throughout the flow”.
 
 ## What is already solid
 
@@ -180,5 +390,6 @@ should:
 ## Completion rule for this review
 
 This review is only useful if the listed barriers are removed in code. The
-document is not the end state. It is the explicit problem statement for the IR
-refinement, surface redesign, and example rewrite work that follows in this PR.
+document is not the end state. It is the explicit problem statement and current
+source-of-truth architecture reference for the IR refinement, surface redesign,
+and example rewrite work that follows in this PR.
