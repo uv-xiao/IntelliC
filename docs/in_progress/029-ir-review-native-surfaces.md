@@ -2,7 +2,7 @@
 
 - ID: `029-ir-review-native-surfaces`
 - Branch: `htp/feat-ir-review-native-surfaces`
-- PR: `TBD`
+- PR: `https://github.com/uv-xiao/htp/pull/68`
 - Status: `planned`
 - Owner: `Codex`
 
