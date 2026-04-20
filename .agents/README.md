@@ -1,4 +1,4 @@
-# ICI Agent Harness
+# IntelliC Agent Harness
 
 The harness is intentionally repo-local and Codex-readable through `AGENTS.md`.
 

@@ -1,4 +1,4 @@
-# ICI Documentation
+# IntelliC Documentation
 
 This tree separates implemented design, future work, active work, and reading evidence.
 

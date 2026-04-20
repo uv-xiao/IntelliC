@@ -1,6 +1,6 @@
 ---
 name: start-feature
-description: Start an ICI feature branch with task and design docs before implementation.
+description: Start an IntelliC feature branch with task and design docs before implementation.
 ---
 
 # Start Feature

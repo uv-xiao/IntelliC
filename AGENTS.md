@@ -1,6 +1,6 @@
-# ICI Agent Guide
+# IntelliC Agent Guide
 
-This file is the Codex entrypoint for the clean ICI branch.
+This file is the Codex entrypoint for the clean IntelliC branch.
 
 ## Read First
 

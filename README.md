@@ -1,6 +1,8 @@
-# ICI
+# IntelliC
 
-ICI is being rebuilt from a clean branch as a human- and LLM-friendly intelligent compiler infrastructure.
+IntelliC is being rebuilt from a clean branch as a human- and LLM-friendly
+intelligent compiler infrastructure. Use `intellic` for the package name and
+`ic` only where a very short local abbreviation is useful.
 
 The first project invariant is process quality: design, evidence, verification, and
 agent workflow come before compiler implementation.

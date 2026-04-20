@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: Prepare and publish an ICI pull request after local verification.
+description: Prepare and publish an IntelliC pull request after local verification.
 ---
 
 # Create PR

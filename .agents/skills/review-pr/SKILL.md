@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Perform a read-only PR or branch review using ICI risk and contract checks.
+description: Perform a read-only PR or branch review using IntelliC risk and contract checks.
 ---
 
 # Review PR
