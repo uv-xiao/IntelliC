@@ -29,7 +29,36 @@ def create_valid_repo(root: Path) -> None:
         "docs/notes/README.md",
     ):
         write_file(root, path, "# file\n")
-    write_file(root, "docs/in_progress/README.md", "# In Progress\n\n## Active Tasks\n\nNone.\n")
+    write_file(
+        root,
+        "docs/notes/README.md",
+        "\n".join(
+            (
+                "# Notes",
+                "",
+                "- Include diagrams, flowcharts, tables, and code sketches.",
+                "- Do not leave source readings as summary-only notes.",
+            )
+        ),
+    )
+    write_file(
+        root,
+        ".agents/skills/design-first/SKILL.md",
+        "\n".join(
+            (
+                "# Design First",
+                "",
+                "- Include concrete examples that show features during design.",
+                "- Convert examples into tests or evidence for implementation verification.",
+            )
+        ),
+    )
+    write_file(root, ".agents/templates/design.md", "# Design\n\n## Examples\n")
+    write_file(
+        root,
+        "docs/in_progress/README.md",
+        "# In Progress\n\n## Active Tasks\n\nNone.\n",
+    )
 
 
 class RepoHarnessPolicyTests(unittest.TestCase):
@@ -46,7 +75,10 @@ class RepoHarnessPolicyTests(unittest.TestCase):
             create_valid_repo(root)
             (root / ".codex").mkdir()
 
-            self.assertIn("prohibited harness directory exists: .codex", validate_repo(root))
+            self.assertIn(
+                "prohibited harness directory exists: .codex",
+                validate_repo(root),
+            )
 
     def test_stale_in_progress_design_fails_when_no_active_tasks(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -56,7 +88,54 @@ class RepoHarnessPolicyTests(unittest.TestCase):
 
             errors = validate_repo(root)
 
-            self.assertTrue(any("stale in-progress design docs" in error for error in errors))
+            self.assertTrue(
+                any("stale in-progress design docs" in error for error in errors)
+            )
+
+    def test_design_first_skill_requires_concrete_examples(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            create_valid_repo(root)
+            write_file(root, ".agents/skills/design-first/SKILL.md", "# Design First\n")
+
+            errors = validate_repo(root)
+
+            self.assertTrue(
+                any(
+                    "design-first skill must require concrete examples" in error
+                    for error in errors
+                )
+            )
+
+    def test_design_template_requires_examples_section(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            create_valid_repo(root)
+            write_file(root, ".agents/templates/design.md", "# Design\n")
+
+            errors = validate_repo(root)
+
+            self.assertTrue(
+                any(
+                    "design template must include ## Examples" in error
+                    for error in errors
+                )
+            )
+
+    def test_notes_readme_requires_rich_evidence_forms(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            create_valid_repo(root)
+            write_file(root, "docs/notes/README.md", "# Notes\n\n- extracted lessons\n")
+
+            errors = validate_repo(root)
+
+            self.assertTrue(
+                any(
+                    "docs/notes README must require rich evidence forms" in error
+                    for error in errors
+                )
+            )
 
 
 if __name__ == "__main__":

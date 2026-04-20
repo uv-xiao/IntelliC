@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the clean ICI repository harness shape."""
+"""Validate the clean IntelliC repository harness shape."""
 
 from __future__ import annotations
 
@@ -20,6 +20,11 @@ PROHIBITED_HARNESS_DIRS = (".codex", ".claude", ".opencode")
 
 def _has_ignore_entry(gitignore_text: str, entry: str) -> bool:
     return any(line.strip() == entry for line in gitignore_text.splitlines())
+
+
+def _has_all_terms(text: str, terms: tuple[str, ...]) -> bool:
+    lowered = text.lower()
+    return all(term in lowered for term in terms)
 
 
 def validate_repo(root: Path) -> list[str]:
@@ -58,8 +63,32 @@ def validate_repo(root: Path) -> list[str]:
         errors.append("docs/reference must not exist; use docs/notes")
     if (root / "docs/research").exists():
         errors.append("docs/research must not exist; use docs/notes")
-    if not (root / "docs/notes/README.md").is_file():
+    notes_readme = root / "docs/notes/README.md"
+    if not notes_readme.is_file():
         errors.append("missing docs/notes/README.md")
+    else:
+        notes_readme_text = notes_readme.read_text(encoding="utf-8")
+        if not _has_all_terms(
+            notes_readme_text,
+            ("diagrams", "flowcharts", "tables", "code", "summary-only"),
+        ):
+            errors.append("docs/notes README must require rich evidence forms")
+
+    design_first_skill = root / ".agents/skills/design-first/SKILL.md"
+    if not design_first_skill.is_file():
+        errors.append("missing .agents/skills/design-first/SKILL.md")
+    else:
+        design_first_text = design_first_skill.read_text(encoding="utf-8")
+        if not _has_all_terms(design_first_text, ("concrete examples", "show features")):
+            errors.append("design-first skill must require concrete examples that show features")
+        if not _has_all_terms(design_first_text, ("examples", "tests or evidence")):
+            errors.append("design-first skill must convert examples into tests or evidence")
+
+    design_template = root / ".agents/templates/design.md"
+    if not design_template.is_file():
+        errors.append("missing .agents/templates/design.md")
+    elif "## Examples" not in design_template.read_text(encoding="utf-8"):
+        errors.append("design template must include ## Examples")
 
     in_progress_readme = root / "docs/in_progress/README.md"
     design_root = root / "docs/in_progress/design"

@@ -24,3 +24,21 @@ lifecycle without bringing over legacy compiler implementation.
 - `.agents/rules/`
 - `.agents/skills/`
 - `scripts/check_repo_harness.py`
+
+## Design Examples And Evidence
+
+Architecture-changing design work must include concrete examples during the
+design phase. The examples may be small, but they must show real feature
+behavior.
+
+Each design example must map to implementation verification before coding
+starts. Preferred mappings are automated parser, round-trip, verifier,
+semantics, or artifact tests. If automation is not possible yet, the design
+must name the manual evidence or replay artifact that will prove the example.
+
+The harness policy check enforces this through:
+
+- `.agents/skills/design-first/SKILL.md`
+- `.agents/templates/design.md`
+- `scripts/check_repo_harness.py`
+- `tests/test_repo_harness.py`
