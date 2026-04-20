@@ -1,2 +1,4 @@
 .references/
 .repositories/
+__pycache__/
+*.py[cod]
