@@ -19,8 +19,9 @@ For every feature-sized change:
 9. before merge:
    - update `docs/design/` for what is now implemented
    - update `docs/todo/README.md` and any active `docs/todo/` feature file if one exists
-   - sync the final validated design from `docs/in_progress/design/` into the relevant `docs/design/` document(s)
+   - merge the final validated design from `docs/in_progress/design/` into `docs/design/` in a unified way: update existing broad-topic documents when they fit, add a new `docs/design/` document only when the material does not fit an existing topic, and remove or rewrite outdated design text rather than copying stale drafts forward
    - remove the corresponding file from `docs/in_progress/`
+   - remove the corresponding files from `docs/in_progress/design/`; a branch is not ready to merge while completed design drafts remain there
    - rebase on current `htp/dev`
    - verify locally and wait for green CI
 
@@ -69,6 +70,7 @@ The `docs/` tree is strict.
   - active feature-branch task files only
   - one file per feature PR
   - `docs/in_progress/design/` holds active feature design docs that must be written before major architectural implementation
+  - completed design docs must be merged into `docs/design/` and removed from `docs/in_progress/design/` before merge
 - `docs/story.md`
   - the final intended framework story and target envelope
 - `docs/reference/`, `docs/research/`

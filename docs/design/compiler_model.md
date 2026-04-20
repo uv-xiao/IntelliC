@@ -14,6 +14,10 @@ The result is a dual representation strategy:
 - typed semantic state is owned by `ProgramModule`,
 - and staged files expose that state through a compact `program.py` / `stage.json` / `state.json` contract.
 
+The cross-cutting AST-all-the-way contract is now consolidated in
+`docs/design/ast_all_the_way.md`. This document focuses on the implemented
+semantic model and typing substrate that make that contract executable.
+
 This is the implemented answer to a common compiler failure mode: when semantic facts live only in pass-local memory, the compiler becomes difficult to debug, retarget, or evolve. HTP instead emits the important semantic state into artifacts so both humans and tools can inspect it.
 
 ## Visual model
