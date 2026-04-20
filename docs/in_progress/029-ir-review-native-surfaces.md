@@ -36,7 +36,7 @@ programs from reading like native Python.
 - [x] rebuild WSP/CSP authoring on that refined IR
 - [x] rewrite `examples/ast_frontend_composability/demo.py` and flagship
       WSP/CSP examples against the refined surfaces
-- [ ] validate authored-surface readability, staged-artifact readability, and
+- [x] validate authored-surface readability, staged-artifact readability, and
       interpreter preservation with focused tests
 
 ## Code Surfaces

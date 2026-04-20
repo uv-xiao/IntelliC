@@ -43,7 +43,7 @@ The reopened work falls into four broad buckets:
       surface
 - [x] reduce remaining builder ceremony in flagship WSP/CSP examples without
       reintroducing raw payload assembly
-- [ ] ensure frontend and staged intermediate programs still read like native
+- [x] ensure frontend and staged intermediate programs still read like native
       Python after non-trivial schedule and protocol rewrites
 
 ### Examples

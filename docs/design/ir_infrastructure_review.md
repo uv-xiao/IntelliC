@@ -361,6 +361,8 @@ This PR rewrites the composability and flagship WSP/CSP examples toward:
 - nested CSP process functions with local bindings such as
   `packed = c.pack_tile(...)`
 - protocol calls that carry values, such as `c.put(partials, packed)`
+- staged `program.py` files with pretty-printed top-level `*_PAYLOAD` bindings
+  that reconstruct `ProgramModule`, instead of one long constructor line
 
 The implementation lesson is that changing only examples would have been
 cosmetic. The examples are readable because the IR and frontend can now own the
