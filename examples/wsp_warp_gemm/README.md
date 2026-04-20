@@ -10,8 +10,9 @@ It proves three implemented contracts:
 - each task can carry explicit stage-plan evidence such as `prologue`,
   `steady`, and `epilogue`, now emitted as structured step objects instead of
   only string markers.
-- the workload uses `w.defaults(...)` and `w.args.<name>` so repeated schedule
-  facts and kernel-argument wiring stay concise and native.
+- the workload uses nested `@w.task(...)` / `@w.mainloop(...)` functions,
+  `with w.prologue():` / `with w.steady():` / `with w.epilogue():` blocks, and
+  `w.args.<name>` bindings so schedule and argument wiring stay readable.
 - the workload is now a four-task pipeline (`load`, `mma`, `accumulate`,
   `store`) instead of a minimal producer/consumer sketch.
 - the kernel body uses explicit `shared_array(...)` storage, semantic loop

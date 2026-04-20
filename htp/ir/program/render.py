@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from pprint import pformat
+
+
+def _payload_assignment(name: str, value: object) -> str:
+    return f"{name} = {pformat(value, width=100, sort_dicts=False)}"
+
 
 def render_program_module_payload(payload: dict[str, object]) -> str:
     return "\n".join(
@@ -8,19 +14,27 @@ def render_program_module_payload(payload: dict[str, object]) -> str:
             "",
             "from htp.ir.program.module import ProgramAspects, ProgramEntrypoint, ProgramIdentity, ProgramItems, ProgramModule",
             "",
-            f"ITEMS = ProgramItems(**{repr(payload['items'])})",
-            f"ASPECTS = ProgramAspects(**{repr(payload['aspects'])})",
-            f"IDENTITY = ProgramIdentity(**{repr(payload['identity'])})",
-            f"ENTRYPOINTS = tuple(ProgramEntrypoint(**item) for item in {repr(payload['entrypoints'])})",
-            f"ANALYSES = {repr(payload['analyses'])}",
-            f"META = {repr(payload['meta'])}",
+            _payload_assignment("ITEMS_PAYLOAD", payload["items"]),
+            "_ITEMS = ProgramItems(**ITEMS_PAYLOAD)",
+            "",
+            _payload_assignment("ASPECTS_PAYLOAD", payload["aspects"]),
+            "_ASPECTS = ProgramAspects(**ASPECTS_PAYLOAD)",
+            "",
+            _payload_assignment("IDENTITY_PAYLOAD", payload["identity"]),
+            "_IDENTITY = ProgramIdentity(**IDENTITY_PAYLOAD)",
+            "",
+            _payload_assignment("ENTRYPOINTS_PAYLOAD", payload["entrypoints"]),
+            "_ENTRYPOINTS = tuple(ProgramEntrypoint(**item) for item in ENTRYPOINTS_PAYLOAD)",
+            "",
+            _payload_assignment("ANALYSES", payload["analyses"]),
+            _payload_assignment("META", payload["meta"]),
             "",
             "PROGRAM_MODULE = ProgramModule(",
-            "    items=ITEMS,",
-            "    aspects=ASPECTS,",
+            "    items=_ITEMS,",
+            "    aspects=_ASPECTS,",
             "    analyses=ANALYSES,",
-            "    identity=IDENTITY,",
-            "    entrypoints=ENTRYPOINTS,",
+            "    identity=_IDENTITY,",
+            "    entrypoints=_ENTRYPOINTS,",
             "    meta=META,",
             ")",
             "",

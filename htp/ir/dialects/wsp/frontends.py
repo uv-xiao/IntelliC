@@ -19,6 +19,7 @@ from htp.ir.frontends import (
     ordered_resolved_values,
     resolve_name,
     resolve_surface_value,
+    resolved_keyword_map,
     sequence_values,
     surface_ref,
 )
@@ -132,7 +133,7 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
     @handles(ast.FunctionDef, decorator="task")
     @handles(ast.FunctionDef, decorator="mainloop")
     def build_task(self, node: ast.FunctionDef, context) -> _PendingWSPTask:
-        from htp.wsp import WSPStageSpec, WSPTaskSpec
+        from htp.wsp import WSPScheduleSpec, WSPStageSpec, WSPTaskSpec
 
         decorator = node.decorator_list[0]
         if not isinstance(decorator, ast.Call):
@@ -155,20 +156,15 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
         for statement in node.body:
             if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Constant):
                 continue
-            stage_name, step = self.dispatch(statement, context)
-            stages.setdefault(stage_name, []).append(step)
+            emitted = self.dispatch(statement, context)
+            for stage_name, step in _stage_emissions(emitted):
+                stages.setdefault(stage_name, []).append(step)
         attrs: dict[str, Any] = {}
-        if role is not None:
-            attrs["role"] = role
         schedule_payload = {
             name: resolve_surface_value(value, context)
             for name, value in keyword_map.items()
             if name in {"tile", "bind", "pipeline", "resources", "specialize"}
         }
-        if schedule_payload:
-            attrs["schedule"] = schedule_payload
-        if stages:
-            attrs["stages"] = [WSPStageSpec(name=name, steps=list(values)) for name, values in stages.items()]
         after_names = tuple(
             resolve_name(item, context, failure="WSP dependency references must be nested task names")
             for item in sequence_values(keyword_map.get("after"))
@@ -181,9 +177,32 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
                 kernel=context.kernel_spec.name,
                 args=tuple(str(item) for item in task_args),
                 attrs=attrs,
+                role=None if role is None else str(role),
+                schedule=WSPScheduleSpec.from_payload(schedule_payload),
+                stages=[WSPStageSpec(name=name, steps=list(values)) for name, values in stages.items()],
             ),
             after=after_names,
         )
+
+    @handles(ast.With)
+    def build_stage_block(self, node: ast.With, context) -> list[tuple[str, WSPStageStep]]:
+        if len(node.items) != 1:
+            raise context.fail(node, "WSP stage blocks accept one context manager")
+        stage_name = _wsp_stage_name(node.items[0].context_expr, context)
+        previous_stage = context.emitted.get("wsp_stage")
+        context.emitted["wsp_stage"] = stage_name
+        emitted: list[tuple[str, WSPStageStep]] = []
+        try:
+            for statement in node.body:
+                if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Constant):
+                    continue
+                emitted.extend(_stage_emissions(self.dispatch(statement, context)))
+        finally:
+            if previous_stage is None:
+                context.emitted.pop("wsp_stage", None)
+            else:
+                context.emitted["wsp_stage"] = previous_stage
+        return emitted
 
     @handles(ast.Expr, call="step")
     def build_stage_step(self, node: ast.Expr, context) -> tuple[str, WSPStageStep]:
@@ -199,6 +218,21 @@ class WSPASTFrontendVisitor(ASTFrontendVisitor):
         op_name = resolve_surface_value(call.args[0], context)
         attrs = {name: resolve_surface_value(value, context) for name, value in keyword_map.items()}
         return str(stage_name), WSPStageStep(op=str(op_name), attrs=attrs)
+
+    @handles(ast.Expr)
+    def build_intrinsic_stage_step(self, node: ast.Expr, context) -> tuple[str, WSPStageStep]:
+        from htp.wsp import WSPStageStep
+
+        if not isinstance(node.value, ast.Call):
+            raise context.fail(node, "WSP stage expression must be a call")
+        op_name = self.call_name(node)
+        if op_name in {None, "task", "mainloop", "step", "stage", "prologue", "steady", "epilogue"}:
+            raise context.fail(node, "Unsupported WSP stage expression")
+        attrs = resolved_keyword_map(node.value, context)
+        positional = [resolve_surface_value(item, context) for item in node.value.args]
+        if positional:
+            attrs["args"] = positional
+        return str(context.emitted.get("wsp_stage", "steady")), WSPStageStep(op=str(op_name), attrs=attrs)
 
 
 def build_wsp_ast_program_spec(
@@ -220,9 +254,8 @@ def _aggregate_schedule(task_specs: tuple[WSPTaskSpec, ...]) -> WSPScheduleSpec:
     from htp.wsp import WSPScheduleSpec
 
     for task_spec in task_specs:
-        schedule_payload = task_spec.attrs.get("schedule")
-        if schedule_payload:
-            return WSPScheduleSpec.from_payload(schedule_payload)
+        if task_spec.schedule is not None and task_spec.schedule.has_values():
+            return task_spec.schedule
     return WSPScheduleSpec()
 
 
@@ -253,7 +286,7 @@ def _build_wsp_ast_program_module(
                 )
                 for index, arg in enumerate(task_spec.args)
             ),
-            attrs=_task_attrs_payload(task_spec.attrs),
+            attrs=_task_attrs_payload(task_spec.semantic_attrs()),
         )
         for task_spec in task_specs
     )
@@ -279,7 +312,7 @@ def _build_wsp_ast_program_module(
                 kernel=task_spec.kernel,
                 args=task_spec.args,
                 entity_id=f"{entry}:{task_spec.task_id}",
-                attrs=dict(task_spec.attrs),
+                attrs=task_spec.semantic_attrs(),
             )
             for task_spec in task_specs
         ),
@@ -346,6 +379,29 @@ def _task_attrs_payload(attrs: Mapping[str, Any]) -> dict[str, Any]:
         else:
             payload[key] = value
     return payload
+
+
+def _stage_emissions(emitted: object) -> list[tuple[str, WSPStageStep]]:
+    from htp.wsp import WSPStageStep
+
+    if isinstance(emitted, tuple) and len(emitted) == 2 and isinstance(emitted[1], WSPStageStep):
+        return [(str(emitted[0]), emitted[1])]
+    if isinstance(emitted, list):
+        return [item for item in emitted if isinstance(item, tuple) and len(item) == 2]
+    return []
+
+
+def _wsp_stage_name(node: ast.AST, context) -> str:
+    if not isinstance(node, ast.Call):
+        raise context.fail(
+            node, "WSP stage block must call w.stage(...), w.prologue(), w.steady(), or w.epilogue()"
+        )
+    call_name = WSPASTFrontendVisitor.call_name(node)
+    if call_name in {"prologue", "steady", "epilogue"}:
+        return call_name
+    if call_name == "stage" and node.args:
+        return str(resolve_surface_value(node.args[0], context))
+    raise context.fail(node, "Unsupported WSP stage block")
 
 
 __all__ = ["WSPASTFrontendVisitor", "build_wsp_ast_program_spec", "wsp_frontend_workload"]

@@ -33,6 +33,7 @@ Agent Product + Workflow
 - `docs/story.md` — final intended framework story
 - `docs/design/README.md` — implemented architecture index
 - `docs/design/compiler_model.md`
+- `docs/design/ast_all_the_way.md`
 - `docs/design/programming_surfaces.md`
 - `docs/design/pipeline_and_solver.md`
 - `docs/design/artifacts_replay_debug.md`
@@ -44,6 +45,7 @@ Agent Product + Workflow
 ## Implemented feature documents
 
 - `docs/design/compiler_model.md` — canonical Python-space compiler model, semantics, typing, layout, effects
+- `docs/design/ast_all_the_way.md` — normalized Python, `ProgramModule`, dialect composability, pass/stage commit, and no-legacy contract
 - `docs/design/programming_surfaces.md` — kernel, WSP, CSP, and workload authoring surfaces
 - `docs/design/pipeline_and_solver.md` — pass spine, capability solver, staged transformations, MLIR round-trip participation
 - `docs/design/artifacts_replay_debug.md` — manifest, staged artifacts, replay, diagnostics, and verification surface

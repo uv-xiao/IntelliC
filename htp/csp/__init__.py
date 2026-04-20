@@ -8,7 +8,14 @@ from inspect import signature
 from typing import Any
 
 from htp.compiler import parse_target
-from htp.ir.dialects.csp import CSPProcessStep, steps_from_payload, steps_to_payload
+from htp.ir.dialects.csp import (
+    CSPComputeStep,
+    CSPGetStep,
+    CSPProcessStep,
+    CSPPutStep,
+    steps_from_payload,
+    steps_to_payload,
+)
 from htp.ir.frontends import resolve_frontend
 from htp.ir.program.module import ProgramModule
 from htp.kernel import KernelSpec, KernelValue
@@ -106,8 +113,11 @@ def fifo(name: str, *, dtype: str, capacity: int) -> dict[str, Any]:
     return channel(name, dtype=dtype, capacity=capacity, protocol="fifo")
 
 
-def put(channel: str | ChannelRef, *, count: int = 1) -> dict[str, Any]:
-    return {"kind": "put", "channel": _channel_name(channel), "count": int(count)}
+def put(channel: str | ChannelRef, value: Any | None = None, *, count: int = 1) -> dict[str, Any]:
+    payload = {"kind": "put", "channel": _channel_name(channel), "count": int(count)}
+    if value is not None:
+        payload["value"] = _step_value(value)
+    return payload
 
 
 def get(channel: str | ChannelRef, *, count: int = 1) -> dict[str, Any]:
@@ -129,16 +139,27 @@ def process(
     if not derived_steps:
         derived_steps = [
             *(
-                CSPProcessStep(
-                    kind="get",
-                    attrs={key: _step_value(value) for key, value in item.items()},
+                CSPGetStep(
+                    channel=str(_step_value(item["channel"])),
+                    count=int(item.get("count", 1)),
+                    attrs={
+                        key: _step_value(value)
+                        for key, value in item.items()
+                        if key not in {"channel", "count"}
+                    },
                 )
                 for item in gets
             ),
             *(
-                CSPProcessStep(
-                    kind="put",
-                    attrs={key: _step_value(value) for key, value in item.items()},
+                CSPPutStep(
+                    channel=str(_step_value(item["channel"])),
+                    count=int(item.get("count", 1)),
+                    value=_step_value(item.get("value")) if item.get("value") is not None else None,
+                    attrs={
+                        key: _step_value(value)
+                        for key, value in item.items()
+                        if key not in {"channel", "count", "value"}
+                    },
                 )
                 for item in puts
             ),
@@ -196,12 +217,24 @@ class CSPProcessBuilder:
         self.spec.role = str(name)
         return self
 
-    def put(self, channel: str | ChannelRef, *, count: int = 1) -> CSPProcessBuilder:
-        self.spec.steps.append(CSPProcessStep.from_payload(put(channel, count=count)))
+    def put(
+        self,
+        channel: str | ChannelRef,
+        value: Any | None = None,
+        *,
+        count: int = 1,
+    ) -> CSPProcessBuilder:
+        self.spec.steps.append(
+            CSPPutStep(
+                channel=_channel_name(channel),
+                count=count,
+                value=_step_value(value) if value is not None else None,
+            )
+        )
         return self
 
     def get(self, channel: str | ChannelRef, *, count: int = 1) -> CSPProcessBuilder:
-        self.spec.steps.append(CSPProcessStep.from_payload(get(channel, count=count)))
+        self.spec.steps.append(CSPGetStep(channel=_channel_name(channel), count=count))
         return self
 
     def compute(self, name: str, **attrs: Any) -> CSPProcessBuilder:
@@ -214,12 +247,19 @@ class CSPProcessBuilder:
         return self
 
     def compute_step(self, op: str, /, **attrs: Any) -> CSPProcessBuilder:
-        self.spec.steps.append(
-            CSPProcessStep(
-                kind="compute",
-                attrs={"op": str(op), **{key: _step_value(value) for key, value in attrs.items()}},
-            )
-        )
+        return self._compute_op(str(op), attrs={key: _step_value(value) for key, value in attrs.items()})
+
+    def __getattr__(self, op: str):
+        if op.startswith("_"):
+            raise AttributeError(op)
+
+        def emit_compute(**attrs: Any) -> CSPProcessBuilder:
+            return self._compute_op(op, attrs={key: _step_value(value) for key, value in attrs.items()})
+
+        return emit_compute
+
+    def _compute_op(self, op: str, *, attrs: Mapping[str, Any]) -> CSPProcessBuilder:
+        self.spec.steps.append(CSPComputeStep(op=op, attrs=attrs))
         return self
 
 
@@ -383,10 +423,13 @@ def _step_value(value: Any) -> Any:
 
 __all__ = [
     "CSPBuilder",
+    "CSPComputeStep",
+    "CSPGetStep",
     "CSPProcessSpec",
     "CSPProcessStep",
     "CSPProcessBuilder",
     "CSPProgramSpec",
+    "CSPPutStep",
     "ChannelRef",
     "channel",
     "fifo",

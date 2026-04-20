@@ -224,16 +224,21 @@ def test_csp_example_compiles_and_replays(tmp_path):
         "kind": "compute",
         "op": "pack_tile",
         "source": "A",
+        "result": "packed",
     }
     assert replay_summary["workload_ir"]["processes"][1]["steps"][1] == {
         "kind": "compute",
         "op": "reduce_partials",
         "channel": "tiles",
+        "tile": "tile",
+        "result": "partial",
     }
     assert replay_summary["workload_ir"]["processes"][2]["steps"][1] == {
         "kind": "compute",
         "op": "normalize_rows",
         "channel": "partials",
+        "partial": "partial",
+        "result": "ready",
     }
     assert replay_summary["effects"]["protocols"] == [
         {

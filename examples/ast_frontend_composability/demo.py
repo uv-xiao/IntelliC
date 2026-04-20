@@ -26,8 +26,9 @@ def tile_kernel(
 def scheduled_tiles(w) -> None:
     @w.task(task_id="load_tiles", role="producer")
     def load_tiles() -> None:
-        w.step("cp_async", stage="prologue", source=w.args.A, target="a_tile")
-        w.step("cp_async", stage="prologue", source=w.args.B, target="b_tile")
+        with w.prologue():
+            w.cp_async(source=w.args.A, target="a_tile")
+            w.cp_async(source=w.args.B, target="b_tile")
 
     @w.mainloop(
         task_id="mma_tiles",
@@ -39,8 +40,9 @@ def scheduled_tiles(w) -> None:
         resources={"num_warps": 4},
     )
     def mma_tiles() -> None:
-        w.step("barrier", stage="steady")
-        w.step("mma_sync", stage="steady", accum="acc")
+        with w.steady():
+            w.barrier()
+            w.mma_sync(accum="acc")
 
 
 @csp_program(target="nvgpu-ampere", kernel=tile_kernel)
@@ -51,16 +53,16 @@ def streamed_tiles(c) -> None:
     @c.process(task_id="dispatch", role="producer")
     def dispatch() -> None:
         tile = c.get(tiles)
-        c.compute("pack_tile", source=c.args.A, tile=tile)
-        c.put(partials)
+        packed = c.pack_tile(source=c.args.A, tile=tile)
+        c.put(partials, packed)
 
     @c.process(
         task_id="combine", role="consumer", args=(c.args.A, c.args.B, c.args.C, c.args.M, c.args.N, c.args.K)
     )
     def combine() -> None:
         partial = c.get(partials)
-        c.compute_step("reduce_partials", value=partial)
-        c.put(tiles)
+        reduced = c.reduce_partials(value=partial)
+        c.put(tiles, reduced)
 
 
 def build_composed_module() -> ProgramModule:

@@ -41,17 +41,17 @@ The reopened work falls into four broad buckets:
       surfaces where possible
 - [x] replace CSP `compute_step(...)` metadata with a more native process-body
       surface
-- [ ] reduce remaining builder ceremony in flagship WSP/CSP examples without
+- [x] reduce remaining builder ceremony in flagship WSP/CSP examples without
       reintroducing raw payload assembly
-- [ ] ensure frontend and staged intermediate programs still read like native
+- [x] ensure frontend and staged intermediate programs still read like native
       Python after non-trivial schedule and protocol rewrites
 
 ### Examples
 
-- [ ] raise flagship WSP examples to a clearer reference-grade mainloop story
-- [ ] raise flagship CSP examples to real protocol-rich process bodies instead
+- [x] raise flagship WSP examples to a clearer reference-grade mainloop story
+- [x] raise flagship CSP examples to real protocol-rich process bodies instead
       of pipeline metadata choreography
-- [ ] keep example-local READMEs synchronized with the actual semantic proof
+- [x] keep example-local READMEs synchronized with the actual semantic proof
       surface
 
 ### Backend depth

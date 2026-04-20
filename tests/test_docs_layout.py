@@ -32,9 +32,11 @@ def test_design_tree_has_only_supported_top_level_entries():
     assert entries == {
         "README.md",
         "agent_product_and_workflow.md",
+        "ast_all_the_way.md",
         "artifacts_replay_debug.md",
         "backends_and_extensions.md",
         "compiler_model.md",
+        "ir_infrastructure_review.md",
         "littlekernel_ast_comparison.md",
         "pipeline_and_solver.md",
         "programming_surfaces.md",
@@ -50,13 +52,20 @@ def test_todo_tree_has_only_supported_top_level_entries():
 
 def test_agent_and_design_docs_record_frontend_composability_rules():
     agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
-    core_rules_text = Path(".agent/rules/core-development.md").read_text(encoding="utf-8")
-    frontend_design_text = Path("docs/in_progress/design/03_dialects_and_frontends.md").read_text(
-        encoding="utf-8"
-    )
-    task_text = Path("docs/in_progress/028-ast-all-the-way-contracts.md").read_text(encoding="utf-8")
+    docs_rules_text = Path(".agent/rules/docs-and-artifacts.md").read_text(encoding="utf-8")
+    ast_design_text = Path("docs/design/ast_all_the_way.md").read_text(encoding="utf-8")
+    ir_review_text = Path("docs/design/ir_infrastructure_review.md").read_text(encoding="utf-8")
 
     assert "Dialect features must compose across parse/capture" in agents_text
-    assert "Keep frontend AST handlers small and single-purpose" in core_rules_text
-    assert "## Frontend composability rules" in frontend_design_text
-    assert "the final frontend-definition substrate must enforce dialect composability" in task_text
+    assert "merge the final validated design from `docs/in_progress/design/`" in agents_text
+    assert "active design drafts from `docs/in_progress/design/`" in docs_rules_text
+    assert "Dialect features must compose through the shared substrate" in ast_design_text
+    assert "IR infrastructure" in ir_review_text
+
+
+def test_no_stale_in_progress_design_docs_when_no_active_tasks():
+    in_progress_text = Path("docs/in_progress/README.md").read_text(encoding="utf-8")
+    design_root = Path("docs/in_progress/design")
+
+    if "## Active tasks\n\nNone." in in_progress_text:
+        assert not list(design_root.glob("*.md"))

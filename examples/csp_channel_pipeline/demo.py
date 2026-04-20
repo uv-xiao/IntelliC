@@ -45,23 +45,27 @@ def token_pipeline(p) -> None:
     partials = p.fifo("partials", dtype="f32", capacity=1)
     ready_rows = p.fifo("ready_rows", dtype="f32", capacity=1)
 
-    dispatch = p.process("dispatch_tiles", task_id="dispatch_tiles").role("producer")
-    dispatch.compute_step("pack_tile", source=p.args.A)
-    dispatch.put(tiles)
+    @p.process(task_id="dispatch_tiles", role="producer")
+    def dispatch_tiles() -> None:
+        packed = p.pack_tile(source=p.args.A)
+        p.put(tiles, packed)
 
-    combine = p.process("combine_tiles", task_id="combine_tiles").role("router")
-    combine.get(tiles)
-    combine.compute_step("reduce_partials", channel=tiles)
-    combine.put(partials)
+    @p.process(task_id="combine_tiles", role="router")
+    def combine_tiles() -> None:
+        tile = p.get(tiles)
+        partial = p.reduce_partials(channel=tiles, tile=tile)
+        p.put(partials, partial)
 
-    finalize = p.process("finalize_rows", task_id="finalize_rows").role("reducer")
-    finalize.get(partials)
-    finalize.compute_step("normalize_rows", channel=partials)
-    finalize.put(ready_rows)
+    @p.process(task_id="finalize_rows", role="reducer")
+    def finalize_rows() -> None:
+        partial = p.get(partials)
+        ready = p.normalize_rows(channel=partials, partial=partial)
+        p.put(ready_rows, ready)
 
-    writeback = p.process("writeback_tiles", task_id="writeback_tiles").role("consumer")
-    writeback.get(ready_rows)
-    writeback.compute_step("write_output", target=p.args.C)
+    @p.process(task_id="writeback_tiles", role="consumer")
+    def writeback_tiles() -> None:
+        rows = p.get(ready_rows)
+        p.write_output(target=p.args.C, rows=rows)
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:

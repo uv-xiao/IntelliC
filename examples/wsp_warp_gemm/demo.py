@@ -50,31 +50,44 @@ def warp_mainloop_tile(
 
 @wsp_program(target="nvgpu-ampere", kernel=warp_mainloop_tile)
 def warp_gemm(w) -> None:
-    with w.defaults(
+    @w.task(
+        task_id="load_tiles",
+        role="producer",
         tile={"block": (64, 128, 32)},
         bind={"grid": "block", "lane": "warp"},
         pipeline={"depth": 3, "buffering": "double"},
         resources={"num_warps": 4},
-    ):
-        load_tiles = w.launch(task_id="load_tiles").role("producer")
-        load_tiles.prologue().step("cp_async", source=w.args.A, target="a_tile")
-        load_tiles.prologue().step("cp_async", source=w.args.B, target="b_tile")
+    )
+    def load_tiles() -> None:
+        with w.prologue():
+            w.cp_async(source=w.args.A, target="a_tile")
+            w.cp_async(source=w.args.B, target="b_tile")
 
-        mma_tiles = w.mainloop(task_id="mma_tiles").after(load_tiles).role("consumer")
-        mma_tiles.steady().step("barrier")
-        mma_tiles.steady().step("mma_sync", accum="acc")
-        mma_tiles.steady().step("accumulate", source="acc")
+    @w.mainloop(task_id="mma_tiles", role="consumer", after=load_tiles)
+    def mma_tiles() -> None:
+        with w.steady():
+            w.barrier()
+            w.mma_sync(accum="acc")
+            w.accumulate(source="acc")
 
-        accumulate_tiles = w.launch(task_id="accumulate_tiles").after(mma_tiles).role("reducer")
-        accumulate_tiles.epilogue().step("reduce_accumulators", source="acc")
-        accumulate_tiles.epilogue().step("apply_epilogue", target=w.args.C)
+    @w.task(task_id="accumulate_tiles", role="reducer", after=mma_tiles)
+    def accumulate_tiles() -> None:
+        with w.epilogue():
+            w.reduce_accumulators(source="acc")
+            w.apply_epilogue(target=w.args.C)
 
-        store_tiles = w.launch(task_id="store_tiles").after(accumulate_tiles).role("epilogue")
-        store_tiles.epilogue().step("store", target=w.args.C)
-        store_tiles.specialize(
-            operator="tensor_core_mainloop",
-            stage_plan="load_tiles->mma_tiles->accumulate_tiles->store_tiles",
-        )
+    @w.task(
+        task_id="store_tiles",
+        role="epilogue",
+        after=accumulate_tiles,
+        specialize={
+            "operator": "tensor_core_mainloop",
+            "stage_plan": "load_tiles->mma_tiles->accumulate_tiles->store_tiles",
+        },
+    )
+    def store_tiles() -> None:
+        with w.epilogue():
+            w.store(target=w.args.C)
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:

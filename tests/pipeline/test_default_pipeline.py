@@ -73,6 +73,8 @@ def test_default_pipeline_runs_all_mandatory_passes(tmp_path):
     current_stage = next(stage for stage in stage_graph if stage["id"] == result.current_stage)
     program_text = (package_dir / current_stage["runnable_py"]["program_py"]).read_text()
     assert '"""Readable staged Python snapshot for HTP replay and debugging."""' in program_text
+    assert "ITEMS_PAYLOAD = {" in program_text
+    assert "_ITEMS = ProgramItems(**ITEMS_PAYLOAD)" in program_text
     assert "PROGRAM_MODULE = ProgramModule(" in program_text
     assert "def program_module():" in program_text
     assert "def program_state():" in program_text

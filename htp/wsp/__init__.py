@@ -40,6 +40,23 @@ class WSPTaskSpec:
     kernel: str
     args: tuple[str, ...]
     attrs: dict[str, Any] = field(default_factory=dict)
+    role: str | None = None
+    schedule: WSPScheduleSpec | None = None
+    stages: list[WSPStageSpec] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        attrs = dict(self.attrs)
+        if self.role is None and attrs.get("role") is not None:
+            self.role = str(attrs.pop("role"))
+        if self.schedule is None:
+            self.schedule = WSPScheduleSpec.from_payload(attrs.pop("schedule", {}))
+        elif "schedule" in attrs:
+            attrs.pop("schedule")
+        if not self.stages and "stages" in attrs:
+            self.stages = stages_from_payload(attrs.pop("stages"))
+        elif "stages" in attrs:
+            attrs.pop("stages")
+        self.attrs = attrs
 
     def to_payload(self) -> dict[str, Any]:
         payload = {
@@ -48,15 +65,24 @@ class WSPTaskSpec:
             "kernel": self.kernel,
             "args": list(self.args),
         }
-        if self.attrs:
-            payload["attrs"] = _task_attrs_payload(self.attrs)
+        attrs = self.semantic_attrs()
+        if attrs:
+            payload["attrs"] = _task_attrs_payload(attrs)
         return payload
+
+    def semantic_attrs(self) -> dict[str, Any]:
+        attrs = dict(self.attrs)
+        if self.role is not None:
+            attrs["role"] = self.role
+        if self.schedule is not None and self.schedule.has_values():
+            attrs["schedule"] = {key: value for key, value in self.schedule.to_payload().items() if value}
+        if self.stages:
+            attrs["stages"] = list(self.stages)
+        return attrs
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> WSPTaskSpec:
         attrs = dict(payload.get("attrs", {}))
-        if "stages" in attrs:
-            attrs["stages"] = stages_from_payload(attrs["stages"])
         return cls(
             task_id=str(payload["task_id"]),
             kind=str(payload["kind"]),
@@ -79,7 +105,7 @@ class WSPDependencySpec:
         return cls(src=str(payload["src"]), dst=str(payload["dst"]))
 
 
-@dataclass(frozen=True)
+@dataclass
 class WSPScheduleSpec:
     tile: dict[str, Any] = field(default_factory=dict)
     bind: dict[str, Any] = field(default_factory=dict)
@@ -95,6 +121,9 @@ class WSPScheduleSpec:
             "resources": dict(self.resources),
             "specialize": dict(self.specialize),
         }
+
+    def has_values(self) -> bool:
+        return any((self.tile, self.bind, self.pipeline, self.resources, self.specialize))
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> WSPScheduleSpec:
@@ -428,35 +457,35 @@ class WSPTaskBuilder:
     def tile(self, *, block: tuple[int, int, int] | list[int]) -> WSPTaskBuilder:
         tile_payload = tile(block=block)
         self.owner.schedule_state["tile"] = tile_payload
-        self._task_schedule()["tile"] = dict(tile_payload)
+        self._ensure_schedule().tile = dict(tile_payload)
         return self
 
     def bind(self, *, grid: str | None = None, lane: str | None = None) -> WSPTaskBuilder:
         bind_payload = bind(grid=grid, lane=lane)
         self.owner.schedule_state["bind"] = bind_payload
-        self._task_schedule()["bind"] = dict(bind_payload)
+        self._ensure_schedule().bind = dict(bind_payload)
         return self
 
     def pipeline(self, *, depth: int, buffering: str = "double") -> WSPTaskBuilder:
         pipeline_payload = pipeline(depth=depth, buffering=buffering)
         self.owner.schedule_state["pipeline"] = pipeline_payload
-        self._task_schedule()["pipeline"] = dict(pipeline_payload)
+        self._ensure_schedule().pipeline = dict(pipeline_payload)
         return self
 
     def resources(self, *, num_warps: int) -> WSPTaskBuilder:
         resource_payload = resources(num_warps=num_warps)
         self.owner.schedule_state["resources"] = resource_payload
-        self._task_schedule()["resources"] = dict(resource_payload)
+        self._ensure_schedule().resources = dict(resource_payload)
         return self
 
     def specialize(self, *, operator: str, **attrs: Any) -> WSPTaskBuilder:
         specialize_payload = specialize(operator=operator, **attrs)
         self.owner.schedule_state["specialize"] = specialize_payload
-        self._task_schedule()["specialize"] = dict(specialize_payload)
+        self._ensure_schedule().specialize = dict(specialize_payload)
         return self
 
     def role(self, name: str) -> WSPTaskBuilder:
-        self._attrs()["role"] = str(name)
+        self.spec.role = str(name)
         return self
 
     def after(self, other: str | WSPTaskBuilder) -> WSPTaskBuilder:
@@ -482,31 +511,25 @@ class WSPTaskBuilder:
         return self.stage("epilogue", *steps)
 
     def _apply_schedule_defaults(self, defaults: Mapping[str, Mapping[str, Any]]) -> None:
-        task_schedule = self._task_schedule()
+        task_schedule = self._ensure_schedule()
         for key, value in defaults.items():
-            if value:
-                task_schedule.setdefault(key, dict(value))
+            if value and not getattr(task_schedule, key):
+                setattr(task_schedule, key, dict(value))
 
     def _attrs(self) -> dict[str, Any]:
         return self.spec.attrs
 
-    def _task_schedule(self) -> dict[str, Any]:
-        return self._attrs().setdefault("schedule", {})
+    def _ensure_schedule(self) -> WSPScheduleSpec:
+        if self.spec.schedule is None:
+            self.spec.schedule = WSPScheduleSpec()
+        return self.spec.schedule
 
     def _stage_spec(self, name: str) -> WSPStageSpec:
-        attrs = self._attrs()
-        stages = attrs.get("stages")
-        if stages is None:
-            stages = []
-            attrs["stages"] = stages
-        elif stages and isinstance(stages[0], Mapping):
-            stages = stages_from_payload(stages)
-            attrs["stages"] = stages
-        for stage in stages:
+        for stage in self.spec.stages:
             if stage.name == str(name):
                 return stage
         stage = WSPStageSpec(name=str(name))
-        stages.append(stage)
+        self.spec.stages.append(stage)
         return stage
 
 

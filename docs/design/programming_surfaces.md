@@ -85,15 +85,18 @@ That frontend registry now has a rule-backed frontend-definition substrate:
 - WSP and CSP public specs now carry typed top-level surface objects rather than
   raw dict payload fields:
   - `WSPTaskSpec`, `WSPDependencySpec`, `WSPScheduleSpec`
-  - `ChannelRef`, `CSPProcessSpec`, `CSPProcessStep`
+  - `WSPStageSpec`, `WSPStageStep`
+  - `ChannelRef`, `CSPProcessSpec`, `CSPGetStep`, `CSPPutStep`,
+    `CSPComputeStep`
 - the shared workload semantic layer is now typed as well:
   - `WorkloadChannel`, `WorkloadDependency`, `WorkloadProcess`,
     `WorkloadProcessStep`
 - WSP and CSP now also support AST-backed nested-function authoring:
   - nested `@w.task(...)` / `@w.mainloop(...)` functions with local
-    `w.step(...)` bodies
+    stage blocks such as `with w.prologue():` and intrinsic-looking stage calls
+    such as `w.cp_async(...)`
   - nested `@c.process(...)` functions with local `c.get(...)`, `c.put(...)`,
-    `c.compute(...)`, and `c.compute_step(...)` bodies
+    and process-local operation calls such as `packed = c.pack_tile(...)`
 - AST-backed WSP/CSP modules now mark `meta["frontend_capture"] == "ast"`
 - dialect-composed modules now go through `ProgramModule.compose(...)` and
   `htp/ir/program/compose.py` instead of ad hoc `ProgramItems` rebuilding
@@ -370,6 +373,8 @@ values and routines instead of inventing parallel semantic roots.
 - bound kernel arguments via `p.args.<name>`
 - default kernel/argument capture for `p.process(...)`
 - fluent process builders such as `.process(...).role(...).compute_step(...).get(...).put(...)`
+- fluent process builders with operation methods such as
+  `.process(...).role(...).get(...).reduce_partials(...).put(...)`
 - process-local step traces that survive into `state.json#/items/workload_ir`
 - public examples that now describe named dispatch/combine/writeback roles and
   protocol-local steps instead of assembling process dicts by hand
@@ -382,12 +387,12 @@ The public surface now supports protocol narratives like:
 ```text
 combine = p.process("combine_tiles", task_id="combine_tiles").role("router")
 combine.get(tiles)
-combine.compute_step("reduce_partials", channel=tiles)
+combine.reduce_partials(channel=tiles)
 combine.put(partials)
 
 finalize = p.process("finalize_rows", task_id="finalize_rows").role("reducer")
 finalize.get(partials)
-finalize.compute_step("normalize_rows", channel=partials)
+finalize.normalize_rows(channel=partials)
 finalize.put(ready_rows)
 ```
 

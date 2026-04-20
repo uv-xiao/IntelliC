@@ -17,7 +17,6 @@ from htp.ir.frontends import (
     ordered_resolved_values,
     resolve_name,
     resolve_surface_value,
-    resolved_keyword_map,
     sequence_values,
     surface_ref,
 )
@@ -191,7 +190,7 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
 
     @handles(ast.Assign, call="get")
     def build_get_step(self, node: ast.Assign, context):
-        from htp.ir.dialects.csp import CSPProcessStep
+        from htp.ir.dialects.csp import CSPGetStep
 
         if not isinstance(node.value, ast.Call):
             raise context.fail(node, "CSP get step must be a call")
@@ -205,11 +204,11 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
         )
         count = keyword_or_default(call, "count", 1, context)
         context.locals[node.targets[0].id] = node.targets[0].id
-        return CSPProcessStep(kind="get", attrs={"channel": channel_name, "count": count})
+        return CSPGetStep(channel=channel_name, count=count)
 
     @handles(ast.Expr, call="put")
     def build_put_step(self, node: ast.Expr, context):
-        from htp.ir.dialects.csp import CSPProcessStep
+        from htp.ir.dialects.csp import CSPPutStep
 
         if not isinstance(node.value, ast.Call):
             raise context.fail(node, "CSP put step must be a call")
@@ -220,33 +219,60 @@ class CSPASTFrontendVisitor(ASTFrontendVisitor):
             failure="CSP put step channel must be a channel ref or identifier",
         )
         count = keyword_or_default(call, "count", 1, context)
-        return CSPProcessStep(kind="put", attrs={"channel": channel_name, "count": count})
+        value = resolve_surface_value(call.args[1], context) if len(call.args) > 1 else None
+        return CSPPutStep(channel=channel_name, count=count, value=value)
 
     @handles(ast.Expr, call="compute")
     def build_compute_step(self, node: ast.Expr, context):
-        from htp.ir.dialects.csp import CSPProcessStep
+        from htp.ir.dialects.csp import CSPComputeStep
 
         if not isinstance(node.value, ast.Call):
             raise context.fail(node, "CSP compute step must be a call")
         call = node.value
         if not call.args:
             raise context.fail(node, "c.compute(...) requires a step name")
-        attrs = {"name": resolve_surface_value(call.args[0], context)}
-        attrs.update(resolved_keyword_map(call, context))
-        return CSPProcessStep(kind="compute", attrs=attrs)
+        attrs = _csp_keyword_map(call, context)
+        return CSPComputeStep(op=str(resolve_surface_value(call.args[0], context)), attrs=attrs)
 
     @handles(ast.Expr, call="compute_step")
     def build_compute_op_step(self, node: ast.Expr, context):
-        from htp.ir.dialects.csp import CSPProcessStep
+        from htp.ir.dialects.csp import CSPComputeStep
 
         if not isinstance(node.value, ast.Call):
             raise context.fail(node, "CSP compute_step must be a call")
         call = node.value
         if not call.args:
             raise context.fail(node, "c.compute_step(...) requires an op name")
-        attrs = {"op": resolve_surface_value(call.args[0], context)}
-        attrs.update(resolved_keyword_map(call, context))
-        return CSPProcessStep(kind="compute", attrs=attrs)
+        attrs = _csp_keyword_map(call, context)
+        return CSPComputeStep(op=str(resolve_surface_value(call.args[0], context)), attrs=attrs)
+
+    @handles(ast.Expr)
+    def build_compute_intrinsic_step(self, node: ast.Expr, context):
+        if not isinstance(node.value, ast.Call):
+            raise context.fail(node, "CSP process expression must be a call")
+        return self._compute_intrinsic(node.value, context)
+
+    @handles(ast.Assign)
+    def build_compute_intrinsic_binding(self, node: ast.Assign, context):
+        if not isinstance(node.value, ast.Call):
+            raise context.fail(node, "CSP process assignment must call a CSP operation")
+        if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+            raise context.fail(node, "CSP compute binding requires one simple target")
+        result = node.targets[0].id
+        context.locals[result] = result
+        return self._compute_intrinsic(node.value, context, result=result)
+
+    def _compute_intrinsic(self, call: ast.Call, context, *, result: str | None = None):
+        from htp.ir.dialects.csp import CSPComputeStep
+
+        op_name = self.call_name(call)
+        if op_name in {None, "fifo", "channel", "process", "get", "put", "compute", "compute_step"}:
+            raise context.fail(call, "Unsupported CSP process operation")
+        attrs = _csp_keyword_map(call, context)
+        positional = [_csp_step_value(resolve_surface_value(item, context)) for item in call.args]
+        if positional:
+            attrs["args"] = positional
+        return CSPComputeStep(op=str(op_name), result=result, attrs=attrs)
 
 
 def build_csp_ast_program_spec(
@@ -396,6 +422,21 @@ def _csp_program_payload(
 
 def _surface_ref(*, node_id: str, name: str):
     return surface_ref(node_id=node_id, name=name)
+
+
+def _csp_keyword_map(call: ast.Call, context) -> dict[str, Any]:
+    return {
+        item.arg: _csp_step_value(resolve_surface_value(item.value, context))
+        for item in call.keywords
+        if item.arg is not None
+    }
+
+
+def _csp_step_value(value: Any) -> Any:
+    name = getattr(value, "name", None)
+    if isinstance(name, str):
+        return name
+    return value
 
 
 __all__ = ["CSPASTFrontendVisitor", "build_csp_ast_program_spec", "csp_frontend_workload"]

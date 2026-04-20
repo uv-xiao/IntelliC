@@ -11,4 +11,9 @@ Rules:
 
 ## Active tasks
 
-- `docs/in_progress/028-ast-all-the-way-contracts.md`
+None.
+
+## Active design docs
+
+None. Completed architecture drafts must be merged into `docs/design/` and
+removed from `docs/in_progress/design/` before a PR is ready to merge.

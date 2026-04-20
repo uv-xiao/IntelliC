@@ -5,10 +5,11 @@ pipeline.
 
 It proves three implemented contracts:
 
-- CSP process/channel metadata lowers into typed workload and effect state through a decorator/builder surface instead of direct dict assembly.
+- CSP process/channel metadata lowers into typed workload and effect state
+  through nested `@p.process(...)` functions instead of direct dict assembly.
 - the example now carries explicit `producer`, `router`, and `consumer`
   process roles plus structured protocol-local compute steps emitted via
-  `compute_step(...)`.
+  native-looking calls such as `packed = p.pack_tile(...)`.
 - the workload uses `p.args.<name>` and default process argument capture so the
   flagship CSP example does not wire kernel arguments through raw string tuples.
 - the pipeline is now decomposed into four named processes over three channels
