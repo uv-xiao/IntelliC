@@ -56,7 +56,7 @@ Required:
 - [x] one malformed-input / contract-violation test
 - [x] one regression test for the motivating gap
 - [x] human-friendly example updated or added
-- [ ] `pixi run verify` or documented fallback
+- [x] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract,
 failure mode, or regression.
