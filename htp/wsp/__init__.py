@@ -75,9 +75,7 @@ class WSPTaskSpec:
         if self.role is not None:
             attrs["role"] = self.role
         if self.schedule is not None and self.schedule.has_values():
-            attrs["schedule"] = {
-                key: value for key, value in self.schedule.to_payload().items() if value
-            }
+            attrs["schedule"] = {key: value for key, value in self.schedule.to_payload().items() if value}
         if self.stages:
             attrs["stages"] = list(self.stages)
         return attrs

@@ -286,7 +286,7 @@ def _build_wsp_ast_program_module(
                 )
                 for index, arg in enumerate(task_spec.args)
             ),
-                attrs=_task_attrs_payload(task_spec.semantic_attrs()),
+            attrs=_task_attrs_payload(task_spec.semantic_attrs()),
         )
         for task_spec in task_specs
     )
@@ -393,7 +393,9 @@ def _stage_emissions(emitted: object) -> list[tuple[str, WSPStageStep]]:
 
 def _wsp_stage_name(node: ast.AST, context) -> str:
     if not isinstance(node, ast.Call):
-        raise context.fail(node, "WSP stage block must call w.stage(...), w.prologue(), w.steady(), or w.epilogue()")
+        raise context.fail(
+            node, "WSP stage block must call w.stage(...), w.prologue(), w.steady(), or w.epilogue()"
+        )
     call_name = WSPASTFrontendVisitor.call_name(node)
     if call_name in {"prologue", "steady", "epilogue"}:
         return call_name

@@ -36,7 +36,9 @@ class CSPProcessStep:
                 channel=str(attrs["channel"]),
                 count=int(attrs.get("count", 1)),
                 value=attrs.get("value"),
-                attrs={key: value for key, value in attrs.items() if key not in {"channel", "count", "value"}},
+                attrs={
+                    key: value for key, value in attrs.items() if key not in {"channel", "count", "value"}
+                },
             )
         if kind == "compute":
             op = attrs.get("op", attrs.get("name"))
