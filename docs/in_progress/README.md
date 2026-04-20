@@ -6,9 +6,13 @@ Rules:
 
 - one task file per feature-sized PR
 - design-changing work must create `docs/in_progress/design/`
+- human instructions captured during active work live under
+  `docs/in_progress/human_words/`
 - completed design drafts must be merged into `docs/design/`
 - stale task and design files must be removed before merge
 
 ## Active Tasks
 
-None.
+- `docs/in_progress/compiler_framework.md` — clean IntelliC compiler framework design,
+  including umbrella, syntax, semantics, and pass mechanism drafts under
+  `docs/in_progress/design/`.

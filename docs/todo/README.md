@@ -5,7 +5,7 @@
 ## Current Gaps
 
 - [x] Agent harness scaffold
-- [ ] Compiler story and architecture design
+- [ ] Compiler story and architecture design (active: `docs/in_progress/compiler_framework.md`)
 - [ ] Minimal package and verification tooling
 - [ ] First executable compiler slice
 
