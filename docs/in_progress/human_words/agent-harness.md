@@ -41,3 +41,16 @@
   - Related: docs/in_progress/human_words/agent-harness.md
   - Related: .agents/skills/record-human-instructions/SKILL.md
   - Agent interpretation: Rename project references from ICI to IntelliC/intellic/ic where appropriate, move the recording skill into the project harness, and make design drafts explicitly unreviewed/unapproved before committing.
+
+- 2026-04-21 02:37 Asia/Shanghai - Clean-branches skill request
+  > Create a skill $skill-creator under this repository. Learn from .repositories/pypto/.claude/skills/clean-branches/SKILL.md, I want the skill to remove useless local and remote branches.
+  - Context: User requested a repo-local skill for cleaning useless local and remote git branches, using skill-creator and pypto's clean-branches skill as reference.
+  - Related: .agents/skills/clean-branches/SKILL.md
+  - Related: .repositories/pypto/.claude/skills/clean-branches/SKILL.md
+  - Agent interpretation: Create a local clean-branches workflow that discovers stale branches, classifies safe deletion candidates, requires explicit approval, deletes only approved local and fork remote branches, and prunes refs.
+
+- 2026-04-21 02:40 Asia/Shanghai - Clean-branches YAML fix
+  > fix:  /home/uvxiao/htp/.agents/skills/clean-branches/SKILL.md: invalid YAML: description: invalid type: sequence, expected a string at line 2 column 14
+  - Context: User reported strict YAML parsing failure in the new clean-branches skill frontmatter.
+  - Related: .agents/skills/clean-branches/SKILL.md
+  - Agent interpretation: Quote the skill description so all YAML parsers treat it as an explicit string.
