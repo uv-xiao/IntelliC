@@ -6,6 +6,21 @@
 
 ## Timeline
 
+- 2026-04-21 02:10 Asia/Shanghai - Initial repo setup and harness request
+  > Good. Now we have a brand new repo. We should start now by first create agent harness. I've create the .references, which include .references/areal-
+  >   vibe.pdf that give many advice for agent harness (clone git@github.com:inclusionAI/AReaL.git into .repositories to learn details, https://www.inclusion-
+  >   ai.org/AReaL/en/reference/ai_assisted_dev.html has a short description, we only do codex related setup, but prefer .agents/ and AGENTs.md , don't
+  >   use .codex/). You should also clone https://github.com/hw-native-sys/pypto and https://github.com/hw-native-sys/simpler into .repositories/, both of which
+  >   have agent rules and skills to learn. For the first commits, we need to build the file structure, rules, skills, and the organization for this project.
+  >   You should also absorb experience from dev/v0 branch, where how docs/ directory is used is specified. Give a plan under docs/in_progress/repo_setup.md
+  >   first to list all things to add.
+  - Context: User directed the initial clean-repo agent harness setup before the current harness structure existed.
+  - Related: AGENTS.md
+  - Related: .agents/
+  - Related: docs/in_progress/repo_setup.md
+  - Related: docs/notes/agent_harness_sources.md
+  - Agent interpretation: Build a repo-local Codex-readable harness, learn from referenced repositories and v0 docs lifecycle, avoid `.codex/`, and start with an in-progress setup plan.
+
 - 2026-04-21 02:15 Asia/Shanghai - Human instruction recording rule
   > Add a new agent rules: record human instructions under @docs/in_progress/human_words/ .
   - Context: User added a persistent agent harness rule during active IntelliC design work.
