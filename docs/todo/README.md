@@ -4,7 +4,7 @@
 
 ## Current Gaps
 
-- [ ] Agent harness scaffold
+- [x] Agent harness scaffold
 - [ ] Compiler story and architecture design
 - [ ] Minimal package and verification tooling
 - [ ] First executable compiler slice

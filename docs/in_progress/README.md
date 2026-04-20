@@ -11,4 +11,4 @@ Rules:
 
 ## Active Tasks
 
-- `docs/in_progress/repo_setup.md`
+None.

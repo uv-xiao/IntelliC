@@ -7,3 +7,7 @@ Before the branch closes, validated design must be merged into the relevant
 broad-topic files here, and stale in-progress drafts must be removed.
 
 Implemented documents will be added as the clean system is built.
+
+## Implemented Documents
+
+- `docs/design/agent_harness.md` — clean-branch agent harness, rules, skills, profiles, templates, and policy checks.
