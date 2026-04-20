@@ -55,9 +55,9 @@ def test_agent_and_design_docs_record_frontend_composability_rules():
     frontend_design_text = Path("docs/in_progress/design/03_dialects_and_frontends.md").read_text(
         encoding="utf-8"
     )
-    task_text = Path("docs/in_progress/029-ir-review-native-surfaces.md").read_text(encoding="utf-8")
+    ir_review_text = Path("docs/design/ir_infrastructure_review.md").read_text(encoding="utf-8")
 
     assert "Dialect features must compose across parse/capture" in agents_text
     assert "Keep frontend AST handlers small and single-purpose" in core_rules_text
     assert "## Frontend composability rules" in frontend_design_text
-    assert "dialect-composability" in task_text or "IR infrastructure" in task_text
+    assert "IR infrastructure" in ir_review_text

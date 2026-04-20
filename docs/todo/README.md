@@ -9,9 +9,9 @@ The review reopened one broad-topic TODO document:
 - `docs/todo/alignment_and_product_gaps.md`
 
 That topic now tracks the remaining product gaps after the AST-all-the-way
-stage-contract slice landed. The current PR closes the programming-surface and
-flagship-example gaps; the remaining open items are backend depth and final
-documentation cleanup before merge.
+stage-contract slice landed. The current PR closes the programming-surface,
+flagship-example, and staged-artifact readability gaps; the remaining open
+items are backend depth and broader repository documentation alignment.
 
 ## Completion statistics
 

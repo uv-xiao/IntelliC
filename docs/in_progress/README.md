@@ -11,4 +11,4 @@ Rules:
 
 ## Active tasks
 
-- `docs/in_progress/029-ir-review-native-surfaces.md`
+None.
