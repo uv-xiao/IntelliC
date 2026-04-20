@@ -54,35 +54,49 @@ def pipelined_mainloop_gemm(
 
 @wsp_program(target="nvgpu-ampere", kernel=pipelined_mainloop_gemm)
 def littlekernel_pipelined_gemm(w) -> None:
-    with w.defaults(
+    @w.task(
+        task_id="prefetch_tiles",
+        role="producer",
         tile={"block": (128, 256, 64)},
         bind={"grid": "block", "lane": "warp"},
         pipeline={"depth": 3, "buffering": "double"},
         resources={"num_warps": 8},
-    ):
-        prefetch_tiles = w.launch(task_id="prefetch_tiles").role("producer")
-        prefetch_tiles.prologue().step("cp_async", source=w.args.A, target="a_stage0")
-        prefetch_tiles.prologue().step("cp_async", source=w.args.B, target="b_stage0")
-        prefetch_tiles.prologue().step("cp_async", source=w.args.A, target="a_stage1")
-        prefetch_tiles.prologue().step("cp_async", source=w.args.B, target="b_stage1")
+    )
+    def prefetch_tiles() -> None:
+        with w.prologue():
+            w.cp_async(source=w.args.A, target="a_stage0")
+            w.cp_async(source=w.args.B, target="b_stage0")
+            w.cp_async(source=w.args.A, target="a_stage1")
+            w.cp_async(source=w.args.B, target="b_stage1")
 
-        steady_tiles = w.mainloop(task_id="steady_tiles").after(prefetch_tiles).role("consumer")
-        steady_tiles.prologue().step("ldmatrix", source="a_stage")
-        steady_tiles.prologue().step("ldmatrix", source="b_stage")
-        steady_tiles.steady().step("mma_sync", stage=0)
-        steady_tiles.steady().step("mma_sync", stage=1)
-        steady_tiles.steady().step("advance_pipeline")
+    @w.mainloop(task_id="steady_tiles", role="consumer", after=prefetch_tiles)
+    def steady_tiles() -> None:
+        with w.prologue():
+            w.ldmatrix(source="a_stage")
+            w.ldmatrix(source="b_stage")
+        with w.steady():
+            w.mma_sync(stage=0)
+            w.mma_sync(stage=1)
+            w.advance_pipeline()
 
-        epilogue_tiles = w.launch(task_id="epilogue_tiles").after(steady_tiles).role("reducer")
-        epilogue_tiles.epilogue().step("reduce_accumulators", source="acc")
-        epilogue_tiles.epilogue().step("convert_output", target=w.args.C)
+    @w.task(task_id="epilogue_tiles", role="reducer", after=steady_tiles)
+    def epilogue_tiles() -> None:
+        with w.epilogue():
+            w.reduce_accumulators(source="acc")
+            w.convert_output(target=w.args.C)
 
-        writeback_tiles = w.launch(task_id="writeback_tiles").after(epilogue_tiles).role("epilogue")
-        writeback_tiles.epilogue().step("store", target=w.args.C)
-        writeback_tiles.specialize(
-            operator="pipelined_mainloop",
-            stage_plan="prefetch_tiles->steady_tiles->epilogue_tiles->writeback_tiles",
-        )
+    @w.task(
+        task_id="writeback_tiles",
+        role="epilogue",
+        after=epilogue_tiles,
+        specialize={
+            "operator": "pipelined_mainloop",
+            "stage_plan": "prefetch_tiles->steady_tiles->epilogue_tiles->writeback_tiles",
+        },
+    )
+    def writeback_tiles() -> None:
+        with w.epilogue():
+            w.store(target=w.args.C)
 
 
 def compile_example(output_dir: Path | str) -> dict[str, Any]:

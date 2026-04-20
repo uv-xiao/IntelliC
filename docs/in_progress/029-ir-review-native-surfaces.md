@@ -3,7 +3,7 @@
 - ID: `029-ir-review-native-surfaces`
 - Branch: `htp/feat-ir-review-native-surfaces`
 - PR: `https://github.com/uv-xiao/htp/pull/68`
-- Status: `planned`
+- Status: `implementation`
 - Owner: `Codex`
 
 ## Goal
@@ -27,14 +27,14 @@ programs from reading like native Python.
 
 ## Scope Checklist
 
-- [ ] review the current IR infrastructure and write
+- [x] review the current IR infrastructure and write
       `docs/design/ir_infrastructure_review.md`
-- [ ] identify the specific IR structures in the WSP/CSP/core/program frontend
+- [x] identify the specific IR structures in the WSP/CSP/core/program frontend
       stack that force metadata-shaped authoring and staged artifacts
-- [ ] refine the typed IR so stage-local and process-local structure are more
+- [x] refine the typed IR so stage-local and process-local structure are more
       directly representable
-- [ ] rebuild WSP/CSP authoring on that refined IR
-- [ ] rewrite `examples/ast_frontend_composability/demo.py` and flagship
+- [x] rebuild WSP/CSP authoring on that refined IR
+- [x] rewrite `examples/ast_frontend_composability/demo.py` and flagship
       WSP/CSP examples against the refined surfaces
 - [ ] validate authored-surface readability, staged-artifact readability, and
       interpreter preservation with focused tests
@@ -52,10 +52,10 @@ programs from reading like native Python.
 ## Test and Verification Plan
 
 Required:
-- [ ] one happy-path test
-- [ ] one malformed-input / contract-violation test
-- [ ] one regression test for the motivating gap
-- [ ] human-friendly example updated or added
+- [x] one happy-path test
+- [x] one malformed-input / contract-violation test
+- [x] one regression test for the motivating gap
+- [x] human-friendly example updated or added
 - [ ] `pixi run verify` or documented fallback
 
 Do not add low-signal tests. Each added test must defend a concrete contract,
@@ -63,9 +63,9 @@ failure mode, or regression.
 
 ## Documentation Plan
 
-- [ ] add `docs/design/ir_infrastructure_review.md`
-- [ ] update `docs/design/` for implemented behavior after the fixes land
-- [ ] update `docs/todo/` to remove or narrow the gap
+- [x] add `docs/design/ir_infrastructure_review.md`
+- [x] update `docs/design/` for implemented behavior after the fixes land
+- [x] update `docs/todo/` to remove or narrow the gap
 - [ ] remove this file from `docs/in_progress/` before merge
 
 ## Commit Plan

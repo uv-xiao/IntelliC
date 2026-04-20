@@ -260,36 +260,53 @@ represented and therefore how local authored syntax can be expressed.
 
 ## Review findings
 
-### 1. WSP stage structure is still metadata-owned
+### 1. WSP stage structure was still metadata-owned
 
-Current WSP authoring lowers task-local stage bodies into:
+The review found that WSP task-local stage bodies were primarily represented as:
 
 - `WSPTaskSpec.attrs["stages"]`
 - `WSPTaskSpec.attrs["schedule"]`
 - step objects whose primary identity is still a symbolic operation name
 
-This is better than raw dict payloads, but it still keeps the real local
-structure inside generic attr containers. That has three consequences:
+That was better than raw dict payloads, but it kept real local structure inside
+generic attr containers. The PR now moves the owned Python objects onto
+`WSPTaskSpec` itself:
 
-- authored syntax still tends to look like schedule annotation rather than local
-  program structure
-- staged variants still read more like encoded plans than direct task-local code
-- passes that want to manipulate stage-local behavior have to decode attrs
-  instead of traversing first-class local structure
+- `WSPTaskSpec.role`
+- `WSPTaskSpec.schedule`
+- `WSPTaskSpec.stages`
 
-### 2. CSP process bodies are still partially metadata choreography
+The compatibility payload still renders these records under task `attrs` at
+serialization boundaries because existing emitted artifacts and semantic passes
+consume that shape. The authoring and dialect-local IR owner no longer require
+humans or frontend handlers to construct `attrs["stages"]` manually.
 
-Current CSP authoring improved, but the dominant shape is still:
+Remaining consequence to keep visible:
+
+- passes that consume serialized workload payloads still see the compatibility
+  payload and should be migrated deliberately if they need structural WSP stage
+  access before serialization
+
+### 2. CSP process bodies were still partially metadata choreography
+
+The review found that CSP authoring improved, but the dominant shape was still:
 
 - process-local `compute(...)` / `compute_step(...)`
 - explicit channel operations as named action markers
 - process steps owned by flat step records rather than richer local process-body
   structure
 
-This keeps CSP readable enough for a proof example, but not yet at the
-human-first bar implied by `docs/story.md`. The user still writes a sequence of
-operation markers, not a strongly native process body with clearer local data
-and protocol intent.
+The PR now introduces typed process-step subclasses:
+
+- `CSPGetStep`
+- `CSPPutStep`
+- `CSPComputeStep`
+
+Builder and AST surfaces can now express process-local operations as ordinary
+method calls such as `dispatch.pack_tile(...)` or `packed = c.pack_tile(...)`.
+The payload boundary still emits `{"kind": "compute", "op": ...}` records so
+existing artifact validators and effect passes keep one stable serialized
+contract.
 
 ### 3. Frontend capture is shared, but local lowering is still too ad hoc
 
@@ -323,24 +340,31 @@ It is weaker at:
 That mismatch explains the user-facing barrier: top-level ownership is clean,
 but local authoring still falls back to metadata containers.
 
-### 5. Example composition is fixed, but example authoring is still too ceremonial
+### 5. Example composition is fixed; flagship authoring is being rewritten
 
 `examples/ast_frontend_composability/demo.py` no longer performs manual
 `ProgramItems` surgery, which was the previous blocker. That fix matters.
 
-But the authored examples still reveal the current substrate limit:
+The next substrate limit was example ceremony:
 
 - WSP example code still reads like a scheduled plan made of named steps
 - CSP example code still reads like a protocol script made of action markers
 - flagship examples still do not yet read like the best “native Python first”
   references
 
-This means the remaining work must change both:
+This PR rewrites the composability and flagship WSP/CSP examples toward:
 
-- IR representation
-- public authoring shape
+- nested WSP task functions with `with w.prologue():`, `with w.steady():`, and
+  `with w.epilogue():` blocks
+- intrinsic-looking WSP stage calls such as `w.cp_async(...)` and
+  `w.mma_sync(...)`
+- nested CSP process functions with local bindings such as
+  `packed = c.pack_tile(...)`
+- protocol calls that carry values, such as `c.put(partials, packed)`
 
-Changing only examples would be cosmetic.
+The implementation lesson is that changing only examples would have been
+cosmetic. The examples are readable because the IR and frontend can now own the
+local structure more directly.
 
 ## Design constraints raised by the review
 

@@ -9,9 +9,16 @@ import htp.wsp as wsp_module
 from htp import ark
 from htp.csp import program as csp_program
 from htp.ir.core.semantics import KernelIR, WorkloadIR
-from htp.ir.dialects.csp import CSPProcessStep as TypedCSPProcessStep
+from htp.ir.dialects.csp import (
+    CSPComputeStep,
+    CSPGetStep,
+    CSPPutStep,
+)
+from htp.ir.dialects.csp import (
+    CSPProcessStep as TypedCSPProcessStep,
+)
 from htp.ir.dialects.wsp import WSPStageSpec, WSPStageStep
-from htp.ir.frontends import resolve_frontend
+from htp.ir.frontends import FrontendSyntaxError, resolve_frontend
 from htp.ir.program.module import ProgramModule
 from htp.kernel import (
     KernelSpec,
@@ -945,18 +952,18 @@ def test_csp_program_spec_uses_typed_process_steps() -> None:
     def streaming_workload(p) -> None:
         tiles = p.fifo("tiles", dtype="f32", capacity=2)
         partials = p.fifo("partials", dtype="f32", capacity=2)
-        p.process("dispatch", task_id="dispatch").role("source").get(tiles).compute_step(
-            "prepare_tile", source=p.args.lhs, count=2
+        p.process("dispatch", task_id="dispatch").role("source").get(tiles).prepare_tile(
+            source=p.args.lhs, count=2
         ).put(partials)
 
     process_spec = streaming_workload.processes[0]
 
     assert process_spec.steps
     assert all(isinstance(step, TypedCSPProcessStep) for step in process_spec.steps)
-    assert process_spec.steps[0].kind == "get"
-    assert process_spec.steps[1].kind == "compute"
+    assert isinstance(process_spec.steps[0], CSPGetStep)
+    assert isinstance(process_spec.steps[1], CSPComputeStep)
     assert process_spec.steps[1].attrs == {"op": "prepare_tile", "source": "lhs", "count": 2}
-    assert process_spec.steps[2].kind == "put"
+    assert isinstance(process_spec.steps[2], CSPPutStep)
 
     payload = process_spec.to_payload()
 
@@ -994,7 +1001,7 @@ def test_wsp_program_spec_uses_typed_stage_objects() -> None:
             .step("cp_async", source=w.args.rhs, target="b_stage")
         )
 
-    stages = tiled.tasks[0].attrs["stages"]
+    stages = tiled.tasks[0].stages
 
     assert isinstance(stages[0], WSPStageSpec)
     assert isinstance(stages[0].steps[0], WSPStageStep)
@@ -1018,8 +1025,9 @@ def test_wsp_ast_frontend_supports_nested_task_functions() -> None:
     def tiled(w) -> None:
         @w.task(task_id="load_tiles", role="producer")
         def load_tiles() -> None:
-            w.step("cp_async", stage="prologue", source=w.args.A, target="a_tile")
-            w.step("cp_async", stage="prologue", source=w.args.B, target="b_tile")
+            with w.prologue():
+                w.cp_async(source=w.args.A, target="a_tile")
+                w.cp_async(source=w.args.B, target="b_tile")
 
         @w.mainloop(
             task_id="mma_tiles",
@@ -1031,8 +1039,9 @@ def test_wsp_ast_frontend_supports_nested_task_functions() -> None:
             resources={"num_warps": 4},
         )
         def mma_tiles() -> None:
-            w.step("barrier", stage="steady")
-            w.step("mma_sync", stage="steady", accum="acc")
+            with w.steady():
+                w.barrier()
+                w.mma_sync(accum="acc")
 
     payload = tiled.to_program()
     module = tiled.to_program_module()
@@ -1042,6 +1051,28 @@ def test_wsp_ast_frontend_supports_nested_task_functions() -> None:
     assert payload["wsp"]["workload"]["tasks"][1]["kind"] == "wsp_mainloop"
     assert module.meta["frontend_capture"] == "ast"
     assert module.items.typed_items[0].name == "tiled"
+
+
+def test_wsp_ast_frontend_rejects_unknown_stage_blocks() -> None:
+    @kernel
+    def affine_mix(
+        A: buffer(dtype="f32", shape=("M", "K"), role="input"),
+        B: buffer(dtype="f32", shape=("K", "N"), role="input"),
+        C: buffer(dtype="f32", shape=("M", "N"), role="output"),
+        M: scalar(dtype="i32", role="shape"),
+        N: scalar(dtype="i32", role="shape"),
+        K: scalar(dtype="i32", role="shape"),
+    ) -> None:
+        store(C, A @ B)
+
+    with pytest.raises(FrontendSyntaxError, match="Unsupported WSP stage block"):
+
+        @wsp_program(target="nvgpu-ampere", kernel=affine_mix)
+        def bad_tiled(w) -> None:
+            @w.task(task_id="load_tiles", role="producer")
+            def load_tiles() -> None:
+                with w.unspecified_stage():
+                    w.cp_async(source=w.args.A, target="a_tile")
 
 
 def test_csp_program_surface_accepts_kernel_specs_and_step_helpers():
@@ -1186,14 +1217,14 @@ def test_csp_ast_frontend_supports_nested_process_functions() -> None:
         @c.process(task_id="dispatch", role="producer")
         def dispatch() -> None:
             tile = c.get(tiles)
-            c.compute("pack_tile", source=c.args.X, tile=tile)
-            c.put(partials)
+            packed = c.pack_tile(source=c.args.X, tile=tile)
+            c.put(partials, packed)
 
         @c.process(task_id="combine", role="consumer", args=(c.args.X, c.args.Y, c.args.M, c.args.N))
         def combine() -> None:
             payload = c.get(partials)
-            c.compute_step("reduce_partials", value=payload)
-            c.put(tiles)
+            reduced = c.reduce_partials(value=payload)
+            c.put(tiles, reduced)
 
     payload = pipeline_demo.to_program()
     module = pipeline_demo.to_program_module()
@@ -1201,14 +1232,16 @@ def test_csp_ast_frontend_supports_nested_process_functions() -> None:
     assert [channel["name"] for channel in payload["csp"]["channels"]] == ["tiles", "partials"]
     assert payload["csp"]["processes"][0]["steps"][1] == {
         "kind": "compute",
-        "name": "pack_tile",
+        "op": "pack_tile",
         "source": "X",
         "tile": "tile",
+        "result": "packed",
     }
     assert payload["csp"]["processes"][1]["steps"][1] == {
         "kind": "compute",
         "op": "reduce_partials",
         "value": "payload",
+        "result": "reduced",
     }
     assert module.meta["frontend_capture"] == "ast"
     assert module.items.typed_items[0].name == "pipeline_demo"
@@ -1233,12 +1266,12 @@ def test_csp_surface_supports_bound_args_and_structured_process_bodies():
         partials = p.fifo("partials", dtype="f32", capacity=1)
 
         dispatch = p.process("dispatch", task_id="dispatch").role("producer")
-        dispatch.compute_step("pack_tile", source=p.args.X)
+        dispatch.pack_tile(source=p.args.X)
         dispatch.put(tiles)
 
         combine = p.process("combine", task_id="combine").role("router")
         combine.get(tiles)
-        combine.compute_step("reduce_partials", channel=tiles)
+        combine.reduce_partials(channel=tiles)
         combine.put(partials)
 
     payload = pipeline_demo.to_program()

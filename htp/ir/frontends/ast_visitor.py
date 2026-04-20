@@ -110,6 +110,13 @@ class ASTFrontendVisitor:
             specs = getattr(method, "__htp_ast_handler_specs__", ())
             for spec in specs:
                 handlers.append(_BoundHandler(spec=spec, method=method))
+        handlers.sort(
+            key=lambda handler: (
+                handler.spec.decorator is not None,
+                handler.spec.call is not None,
+            ),
+            reverse=True,
+        )
         return tuple(handlers)
 
 
