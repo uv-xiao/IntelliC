@@ -16,7 +16,7 @@ The framework starts from these concepts:
 
 ```text
 Lang := Surface | IR
-Surface := IR + Parser
+Surface := IR + Construction API
 IR := Sy + Se
 ```
 
@@ -36,19 +36,26 @@ The selected split is:
 
 - `Sy`: syntax, structure, identity, verification, canonical MLIR/xDSL-style
   text, and IR parsing.
-- `Se`: polymorphic semantic models over syntax, expressed through transition
-  and trace mechanisms where possible.
-- Pipeline infrastructure: a unified action mechanism for parsing, analysis,
+- `Se`: thin level-keyed semantic definitions over syntax, expressed through
+  transitions over a shared semantic state/fact/event database.
+- Surface construction APIs: Python-native builders, decorators, operator
+  hooks, and region helpers that construct IR without parser-level composition.
+- Pipeline infrastructure: a unified action mechanism for IR parsing, analysis,
   rewriting, semantic execution, gates, LLM-agent steps, and backend handoff.
 
-## Parser Split
+## Surface Construction And IR Parsing
 
-IntelliC needs two parser families:
+IntelliC should not make Pythonic authoring depend on a hardened or composable
+surface parser. Parser-level composition is too complex for the first clean
+architecture. The human/LLM-facing surface should instead be a Python
+construction API over IR.
 
 ```text
-surface_parser:
-  modular parsers for human/LLM-facing programming surfaces
-  each parser lowers into canonical IR and produces source evidence
+surface_api:
+  Python builders and decorators for human/LLM-facing programming surfaces
+  each builder constructs native Sy objects or canonical IR fragments
+  shares insertion context, diagnostics, symbol binding, type helpers, evidence,
+  and round-trip hooks
 
 ir_parser:
   strict MLIR/xDSL-style parser for canonical IR text
@@ -56,11 +63,16 @@ ir_parser:
   only where IntelliC architecture requires it
 ```
 
-Surface parsers should be modular but share common infrastructure: source
-capture, diagnostics, symbol binding, lowering utilities, example evidence, and
-round-trip hooks. The IR parser has a different contract: it must parse the
-canonical IR syntax accepted by MLIR/xDSL, including generic and custom
-operation forms.
+Surface APIs should be modular but they compose as Python construction
+primitives, not grammar or AST parser extensions. Dialects and operations may
+provide builder functions, type constructors, operator hooks, decorators, and
+region/context-manager helpers. A final decorator can stage a Python function by
+creating symbolic IR values, executing the function under an insertion context,
+collecting emitted operations, and verifying the resulting `Sy` graph.
+
+The IR parser has a different contract: it must parse the canonical IR syntax
+accepted by MLIR/xDSL, including generic and custom operation forms. It is not
+responsible for accepting Pythonic syntax.
 
 ## Design Decomposition
 
@@ -68,11 +80,12 @@ This umbrella document records the architectural choice and links the concrete
 subdesigns:
 
 - `docs/in_progress/design/compiler_syntax.md` — `Sy`, copied/adapted from
-  xDSL classes where useful, with strict MLIR/xDSL syntax format and separate
-  `surface_parser` / `ir_parser` contracts.
-- `docs/in_progress/design/compiler_semantics.md` — `Se`, designed as
-  polymorphic semantic models and trace-updating transition systems rather than
-  a single semantic definition per operation.
+  xDSL classes where useful, with strict MLIR/xDSL syntax format, Python-native
+  surface construction APIs, and a separate strict `ir_parser` contract.
+- `docs/in_progress/design/compiler_semantics.md` — `Se`, designed as thin
+  `SemanticDef` records bound to typed owners and extensible semantic level keys
+  over a shared `TraceDB`, rather than a single semantic definition per
+  operation.
 - `docs/in_progress/design/compiler_passes.md` — unified compiler actions for
   analysis, rewrite, pass, gate, semantic execution, LLM-agent participation,
   and backend handoff.
@@ -88,61 +101,78 @@ Planned package ownership:
 intellic/
   ir/
     syntax/          # copied/adapted xDSL-style Operation, Region, Block, etc.
-    semantics/       # semantic models, transition relations, trace updates
+    semantics/       # SemanticDef records, transition relations, TraceDB
     actions/         # unified analysis/rewrite/pass/gate/action execution
     dialects/        # dialect registration and extension ownership
     parser/          # ir_parser: strict canonical IR parser
   surfaces/
-    parser/          # surface_parser shared infrastructure and modular parsers
+    api/             # decorators, builders, insertion contexts, evidence
   examples/          # small executable examples used as evidence
 ```
 
 Core dependency direction:
 
 ```text
-surface_parser modules
-      |
-      v
-canonical IR text <----> ir_parser
+surface_api decorators/builders
       |
       v
   Sy objects  <---- dialect definitions
-      |
+      | \
+      |  \-> canonical IR text <----> ir_parser
       v
-  Se models and trace updates
+  Se definitions and TraceDB updates
       |
       v
 Unified compiler actions
       |
       v
-Evidence: source maps, traces, e-graphs, artifacts, review notes
+Evidence: source maps, TraceDB, e-graphs, artifacts, review notes
 ```
 
 `Sy` owns structural shape and MLIR/xDSL-compatible syntax. `Se` depends on
 `Sy`, but it must not be hidden inside parser or action-local metadata. Compiler
-actions depend on both `Sy` and `Se` and record their changes in a general trace
-or evidence stream.
+actions depend on both `Sy` and `Se` and record semantic changes in `TraceDB`.
 
 ## Cross-Cutting Contracts
 
 - Every canonical IR program is `IR := Sy + Se`, not syntax alone.
-- `surface_parser` and `ir_parser` are different parser families with shared
-  lower-level infrastructure where useful.
+- `surface_api` and `ir_parser` are different layers. `surface_api` constructs
+  IR through Python builders and decorators; `ir_parser` reads canonical IR
+  text.
 - `ir_parser` must strictly match MLIR/xDSL canonical syntax.
+- Pythonic surface authoring must not require AST/parser-level composition.
 - Native IntelliC syntax classes are copied/adapted from xDSL where useful; they are
   not imported through wrappers as IntelliC's public architecture.
 - IntelliC is the infrastructure name, not a dialect name. Examples should use
   MLIR-style dialect names such as `builtin`, `func`, and `arith`, or future
   real project dialect names once designed.
-- A single operation may have multiple semantic models, such as concrete
-  execution, abstract interpretation, rewrite/equality reasoning, or backend
-  evidence semantics.
+- A single operation may have multiple level-specific `SemanticDef` records.
+  Level keys are extensible; examples include concrete value, abstract range,
+  symbols, or backend evidence semantics.
+- Equality saturation/e-graph reasoning should be modeled as explicit IR
+  operations plus compiler actions, not as a `SemanticDef` level.
 - Effects, obligations, diagnostics, and pass gates should be represented as
-  general trace facts or evidence records unless a later design proves a more
-  specific abstraction is necessary.
+  typed `TraceDB` event/fact relations or projections unless a later design
+  proves a more specific abstraction is necessary.
 - Compiler pipeline pieces should share one action mechanism where possible;
-  analysis, rewrite, pass, gate, semantic execution, and LLM-agent review are
-  specializations of action execution rather than unrelated subsystems.
+  analysis, rewrite, pass, gate, semantic execution, and LLM-agent participation
+  are specializations of action execution rather than unrelated subsystems.
+- Compiler actions are classified as `Fixed` or `AgentAct`. `AgentEvolve` is a
+  separate JIT-like workflow that generates verified `Fixed` actions.
+  Actions record matches, facts, evidence, and mutation intents in `TraceDB`;
+  syntax mutation is performed by explicit mutator stages that consume those
+  records.
+- A compiler pipeline has one authoritative `TraceDB` per run, with action
+  frames, transactions, checkpoints, and optional speculative overlays for
+  agent work.
+- Actions may also create auxiliary `TraceDB` instances for local computation,
+  but only records exported into the pipeline `TraceDB` participate in shared
+  pipeline logic, gates, replay, or cross-action reuse.
+- Fast shared pipeline lookup stays inside the authoritative `TraceDB` through
+  declared relation indexes and optional materialized projections rather than a
+  separate pipeline-level analysis-cache subsystem.
+- Python and future C++ actions should share one language-neutral action host
+  contract and canonical `TraceDB`/evidence schemas.
 - Every design example maps to evidence before implementation starts. For
   documentation-only work, evidence may be a focused reread, link/path check,
   or policy check rather than automated tests.
@@ -154,7 +184,7 @@ or evidence stream.
 Surface:
 
 ```python
-@surface
+@func.ir_function
 def add_one(x: i32) -> i32:
     return x + 1
 ```
@@ -174,24 +204,28 @@ Canonical IR sketch:
 Decomposition:
 
 ```text
-surface_parser:
-  lower Pythonic source to canonical IR plus source evidence
+surface_api:
+  create symbolic function arguments
+  execute the Python function under an insertion context
+  lower x + 1 through registered value/operator builders
+  produce Sy objects plus builder-call evidence
 
 ir_parser:
-  parse strict MLIR/xDSL-style canonical text
+  parse strict MLIR/xDSL-style canonical text when reading or round-tripping IR
 
 compiler_syntax.md:
   define copied/adapted Operation, Region, Block, Value, Type, Attribute classes
+  and high-level Python construction APIs
 
 compiler_semantics.md:
-  attach one or more semantic models to builtin/func/arith operations
+  attach one or more level-keyed SemanticDef records to builtin/func/arith operations
 
 compiler_passes.md:
   run unified actions for interpretation, rewriting, eqsat, gates, and review
 ```
 
-Verification mapping: parser golden evidence, IR round-trip evidence, semantic
-trace evidence, and action-pipeline evidence.
+Verification mapping: construction API example evidence, IR round-trip evidence,
+semantic database evidence, and action-pipeline evidence.
 
 ### Example 2: E-Graph Reasoning Is A Mechanism, Not Per-Op Equivalence Fields
 
@@ -203,8 +237,8 @@ arith.muli(%x, %one)  <=> %x
 ```
 
 Feature shown: equivalence belongs in an equality-saturation/e-graph mechanism
-that can consume rewrite rules and cost models. Operation semantics do not need
-per-op equivalence fields.
+modeled with IR operations and actions that can consume rewrite rules and cost
+models. Operation semantics do not need per-op equivalence fields.
 
 Verification mapping: e-graph action evidence records e-class creation,
 saturation rules, extraction cost, and chosen replacement.
@@ -212,21 +246,29 @@ saturation rules, extraction cost, and chosen replacement.
 ## Acceptance Criteria
 
 - `compiler_framework.md` records only the selected architectural decision,
-  parser split, decomposition, and cross-cutting requirements.
+  surface construction boundary, strict IR parser boundary, decomposition, and
+  cross-cutting requirements.
 - Syntax, semantics, and pass mechanisms each have focused design drafts.
 - The syntax design avoids declarative operation-definition machinery as an
-  initial dependency, distinguishes `surface_parser` and `ir_parser`, and
-  commits to strict MLIR/xDSL syntax.
-- The semantics design allows multiple semantic models per operation and treats
-  effects/obligations/diagnostics/traces as general trace facts until proven
+  initial dependency, distinguishes Python-native surface construction from
+  strict `ir_parser`, and commits to strict MLIR/xDSL syntax.
+- The semantics design defines how IRs, dialects, regions, and operations
+  contribute thin level-keyed `SemanticDef` records, and treats
+  effects/obligations/diagnostics as `TraceDB` projections until proven
   otherwise.
+- The framework keeps eqsat/e-graph reasoning out of `SemanticDef` levels and
+  represents it through operation-modeled IR plus actions.
 - The passes design unifies pass, analysis, rewrite, gates, semantic execution,
-  and LLM-agent pipeline participation around one action mechanism.
+  and LLM-agent pipeline participation around one action mechanism with `Fixed`
+  and `AgentAct` action kinds, a separate `AgentEvolve` fixed-action generation
+  workflow, mutator stages for syntax changes, `TraceDB`-native indexing, and a
+  shared cross-language action/evidence contract.
 
 ## Out Of Scope
 
 - Direct implementation of the compiler core.
 - Designing a complete surface language.
+- Parser-level composition for Pythonic source surfaces.
 - Backend lowering details beyond semantic/evidence boundaries.
 - Treating `intellic` as a dialect name before dialect design exists.
 
