@@ -1,6 +1,6 @@
 # Docs And Knowledge Rules
 
-- `docs/design/` contains implemented behavior only.
+- `docs/design/` contains accepted architecture and implemented behavior only.
 - `docs/todo/` contains future or partial work only.
 - `docs/in_progress/` contains active feature tasks and active design drafts only.
 - Record human instructions under `docs/in_progress/human_words/` during active

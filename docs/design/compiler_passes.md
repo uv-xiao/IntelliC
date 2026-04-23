@@ -1,8 +1,6 @@
 # Design: Compiler Passes
 
-> Review status: Draft only. Not reviewed or approved. This document records
-> current working direction and fix advice for IntelliC; do not treat it as
-> accepted architecture until explicit human review approves it.
+> Status: Accepted architecture design for IntelliC compiler actions and pipelines.
 
 ## Goal
 

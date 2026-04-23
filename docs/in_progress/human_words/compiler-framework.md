@@ -201,3 +201,13 @@
   - Related: docs/in_progress/design/compiler_framework.md
   - Related: docs/notes/compiler_framework_sources.md
   - Agent interpretation: Support both an authoritative pipeline TraceDB and optional action-owned auxiliary TraceDB instances. Clarify that the pipeline TraceDB plays some cross-action roles similar to an analysis-cache system, but remains broader and evidence-bearing; auxiliary action TraceDBs may provide local cached or derived information and must export selected results into the pipeline TraceDB to affect pipeline behavior.
+
+- 2026-04-24 00:57 local - Promote compiler architecture draft to accepted design
+  > We should accept the draft to become an accepted-architecture design. Do the promotion.
+  - Context: User decided to promote the compiler architecture draft into accepted design status after opening the draft PR.
+  - Related: docs/design/compiler_framework.md
+  - Related: docs/design/compiler_syntax.md
+  - Related: docs/design/compiler_semantics.md
+  - Related: docs/design/compiler_passes.md
+  - Related: docs/todo/README.md
+  - Agent interpretation: Promote the accepted architecture by moving the compiler design docs from docs/in_progress/design into docs/design, removing draft-only status language, updating task/todo/in-progress indexes, and aligning the PR metadata with accepted-architecture wording.

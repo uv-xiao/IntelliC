@@ -1,8 +1,6 @@
 # Design: Compiler Framework
 
-> Review status: Draft only. Not reviewed or approved. This document records
-> current working direction and fix advice for IntelliC; do not treat it as
-> accepted architecture until explicit human review approves it.
+> Status: Accepted architecture design for IntelliC's compiler framework.
 
 ## Goal
 
@@ -79,14 +77,14 @@ responsible for accepting Pythonic syntax.
 This umbrella document records the architectural choice and links the concrete
 subdesigns:
 
-- `docs/in_progress/design/compiler_syntax.md` — `Sy`, copied/adapted from
+- `docs/design/compiler_syntax.md` — `Sy`, copied/adapted from
   xDSL classes where useful, with strict MLIR/xDSL syntax format, Python-native
   surface construction APIs, and a separate strict `ir_parser` contract.
-- `docs/in_progress/design/compiler_semantics.md` — `Se`, designed as thin
+- `docs/design/compiler_semantics.md` — `Se`, designed as thin
   `SemanticDef` records bound to typed owners and extensible semantic level keys
   over a shared `TraceDB`, rather than a single semantic definition per
   operation.
-- `docs/in_progress/design/compiler_passes.md` — unified compiler actions for
+- `docs/design/compiler_passes.md` — unified compiler actions for
   analysis, rewrite, pass, gate, semantic execution, LLM-agent participation,
   and backend handoff.
 

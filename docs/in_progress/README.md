@@ -13,6 +13,4 @@ Rules:
 
 ## Active Tasks
 
-- `docs/in_progress/compiler_framework.md` — clean IntelliC compiler framework design,
-  including umbrella, syntax, semantics, and pass mechanism drafts under
-  `docs/in_progress/design/`.
+- None currently.
