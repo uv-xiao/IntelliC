@@ -800,6 +800,42 @@ First-slice failure tests:
 - an `AgentAct` proposal that violates policy is recorded as rejected, not
   silently ignored or applied.
 
+## First-Slice Pass Set
+
+The first implementation slice should implement a small fixed pipeline that
+exercises syntax, semantics, actions, mutation, and legality records without
+claiming a production optimizer. These are the selected passes/actions, in
+pipeline order:
+
+| Order | Pass/action | Kind | Reads | Writes | Failure evidence |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `verify-structure` | Fixed gate | module syntax | `Diagnostic`, `EvidenceLink` | broken ownership, bad terminators, type mismatches |
+| 2 | `seed-constant-facts` | Fixed analysis | `arith.constant`, function inputs | `ValueConcrete`, `ValueRange` | unsupported constant attr/type |
+| 3 | `seed-affine-facts` | Fixed analysis | affine maps/sets/loops/memory ops, memref/vector types | `AffineMapValue`, `AffineConstraintSet`, `AffineLoopBounds`, `AffineLoopBand`, `AffineAccess`, `MemoryEffect` | invalid dimension/symbol binding, rank/type mismatch |
+| 4 | `execute-sum-to-n` | Fixed semantic run | selected semantic defs, concrete input facts | `Evaluated`, `RegionEntered`, `LoopIteration`, `RegionResult`, `ValueConcreteTuple` | missing semantic def, bad loop step, missing concrete fact |
+| 5 | `canonicalize-add-zero` | Fixed rewrite | `ValueConcrete(0)`, nested-region syntax | `MatchRecord`, `MutationIntent`, `RewriteEvidence` | stale syntax id, result/yield preservation failure |
+| 6 | `apply-mutations` | MutatorStage | current `MutationIntent` records | `MutationApplied`, updated syntax ids | stale subject, verifier failure after mutation |
+| 7 | `simplify-affine-maps` | Fixed rewrite | `AffineMapValue`, affine syntax | `MatchRecord`, `MutationIntent`, `RewriteEvidence` | changed dim/symbol order, non-equivalent result expr |
+| 8 | `check-affine-tile-fusion-legality` | Fixed legality | `AffineAccess`, `AffineLoopBounds`, `AffineLoopBand`, `MemoryEffect` | `AffineDependence`, `AffineTransformLegality` | dependence conflict, stale dependency, unsupported memory effect |
+| 9 | `pending-record-gate` | Fixed gate | required-to-handle records | `PipelineRun` status evidence | unhandled mutation, stale legality, rejected required diagnostic |
+
+This set is intentionally implementation-sized:
+
+- It proves the syntax substrate by verifying nested regions, full-SCF
+  structural contracts, affine maps, and memref/vector type checks.
+- It proves semantic execution on the challenging `sum_to_n` loop-carried
+  example instead of a straight-line arithmetic toy.
+- It proves mutation through `MutationIntent` plus `MutatorStage`, not direct
+  pass mutation.
+- It proves affine support by extracting typed access/bounds facts and producing
+  a versioned legality decision before any affine transform may mutate syntax.
+
+`check-affine-tile-fusion-legality` is selected for the first slice, but the
+actual `affine-tile-fuse` mutating transform is deferred unless the legality
+check and syntax mutation substrate are already stable. The first slice must
+still include both accepted and rejected legality cases so implementation has a
+real affine optimization contract to satisfy.
+
 ## SCF And Affine Action Contracts
 
 SCF and affine are the first action-heavy dialect families. Their actions must
@@ -849,6 +885,10 @@ version. Failed legality checks are useful evidence and should remain in
 - Example action-local auxiliary `TraceDB` evidence showing explicit export into
   the authoritative pipeline database.
 - Negative evidence where an unconsumed mutation intent causes action failure.
+- First-slice pipeline evidence for `verify-structure`, `seed-constant-facts`,
+  `seed-affine-facts`, `execute-sum-to-n`, `canonicalize-add-zero`,
+  `apply-mutations`, `simplify-affine-maps`,
+  `check-affine-tile-fusion-legality`, and `pending-record-gate`.
 - SCF evidence covering `if`, `for`, `while`, `execute_region`, `index_switch`,
   `parallel`, `reduce`, `forall`, and their terminators.
 - Affine action evidence covering map simplification, dependence facts, and one

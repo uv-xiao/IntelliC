@@ -240,6 +240,10 @@ Required evidence:
   as replacing `addi(total, 0)` if present in a variant fixture, writes a
   mutation intent, applies it through `MutatorStage`, and fails if required
   pending records remain unhandled.
+- The first action pipeline is fixed and named: `verify-structure`,
+  `seed-constant-facts`, `seed-affine-facts`, `execute-sum-to-n`,
+  `canonicalize-add-zero`, `apply-mutations`, `simplify-affine-maps`,
+  `check-affine-tile-fusion-legality`, and `pending-record-gate`.
 
 The first slice does not need broad dialect coverage. It needs enough depth for
 the object model, semantics model, and action model to prove their contracts.

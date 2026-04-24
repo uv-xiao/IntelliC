@@ -31,6 +31,9 @@ so an implementation agent can answer:
   loop-carried values, TraceDB semantics, and actions work together
 - [x] Review and make full SCF plus affine dialect support concrete enough for
   implementation
+- [x] Fill reviewed gaps: minimal memref/vector substrate, concrete
+  `scf.forall` schemas, typed affine legality records, and selected first-slice
+  pass set
 - [x] Verify locally
 - [x] Sync `docs/design/`, `docs/todo/`, and `docs/in_progress/`
 
@@ -82,6 +85,7 @@ Verification run:
 - `rg -n "Implementation-Ready|First-slice invariants|First-slice failure tests|Build Order|First Implementation Slice" docs/design/compiler_*.md docs/in_progress/implementation_ready_compiler_design.md` — confirmed the new design sections are present
 - `rg -n 'sum_to_n|loop-body|challenging|LoopIteration|ValueConcreteTuple|scf.for_' docs/design/compiler_*.md docs/in_progress/design/implementation_ready_compiler_design.md docs/in_progress/implementation_ready_compiler_design.md docs/in_progress/human_words/compiler-framework.md` — confirmed the challenging examples and evidence hooks are present
 - `rg -n 'Full SCF|Affine Syntax Coverage|Affine Semantics|SCF And Affine|affine_tile|AffineTransformLegality|scf.forall|affine.dma|Require affine' docs/design docs/in_progress docs/notes/compiler_framework_sources.md` — confirmed full SCF and affine design coverage is present
+- `rg -n "Minimal MemRef|VectorType|ScfForallOp|ForallIteration|AffineLoopBand|AffineTransformLegality|First-Slice Pass Set|verify-structure|check-affine-tile-fusion-legality|memref.py|vector.py" docs/design docs/in_progress docs/notes/compiler_framework_sources.md` — confirmed the filled gaps and selected first-slice pass set are present
 
 ## Docs
 

@@ -35,3 +35,13 @@
   - Related: docs/design/compiler_passes.md
   - Related: docs/in_progress/design/implementation_ready_compiler_design.md
   - Agent interpretation: Review accepted compiler design for implementation gaps, promote affine from future/nice-to-have to a first-class dialect family, and define full SCF syntax/semantics/action coverage rather than only scf.for.
+
+- 2026-04-24 16:29 CST - Fill implementation design gaps and choose first passes
+  > Fill the missing things. You also need to decide a set of passes to be implemented in the first slice.
+  - Context: User asked to address the review findings for PR #70 and make an explicit first-slice pass selection.
+  - Related: docs/design/compiler_syntax.md
+  - Related: docs/design/compiler_semantics.md
+  - Related: docs/design/compiler_passes.md
+  - Related: docs/design/compiler_framework.md
+  - Related: docs/in_progress/design/implementation_ready_compiler_design.md
+  - Agent interpretation: Define the missing memref/vector substrate for affine, concrete scf.forall operation contracts, typed affine legality records, and a selected first-slice pass/action set.

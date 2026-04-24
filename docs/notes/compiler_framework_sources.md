@@ -50,7 +50,7 @@ cover most of the planned `Sy` implementation:
 | Printing and SSA/block name allocation | `.repositories/xdsl/xdsl/printer.py` |
 | Insertion points and mutation discipline | `.repositories/xdsl/xdsl/rewriter.py`, `.repositories/xdsl/docs/marimo/builders.py` |
 | Human-readable MLIR/xDSL syntax examples | `.repositories/xdsl/docs/marimo/mlir_ir.py`, `.repositories/xdsl/docs/marimo/xdsl_introduction.py` |
-| First-slice dialect examples | `.repositories/xdsl/xdsl/dialects/builtin.py`, `.repositories/xdsl/xdsl/dialects/func.py`, `.repositories/xdsl/xdsl/dialects/arith.py`, `.repositories/xdsl/xdsl/dialects/cf.py`, `.repositories/xdsl/xdsl/dialects/scf.py`, `.repositories/xdsl/xdsl/dialects/affine.py` |
+| First-slice dialect examples | `.repositories/xdsl/xdsl/dialects/builtin.py`, `.repositories/xdsl/xdsl/dialects/func.py`, `.repositories/xdsl/xdsl/dialects/arith.py`, `.repositories/xdsl/xdsl/dialects/cf.py`, `.repositories/xdsl/xdsl/dialects/scf.py`, `.repositories/xdsl/xdsl/dialects/affine.py`, `.repositories/xdsl/xdsl/dialects/memref.py`, `.repositories/xdsl/xdsl/dialects/vector.py` |
 | Full SCF operation contract | `.repositories/llvm-project/mlir/include/mlir/Dialect/SCF/IR/SCFOps.td` |
 | Full affine operation contract | `.repositories/llvm-project/mlir/include/mlir/Dialect/Affine/IR/AffineOps.td`, `.repositories/llvm-project/mlir/docs/Dialects/Affine.md` |
 | MLIR textual and operation-definition background | `.repositories/llvm-project/mlir/docs/LangRef.md`, `.repositories/llvm-project/mlir/docs/DefiningDialects/Operations.md` |

@@ -443,6 +443,36 @@ The affine parser/printer must support MLIR's dimension and symbol use lists:
 `(dims)[symbols]`. Verification must distinguish invalid symbol uses from
 invalid dimension uses because later affine analyses depend on that distinction.
 
+### Minimal MemRef And Vector Type Substrate
+
+Affine memory operations require memref and vector types even though broad
+memref/vector dialect behavior is not part of the first compiler slice. The
+first slice therefore owns a narrow type substrate:
+
+```text
+MemRefType(element_type, shape, layout=None, memory_space=None)
+VectorType(element_type, shape)
+```
+
+Contracts:
+
+- `MemRefType` verifies ranked and unranked memref spelling used by affine
+  load/store examples, including dynamic dimensions spelled `?`.
+- `VectorType` verifies element type and static vector shape for
+  `affine.vector_load` and `affine.vector_store`.
+- Affine load/store verification reads only type shape, rank, element type,
+  layout, and memory-space metadata. It does not require allocation, subview,
+  cast, transfer, vector arithmetic, or bufferization operations.
+- A memory operation's affine map result count must match the memref rank unless
+  the operation contract explicitly documents a special case.
+- `affine.load` and `affine.store` element values must match the memref element
+  type. `affine.vector_load` and `affine.vector_store` values must match a
+  `VectorType` whose element type matches the memref element type.
+
+Follow-up memref/vector dialect implementation may replace or extend these
+classes, but it must preserve the type identity and verification contracts used
+by first-slice affine operations.
+
 ## Copy Boundary
 
 Candidate xDSL concepts to copy and adjust:
@@ -667,7 +697,8 @@ Input:
   Canonical MLIR/xDSL-compatible IR text using builtin.module, func.func,
   func.return, arith.constant, arith.addi, arith.index_cast, full scf syntax,
   affine.apply, affine.for, affine.if, affine.load/store, affine.min/max,
-  simple blocks, loop-carried block arguments, and nested regions
+  minimal memref/vector types, simple blocks, loop-carried block arguments,
+  and nested regions
 
   Python construction API examples using builtin.module, func.ir_function,
   func.return_, arith.constant, arith.addi, arith.index_cast, scf builders,
@@ -711,6 +742,8 @@ Included in the first slice:
 - Affine expression/map/set constructors and named builders for `affine.apply`,
   `affine.for_`, `affine.if_`, `affine.load`, `affine.store`, `affine.min`,
   and `affine.max`.
+- Minimal `MemRefType` and `VectorType` construction/parsing sufficient for
+  affine load/store/vector_load/vector_store type verification.
 - Basic operator sugar for `Value.__add__` when the active construction policy maps it to
   `arith.addi`.
 - Construction evidence for builder/decorator/operator-hook calls.
@@ -748,6 +781,8 @@ intellic/ir/dialects/
   arith.py           # arith.constant, arith.addi, integer attrs/types
   scf.py             # full structured-control-flow dialect
   affine.py          # affine expressions, maps, sets, and affine ops
+  memref.py          # type-only first-slice MemRefType substrate
+  vector.py          # type-only first-slice VectorType substrate
 
 intellic/ir/parser/
   lexer.py           # copied/adapted MLIR lexer behavior
@@ -791,7 +826,8 @@ First-slice failure tests:
   invalid `scf.condition` payloads, and malformed `scf.forall.in_parallel`.
 - Affine verification rejects dimension/symbol operand count mismatches,
   invalid symbol binding, non-positive affine loop steps, memory element type
-  mismatches, and malformed affine DMA/prefetch operand groups.
+  mismatches, rank/map-result mismatches, vector element mismatches, and
+  malformed affine DMA/prefetch operand groups.
 
 ## Acceptance Criteria
 
@@ -809,6 +845,8 @@ First-slice failure tests:
   control flow over symbolic values is rejected.
 - Full SCF coverage and affine dialect coverage are concrete enough to implement
   in batches without changing public contracts.
+- The first-slice memref/vector substrate is narrow but sufficient for affine
+  memory operation verification.
 - Examples cover canonical IR parsing, Python builder construction, operator
   sugar, explicit region helpers, affine map/set syntax, and affine access facts.
 - Each example names verification evidence before implementation.

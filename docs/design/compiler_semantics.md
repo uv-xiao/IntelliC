@@ -310,6 +310,49 @@ SCF operations must write enough `TraceDB` evidence to replay which regions ran,
 which payload values crossed region boundaries, and which facts were joined,
 widened, reduced, or rejected.
 
+#### `scf.forall` Record Shape
+
+`scf.forall` needs a concrete contract because it is easy to accidentally model
+it as an ordinary sequential loop. IntelliC records it as a parallel iteration
+space with an explicit merge point:
+
+```text
+ScfForallOp(
+  lower_bounds: tuple[ValueId | AttributeId, ...],
+  upper_bounds: tuple[ValueId | AttributeId, ...],
+  steps: tuple[ValueId | AttributeId, ...],
+  shared_outs: tuple[ValueId, ...],
+  mapping: tuple[AttributeId, ...],
+  body: RegionId,
+  results: tuple[ValueId, ...],
+)
+
+ScfForallInParallelOp(
+  yielding_ops: tuple[OperationId, ...],
+  destination_values: tuple[ValueId, ...],
+)
+```
+
+Semantic evidence:
+
+```text
+ForallIteration(op: OperationId, logical_indices, body_region, yielded)
+ForallSharedOutput(op: OperationId, source: ValueId, destination: ValueId, rank)
+ForallMerge(op: OperationId, in_parallel: OperationId, outputs, merge_policy)
+SynchronizationPoint(op: OperationId, kind: forall_implicit_barrier)
+```
+
+Contracts:
+
+- Concrete replay may choose a deterministic iteration order, but that order is
+  evidence only. It must not prove reorderability by itself.
+- Abstract/action semantics may treat iterations as reorderable only after
+  isolation, shared-output ownership, and merge-policy facts are present.
+- `scf.forall.in_parallel` is the only legal terminator for a `scf.forall`
+  region. Its yielding operations must target the declared shared outputs.
+- Result facts become visible after `SynchronizationPoint`; body-local facts do
+  not escape unless yielded, merged, or explicitly exported.
+
 ### Affine Semantics
 
 Affine semantics is not just concrete execution of loops. It is the source of
@@ -337,15 +380,29 @@ Minimal affine relation schemas:
 ```text
 AffineMapValue(map: AffineMapId, dims, symbols, results)
 AffineConstraintSet(set: AffineSetId, dims, symbols, constraints)
-AffineAccess(op: OperationId, memref: ValueId, indices, map, dims, symbols, kind)
-AffineLoopBounds(op: OperationId, lower_map, upper_map, step, operands)
-AffineDependence(src: OperationId, dst: OperationId, relation, evidence)
-AffineTransformLegality(action: ActionId, subject: OperationId, status, evidence)
+AffineAccess(op: OperationId, memref: ValueId, element_type, rank,
+             map: AffineMapId, dims, symbols, indices, kind, effect)
+AffineLoopBounds(op: OperationId, iv: ValueId, lower_map, upper_map,
+                 lower_operands, upper_operands, step, scope)
+AffineLoopBand(subject: OperationId, loops: tuple[OperationId, ...],
+               ivs: tuple[ValueId, ...], bounds, permutable)
+AffineDependence(src: OperationId, dst: OperationId, src_access, dst_access,
+                 relation, distance_vector, direction_vector, evidence)
+AffineTransformLegality(action: ActionId, subject: OperationId, transform_name,
+                        transform_version, status, dependencies,
+                        invalidated_by, evidence)
 MemoryEffect(op: OperationId, kind: read | write | prefetch | dma_start | dma_wait)
 ```
 
 Affine legality actions consume these facts before loop interchange, tiling,
 fusion, parallelization, or lowering actions can run.
+
+Typed legality records must cite the transform name and version because a later
+pass revision may invalidate earlier evidence. `dependencies` lists the exact
+`AffineAccess`, `AffineLoopBounds`, `AffineLoopBand`, and `MemoryEffect` records
+read by the check; `invalidated_by` starts empty and is filled when a syntax
+mutation changes any cited subject. Transform actions may require only current,
+accepted legality records with no invalidations.
 
 ### Registry
 
@@ -1406,9 +1463,18 @@ RegionEntered(region: RegionId, inputs: tuple[ValueId, ...])
 RegionReturned(region: RegionId, values: tuple[PythonValue, ...])
 RegionResult(region: RegionId, values: tuple[PythonValue, ...])
 LoopIteration(op: OperationId, index: PythonValue, inputs, yielded)
+ForallIteration(op: OperationId, logical_indices, body_region, yielded)
+ForallSharedOutput(op: OperationId, source, destination, rank)
+ForallMerge(op: OperationId, in_parallel, outputs, merge_policy)
+SynchronizationPoint(op: OperationId, kind)
 AffineMapValue(map: AffineMapId, dims, symbols, results)
-AffineAccess(op: OperationId, memref: ValueId, indices, map, dims, symbols, kind)
+AffineAccess(op: OperationId, memref: ValueId, element_type, rank, map, dims,
+             symbols, indices, kind, effect)
 AffineLoopBounds(op: OperationId, lower_map, upper_map, step, operands)
+AffineLoopBand(subject: OperationId, loops, ivs, bounds, permutable)
+AffineDependence(src: OperationId, dst: OperationId, relation, evidence)
+AffineTransformLegality(action: ActionId, subject: OperationId, status,
+                        dependencies, invalidated_by, evidence)
 MemoryEffect(op: OperationId, kind, subject, evidence)
 Diagnostic(subject: SyntaxId, severity, message, evidence)
 EvidenceLink(subject: SyntaxId | TraceRecordId, artifact)
@@ -1429,6 +1495,12 @@ First-slice invariants:
   inputs, facts read, facts written, and region results.
 - Affine semantics records both concrete values and symbolic/index facts when
   both are available; concrete execution must not discard affine legality facts.
+- `scf.forall` semantics records iteration evidence, shared-output ownership,
+  merge policy, and synchronization separately so later actions can distinguish
+  deterministic replay from proven parallel legality.
+- Affine legality records cite the transform version and exact dependencies they
+  read; syntax mutation invalidates current legality records that cite changed
+  subjects.
 
 First-slice failure tests:
 
@@ -1445,6 +1517,10 @@ First-slice failure tests:
   uses produce diagnostics instead of unsafely becoming dimensions.
 - affine memory operations reject element-type mismatches and record memory
   effects even when concrete memory values are unavailable.
+- `scf.forall` rejects missing `scf.forall.in_parallel`, malformed shared-output
+  merges, and attempts to expose body-local values without a yield/merge/export.
+- affine transforms reject stale or version-mismatched
+  `AffineTransformLegality` records before mutation.
 
 ## Planned Verification Evidence
 

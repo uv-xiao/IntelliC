@@ -80,6 +80,13 @@ This PR also makes two dialect requirements explicit:
   expressions, maps, sets, affine loops/conditionals/parallelism, affine memory
   access, affine min/max/apply, DMA/prefetch/index transforms, and legality
   evidence for transformations.
+- Affine memory operations need a first-slice type substrate for `MemRefType`
+  and `VectorType`, but broad memref/vector dialect behavior remains deferred.
+  The accepted syntax design now names the narrow type contracts needed for
+  affine load/store/vector_load/vector_store verification.
+- `scf.forall` must be modeled with explicit iteration, shared-output, merge,
+  and synchronization evidence. It cannot be treated as a sequential loop whose
+  replay order accidentally proves parallel legality.
 
 ## Examples
 
@@ -117,6 +124,28 @@ This PR also makes two dialect requirements explicit:
 - Verification mapping: `tests/test_affine_syntax.py`,
   `tests/test_affine_semantics.py`, and `tests/test_affine_actions.py` with
   invalid symbol-use, map-operand mismatch, and dependence-legality cases.
+
+## First-Slice Pass Set
+
+The first executable slice should implement these passes/actions in order:
+
+1. `verify-structure`
+2. `seed-constant-facts`
+3. `seed-affine-facts`
+4. `execute-sum-to-n`
+5. `canonicalize-add-zero`
+6. `apply-mutations`
+7. `simplify-affine-maps`
+8. `check-affine-tile-fusion-legality`
+9. `pending-record-gate`
+
+This set is deliberately small but cross-cutting. It forces implementation of
+structural verification, TraceDB facts, concrete semantic execution,
+action-owned mutation, affine fact extraction, and versioned affine legality
+records before any production optimization suite is attempted. The first slice
+includes accepted and rejected affine legality cases; it defers the mutating
+`affine-tile-fuse` transform until the legality and mutation substrate are
+stable.
 
 ## Contracts
 
