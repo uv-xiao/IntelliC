@@ -32,18 +32,48 @@ def record_direct_mutation_attempt(kind: str, subject: object, **details: object
 
 class GuardedDict(MutableMapping):
     def __init__(self, owner: object, field: str, values: Mapping[str, Any]) -> None:
-        self._data = dict(values)
-        self._owner = owner
-        self._field = field
+        super().__setattr__("_data", tuple(dict(values).items()))
+        super().__setattr__("_owner", owner)
+        super().__setattr__("_field", field)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name == "_data" and hasattr(self, "_data"):
+            record_direct_mutation_attempt(
+                "metadata_backing_assignment",
+                self._owner,
+                field=self._field,
+            )
+            value = tuple(dict(value).items()) if isinstance(value, Mapping) else tuple(value)
+        super().__setattr__(name, value)
 
     def __getitem__(self, key: str) -> Any:
-        return self._data[key]
+        for existing_key, value in self._data:
+            if existing_key == key:
+                return value
+        raise KeyError(key)
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._data)
+        return (key for key, _value in self._data)
 
     def __len__(self) -> int:
         return len(self._data)
+
+    def _with_item(self, key: str, value: Any) -> tuple[tuple[str, Any], ...]:
+        items = list(self._data)
+        for index, (existing_key, _existing_value) in enumerate(items):
+            if existing_key == key:
+                items[index] = (key, value)
+                return tuple(items)
+        items.append((key, value))
+        return tuple(items)
+
+    def _without_item(self, key: str) -> tuple[tuple[str, Any], ...]:
+        items = list(self._data)
+        for index, (existing_key, _existing_value) in enumerate(items):
+            if existing_key == key:
+                del items[index]
+                return tuple(items)
+        raise KeyError(key)
 
     def __setitem__(self, key: str, value: Any) -> None:
         record_direct_mutation_attempt(
@@ -52,7 +82,7 @@ class GuardedDict(MutableMapping):
             field=self._field,
             key=key,
         )
-        self._data[key] = value
+        super().__setattr__("_data", self._with_item(key, value))
 
     def __delitem__(self, key: str) -> None:
         record_direct_mutation_attempt(
@@ -61,11 +91,11 @@ class GuardedDict(MutableMapping):
             field=self._field,
             key=key,
         )
-        del self._data[key]
+        super().__setattr__("_data", self._without_item(key))
 
     def clear(self) -> None:
         record_direct_mutation_attempt("metadata_clear", self._owner, field=self._field)
-        self._data.clear()
+        super().__setattr__("_data", ())
 
     def pop(self, key: str, default: Any = _MISSING) -> Any:
         record_direct_mutation_attempt(
@@ -74,13 +104,22 @@ class GuardedDict(MutableMapping):
             field=self._field,
             key=key,
         )
-        if default is _MISSING:
-            return self._data.pop(key)
-        return self._data.pop(key, default)
+        try:
+            value = self[key]
+        except KeyError:
+            if default is _MISSING:
+                raise
+            return default
+        super().__setattr__("_data", self._without_item(key))
+        return value
 
     def popitem(self) -> tuple[str, Any]:
         record_direct_mutation_attempt("metadata_delete", self._owner, field=self._field)
-        return self._data.popitem()
+        if not self._data:
+            raise KeyError("dictionary is empty")
+        item = self._data[-1]
+        super().__setattr__("_data", self._data[:-1])
+        return item
 
     def setdefault(self, key: str, default: Any = None) -> Any:
         if key not in self:
@@ -90,32 +129,42 @@ class GuardedDict(MutableMapping):
                 field=self._field,
                 key=key,
             )
-        return self._data.setdefault(key, default)
+            super().__setattr__("_data", self._with_item(key, default))
+            return default
+        return self[key]
 
     def update(self, *args: object, **kwargs: Any) -> None:
         if args or kwargs:
             record_direct_mutation_attempt("metadata_update", self._owner, field=self._field)
-        self._data.update(*args, **kwargs)
+        updates = dict(*args, **kwargs)
+        for key, value in updates.items():
+            super().__setattr__("_data", self._with_item(key, value))
 
     def __ior__(self, other: object):
         record_direct_mutation_attempt("metadata_update", self._owner, field=self._field)
-        self._data |= dict(other)
+        self.update(other)
         return self
 
     def __repr__(self) -> str:
-        return repr(self._data)
+        return repr(dict(self._data))
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Mapping):
-            return self._data == dict(other)
+            return dict(self._data) == dict(other)
         return False
 
 
 class GuardedList(MutableSequence):
     def __init__(self, owner: object, field: str, values: Iterable[object] = ()) -> None:
-        self._data = list(values)
-        self._owner = owner
-        self._field = field
+        super().__setattr__("_data", tuple(values))
+        super().__setattr__("_owner", owner)
+        super().__setattr__("_field", field)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name == "_data" and hasattr(self, "_data"):
+            self._record("backing_assignment")
+            value = tuple(value)
+        super().__setattr__(name, value)
 
     def _record(self, kind: str) -> None:
         record_direct_mutation_attempt(f"{self._prefix}_{kind}", self._owner, field=self._field)
@@ -134,47 +183,58 @@ class GuardedList(MutableSequence):
 
     def __setitem__(self, index, value) -> None:
         self._record("update")
-        self._data[index] = value
+        items = list(self._data)
+        items[index] = value
+        super().__setattr__("_data", tuple(items))
 
     def __delitem__(self, index) -> None:
         self._record("delete")
-        del self._data[index]
+        items = list(self._data)
+        del items[index]
+        super().__setattr__("_data", tuple(items))
 
     def clear(self) -> None:
         self._record("clear")
-        self._data.clear()
+        super().__setattr__("_data", ())
 
     def extend(self, values: Iterable[object]) -> None:
         self._record("extend")
-        self._data.extend(values)
+        super().__setattr__("_data", (*self._data, *tuple(values)))
 
     def insert(self, index: int, value: object) -> None:
         self._record("insert")
-        self._data.insert(index, value)
+        items = list(self._data)
+        items.insert(index, value)
+        super().__setattr__("_data", tuple(items))
 
     def pop(self, index: int = -1) -> object:
         self._record("delete")
-        return self._data.pop(index)
+        items = list(self._data)
+        value = items.pop(index)
+        super().__setattr__("_data", tuple(items))
+        return value
 
     def remove(self, value: object) -> None:
         self._record("delete")
-        self._data.remove(value)
+        items = list(self._data)
+        items.remove(value)
+        super().__setattr__("_data", tuple(items))
 
     def reverse(self) -> None:
         self._record("reorder")
-        self._data.reverse()
+        super().__setattr__("_data", tuple(reversed(self._data)))
 
     def sort(self, *args: object, **kwargs: Any) -> None:
         self._record("reorder")
-        self._data.sort(*args, **kwargs)
+        super().__setattr__("_data", tuple(sorted(self._data, *args, **kwargs)))
 
     def __iadd__(self, values: Iterable[object]):
         self._record("extend")
-        self._data += list(values)
+        super().__setattr__("_data", (*self._data, *tuple(values)))
         return self
 
     def __repr__(self) -> str:
-        return repr(self._data)
+        return repr(list(self._data))
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Iterable):

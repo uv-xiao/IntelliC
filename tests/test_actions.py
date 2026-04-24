@@ -358,6 +358,61 @@ class ActionTests(unittest.TestCase):
 
         self.assertEqual(region.blocks, (first_block, second_block))
 
+    def test_action_apply_metadata_backing_store_mutator_cannot_silently_pass(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            const = builder.insert(arith.constant(7, i32))
+        run = PipelineRun(module)
+
+        def mutate_then_restore(current_run):
+            const.properties._data["value"] = 8
+            const.properties._data["value"] = 7
+
+        action = CompilerAction("bad-metadata-backing-mutation", mutate_then_restore)
+
+        with self.assertRaises((TypeError, AttributeError, ValueError)):
+            action.run(run)
+
+        self.assertEqual(const.properties["value"], 7)
+
+    def test_action_apply_block_operations_backing_store_mutator_cannot_silently_pass(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            first = builder.insert(arith.constant(1, i32))
+            second = builder.insert(arith.constant(2, i32))
+        run = PipelineRun(module)
+
+        def mutate_then_restore(current_run):
+            block._operations._data.reverse()
+            block._operations._data.reverse()
+
+        action = CompilerAction("bad-block-backing-mutation", mutate_then_restore)
+
+        with self.assertRaises((TypeError, AttributeError, ValueError)):
+            action.run(run)
+
+        self.assertEqual(block.operations, (first, second))
+
+    def test_action_apply_region_blocks_backing_store_mutator_cannot_silently_pass(self) -> None:
+        first_block = Block()
+        second_block = Block()
+        region = Region.from_block_list([first_block, second_block])
+        module = builtin.module(region)
+        run = PipelineRun(module)
+
+        def mutate_then_restore(current_run):
+            region._blocks._data.reverse()
+            region._blocks._data.reverse()
+
+        action = CompilerAction("bad-region-backing-mutation", mutate_then_restore)
+
+        with self.assertRaises((TypeError, AttributeError, ValueError)):
+            action.run(run)
+
+        self.assertEqual(region.blocks, (first_block, second_block))
+
     def test_cse_records_duplicate_erase_intent(self) -> None:
         block = Block()
         module = builtin.module(Region.from_block_list([block]))
