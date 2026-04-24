@@ -23,6 +23,7 @@ def create_valid_repo(root: Path) -> None:
         ".agents/templates/README.md",
         "docs/README.md",
         "docs/story.md",
+        "docs/archive/README.md",
         "docs/design/README.md",
         "docs/todo/README.md",
         "docs/in_progress/README.md",

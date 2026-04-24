@@ -7,5 +7,6 @@
 - Architecture-changing work must create design drafts under `docs/in_progress/design/` before implementation.
 - Multi-file work requires a written plan with explicit input, output, and verification criteria.
 - Before merge, move implemented design into `docs/design/`, update `docs/todo/`, remove stale task files, and remove completed `docs/in_progress/design/` drafts.
+- Before or immediately after merge, archive the PR's `docs/in_progress/human_words/` contents under `docs/archive/<pr-number-or-slug>-<pr-title-slug>/human_words/`.
 - Do not preserve legacy parallel systems after a redesign supersedes them.
 - Commit in coherent slices that match the task plan.

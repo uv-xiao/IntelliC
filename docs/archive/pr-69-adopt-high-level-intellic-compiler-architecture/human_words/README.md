@@ -10,10 +10,6 @@ Human words are not normative by themselves. Promote curated decisions into
 `.agents/rules/`, `docs/in_progress/`, `docs/todo/`, or `docs/design/` when
 they become project rules, task scope, or implemented design.
 
-When the active PR closes, move that PR's records into
-`docs/archive/<pr-number-or-slug>-<pr-title-slug>/human_words/` and recreate
-this README for the next active task.
-
 Suggested entry shape:
 
 ```text

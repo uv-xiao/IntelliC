@@ -3,9 +3,13 @@
 - `docs/design/` contains accepted architecture and implemented behavior only.
 - `docs/todo/` contains future or partial work only.
 - `docs/in_progress/` contains active feature tasks and active design drafts only.
+- `docs/archive/` contains closed-PR historical artifacts that should be preserved but are no longer active.
 - Record human instructions under `docs/in_progress/human_words/` during active
   work. Preserve the user's wording, date, and context; promote only curated
   decisions into rules, tasks, or design docs.
+- When merging a PR, move that PR's `docs/in_progress/human_words/` contents
+  into `docs/archive/<pr-number-or-slug>-<pr-title-slug>/human_words/`, then
+  recreate an empty active `docs/in_progress/human_words/` area for future work.
 - `docs/notes/` contains document-reading and repository-reading reports.
 - Do not create `docs/reference/` or `docs/research/` in the clean branch.
 - Local reading inputs under `.references/` and `.repositories/` remain ignored and uncommitted.

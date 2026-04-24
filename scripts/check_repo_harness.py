@@ -9,6 +9,7 @@ from pathlib import Path
 APPROVED_DOCS_ENTRIES = {
     "README.md",
     "story.md",
+    "archive",
     "design",
     "todo",
     "in_progress",
