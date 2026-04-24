@@ -164,6 +164,21 @@ class ActionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 
+    def test_action_apply_block_parent_assignment_is_rolled_back(self) -> None:
+        block = Block()
+        module_region = Region.from_block_list([block])
+        module = builtin.module(module_region)
+        run = PipelineRun(module)
+
+        action = CompilerAction("bad-block-parent-clear", lambda current_run: setattr(block, "parent", None))
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        self.assertIs(block.parent, module_region)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
     def test_action_apply_transient_region_parent_assignment_is_rejected(self) -> None:
         block = Block()
         module_region = Region.from_block_list([block])
@@ -183,6 +198,73 @@ class ActionTests(unittest.TestCase):
         self.assertEqual(violation["kind"], "mutation_attempt")
         self.assertIn("region_parent_assignment", violation["attempts"])
         self.assertIs(module_region.parent, module)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_region_parent_assignment_is_rolled_back(self) -> None:
+        block = Block()
+        module_region = Region.from_block_list([block])
+        module = builtin.module(module_region)
+        run = PipelineRun(module)
+
+        action = CompilerAction("bad-region-parent-clear", lambda current_run: setattr(module_region, "parent", None))
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        self.assertIs(module_region.parent, module)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_results_assignment_is_rolled_back(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            const = builder.insert(arith.constant(7, i32))
+        original_results = const.results
+        run = PipelineRun(module)
+
+        action = CompilerAction("bad-results-clear", lambda current_run: setattr(const, "results", ()))
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        self.assertIs(const.results, original_results)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_regions_assignment_is_rolled_back(self) -> None:
+        block = Block()
+        module_region = Region.from_block_list([block])
+        module = builtin.module(module_region)
+        original_regions = module.regions
+        run = PipelineRun(module)
+
+        action = CompilerAction("bad-regions-clear", lambda current_run: setattr(module, "regions", ()))
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        self.assertIs(module.regions, original_regions)
+        self.assertIs(module_region.parent, module)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_successors_assignment_is_rejected_and_rolled_back(self) -> None:
+        block = Block()
+        successor = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            op = builder.insert(Operation.create("test.branch", successors=(successor,)))
+        original_successors = op.successors
+        run = PipelineRun(module)
+
+        action = CompilerAction("bad-successors-clear", lambda current_run: setattr(op, "successors", ()))
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        self.assertIs(op.successors, original_successors)
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 

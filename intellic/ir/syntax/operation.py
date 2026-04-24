@@ -30,6 +30,16 @@ class Operation:
                 record_direct_mutation_attempt("results_assignment", self)
             self._set_results_unchecked(value)
             return
+        if name == "regions":
+            if hasattr(self, "regions"):
+                record_direct_mutation_attempt("regions_assignment", self)
+            self._set_regions_unchecked(value)
+            return
+        if name == "successors":
+            if hasattr(self, "successors"):
+                record_direct_mutation_attempt("successors_assignment", self)
+            self._set_successors_unchecked(value)
+            return
         if name == "properties":
             if hasattr(self, "properties"):
                 record_direct_mutation_attempt("metadata_assignment", self, field=name)
@@ -67,6 +77,12 @@ class Operation:
 
     def _set_results_unchecked(self, results: tuple[OpResult, ...]) -> None:
         super().__setattr__("_Operation__results", tuple(results))
+
+    def _set_regions_unchecked(self, regions: tuple[object, ...]) -> None:
+        super().__setattr__("regions", tuple(regions))
+
+    def _set_successors_unchecked(self, successors: tuple[object, ...]) -> None:
+        super().__setattr__("successors", tuple(successors))
 
     def _set_properties_unchecked(self, properties: GuardedDict) -> None:
         super().__setattr__("_Operation__properties", properties)
