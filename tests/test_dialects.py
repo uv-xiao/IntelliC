@@ -272,6 +272,22 @@ class DialectTests(unittest.TestCase):
                 body=bad_body,
             )
 
+        no_result_reduce_body = self._single_block_region(
+            arg_types=(index, index),
+            terminator_factory=lambda _args: Operation.create(
+                "scf.reduce",
+                operands=(initial,),
+                regions=(),
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "no-result"):
+            scf.parallel(
+                lower_bounds=(lower, lower),
+                upper_bounds=(upper, upper),
+                steps=(step, step),
+                body=no_result_reduce_body,
+            )
+
     def test_scf_forall_verifies_parallel_terminator_and_shared_outputs(self) -> None:
         lower = arith.constant(0, index).results[0]
         upper = arith.constant(4, index).results[0]

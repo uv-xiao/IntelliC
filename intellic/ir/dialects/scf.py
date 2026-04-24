@@ -210,6 +210,11 @@ def parallel(
     if init_vals:
         terminator = _required_terminator(block, "scf.reduce", "scf.parallel body")
         _verify_reduce_operation(terminator, result_types, "scf.parallel")
+    elif block.operations and block.operations[-1].name == "scf.reduce":
+        terminator = block.operations[-1]
+        if terminator.operands:
+            raise ValueError("scf.parallel no-result reduce terminator must not have operands")
+        _verify_reduce_operation(terminator, (), "scf.parallel")
     elif block.operations and block.operations[-1].name == "scf.yield":
         _verify_yield_terminator(block, (), "scf.parallel body")
     return Operation.create(

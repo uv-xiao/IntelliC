@@ -1,8 +1,8 @@
 import unittest
 
-from intellic.ir.dialects import arith, builtin
+from intellic.ir.dialects import arith, builtin, scf
 from intellic.ir.parser import parse_operation
-from intellic.ir.syntax import Block, Builder, Region, Type
+from intellic.ir.syntax import Block, Builder, Region, Type, i1, i32
 from intellic.ir.syntax.printer import print_operation
 
 
@@ -43,6 +43,39 @@ class ParserPrinterTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "unknown SSA value"):
             parse_operation(text)
+
+    def test_generic_roundtrip_preserves_scf_if_regions(self) -> None:
+        module_region = Region.from_block_list([Block()])
+        then_region = Region.from_block_list([Block()])
+        else_region = Region.from_block_list([Block()])
+        module = builtin.module(module_region)
+        with Builder().insert_at_end(module_region.blocks[0]) as builder:
+            condition = builder.insert(arith.constant(1, i1)).results[0]
+            then_value = builder.insert(arith.constant(10, i32)).results[0]
+            else_value = builder.insert(arith.constant(20, i32)).results[0]
+            with Builder().insert_at_end(then_region.blocks[0]) as then_builder:
+                then_builder.insert(scf.yield_(then_value))
+            with Builder().insert_at_end(else_region.blocks[0]) as else_builder:
+                else_builder.insert(scf.yield_(else_value))
+            builder.insert(
+                scf.if_(
+                    condition,
+                    result_types=(i32,),
+                    then_region=then_region,
+                    else_region=else_region,
+                )
+            )
+
+        text = print_operation(module)
+        parsed = parse_operation(text)
+        parsed_if = parsed.regions[0].blocks[0].operations[-1]
+
+        self.assertEqual(parsed_if.name, "scf.if")
+        self.assertEqual(len(parsed_if.regions), 2)
+        self.assertEqual(
+            [block.operations[0].name for region in parsed_if.regions for block in region.blocks],
+            ["scf.yield", "scf.yield"],
+        )
 
 
 if __name__ == "__main__":

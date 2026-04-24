@@ -19,7 +19,9 @@ class _Printer:
             lines = [
                 f'{prefix}{result_prefix}"{op.name}"({operands}) ({{',
             ]
-            for region in op.regions:
+            for region_index, region in enumerate(op.regions):
+                if region_index > 0:
+                    lines.append(f"{prefix}}}, {{")
                 for block in region.blocks:
                     child_indent = indent + 2
                     if block.arguments:

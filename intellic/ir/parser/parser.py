@@ -15,6 +15,7 @@ _REGION_START_RE = re.compile(
     r'^(?:(?P<results>%[\w.]+(?:\s*,\s*%[\w.]+)*)\s*=\s*)?'
     r'"(?P<name>[^"]+)"\((?P<operands>[^)]*)\)\s*\(\{$'
 )
+_REGION_SEPARATOR_RE = re.compile(r"^\},\s*\{$")
 _REGION_END_RE = re.compile(r"^\}\)\s*:\s*\(\)\s*->\s*\((?P<result_types>[^)]*)\)$")
 _BLOCK_RE = re.compile(r"^\^(?P<label>[\w.]+)\((?P<args>.*)\):$")
 
@@ -59,22 +60,39 @@ class _Parser:
 
     def _parse_region_operation(self, match: re.Match[str]) -> Operation:
         self.index += 1
-        block = self._parse_optional_block()
-        region = Region.from_block_list([block])
-        children: list[Operation] = []
-        while self.has_more and not _REGION_END_RE.match(self.lines[self.index]):
-            children.append(self.parse_one())
-        if not self.has_more:
-            raise ValueError("unterminated region")
-        end_match = _REGION_END_RE.match(self.lines[self.index])
-        assert end_match is not None
-        self.index += 1
-        with Builder().insert_at_end(block) as builder:
-            for child in children:
-                builder.insert(child)
+        regions: list[Region] = []
+        end_match: re.Match[str] | None = None
+        while True:
+            block = self._parse_optional_block()
+            region = Region.from_block_list([block])
+            children: list[Operation] = []
+            while (
+                self.has_more
+                and not _REGION_SEPARATOR_RE.match(self.lines[self.index])
+                and not _REGION_END_RE.match(self.lines[self.index])
+            ):
+                children.append(self.parse_one())
+            if not self.has_more:
+                raise ValueError("unterminated region")
+            with Builder().insert_at_end(block) as builder:
+                for child in children:
+                    builder.insert(child)
+            regions.append(region)
+            if _REGION_SEPARATOR_RE.match(self.lines[self.index]):
+                self.index += 1
+                continue
+            end_match = _REGION_END_RE.match(self.lines[self.index])
+            assert end_match is not None
+            self.index += 1
+            break
         operands = self._parse_operands(match.group("operands"))
         result_types = self._parse_types(end_match.group("result_types"))
-        op = Operation.create(match.group("name"), operands=operands, result_types=result_types, regions=(region,))
+        op = Operation.create(
+            match.group("name"),
+            operands=operands,
+            result_types=result_types,
+            regions=tuple(regions),
+        )
         self._bind_results(match.group("results"), op)
         return op
 
