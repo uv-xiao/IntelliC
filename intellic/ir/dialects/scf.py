@@ -155,8 +155,7 @@ def execute_region(
     if not region.blocks:
         raise ValueError("scf.execute_region must own at least one block")
     for block in region.blocks:
-        if result_types or (block.operations and block.operations[-1].name == "scf.yield"):
-            _verify_yield_terminator(block, result_types, "scf.execute_region region")
+        _verify_yield_terminator(block, result_types, "scf.execute_region region")
     return Operation.create(
         "scf.execute_region",
         result_types=result_types,
@@ -318,8 +317,7 @@ def _required_terminator(block: Block, name: str, owner: str) -> Operation:
 
 def _verify_yielding_region(region: Region, result_types: tuple[Type, ...], owner: str) -> None:
     block = _single_block(region, owner)
-    if result_types or (block.operations and block.operations[-1].name == "scf.yield"):
-        _verify_yield_terminator(block, result_types, owner)
+    _verify_yield_terminator(block, result_types, owner)
 
 
 def _verify_yield_terminator(block: Block, result_types: tuple[Type, ...], owner: str) -> None:

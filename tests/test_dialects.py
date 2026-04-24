@@ -101,6 +101,15 @@ class DialectTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "yield type"):
             scf.if_(condition, result_types=(i32,), then_region=bad_then, else_region=bad_else)
 
+    def test_scf_if_rejects_zero_result_wrong_terminator(self) -> None:
+        condition = arith.constant(1, i1).results[0]
+        bad_then = self._single_block_region(
+            terminator_factory=lambda _args: scf.condition(condition)
+        )
+
+        with self.assertRaisesRegex(ValueError, "scf.yield"):
+            scf.if_(condition, then_region=bad_then)
+
     def test_scf_while_verifies_condition_payload_and_after_yield(self) -> None:
         initial = arith.constant(0, i32).results[0]
         condition = arith.constant(1, i1).results[0]
@@ -179,6 +188,15 @@ class DialectTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "terminate with scf.yield"):
             scf.execute_region(bad_region, result_types=(i32,))
 
+    def test_scf_execute_region_rejects_zero_result_wrong_terminator(self) -> None:
+        condition = arith.constant(1, i1).results[0]
+        bad_region = self._single_block_region(
+            terminator_factory=lambda _args: scf.condition(condition)
+        )
+
+        with self.assertRaisesRegex(ValueError, "scf.yield"):
+            scf.execute_region(bad_region)
+
     def test_scf_index_switch_verifies_index_cases_and_region_yields(self) -> None:
         flag = arith.constant(0, index).results[0]
         value = arith.constant(7, i32).results[0]
@@ -214,6 +232,19 @@ class DialectTests(unittest.TestCase):
                 self._single_block_region(terminator_factory=lambda _args: scf.yield_(value)),
                 result_types=(i32,),
             )
+
+    def test_scf_index_switch_rejects_zero_result_wrong_terminator(self) -> None:
+        flag = arith.constant(0, index).results[0]
+        condition = arith.constant(1, i1).results[0]
+        bad_case = self._single_block_region(
+            terminator_factory=lambda _args: scf.condition(condition)
+        )
+        default_region = self._single_block_region(
+            terminator_factory=lambda _args: scf.yield_()
+        )
+
+        with self.assertRaisesRegex(ValueError, "scf.yield"):
+            scf.index_switch(flag, (0,), (bad_case,), default_region)
 
     def test_scf_parallel_reduce_and_reduce_return_verify_rank_and_types(self) -> None:
         lower = arith.constant(0, index).results[0]

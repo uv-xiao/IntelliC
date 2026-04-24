@@ -2,7 +2,7 @@ import unittest
 
 from intellic.ir.dialects import arith, builtin, scf
 from intellic.ir.parser import parse_operation
-from intellic.ir.syntax import Block, Builder, Region, Type, i1, i32
+from intellic.ir.syntax import Attribute, Block, Builder, Region, Type, i1, i32
 from intellic.ir.syntax.printer import print_operation
 
 
@@ -82,6 +82,7 @@ class ParserPrinterTests(unittest.TestCase):
         for index, block in enumerate(region.blocks):
             with Builder().insert_at_end(block) as builder:
                 builder.insert(arith.constant(index, i32))
+                builder.insert(scf.yield_())
         op = scf.execute_region(region, no_inline=True)
 
         text = print_operation(op)
@@ -102,6 +103,7 @@ class ParserPrinterTests(unittest.TestCase):
         execute_region = Region.from_block_list([Block()])
         with Builder().insert_at_end(execute_region.blocks[0]) as builder:
             builder.insert(arith.constant(42, i32))
+            builder.insert(scf.yield_())
 
         switch_region = Region.from_block_list([Block()])
         default_region = Region.from_block_list([Block()])
@@ -155,6 +157,41 @@ class ParserPrinterTests(unittest.TestCase):
         self.assertEqual(parsed_execute.properties["no_inline"], True)
         self.assertEqual(parsed_switch.properties["case_values"], (3,))
         self.assertEqual(parsed_forall.properties["mapping"], ("thread-x",))
+
+    def test_generic_roundtrip_preserves_attribute_mapping_property(self) -> None:
+        module_region = Region.from_block_list([Block()])
+        module = builtin.module(module_region)
+        yield_region = Region.from_block_list([Block(arg_types=(i32,))])
+        with Builder().insert_at_end(yield_region.blocks[0]) as builder:
+            builder.insert(scf.yield_(yield_region.blocks[0].arguments[0]))
+        body = Region.from_block_list([Block(arg_types=(Type("index"), i32))])
+        mapping = (Attribute("gpu.thread", "x"),)
+        with Builder().insert_at_end(module_region.blocks[0]) as module_builder:
+            lower = module_builder.insert(arith.constant(0, Type("index"))).results[0]
+            upper = module_builder.insert(arith.constant(4, Type("index"))).results[0]
+            step = module_builder.insert(arith.constant(1, Type("index"))).results[0]
+            shared = module_builder.insert(arith.constant(0, i32)).results[0]
+            with Builder().insert_at_end(body.blocks[0]) as builder:
+                builder.insert(
+                    scf.forall_in_parallel(
+                        scf.forall_yield(body.blocks[0].arguments[1], region=yield_region)
+                    )
+                )
+            module_builder.insert(
+                scf.forall(
+                    lower_bounds=(lower,),
+                    upper_bounds=(upper,),
+                    steps=(step,),
+                    shared_outputs=(shared,),
+                    body=body,
+                    mapping=mapping,
+                )
+            )
+
+        parsed = parse_operation(print_operation(module))
+        parsed_forall = parsed.regions[0].blocks[0].operations[-1]
+
+        self.assertEqual(parsed_forall.properties["mapping"], mapping)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .attribute import Attribute
 from .operation import Operation
 from .value import Value
 
@@ -51,7 +52,7 @@ class _Printer:
 
     def _properties_suffix(self, op: Operation) -> str:
         properties = {
-            key: value
+            key: _encode_property(value)
             for key, value in sorted(op.properties.items())
             if _is_printable_property(value)
         }
@@ -78,8 +79,25 @@ def print_operation(op: Operation) -> str:
 
 
 def _is_printable_property(value: Any) -> bool:
-    if isinstance(value, (bool, int, str)):
+    if value is None or isinstance(value, (bool, int, str)):
         return True
+    if isinstance(value, Attribute):
+        return _is_printable_property(value.value)
     if isinstance(value, tuple):
         return all(_is_printable_property(element) for element in value)
     return False
+
+
+def _encode_property(value: Any) -> Any:
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if isinstance(value, Attribute):
+        return {
+            "__intellic_attribute__": (
+                value.name,
+                _encode_property(value.value),
+            )
+        }
+    if isinstance(value, tuple):
+        return tuple(_encode_property(element) for element in value)
+    raise TypeError(f"unsupported printable property: {type(value).__name__}")

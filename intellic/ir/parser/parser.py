@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 import re
 
-from intellic.ir.syntax import Block, Builder, Operation, Region, Type, Value
+from intellic.ir.syntax import Attribute, Block, Builder, Operation, Region, Type, Value
 from intellic.ir.parser.lexer import strip_comments
 
 
@@ -175,6 +175,26 @@ class _Parser:
         value = ast.literal_eval(text)
         if not isinstance(value, dict):
             raise ValueError("operation properties must be a dictionary")
+        return {
+            key: self._decode_property(property_value)
+            for key, property_value in value.items()
+        }
+
+    def _decode_property(self, value: object) -> object:
+        if (
+            isinstance(value, dict)
+            and set(value) == {"__intellic_attribute__"}
+        ):
+            payload = value["__intellic_attribute__"]
+            if (
+                not isinstance(payload, tuple)
+                or len(payload) != 2
+                or not isinstance(payload[0], str)
+            ):
+                raise ValueError("malformed attribute property")
+            return Attribute(payload[0], self._decode_property(payload[1]))
+        if isinstance(value, tuple):
+            return tuple(self._decode_property(element) for element in value)
         return value
 
     def _bind_results(self, names_text: str | None, op: Operation) -> None:
