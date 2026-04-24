@@ -142,6 +142,50 @@ class ActionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 
+    def test_action_apply_transient_block_parent_assignment_is_rejected(self) -> None:
+        block = Block()
+        module_region = Region.from_block_list([block])
+        module = builtin.module(module_region)
+        run = PipelineRun(module)
+
+        def assign_then_restore(current_run):
+            block.parent = None
+            block.parent = module_region
+
+        action = CompilerAction("bad-block-parent-assignment", assign_then_restore)
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-block-parent-assignment").value
+        self.assertEqual(violation["kind"], "mutation_attempt")
+        self.assertIn("block_parent_assignment", violation["attempts"])
+        self.assertIs(block.parent, module_region)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_transient_region_parent_assignment_is_rejected(self) -> None:
+        block = Block()
+        module_region = Region.from_block_list([block])
+        module = builtin.module(module_region)
+        run = PipelineRun(module)
+
+        def assign_then_restore(current_run):
+            module_region.parent = None
+            module_region.parent = module
+
+        action = CompilerAction("bad-region-parent-assignment", assign_then_restore)
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-region-parent-assignment").value
+        self.assertEqual(violation["kind"], "mutation_attempt")
+        self.assertIn("region_parent_assignment", violation["attempts"])
+        self.assertIs(module_region.parent, module)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
     def test_action_apply_direct_property_mutation_then_exception_records_violation(self) -> None:
         block = Block()
         module = builtin.module(Region.from_block_list([block]))

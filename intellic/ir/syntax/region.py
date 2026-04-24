@@ -3,13 +3,18 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from .ids import SyntaxId
-from .mutation_guard import GuardedList
+from .mutation_guard import GuardedList, record_direct_mutation_attempt
 from .type import Type
 from .value import BlockArgument
 
 
 class Block:
     """Ordered operation list with typed block arguments."""
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name == "parent" and hasattr(self, "parent"):
+            record_direct_mutation_attempt("block_parent_assignment", self)
+        super().__setattr__(name, value)
 
     def __init__(self, arg_types: Iterable[Type] = ()) -> None:
         self.id = SyntaxId.fresh()
@@ -33,6 +38,11 @@ class Block:
 
 class Region:
     """Ordered block list owned by an operation."""
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name == "parent" and hasattr(self, "parent"):
+            record_direct_mutation_attempt("region_parent_assignment", self)
+        super().__setattr__(name, value)
 
     def __init__(self, blocks: Iterable[Block] = ()) -> None:
         self.id = SyntaxId.fresh()
