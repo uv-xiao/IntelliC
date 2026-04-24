@@ -75,11 +75,7 @@ def _collect_syntax(
         "attributes": dict(op.attributes),
     }
     for result in op.results:
-        uses[result.id] = {
-            "object": result,
-            "uses": tuple(result.uses),
-            "use_ids": tuple((use.owner.id, use.operand_index) for use in result.uses),
-        }
+        uses[result.id] = _value_uses_snapshot(result)
     for region in op.regions:
         regions[region.id] = {
             "object": region,
@@ -98,8 +94,18 @@ def _collect_syntax(
                 "operations": tuple(block.operations),
                 "operation_ids": tuple(child.id for child in block.operations),
             }
+            for argument in block.arguments:
+                uses[argument.id] = _value_uses_snapshot(argument)
             for child in block.operations:
                 _collect_syntax(child, operations, regions, blocks, uses)
+
+
+def _value_uses_snapshot(value) -> dict[str, object]:
+    return {
+        "object": value,
+        "uses": tuple(value.uses),
+        "use_ids": tuple((use.owner.id, use.operand_index) for use in value.uses),
+    }
 
 
 def _direct_mutation_violation(

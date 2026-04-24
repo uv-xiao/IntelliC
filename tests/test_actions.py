@@ -2,7 +2,7 @@ import unittest
 
 from intellic.ir.actions import CompilerAction, MutationIntent, MutatorStage, PendingRecordGate, PipelineRun, passes
 from intellic.ir.dialects import affine, arith, builtin, func, memref, scf
-from intellic.ir.syntax import Attribute, Block, Builder, Operation, Region, i1, i32, index
+from intellic.ir.syntax import Attribute, Block, Builder, Operation, Region, i1, i32, index, verify_operation
 
 
 class ActionTests(unittest.TestCase):
@@ -66,6 +66,35 @@ class ActionTests(unittest.TestCase):
         violation = run.db.require("DirectMutationViolation", "bad-direct-mutation").value
         self.assertEqual(violation["before"], old_rhs.results[0].id)
         self.assertEqual(violation["after"], new_rhs.results[0].id)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_block_argument_operand_mutation_restores_use_list(self) -> None:
+        entry = Block()
+        function_block = Block(arg_types=(i32,))
+        function_region = Region.from_block_list([function_block])
+        module = builtin.module(Region.from_block_list([entry]))
+        with Builder().insert_at_end(function_block) as builder:
+            replacement = builder.insert(arith.constant(9, i32))
+            user = builder.insert(arith.addi(function_block.arguments[0], replacement.results[0]))
+            builder.insert(func.return_(user.results[0]))
+        function_type = func.FunctionType(inputs=(i32,), results=(i32,))
+        with Builder().insert_at_end(entry) as builder:
+            builder.insert(func.func("uses_arg", function_type, function_region))
+        original_arg = function_block.arguments[0]
+        run = PipelineRun(module)
+
+        action = CompilerAction(
+            "bad-block-argument-operand-mutation",
+            lambda current_run: user.replace_operand(0, replacement.results[0]),
+        )
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        self.assertIs(user.operands[0], original_arg)
+        self.assertTrue(any(use.owner is user and use.operand_index == 0 for use in original_arg.uses))
+        verify_operation(module)
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 
