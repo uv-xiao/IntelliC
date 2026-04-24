@@ -59,6 +59,8 @@ prove the system works end to end.
 
 ## Implementation Plan
 
+Detailed execution plan: `docs/in_progress/complete_intellic_implementation_plan.md`.
+
 1. Package foundation:
    create `pyproject.toml` or equivalent minimal project metadata, `intellic/`,
    and baseline tests/import checks without adding external dependencies.
