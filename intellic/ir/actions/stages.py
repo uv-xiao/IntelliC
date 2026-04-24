@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from intellic.ir.syntax import Value
+from intellic.ir.syntax import BlockArgument, Operation, Value
 
 from .mutation import MutationApplied, MutationIntent, MutationRejected
 from .pipeline import PipelineRun
@@ -37,6 +37,8 @@ class MutatorStage:
                 return "self replacement value"
             if not self._is_attached_value(intent.replacement):
                 return "stale replacement value"
+            if not self._replacement_dominates_uses(intent):
+                return "replacement does not dominate use"
         return None
 
     def _is_attached_value(self, value: Value) -> bool:
@@ -47,6 +49,42 @@ class MutatorStage:
         blocks = getattr(getattr(owner, "parent", None), "_blocks", None)
         if blocks is not None:
             return owner in blocks
+        return False
+
+    def _replacement_dominates_uses(self, intent: MutationIntent) -> bool:
+        if intent.replacement is None:
+            return False
+        replacement_owner = getattr(intent.replacement, "owner", None)
+        if isinstance(replacement_owner, BlockArgument):
+            return True
+        if not isinstance(replacement_owner, Operation):
+            return False
+        replacement_block = replacement_owner.parent
+        for result in intent.subject.results:
+            for use in result.uses:
+                if not self._operation_dominates_use(replacement_owner, replacement_block, use.owner):
+                    return False
+        return True
+
+    def _operation_dominates_use(
+        self,
+        replacement_owner: Operation,
+        replacement_block: object,
+        use_owner: Operation,
+    ) -> bool:
+        use_block = use_owner.parent
+        if replacement_block is use_block:
+            operations = getattr(replacement_block, "_operations", ())
+            return operations.index(replacement_owner) < operations.index(use_owner)
+        return self._is_ancestor_operation(replacement_owner, use_owner)
+
+    def _is_ancestor_operation(self, ancestor: Operation, op: Operation) -> bool:
+        current = op.parent
+        while current is not None:
+            parent = getattr(current, "parent", None)
+            if parent is ancestor:
+                return True
+            current = parent
         return False
 
     def _apply_intent(self, intent: MutationIntent) -> None:

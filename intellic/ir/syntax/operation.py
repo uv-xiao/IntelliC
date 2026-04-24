@@ -6,6 +6,7 @@ from typing import Any
 from .attribute import Attribute
 from .ids import SyntaxId
 from .location import GENERATED, SourceLocation
+from .mutation_guard import GuardedDict, record_direct_mutation_attempt
 from .type import Type
 from .value import OpResult, Value
 
@@ -30,8 +31,8 @@ class Operation:
         self.name = name
         self.parent: object | None = None
         self.operands = tuple(operands)
-        self.properties = dict(properties)
-        self.attributes = dict(attributes)
+        self.properties = GuardedDict(self, "properties", properties)
+        self.attributes = GuardedDict(self, "attributes", attributes)
         self.regions = tuple(regions)
         self.successors = tuple(successors)
         self.loc = loc
@@ -66,6 +67,7 @@ class Operation:
         )
 
     def replace_operand(self, index: int, value: Value) -> None:
+        record_direct_mutation_attempt("replace_operand", self, operand_index=index)
         old_value = self.operands[index]
         old_value.remove_use(self, index)
         operands = list(self.operands)
@@ -74,5 +76,6 @@ class Operation:
         value.add_use(self, index)
 
     def erase_operand_uses(self) -> None:
+        record_direct_mutation_attempt("erase_operand_uses", self)
         for index, value in enumerate(self.operands):
             value.remove_use(self, index)

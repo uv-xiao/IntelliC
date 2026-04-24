@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from intellic.ir.syntax import Operation
+from intellic.ir.syntax.mutation_guard import direct_mutation_guard
 
 from .pipeline import PipelineRun
 
@@ -17,19 +18,26 @@ class CompilerAction:
         run.db.put("ActionRun", self.name, {"name": self.name})
         before = _syntax_snapshot(run.module)
         apply_error: BaseException | None = None
-        try:
-            self.apply(run)
-        except BaseException as exc:
-            apply_error = exc
-        finally:
-            after = _syntax_snapshot(run.module)
-            violation = _direct_mutation_violation(before, after)
-            if violation is not None:
-                run.db.put("DirectMutationViolation", self.name, violation)
-                if apply_error is None:
-                    raise ValueError(f"direct syntax mutation in action {self.name}")
-            if apply_error is not None:
-                raise apply_error
+        with direct_mutation_guard() as attempts:
+            try:
+                self.apply(run)
+            except BaseException as exc:
+                apply_error = exc
+            finally:
+                after = _syntax_snapshot(run.module)
+                violation = _direct_mutation_violation(before, after)
+                if violation is None and attempts:
+                    violation = {
+                        "kind": "mutation_attempt",
+                        "attempts": tuple(attempt["kind"] for attempt in attempts),
+                        "details": tuple(attempts),
+                    }
+                if violation is not None:
+                    run.db.put("DirectMutationViolation", self.name, violation)
+                    if apply_error is None:
+                        raise ValueError(f"direct syntax mutation in action {self.name}")
+                if apply_error is not None:
+                    raise apply_error
 
 
 def _syntax_snapshot(root: Operation) -> dict[str, dict[object, object]]:

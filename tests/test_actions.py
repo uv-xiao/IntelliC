@@ -97,6 +97,37 @@ class ActionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 
+    def test_action_apply_transient_direct_mutation_is_rejected(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            lhs = builder.insert(arith.constant(7, i32))
+            old_rhs = builder.insert(arith.constant(1, i32))
+            new_rhs = builder.insert(arith.constant(2, i32))
+            const = builder.insert(arith.constant(3, i32))
+            add = builder.insert(arith.addi(lhs.results[0], old_rhs.results[0]))
+        run = PipelineRun(module)
+
+        def mutate_then_restore(current_run):
+            add.replace_operand(1, new_rhs.results[0])
+            add.replace_operand(1, old_rhs.results[0])
+            const.properties["value"] = 4
+            const.properties["value"] = 3
+
+        action = CompilerAction("bad-transient-mutation", mutate_then_restore)
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-transient-mutation").value
+        self.assertEqual(violation["kind"], "mutation_attempt")
+        self.assertIn("replace_operand", violation["attempts"])
+        self.assertIn("metadata_update", violation["attempts"])
+        self.assertIs(add.operands[1], old_rhs.results[0])
+        self.assertEqual(const.properties["value"], 3)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
     def test_action_apply_direct_attribute_mutation_is_rejected(self) -> None:
         block = Block()
         module = builtin.module(Region.from_block_list([block]))
@@ -472,6 +503,35 @@ class ActionTests(unittest.TestCase):
         self.assertEqual(rejection.reason, "self replacement value")
         self.assertIn(subject, block.operations)
         self.assertIs(user.operands[0], subject.results[0])
+        self.assertNoDetachedOperands(block)
+        PendingRecordGate().run(run)
+
+    def test_mutator_rejects_later_same_block_replacement_with_evidence(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            old = builder.insert(arith.constant(1, i32))
+            zero = builder.insert(arith.constant(0, i32))
+            user = builder.insert(arith.addi(old.results[0], zero.results[0]))
+            later = builder.insert(arith.constant(2, i32))
+        run = PipelineRun(module)
+        run.db.put(
+            "MutationIntent",
+            old.id,
+            MutationIntent(
+                "replace_uses_and_erase",
+                old,
+                later.results[0],
+                reason="later replacement test",
+            ),
+        )
+
+        MutatorStage().run(run)
+
+        rejection = run.db.require("MutationRejected", old.id).value
+        self.assertEqual(rejection.reason, "replacement does not dominate use")
+        self.assertIn(old, block.operations)
+        self.assertIs(user.operands[0], old.results[0])
         self.assertNoDetachedOperands(block)
         PendingRecordGate().run(run)
 
