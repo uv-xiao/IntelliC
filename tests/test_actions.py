@@ -1,6 +1,6 @@
 import unittest
 
-from intellic.ir.actions import MutationIntent, MutatorStage, PendingRecordGate, PipelineRun, passes
+from intellic.ir.actions import CompilerAction, MutationIntent, MutatorStage, PendingRecordGate, PipelineRun, passes
 from intellic.ir.dialects import affine, arith, builtin, func, scf
 from intellic.ir.syntax import Block, Builder, Operation, Region, i32, index
 
@@ -27,6 +27,30 @@ class ActionTests(unittest.TestCase):
         self.assertNotIn(add, block.operations)
         self.assertEqual(len(run.db.query("MutationApplied")), 1)
         PendingRecordGate().run(run)
+
+    def test_action_apply_direct_operand_mutation_is_rejected(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            lhs = builder.insert(arith.constant(7, i32))
+            old_rhs = builder.insert(arith.constant(1, i32))
+            new_rhs = builder.insert(arith.constant(2, i32))
+            add = builder.insert(arith.addi(lhs.results[0], old_rhs.results[0]))
+        run = PipelineRun(module)
+
+        action = CompilerAction(
+            "bad-direct-mutation",
+            lambda current_run: add.replace_operand(1, new_rhs.results[0]),
+        )
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-direct-mutation").value
+        self.assertEqual(violation["before"], old_rhs.results[0].id)
+        self.assertEqual(violation["after"], new_rhs.results[0].id)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
 
     def test_cse_records_duplicate_erase_intent(self) -> None:
         block = Block()

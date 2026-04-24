@@ -71,6 +71,9 @@ class MutatorStage:
 
 class PendingRecordGate:
     def run(self, run: PipelineRun) -> None:
+        violations = run.db.query("DirectMutationViolation")
+        if violations:
+            raise ValueError(f"direct mutation violations remain: {len(violations)}")
         pending = run.db.query("MutationIntent")
         if pending:
             raise ValueError(f"pending records remain: {len(pending)}")
