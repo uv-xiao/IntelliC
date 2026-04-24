@@ -13,6 +13,4 @@ Rules:
 
 ## Active Tasks
 
-- `docs/in_progress/implementation_ready_compiler_design.md` — clarify the
-  accepted compiler architecture into implementation-ready contracts, order,
-  examples, and verification evidence.
+No active tasks.
