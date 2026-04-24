@@ -22,7 +22,7 @@ prove the system works end to end.
 - [x] Implement minimal package and verification tooling
 - [x] Implement `intellic.ir.syntax` identity, ownership, use-list, builder, and
   verifier contracts
-- [ ] Implement first-slice dialects: builtin, func, arith, full SCF contracts,
+- [x] Implement first-slice dialects: builtin, func, arith, full SCF contracts,
   affine contracts, and minimal memref/vector type substrate
 - [ ] Implement canonical parser/printer round-trip for selected generic/custom
   forms
@@ -127,6 +127,13 @@ Batch 2 verification:
 
 ```bash
 python -m unittest tests/test_syntax_core.py
+python -m unittest discover -s tests
+```
+
+Batch 3 verification:
+
+```bash
+python -m unittest tests/test_dialects.py
 python -m unittest discover -s tests
 ```
 
