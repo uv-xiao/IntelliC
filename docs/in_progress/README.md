@@ -13,4 +13,6 @@ Rules:
 
 ## Active Tasks
 
-No active tasks.
+- `docs/in_progress/complete_intellic_implementation.md` — implement the
+  complete first executable IntelliC compiler slice from the accepted compiler
+  design.
