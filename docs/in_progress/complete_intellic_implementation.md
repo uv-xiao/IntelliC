@@ -28,7 +28,7 @@ prove the system works end to end.
   forms
 - [x] Implement Python construction surfaces for module/function/arith/SCF/affine
   examples
-- [ ] Implement `TraceDB`, semantic registry, concrete interpreter, and selected
+- [x] Implement `TraceDB`, semantic registry, concrete interpreter, and selected
   first-slice semantic definitions
 - [ ] Implement shared-pass-style actions and gates selected from MLIR/xDSL:
   canonicalization, CSE, SCCP-style propagation, symbol/dead-code cleanup,
@@ -148,6 +148,13 @@ Batch 5 verification:
 
 ```bash
 python -m unittest tests/test_surface_builders.py
+python -m unittest discover -s tests
+```
+
+Batch 6 verification:
+
+```bash
+python -m unittest tests/test_semantics.py
 python -m unittest discover -s tests
 ```
 
