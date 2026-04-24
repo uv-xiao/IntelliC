@@ -15,10 +15,20 @@ class Operation:
     """MLIR-style operation with operands, results, attributes, and regions."""
 
     def __setattr__(self, name: str, value: Any) -> None:
+        if name == "parent":
+            if hasattr(self, "parent"):
+                record_direct_mutation_attempt("parent_assignment", self)
+            super().__setattr__(name, value)
+            return
         if name == "operands":
             if hasattr(self, "operands"):
                 record_direct_mutation_attempt("operand_assignment", self)
             self._set_operands_unchecked(value)
+            return
+        if name == "results":
+            if hasattr(self, "results"):
+                record_direct_mutation_attempt("results_assignment", self)
+            self._set_results_unchecked(value)
             return
         if name == "properties":
             if hasattr(self, "properties"):
@@ -48,8 +58,15 @@ class Operation:
     def attributes(self) -> GuardedDict:
         return self.__attributes
 
+    @property
+    def results(self) -> tuple[OpResult, ...]:
+        return self.__results
+
     def _set_operands_unchecked(self, operands: tuple[Value, ...]) -> None:
         super().__setattr__("_Operation__operands", tuple(operands))
+
+    def _set_results_unchecked(self, results: tuple[OpResult, ...]) -> None:
+        super().__setattr__("_Operation__results", tuple(results))
 
     def _set_properties_unchecked(self, properties: GuardedDict) -> None:
         super().__setattr__("_Operation__properties", properties)

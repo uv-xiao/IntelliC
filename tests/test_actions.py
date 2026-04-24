@@ -74,6 +74,7 @@ class ActionTests(unittest.TestCase):
         module = builtin.module(Region.from_block_list([block]))
         with Builder().insert_at_end(block) as builder:
             const = builder.insert(arith.constant(7, i32))
+        properties_ref = const.properties
         run = PipelineRun(module)
 
         action = CompilerAction(
@@ -88,7 +89,56 @@ class ActionTests(unittest.TestCase):
         self.assertEqual(violation["kind"], "properties_changed")
         self.assertEqual(violation["before"]["value"], 7)
         self.assertEqual(violation["after"]["value"], 8)
+        self.assertIs(const.properties, properties_ref)
+        self.assertEqual(properties_ref["value"], 7)
         self.assertEqual(const.properties["value"], 7)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_transient_parent_assignment_is_rejected(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            const = builder.insert(arith.constant(7, i32))
+        run = PipelineRun(module)
+
+        def assign_then_restore(current_run):
+            const.parent = None
+            const.parent = block
+
+        action = CompilerAction("bad-parent-assignment", assign_then_restore)
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-parent-assignment").value
+        self.assertEqual(violation["kind"], "mutation_attempt")
+        self.assertIn("parent_assignment", violation["attempts"])
+        self.assertIs(const.parent, block)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_transient_results_assignment_is_rejected(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            const = builder.insert(arith.constant(7, i32))
+        original_results = const.results
+        run = PipelineRun(module)
+
+        def assign_then_restore(current_run):
+            const.results = ()
+            const.results = original_results
+
+        action = CompilerAction("bad-results-assignment", assign_then_restore)
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-results-assignment").value
+        self.assertEqual(violation["kind"], "mutation_attempt")
+        self.assertIn("results_assignment", violation["attempts"])
+        self.assertIs(const.results, original_results)
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 

@@ -65,8 +65,10 @@ def _collect_syntax(
         "parent": getattr(op.parent, "id", None),
         "parent_object": op.parent,
         "properties_guarded": isinstance(op.properties, GuardedDict),
+        "properties_object": op.properties,
         "properties": dict(op.properties),
         "attributes_guarded": isinstance(op.attributes, GuardedDict),
+        "attributes_object": op.attributes,
         "attributes": dict(op.attributes),
     }
     for result in op.results:
@@ -188,8 +190,10 @@ def _restore_syntax(
         op = op_data["object"]
         op.parent = op_data["parent_object"]
         op.operands = op_data["operand_values"]
-        op.properties = op_data["properties"]
-        op.attributes = op_data["attributes"]
+        _restore_guarded_dict(op_data["properties_object"], op_data["properties"])
+        _restore_guarded_dict(op_data["attributes_object"], op_data["attributes"])
+        op.properties = op_data["properties_object"]
+        op.attributes = op_data["attributes_object"]
     for use_data in snapshot["uses"].values():
         value = use_data["object"]
         value._uses = use_data["uses"]
@@ -210,3 +214,8 @@ def _detach_removed_syntax(
     for region_id, region_data in after["regions"].items():
         if region_id not in snapshot["regions"]:
             region_data["object"].parent = None
+
+
+def _restore_guarded_dict(target: GuardedDict, values: dict[object, object]) -> None:
+    target.clear()
+    target.update(values)
