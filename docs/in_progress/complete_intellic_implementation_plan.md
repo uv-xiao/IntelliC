@@ -82,9 +82,9 @@ intellic/ir/actions/stages.py
 intellic/ir/actions/pipeline.py
 intellic/ir/actions/host.py
 intellic/ir/actions/passes.py
-intellic/examples/__init__.py
-intellic/examples/sum_to_n.py
-intellic/examples/affine_tile.py
+examples/__init__.py
+examples/sum_to_n.py
+examples/affine_tile.py
 tests/test_imports.py
 tests/test_syntax_core.py
 tests/test_dialects.py
@@ -393,8 +393,8 @@ git commit -m "feat: implement compiler actions"
 
 **Files**
 
-- Create: `intellic/examples/sum_to_n.py`
-- Create: `intellic/examples/affine_tile.py`
+- Create: `examples/sum_to_n.py`
+- Create: `examples/affine_tile.py`
 - Create: `tests/test_examples.py`
 - Modify: `docs/in_progress/complete_intellic_implementation.md`
 - Modify: `docs/todo/README.md`
@@ -420,7 +420,7 @@ Expected result: full test suite and repo policy pass; import succeeds.
 **Commit**
 
 ```bash
-git add intellic/examples tests/test_examples.py docs/in_progress/complete_intellic_implementation.md docs/todo/README.md
+git add examples tests/test_examples.py docs/in_progress/complete_intellic_implementation.md docs/todo/README.md
 git commit -m "test: add end-to-end intellic examples"
 ```
 

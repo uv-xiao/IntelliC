@@ -25,3 +25,10 @@
   - Related: docs/design/compiler_semantics.md
   - Related: docs/design/compiler_passes.md
   - Agent interpretation: Create an execution-ready implementation plan with batch order, file ownership, verification commands, and first code-slice boundary before writing compiler implementation code.
+
+- 2026-04-24 19:25 CST - Keep examples outside package
+  > Examples should be moved from intellic/ to examples/
+  - Context: User corrected PR #71 implementation layout after end-to-end examples were added under the importable `intellic` package.
+  - Related: examples/
+  - Related: tests/test_examples.py
+  - Agent interpretation: Move reusable example programs to top-level `examples/` so they remain project evidence rather than package internals, and update tests/docs to import from that location.

@@ -1,7 +1,7 @@
 import unittest
 
-from intellic.examples.affine_tile import build_affine_tiled_access
-from intellic.examples.sum_to_n import build_sum_to_n
+from examples.affine_tile import build_affine_tiled_access
+from examples.sum_to_n import build_sum_to_n
 from intellic.ir.actions import MutatorStage, PendingRecordGate, PipelineRun, passes
 from intellic.ir.parser import parse_operation
 from intellic.ir.semantics import TraceDB, execute_function
