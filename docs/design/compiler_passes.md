@@ -802,39 +802,45 @@ First-slice failure tests:
 
 ## First-Slice Pass Set
 
-The first implementation slice should implement a small fixed pipeline that
-exercises syntax, semantics, actions, mutation, and legality records without
-claiming a production optimizer. These are the selected passes/actions, in
-pipeline order:
+The first implementation slice should prioritize passes that MLIR and xDSL both
+treat as shared compiler infrastructure. Dialect-specific passes are included
+only when they cover core dialect contracts that shared passes depend on. These
+are the selected passes/actions, in pipeline order:
 
-| Order | Pass/action | Kind | Reads | Writes | Failure evidence |
-| --- | --- | --- | --- | --- | --- |
-| 1 | `verify-structure` | Fixed gate | module syntax | `Diagnostic`, `EvidenceLink` | broken ownership, bad terminators, type mismatches |
-| 2 | `seed-constant-facts` | Fixed analysis | `arith.constant`, function inputs | `ValueConcrete`, `ValueRange` | unsupported constant attr/type |
-| 3 | `seed-affine-facts` | Fixed analysis | affine maps/sets/loops/memory ops, memref/vector types | `AffineMapValue`, `AffineConstraintSet`, `AffineLoopBounds`, `AffineLoopBand`, `AffineAccess`, `MemoryEffect` | invalid dimension/symbol binding, rank/type mismatch |
-| 4 | `execute-sum-to-n` | Fixed semantic run | selected semantic defs, concrete input facts | `Evaluated`, `RegionEntered`, `LoopIteration`, `RegionResult`, `ValueConcreteTuple` | missing semantic def, bad loop step, missing concrete fact |
-| 5 | `canonicalize-add-zero` | Fixed rewrite | `ValueConcrete(0)`, nested-region syntax | `MatchRecord`, `MutationIntent`, `RewriteEvidence` | stale syntax id, result/yield preservation failure |
-| 6 | `apply-mutations` | MutatorStage | current `MutationIntent` records | `MutationApplied`, updated syntax ids | stale subject, verifier failure after mutation |
-| 7 | `simplify-affine-maps` | Fixed rewrite | `AffineMapValue`, affine syntax | `MatchRecord`, `MutationIntent`, `RewriteEvidence` | changed dim/symbol order, non-equivalent result expr |
-| 8 | `check-affine-tile-fusion-legality` | Fixed legality | `AffineAccess`, `AffineLoopBounds`, `AffineLoopBand`, `MemoryEffect` | `AffineDependence`, `AffineTransformLegality` | dependence conflict, stale dependency, unsupported memory effect |
-| 9 | `pending-record-gate` | Fixed gate | required-to-handle records | `PipelineRun` status evidence | unhandled mutation, stale legality, rejected required diagnostic |
+| Order | Pass/action | Upstream anchor | Dialects covered | Required records |
+| --- | --- | --- | --- | --- |
+| 1 | `verify-structure` | MLIR verifier/xDSL op verifiers | builtin, func, arith, scf, affine, memref types, vector types | `Diagnostic`, `EvidenceLink` |
+| 2 | `canonicalize-greedy` | MLIR `Canonicalizer`, xDSL `canonicalize.py` and dialect canonicalization patterns | arith, scf, affine, memref, vector type users | `MatchRecord`, `MutationIntent`, `RewriteEvidence` |
+| 3 | `common-subexpression-elimination` | MLIR `CSE`, xDSL `common_subexpression_elimination.py` | arith, affine.apply, pure shape/index computations, side-effect-aware memory users | `MatchRecord`, `MutationIntent`, memory-effect read evidence |
+| 4 | `sparse-constant-propagation` | MLIR `SCCP`, xDSL constant-fold/interpreter patterns | arith, func regions, scf branches/loops where facts are bounded | `ValueConcrete`, `ValueRange`, branch/region reachability facts |
+| 5 | `symbol-dce-and-dead-code` | MLIR `SymbolDCE`/dead-value removal, xDSL `dead_code_elimination.py` | builtin.module, func.func, func.call users, unused pure ops | symbol liveness facts, `MutationIntent.EraseOp` |
+| 6 | `inline-single-call` | MLIR `Inliner`, xDSL function transformation patterns | func.func, func.call, func.return, canonicalization cleanup | callgraph facts, cloned-region mapping, result replacement evidence |
+| 7 | `loop-invariant-code-motion` | MLIR `LoopInvariantCodeMotion`, xDSL `loop_invariant_code_motion.py` | scf.for, scf.while where legal, affine.for, affine.parallel | loop-scope facts, side-effect facts, moved-op evidence |
+| 8 | `lower-affine-to-scf` | MLIR affine lowering/decompose passes, xDSL `lower_affine.py` | affine maps/sets/loops/memory ops into arith/scf/memref-indexing form | affine expansion facts, dim/symbol mapping, semantic-preservation evidence |
+| 9 | `normalize-and-simplify-affine-loops` | MLIR affine loop normalize/simplify passes plus xDSL loop range folding analogs | affine.for, affine.parallel, affine.min/max/apply, scf loop bounds after lowering | `AffineLoopBounds`, `AffineLoopBand`, normalized-bound evidence |
+| 10 | `pending-record-gate` | IntelliC action safety gate around MLIR/xDSL-style rewrites | all dialects touched by prior passes | required-record completion or rejection evidence |
 
-This set is intentionally implementation-sized:
+Selection rules:
 
-- It proves the syntax substrate by verifying nested regions, full-SCF
-  structural contracts, affine maps, and memref/vector type checks.
-- It proves semantic execution on the challenging `sum_to_n` loop-carried
-  example instead of a straight-line arithmetic toy.
-- It proves mutation through `MutationIntent` plus `MutatorStage`, not direct
-  pass mutation.
-- It proves affine support by extracting typed access/bounds facts and producing
-  a versioned legality decision before any affine transform may mutate syntax.
+- Shared MLIR/xDSL pass families win over bespoke examples. `canonicalize`,
+  `CSE`, constant propagation, symbol/dead-code cleanup, inlining, and LICM are
+  first because they stress the common operation, region, dominance, side-effect,
+  and mutation contracts every later pass needs.
+- Dialect coverage still matters. The first slice must include enough arith,
+  func, scf, affine, memref-type, and vector-type examples for each selected
+  shared pass to prove it respects dialect verification and side-effect
+  contracts.
+- Affine remains important, but the first affine work should be MLIR/xDSL-shaped:
+  lower/decompose affine constructs, normalize/simplify affine loops and maps,
+  and record dependence/legality facts needed by later tiling/fusion.
+- `execute-sum-to-n` stays as verification evidence for semantics, not as a
+  selected optimization pass. `canonicalize-add-zero` is now a test case inside
+  `canonicalize-greedy`, not a standalone pass.
 
-`check-affine-tile-fusion-legality` is selected for the first slice, but the
-actual `affine-tile-fuse` mutating transform is deferred unless the legality
-check and syntax mutation substrate are already stable. The first slice must
-still include both accepted and rejected legality cases so implementation has a
-real affine optimization contract to satisfy.
+The first slice defers production affine fusion/tiling, full bufferization,
+backend conversion, and target-specific vector lowering. It must still include
+accepted and rejected legality cases for affine memory effects so later loop
+transforms cannot bypass evidence.
 
 ## SCF And Affine Action Contracts
 
@@ -885,10 +891,11 @@ version. Failed legality checks are useful evidence and should remain in
 - Example action-local auxiliary `TraceDB` evidence showing explicit export into
   the authoritative pipeline database.
 - Negative evidence where an unconsumed mutation intent causes action failure.
-- First-slice pipeline evidence for `verify-structure`, `seed-constant-facts`,
-  `seed-affine-facts`, `execute-sum-to-n`, `canonicalize-add-zero`,
-  `apply-mutations`, `simplify-affine-maps`,
-  `check-affine-tile-fusion-legality`, and `pending-record-gate`.
+- First-slice pipeline evidence for `verify-structure`, `canonicalize-greedy`,
+  `common-subexpression-elimination`, `sparse-constant-propagation`,
+  `symbol-dce-and-dead-code`, `inline-single-call`,
+  `loop-invariant-code-motion`, `lower-affine-to-scf`,
+  `normalize-and-simplify-affine-loops`, and `pending-record-gate`.
 - SCF evidence covering `if`, `for`, `while`, `execute_region`, `index_switch`,
   `parallel`, `reduce`, `forall`, and their terminators.
 - Affine action evidence covering map simplification, dependence facts, and one

@@ -51,6 +51,9 @@ cover most of the planned `Sy` implementation:
 | Insertion points and mutation discipline | `.repositories/xdsl/xdsl/rewriter.py`, `.repositories/xdsl/docs/marimo/builders.py` |
 | Human-readable MLIR/xDSL syntax examples | `.repositories/xdsl/docs/marimo/mlir_ir.py`, `.repositories/xdsl/docs/marimo/xdsl_introduction.py` |
 | First-slice dialect examples | `.repositories/xdsl/xdsl/dialects/builtin.py`, `.repositories/xdsl/xdsl/dialects/func.py`, `.repositories/xdsl/xdsl/dialects/arith.py`, `.repositories/xdsl/xdsl/dialects/cf.py`, `.repositories/xdsl/xdsl/dialects/scf.py`, `.repositories/xdsl/xdsl/dialects/affine.py`, `.repositories/xdsl/xdsl/dialects/memref.py`, `.repositories/xdsl/xdsl/dialects/vector.py` |
+| Shared MLIR transform references | `.repositories/llvm-project/mlir/lib/Transforms/Canonicalizer.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/CSE.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/SCCP.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/SymbolDCE.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/RemoveDeadValues.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/InlinerPass.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/LoopInvariantCodeMotion.cpp` |
+| xDSL transform references | `.repositories/xdsl/xdsl/transforms/canonicalize.py`, `.repositories/xdsl/xdsl/transforms/common_subexpression_elimination.py`, `.repositories/xdsl/xdsl/transforms/dead_code_elimination.py`, `.repositories/xdsl/xdsl/transforms/constant_fold_interp.py`, `.repositories/xdsl/xdsl/transforms/function_transformations.py`, `.repositories/xdsl/xdsl/transforms/loop_invariant_code_motion.py`, `.repositories/xdsl/xdsl/transforms/lower_affine.py`, `.repositories/xdsl/xdsl/transforms/convert_scf_to_cf.py` |
+| Affine/SCF transform references | `.repositories/llvm-project/mlir/lib/Dialect/Affine/Transforms/DecomposeAffineOps.cpp`, `.repositories/llvm-project/mlir/lib/Dialect/Affine/Transforms/AffineLoopNormalize.cpp`, `.repositories/llvm-project/mlir/lib/Dialect/Affine/Transforms/SimplifyAffineStructures.cpp`, `.repositories/llvm-project/mlir/lib/Dialect/Affine/Transforms/LoopTiling.cpp`, `.repositories/xdsl/xdsl/transforms/scf_for_loop_range_folding.py`, `.repositories/xdsl/xdsl/transforms/scf_parallel_loop_tiling.py` |
 | Full SCF operation contract | `.repositories/llvm-project/mlir/include/mlir/Dialect/SCF/IR/SCFOps.td` |
 | Full affine operation contract | `.repositories/llvm-project/mlir/include/mlir/Dialect/Affine/IR/AffineOps.td`, `.repositories/llvm-project/mlir/docs/Dialects/Affine.md` |
 | MLIR textual and operation-definition background | `.repositories/llvm-project/mlir/docs/LangRef.md`, `.repositories/llvm-project/mlir/docs/DefiningDialects/Operations.md` |
@@ -249,6 +252,10 @@ Need transform equivalence
   -> model eqsat as operations/actions, learning first from xDSL eqsat
 Need pass simplicity
   -> unify analysis/rewrite/pass/gate/execution/LLM review as actions
+Need implementation-worthy first passes
+  -> prefer shared MLIR/xDSL transform families before bespoke examples
+  -> select canonicalizer, CSE, SCCP/constant folding, SymbolDCE/DCE, inliner,
+     LICM, affine lowering, and affine loop normalization/simplification
 Need agent-safe mutation
   -> classify actions as Fixed or AgentAct
   -> keep AgentEvolve as a JIT-like workflow that generates Fixed actions
@@ -292,6 +299,14 @@ Need pipeline replay
   operation definitions are the completeness target. IntelliC should treat
   affine maps/sets, affine memory-access facts, and transform legality evidence
   as first-class design contracts.
+- The first pass set should be grounded in shared MLIR/xDSL infrastructure:
+  greedy canonicalization, CSE, constant propagation, symbol/dead-code cleanup,
+  inlining, and LICM are more valuable first than bespoke one-off rewrites
+  because they exercise common dominance, region, side-effect, symbol, and
+  mutation contracts across dialects.
+- Affine-specific first passes should look like upstream affine infrastructure:
+  lower/decompose affine constructs, normalize/simplify affine loops and maps,
+  and record legality/dependence evidence before later tiling or fusion.
 - The Fjfj paper shows that semantic modularity may come from a combination of
   restrictions, partial transition relations, and tracked calls/events. IntelliC
   should consider a shared semantic state/fact/event database before freezing

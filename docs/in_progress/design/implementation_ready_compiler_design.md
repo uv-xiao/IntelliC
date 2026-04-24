@@ -127,25 +127,27 @@ This PR also makes two dialect requirements explicit:
 
 ## First-Slice Pass Set
 
-The first executable slice should implement these passes/actions in order:
+The first executable slice should implement important shared MLIR/xDSL-style
+passes before bespoke IntelliC-only optimization examples:
 
 1. `verify-structure`
-2. `seed-constant-facts`
-3. `seed-affine-facts`
-4. `execute-sum-to-n`
-5. `canonicalize-add-zero`
-6. `apply-mutations`
-7. `simplify-affine-maps`
-8. `check-affine-tile-fusion-legality`
-9. `pending-record-gate`
+2. `canonicalize-greedy`
+3. `common-subexpression-elimination`
+4. `sparse-constant-propagation`
+5. `symbol-dce-and-dead-code`
+6. `inline-single-call`
+7. `loop-invariant-code-motion`
+8. `lower-affine-to-scf`
+9. `normalize-and-simplify-affine-loops`
+10. `pending-record-gate`
 
-This set is deliberately small but cross-cutting. It forces implementation of
-structural verification, TraceDB facts, concrete semantic execution,
-action-owned mutation, affine fact extraction, and versioned affine legality
-records before any production optimization suite is attempted. The first slice
-includes accepted and rejected affine legality cases; it defers the mutating
-`affine-tile-fuse` transform until the legality and mutation substrate are
-stable.
+This set is still implementation-sized, but it follows upstream priorities:
+canonicalization, CSE, constant propagation, symbol/dead-code cleanup, inlining,
+LICM, and affine lowering/normalization are shared compiler infrastructure in
+MLIR and xDSL. The slice must cover builtin, func, arith, scf, affine, minimal
+memref types, and minimal vector types through these passes. `sum_to_n` remains
+semantic verification evidence, and add-zero folding becomes a canonicalizer test
+case instead of its own pass.
 
 ## Contracts
 

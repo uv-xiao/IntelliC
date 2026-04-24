@@ -45,3 +45,11 @@
   - Related: docs/design/compiler_framework.md
   - Related: docs/in_progress/design/implementation_ready_compiler_design.md
   - Agent interpretation: Define the missing memref/vector substrate for affine, concrete scf.forall operation contracts, typed affine legality records, and a selected first-slice pass/action set.
+
+- 2026-04-24 16:45 CST - Prefer shared MLIR/xDSL passes for first slice
+  > You should pick the important passes from MLIR/xDSL (somehow, the shared ones are more important) to implement. They should cover the dialects.
+  - Context: User refined PR #70 first-slice pass selection after the previous bespoke pass list.
+  - Related: docs/design/compiler_passes.md
+  - Related: docs/design/compiler_framework.md
+  - Related: docs/in_progress/design/implementation_ready_compiler_design.md
+  - Agent interpretation: Revise the first-slice pass set to prioritize important shared/common MLIR and xDSL pass families while still covering builtin, func, arith, scf, affine, memref, and vector contracts.

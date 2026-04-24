@@ -34,6 +34,8 @@ so an implementation agent can answer:
 - [x] Fill reviewed gaps: minimal memref/vector substrate, concrete
   `scf.forall` schemas, typed affine legality records, and selected first-slice
   pass set
+- [x] Revise first-slice pass set to prioritize important shared MLIR/xDSL pass
+  families while still covering first-slice dialects
 - [x] Verify locally
 - [x] Sync `docs/design/`, `docs/todo/`, and `docs/in_progress/`
 
@@ -85,7 +87,8 @@ Verification run:
 - `rg -n "Implementation-Ready|First-slice invariants|First-slice failure tests|Build Order|First Implementation Slice" docs/design/compiler_*.md docs/in_progress/implementation_ready_compiler_design.md` — confirmed the new design sections are present
 - `rg -n 'sum_to_n|loop-body|challenging|LoopIteration|ValueConcreteTuple|scf.for_' docs/design/compiler_*.md docs/in_progress/design/implementation_ready_compiler_design.md docs/in_progress/implementation_ready_compiler_design.md docs/in_progress/human_words/compiler-framework.md` — confirmed the challenging examples and evidence hooks are present
 - `rg -n 'Full SCF|Affine Syntax Coverage|Affine Semantics|SCF And Affine|affine_tile|AffineTransformLegality|scf.forall|affine.dma|Require affine' docs/design docs/in_progress docs/notes/compiler_framework_sources.md` — confirmed full SCF and affine design coverage is present
-- `rg -n "Minimal MemRef|VectorType|ScfForallOp|ForallIteration|AffineLoopBand|AffineTransformLegality|First-Slice Pass Set|verify-structure|check-affine-tile-fusion-legality|memref.py|vector.py" docs/design docs/in_progress docs/notes/compiler_framework_sources.md` — confirmed the filled gaps and selected first-slice pass set are present
+- `rg -n "Minimal MemRef|VectorType|ScfForallOp|ForallIteration|AffineLoopBand|AffineTransformLegality|memref.py|vector.py" docs/design docs/in_progress docs/notes/compiler_framework_sources.md` — confirmed the filled dialect substrate gaps are present
+- `rg -n "canonicalize-greedy|common-subexpression-elimination|sparse-constant-propagation|symbol-dce-and-dead-code|inline-single-call|loop-invariant-code-motion|lower-affine-to-scf|normalize-and-simplify-affine-loops|Canonicalizer.cpp|common_subexpression_elimination.py|lower_affine.py|func.call" docs/design docs/in_progress docs/notes/compiler_framework_sources.md` — confirmed the shared MLIR/xDSL first-slice pass selection and required `func.call` contract are present
 
 ## Docs
 

@@ -1017,6 +1017,9 @@ when examples need existing control-flow or containment operations.
 Syntax holds regions. Semantic definitions define what a region means:
 
 - `func.func` definitions: callable region and symbol behavior.
+- `func.call` definitions: direct callee symbol lookup, argument fact
+  forwarding, callgraph evidence, callable-region execution, and result fact
+  forwarding.
 - `scf.if` definitions: chooses a region based on a condition and yields values.
 - `scf.for` definitions: run a body region with an induction variable and
   loop-carried values.
@@ -1462,6 +1465,7 @@ Evaluated(op: OperationId, results: tuple[ValueId, ...])
 RegionEntered(region: RegionId, inputs: tuple[ValueId, ...])
 RegionReturned(region: RegionId, values: tuple[PythonValue, ...])
 RegionResult(region: RegionId, values: tuple[PythonValue, ...])
+CallGraphEdge(call: OperationId, callee: OperationId, args, results)
 LoopIteration(op: OperationId, index: PythonValue, inputs, yielded)
 ForallIteration(op: OperationId, logical_indices, body_region, yielded)
 ForallSharedOutput(op: OperationId, source, destination, rank)
@@ -1511,6 +1515,9 @@ First-slice failure tests:
   lookup.
 - `current` projection hides retracted facts while `history` still exposes them.
 - `func.return` outside a valid region convention is rejected.
+- `func.call` rejects unknown or recursively unsupported callees in the first
+  slice, mismatched argument/result types, and inlining without callee-region
+  mapping evidence.
 - `scf.for` rejects mismatched iter-arg/yield/result counts and invalid step
   values before committing result facts.
 - affine map operands reject dimension/symbol count mismatches; invalid symbol

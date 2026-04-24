@@ -379,6 +379,7 @@ Use existing MLIR-style dialect names in examples:
 
 - `builtin.module`
 - `func.func`
+- `func.call`
 - `func.return`
 - `arith.constant`
 - `arith.addi`
@@ -695,10 +696,10 @@ IntelliC APIs.
 ```text
 Input:
   Canonical MLIR/xDSL-compatible IR text using builtin.module, func.func,
-  func.return, arith.constant, arith.addi, arith.index_cast, full scf syntax,
-  affine.apply, affine.for, affine.if, affine.load/store, affine.min/max,
-  minimal memref/vector types, simple blocks, loop-carried block arguments,
-  and nested regions
+  func.call, func.return, arith.constant, arith.addi, arith.index_cast,
+  full scf syntax, affine.apply, affine.for, affine.if, affine.load/store,
+  affine.min/max, minimal memref/vector types, simple blocks, loop-carried
+  block arguments, and nested regions
 
   Python construction API examples using builtin.module, func.ir_function,
   func.return_, arith.constant, arith.addi, arith.index_cast, scf builders,
@@ -735,7 +736,7 @@ Included in the first slice:
 - Builder and insertion-point APIs.
 - `func.ir_function` staging for straight-line functions and the first
   `scf.for_` loop-carried example.
-- Named builders for `builtin.module`, `func.func`, `func.return_`,
+- Named builders for `builtin.module`, `func.func`, `func.call`, `func.return_`,
   `arith.constant`, `arith.addi`, `arith.index_cast`, `scf.for_`, and
   `scf.yield_`; full SCF builders may land in batches but their contracts are
   defined here.
@@ -777,7 +778,7 @@ intellic/ir/syntax/
 
 intellic/ir/dialects/
   builtin.py         # module op, builtin attrs/types needed by examples
-  func.py            # func.func, func.return, function type helpers
+  func.py            # func.func, func.call, func.return, function type helpers
   arith.py           # arith.constant, arith.addi, integer attrs/types
   scf.py             # full structured-control-flow dialect
   affine.py          # affine expressions, maps, sets, and affine ops
@@ -821,6 +822,8 @@ First-slice failure tests:
 - `func.ir_function` rejects missing annotations, unsupported Python control
   flow over symbolic values, and returns that cannot be lowered to
   `func.return`.
+- `func.call` rejects unknown symbols, operand count/type mismatches against the
+  callee function type, and result type mismatches.
 - SCF verification rejects missing required regions, invalid terminator
   placement, mismatched yield/result counts, invalid reduction region types,
   invalid `scf.condition` payloads, and malformed `scf.forall.in_parallel`.
