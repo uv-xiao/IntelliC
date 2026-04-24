@@ -26,7 +26,7 @@ prove the system works end to end.
   affine contracts, and minimal memref/vector type substrate
 - [x] Implement canonical parser/printer round-trip for selected generic/custom
   forms
-- [ ] Implement Python construction surfaces for module/function/arith/SCF/affine
+- [x] Implement Python construction surfaces for module/function/arith/SCF/affine
   examples
 - [ ] Implement `TraceDB`, semantic registry, concrete interpreter, and selected
   first-slice semantic definitions
@@ -141,6 +141,13 @@ Batch 4 verification:
 
 ```bash
 python -m unittest tests/test_parser_printer.py
+python -m unittest discover -s tests
+```
+
+Batch 5 verification:
+
+```bash
+python -m unittest tests/test_surface_builders.py
 python -m unittest discover -s tests
 ```
 
