@@ -125,6 +125,41 @@ class DialectTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "condition payload"):
             scf.while_((initial,), before_region=bad_before, after_region=after_region)
 
+    def test_scf_while_allows_payload_result_types_to_differ_from_next_operands(self) -> None:
+        initial = arith.constant(0, i32).results[0]
+        next_initial = arith.constant(1, i32).results[0]
+        condition = arith.constant(1, i1).results[0]
+        payload = arith.constant(0, index).results[0]
+        before_region = self._single_block_region(
+            arg_types=(i32,),
+            terminator_factory=lambda _args: scf.condition(condition, payload),
+        )
+        after_region = self._single_block_region(
+            arg_types=(index,),
+            terminator_factory=lambda _args: scf.yield_(next_initial),
+        )
+
+        while_op = scf.while_(
+            (initial,),
+            before_region=before_region,
+            after_region=after_region,
+            result_types=(index,),
+        )
+
+        self.assertEqual(while_op.results[0].type, index)
+
+        bad_after_region = self._single_block_region(
+            arg_types=(index,),
+            terminator_factory=lambda args: scf.yield_(args[0]),
+        )
+        with self.assertRaisesRegex(TypeError, "after region yield type"):
+            scf.while_(
+                (initial,),
+                before_region=before_region,
+                after_region=bad_after_region,
+                result_types=(index,),
+            )
+
     def test_scf_execute_region_allows_multiblock_and_verifies_yields(self) -> None:
         value = arith.constant(7, i32).results[0]
         first = Block()
@@ -220,14 +255,37 @@ class DialectTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "reduce.return"):
             scf.reduce(initial, regions=(bad_reduce_region,))
 
+        bad_body = self._single_block_region(
+            arg_types=(index, index),
+            terminator_factory=lambda _args: Operation.create(
+                "scf.reduce",
+                operands=(initial,),
+                regions=(),
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "reduction region"):
+            scf.parallel(
+                lower_bounds=(lower, lower),
+                upper_bounds=(upper, upper),
+                steps=(step, step),
+                init_vals=(initial,),
+                body=bad_body,
+            )
+
     def test_scf_forall_verifies_parallel_terminator_and_shared_outputs(self) -> None:
         lower = arith.constant(0, index).results[0]
         upper = arith.constant(4, index).results[0]
         step = arith.constant(1, index).results[0]
         shared = arith.constant(0, i32).results[0]
+        yield_region = self._single_block_region(
+            arg_types=(i32,),
+            terminator_factory=lambda args: scf.yield_(args[0]),
+        )
         body = self._single_block_region(
             arg_types=(index, index, i32),
-            terminator_factory=lambda args: scf.forall_in_parallel(args[2]),
+            terminator_factory=lambda args: scf.forall_in_parallel(
+                scf.forall_yield(args[2], region=yield_region)
+            ),
         )
 
         op = scf.forall(
@@ -242,6 +300,7 @@ class DialectTests(unittest.TestCase):
         self.assertEqual(op.name, "scf.forall")
         self.assertEqual(op.results[0].type, i32)
         self.assertEqual(op.properties["mapping"], ("thread-x", "thread-y"))
+        self.assertEqual(body.blocks[0].operations[-1].regions, (yield_region,))
 
         bad_body = self._single_block_region(
             arg_types=(index, index, i32),
@@ -258,7 +317,12 @@ class DialectTests(unittest.TestCase):
 
         bad_output_body = self._single_block_region(
             arg_types=(index, index, i32),
-            terminator_factory=lambda _args: scf.forall_in_parallel(lower),
+            terminator_factory=lambda _args: scf.forall_in_parallel(
+                scf.forall_yield(lower, region=self._single_block_region(
+                    arg_types=(index,),
+                    terminator_factory=lambda args: scf.yield_(args[0]),
+                ))
+            ),
         )
         with self.assertRaisesRegex(TypeError, "shared output"):
             scf.forall(

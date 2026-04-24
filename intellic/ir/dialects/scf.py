@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Iterator
 
 from intellic.ir.syntax import (
@@ -38,8 +39,29 @@ def reduce_return(value: Value) -> Operation:
     return Operation.create("scf.reduce.return", operands=(value,))
 
 
-def forall_in_parallel(*operands: Value) -> Operation:
-    return Operation.create("scf.forall.in_parallel", operands=tuple(operands))
+@dataclass(frozen=True)
+class ForallYield:
+    """First-slice representation of a shared-output parallel yielding op."""
+
+    value: Value
+    region: Region
+
+
+def forall_yield(value: Value, *, region: Region) -> ForallYield:
+    _verify_forall_yield_region(region, value.type, "scf.forall.yield region")
+    return ForallYield(value=value, region=region)
+
+
+def forall_in_parallel(*yielding_ops: ForallYield) -> Operation:
+    for yielding_op in yielding_ops:
+        if not isinstance(yielding_op, ForallYield):
+            raise TypeError("scf.forall.in_parallel requires forall yielding operations")
+    return Operation.create(
+        "scf.forall.in_parallel",
+        operands=tuple(yielding_op.value for yielding_op in yielding_ops),
+        properties={"yield_count": len(yielding_ops)},
+        regions=tuple(yielding_op.region for yielding_op in yielding_ops),
+    )
 
 
 def if_(
@@ -99,11 +121,10 @@ def while_(
     results = (
         result_types if result_types is not None else tuple(value.type for value in operands)
     )
-    if tuple(value.type for value in operands) != results:
-        raise TypeError("scf.while operand types must match result types")
+    operand_types = tuple(value.type for value in operands)
     before_block = _single_block(before_region, "scf.while before region")
     after_block = _single_block(after_region, "scf.while after region")
-    _verify_block_argument_types(before_block, results, "scf.while before region")
+    _verify_block_argument_types(before_block, operand_types, "scf.while before region")
     _verify_block_argument_types(after_block, results, "scf.while after region")
     before_terminator = _required_terminator(
         before_block,
@@ -116,7 +137,7 @@ def while_(
     if len(condition_payload) != len(results):
         raise ValueError("scf.while condition payload count must match result types")
     _verify_value_types(condition_payload, results, "scf.while condition payload")
-    _verify_yield_terminator(after_block, results, "scf.while after region")
+    _verify_yield_terminator(after_block, operand_types, "scf.while after region")
     return Operation.create(
         "scf.while",
         operands=operands,
@@ -188,9 +209,7 @@ def parallel(
     result_types = tuple(value.type for value in init_vals)
     if init_vals:
         terminator = _required_terminator(block, "scf.reduce", "scf.parallel body")
-        if len(terminator.operands) != len(init_vals):
-            raise ValueError("scf.parallel reduction count must match init values")
-        _verify_value_types(terminator.operands, result_types, "scf.parallel reduction")
+        _verify_reduce_operation(terminator, result_types, "scf.parallel")
     elif block.operations and block.operations[-1].name == "scf.yield":
         _verify_yield_terminator(block, (), "scf.parallel body")
     return Operation.create(
@@ -203,22 +222,14 @@ def parallel(
 
 
 def reduce(*operands: Value, regions: tuple[Region, ...]) -> Operation:
-    if len(operands) != len(regions):
-        raise ValueError("scf.reduce operand count must match reduction regions")
-    for operand, region in zip(operands, regions):
-        block = _single_block(region, "scf.reduce region")
-        _verify_block_argument_types(block, (operand.type, operand.type), "scf.reduce region")
-        terminator = _required_terminator(block, "scf.reduce.return", "scf.reduce region")
-        if len(terminator.operands) != 1:
-            raise ValueError("scf.reduce.return must have one operand")
-        if terminator.operands[0].type != operand.type:
-            raise TypeError("scf.reduce.return operand type must match reduce operand")
-    return Operation.create(
+    op = Operation.create(
         "scf.reduce",
         operands=tuple(operands),
         properties={"operand_count": len(operands)},
         regions=regions,
     )
+    _verify_reduce_operation(op, tuple(operand.type for operand in operands), "scf.reduce")
+    return op
 
 
 def forall(
@@ -240,10 +251,14 @@ def forall(
     terminator = _required_terminator(block, "scf.forall.in_parallel", "scf.forall body")
     if len(terminator.operands) != len(shared_outputs):
         raise ValueError("scf.forall.in_parallel operand count must match shared outputs")
+    if len(terminator.regions) != len(shared_outputs):
+        raise ValueError("scf.forall.in_parallel yielding region count must match shared outputs")
     try:
         _verify_value_types(terminator.operands, shared_types, "scf.forall shared output")
     except TypeError as exc:
         raise TypeError("scf.forall shared output type mismatch") from exc
+    for region, type_ in zip(terminator.regions, shared_types):
+        _verify_forall_yield_region(region, type_, "scf.forall.in_parallel yielding region")
     return Operation.create(
         "scf.forall",
         operands=lower_bounds + upper_bounds + steps + shared_outputs,
@@ -310,6 +325,28 @@ def _verify_yield_terminator(block: Block, result_types: tuple[Type, ...], owner
         _verify_value_types(terminator.operands, result_types, owner)
     except TypeError as exc:
         raise TypeError(f"{owner} yield type mismatch") from exc
+
+
+def _verify_reduce_operation(op: Operation, result_types: tuple[Type, ...], owner: str) -> None:
+    if len(op.operands) != len(result_types):
+        raise ValueError(f"{owner} reduction count must match result types")
+    if len(op.regions) != len(op.operands):
+        raise ValueError(f"{owner} reduction region count must match reduction operands")
+    _verify_value_types(op.operands, result_types, f"{owner} reduction")
+    for operand, region in zip(op.operands, op.regions):
+        block = _single_block(region, "scf.reduce region")
+        _verify_block_argument_types(block, (operand.type, operand.type), "scf.reduce region")
+        terminator = _required_terminator(block, "scf.reduce.return", "scf.reduce region")
+        if len(terminator.operands) != 1:
+            raise ValueError("scf.reduce.return must have one operand")
+        if terminator.operands[0].type != operand.type:
+            raise TypeError("scf.reduce.return operand type must match reduce operand")
+
+
+def _verify_forall_yield_region(region: Region, type_: Type, owner: str) -> None:
+    block = _single_block(region, owner)
+    _verify_block_argument_types(block, (type_,), owner)
+    _verify_yield_terminator(block, (type_,), owner)
 
 
 def _verify_block_argument_types(block: Block, types: tuple[Type, ...], owner: str) -> None:
