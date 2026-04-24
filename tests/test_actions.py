@@ -71,6 +71,7 @@ class ActionTests(unittest.TestCase):
         self.assertEqual(violation["kind"], "properties_changed")
         self.assertEqual(violation["before"]["value"], 7)
         self.assertEqual(violation["after"]["value"], 8)
+        self.assertEqual(const.properties["value"], 7)
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 
@@ -195,7 +196,7 @@ class ActionTests(unittest.TestCase):
 
         violation = run.db.require("DirectMutationViolation", "bad-region-block-reorder").value
         self.assertEqual(violation["kind"], "region_blocks_changed")
-        self.assertEqual(region.blocks, (second_block, first_block))
+        self.assertEqual(region.blocks, (first_block, second_block))
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 
@@ -301,6 +302,61 @@ class ActionTests(unittest.TestCase):
         self.assertEqual(op.attributes["tag"], Attribute("tag", "before"))
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
+
+    def test_action_apply_base_dict_metadata_mutator_cannot_silently_pass(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            const = builder.insert(arith.constant(7, i32))
+        run = PipelineRun(module)
+
+        def mutate_then_restore(current_run):
+            dict.__setitem__(const.properties, "value", 8)
+            dict.__setitem__(const.properties, "value", 7)
+
+        action = CompilerAction("bad-base-dict-mutation", mutate_then_restore)
+
+        with self.assertRaises((TypeError, ValueError)):
+            action.run(run)
+
+        self.assertEqual(const.properties["value"], 7)
+
+    def test_action_apply_base_list_block_mutator_cannot_silently_pass(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            first = builder.insert(arith.constant(1, i32))
+            second = builder.insert(arith.constant(2, i32))
+        run = PipelineRun(module)
+
+        def mutate_then_restore(current_run):
+            list.reverse(block._operations)
+            list.reverse(block._operations)
+
+        action = CompilerAction("bad-base-list-block-mutation", mutate_then_restore)
+
+        with self.assertRaises((TypeError, ValueError)):
+            action.run(run)
+
+        self.assertEqual(block.operations, (first, second))
+
+    def test_action_apply_base_list_region_mutator_cannot_silently_pass(self) -> None:
+        first_block = Block()
+        second_block = Block()
+        region = Region.from_block_list([first_block, second_block])
+        module = builtin.module(region)
+        run = PipelineRun(module)
+
+        def mutate_then_restore(current_run):
+            list.reverse(region._blocks)
+            list.reverse(region._blocks)
+
+        action = CompilerAction("bad-base-list-region-mutation", mutate_then_restore)
+
+        with self.assertRaises((TypeError, ValueError)):
+            action.run(run)
+
+        self.assertEqual(region.blocks, (first_block, second_block))
 
     def test_cse_records_duplicate_erase_intent(self) -> None:
         block = Block()

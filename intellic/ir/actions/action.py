@@ -33,6 +33,7 @@ class CompilerAction:
                         "details": tuple(attempts),
                     }
                 if violation is not None:
+                    _restore_syntax(before)
                     run.db.put("DirectMutationViolation", self.name, violation)
                     if apply_error is None:
                         raise ValueError(f"direct syntax mutation in action {self.name}")
@@ -57,17 +58,32 @@ def _collect_syntax(
     uses: dict[object, object],
 ) -> None:
     operations[op.id] = {
+        "object": op,
         "operands": tuple(operand.id for operand in op.operands),
+        "operand_values": tuple(op.operands),
         "parent": getattr(op.parent, "id", None),
+        "parent_object": op.parent,
         "properties": dict(op.properties),
         "attributes": dict(op.attributes),
     }
     for result in op.results:
-        uses[result.id] = tuple((use.owner.id, use.operand_index) for use in result.uses)
+        uses[result.id] = {
+            "object": result,
+            "uses": tuple(result.uses),
+            "use_ids": tuple((use.owner.id, use.operand_index) for use in result.uses),
+        }
     for region in op.regions:
-        regions[region.id] = tuple(block.id for block in region.blocks)
+        regions[region.id] = {
+            "object": region,
+            "blocks": tuple(region.blocks),
+            "block_ids": tuple(block.id for block in region.blocks),
+        }
         for block in region.blocks:
-            blocks[block.id] = tuple(child.id for child in block.operations)
+            blocks[block.id] = {
+                "object": block,
+                "operations": tuple(block.operations),
+                "operation_ids": tuple(child.id for child in block.operations),
+            }
             for child in block.operations:
                 _collect_syntax(child, operations, regions, blocks, uses)
 
@@ -117,20 +133,20 @@ def _direct_mutation_violation(
             }
     for block_id, before_ops in before["blocks"].items():
         after_ops = after["blocks"].get(block_id)
-        if before_ops != after_ops:
+        if after_ops is None or before_ops["operation_ids"] != after_ops["operation_ids"]:
             return {"kind": "block_operations_changed", "block": block_id}
     for region_id, before_blocks in before["regions"].items():
         after_blocks = after["regions"].get(region_id)
-        if before_blocks != after_blocks:
+        if after_blocks is None or before_blocks["block_ids"] != after_blocks["block_ids"]:
             return {"kind": "region_blocks_changed", "region": region_id}
     for value_id, before_uses in before["uses"].items():
         after_uses = after["uses"].get(value_id)
-        if before_uses != after_uses:
+        if after_uses is None or before_uses["use_ids"] != after_uses["use_ids"]:
             return {
                 "kind": "uses_changed",
                 "value": value_id,
-                "before": before_uses,
-                "after": after_uses,
+                "before": before_uses["use_ids"],
+                "after": after_uses["use_ids"] if after_uses is not None else None,
             }
     if set(before["operations"]) != set(after["operations"]):
         return {"kind": "operation_set_changed"}
@@ -139,3 +155,23 @@ def _direct_mutation_violation(
     if set(before["regions"]) != set(after["regions"]):
         return {"kind": "region_set_changed"}
     return None
+
+
+def _restore_syntax(snapshot: dict[str, dict[object, object]]) -> None:
+    for region_data in snapshot["regions"].values():
+        region = region_data["object"]
+        region._blocks.clear()
+        region._blocks.extend(region_data["blocks"])
+    for block_data in snapshot["blocks"].values():
+        block = block_data["object"]
+        block._operations.clear()
+        block._operations.extend(block_data["operations"])
+    for op_data in snapshot["operations"].values():
+        op = op_data["object"]
+        op.parent = op_data["parent_object"]
+        op.operands = op_data["operand_values"]
+        op.properties = op_data["properties"]
+        op.attributes = op_data["attributes"]
+    for use_data in snapshot["uses"].values():
+        value = use_data["object"]
+        value._uses = use_data["uses"]
