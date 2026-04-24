@@ -319,6 +319,39 @@ class DialectTests(unittest.TestCase):
                 body=no_result_reduce_body,
             )
 
+        unterminated_body = Region.from_block_list([Block(arg_types=(index, index))])
+        with self.assertRaisesRegex(ValueError, "scf.reduce"):
+            scf.parallel(
+                lower_bounds=(lower, lower),
+                upper_bounds=(upper, upper),
+                steps=(step, step),
+                body=unterminated_body,
+            )
+
+        wrong_terminator_body = self._single_block_region(
+            arg_types=(index, index),
+            terminator_factory=lambda _args: Operation.create("test.terminator"),
+        )
+        with self.assertRaisesRegex(ValueError, "scf.reduce"):
+            scf.parallel(
+                lower_bounds=(lower, lower),
+                upper_bounds=(upper, upper),
+                steps=(step, step),
+                body=wrong_terminator_body,
+            )
+
+        yield_body = self._single_block_region(
+            arg_types=(index, index),
+            terminator_factory=lambda _args: scf.yield_(),
+        )
+        with self.assertRaisesRegex(ValueError, "scf.reduce"):
+            scf.parallel(
+                lower_bounds=(lower, lower),
+                upper_bounds=(upper, upper),
+                steps=(step, step),
+                body=yield_body,
+            )
+
     def test_scf_forall_verifies_parallel_terminator_and_shared_outputs(self) -> None:
         lower = arith.constant(0, index).results[0]
         upper = arith.constant(4, index).results[0]

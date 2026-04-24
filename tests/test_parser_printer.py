@@ -2,7 +2,17 @@ import unittest
 
 from intellic.ir.dialects import arith, builtin, scf
 from intellic.ir.parser import parse_operation
-from intellic.ir.syntax import Attribute, Block, Builder, Region, Type, i1, i32
+from intellic.ir.syntax import (
+    Attribute,
+    Block,
+    Builder,
+    Region,
+    Type,
+    VerificationError,
+    i1,
+    i32,
+    verify_operation,
+)
 from intellic.ir.syntax.printer import print_operation
 
 
@@ -192,6 +202,21 @@ class ParserPrinterTests(unittest.TestCase):
         parsed_forall = parsed.regions[0].blocks[0].operations[-1]
 
         self.assertEqual(parsed_forall.properties["mapping"], mapping)
+
+    def test_verify_rejects_malformed_parsed_scf_if(self) -> None:
+        text = """
+        "builtin.module"() ({
+          %0 = "arith.constant"() {'value': 0} : () -> (index)
+          "scf.if"(%0) ({
+            "scf.condition"(%0) : () -> ()
+          }) : () -> ()
+        }) : () -> ()
+        """
+
+        parsed = parse_operation(text)
+
+        with self.assertRaisesRegex(VerificationError, "scf.if"):
+            verify_operation(parsed)
 
 
 if __name__ == "__main__":

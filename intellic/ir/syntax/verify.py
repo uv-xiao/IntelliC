@@ -27,4 +27,20 @@ def verify_operation(op: Operation) -> None:
             for child in block.operations:
                 if child.parent is not block:
                     raise VerificationError("operation has wrong parent")
+    _verify_dialect_contract(op)
+
+    for region in op.regions:
+        for block in region.blocks:
+            for child in block.operations:
                 verify_operation(child)
+
+
+def _verify_dialect_contract(op: Operation) -> None:
+    if not op.name.startswith("scf."):
+        return
+    from intellic.ir.dialects import scf
+
+    try:
+        scf.verify_operation_contract(op)
+    except (TypeError, ValueError) as exc:
+        raise VerificationError(f"{op.name}: {exc}") from exc

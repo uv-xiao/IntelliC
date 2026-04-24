@@ -206,16 +206,10 @@ def parallel(
     expected_arg_types = (index,) * rank
     _verify_block_argument_types(block, expected_arg_types, "scf.parallel body")
     result_types = tuple(value.type for value in init_vals)
-    if init_vals:
-        terminator = _required_terminator(block, "scf.reduce", "scf.parallel body")
-        _verify_reduce_operation(terminator, result_types, "scf.parallel")
-    elif block.operations and block.operations[-1].name == "scf.reduce":
-        terminator = block.operations[-1]
-        if terminator.operands:
-            raise ValueError("scf.parallel no-result reduce terminator must not have operands")
-        _verify_reduce_operation(terminator, (), "scf.parallel")
-    elif block.operations and block.operations[-1].name == "scf.yield":
-        _verify_yield_terminator(block, (), "scf.parallel body")
+    terminator = _required_terminator(block, "scf.reduce", "scf.parallel body")
+    if not init_vals and terminator.operands:
+        raise ValueError("scf.parallel no-result reduce terminator must not have operands")
+    _verify_reduce_operation(terminator, result_types, "scf.parallel")
     return Operation.create(
         "scf.parallel",
         operands=lower_bounds + upper_bounds + steps + init_vals,
@@ -298,6 +292,165 @@ def _verify_loop_body(body: Region, iter_args: tuple[Value, ...]) -> None:
     for yielded, initial in zip(terminator.operands, iter_args):
         if yielded.type != initial.type:
             raise TypeError("scf.for yielded type does not match iter_arg")
+
+
+def verify_operation_contract(op: Operation) -> None:
+    """Verify SCF operation contracts for parsed or manually-created operations."""
+
+    if op.name == "scf.yield":
+        return
+    if op.name == "scf.condition":
+        if not op.operands or op.operands[0].type != i1:
+            raise TypeError("scf.condition first operand must be i1 typed")
+        return
+    if op.name == "scf.reduce.return":
+        if len(op.operands) != 1:
+            raise ValueError("scf.reduce.return must have one operand")
+        return
+    if op.name == "scf.forall.in_parallel":
+        if len(op.operands) != op.properties.get("yield_count", len(op.operands)):
+            raise ValueError("scf.forall.in_parallel yield count mismatch")
+        if len(op.regions) != len(op.operands):
+            raise ValueError("scf.forall.in_parallel yielding region count must match operands")
+        for operand, region in zip(op.operands, op.regions):
+            _verify_forall_yield_region(region, operand.type, "scf.forall.in_parallel yielding region")
+        return
+    if op.name == "scf.if":
+        if len(op.operands) != 1 or op.operands[0].type != i1:
+            raise TypeError("scf.if condition must be i1 typed")
+        result_types = tuple(result.type for result in op.results)
+        if result_types and len(op.regions) != 2:
+            raise ValueError("scf.if result types require both regions")
+        if len(op.regions) not in (1, 2):
+            raise ValueError("scf.if must have then and optional else regions")
+        _verify_yielding_region(op.regions[0], result_types, "scf.if then region")
+        if len(op.regions) == 2:
+            _verify_yielding_region(op.regions[1], result_types, "scf.if else region")
+        return
+    if op.name == "scf.for":
+        if len(op.operands) < 3:
+            raise ValueError("scf.for requires lower, upper, and step operands")
+        lower_bound, upper_bound, step, *iter_args = op.operands
+        if lower_bound.type != index or upper_bound.type != index or step.type != index:
+            raise TypeError("scf.for bounds and step must be index typed")
+        if len(op.regions) != 1:
+            raise ValueError("scf.for must have one body region")
+        if tuple(result.type for result in op.results) != tuple(value.type for value in iter_args):
+            raise TypeError("scf.for result types must match iter_args")
+        _verify_loop_body(op.regions[0], tuple(iter_args))
+        return
+    if op.name == "scf.while":
+        if len(op.regions) != 2:
+            raise ValueError("scf.while must have before and after regions")
+        operands = tuple(op.operands)
+        result_types = tuple(result.type for result in op.results)
+        before_block = _single_block(op.regions[0], "scf.while before region")
+        after_block = _single_block(op.regions[1], "scf.while after region")
+        _verify_block_argument_types(
+            before_block,
+            tuple(value.type for value in operands),
+            "scf.while before region",
+        )
+        _verify_block_argument_types(after_block, result_types, "scf.while after region")
+        before_terminator = _required_terminator(
+            before_block,
+            "scf.condition",
+            "scf.while before region",
+        )
+        if not before_terminator.operands or before_terminator.operands[0].type != i1:
+            raise TypeError("scf.condition first operand must be i1 typed")
+        condition_payload = before_terminator.operands[1:]
+        if len(condition_payload) != len(result_types):
+            raise ValueError("scf.while condition payload count must match result types")
+        _verify_value_types(condition_payload, result_types, "scf.while condition payload")
+        _verify_yield_terminator(
+            after_block,
+            tuple(value.type for value in operands),
+            "scf.while after region",
+        )
+        return
+    if op.name == "scf.execute_region":
+        if len(op.regions) != 1:
+            raise ValueError("scf.execute_region must have one region")
+        result_types = tuple(result.type for result in op.results)
+        if not op.regions[0].blocks:
+            raise ValueError("scf.execute_region must own at least one block")
+        for block in op.regions[0].blocks:
+            _verify_yield_terminator(block, result_types, "scf.execute_region region")
+        return
+    if op.name == "scf.index_switch":
+        if len(op.operands) != 1 or op.operands[0].type != index:
+            raise TypeError("scf.index_switch index flag must be index typed")
+        case_values = op.properties.get("case_values", ())
+        if len(op.regions) != len(case_values) + 1:
+            raise ValueError("scf.index_switch case values must match case regions")
+        if len(set(case_values)) != len(case_values):
+            raise ValueError("scf.index_switch case values must be unique")
+        result_types = tuple(result.type for result in op.results)
+        for region in op.regions[:-1]:
+            _verify_yielding_region(region, result_types, "scf.index_switch case region")
+        _verify_yielding_region(op.regions[-1], result_types, "scf.index_switch default region")
+        return
+    if op.name == "scf.parallel":
+        rank = op.properties.get("rank")
+        init_count = op.properties.get("init_count", len(op.results))
+        if not isinstance(rank, int) or not isinstance(init_count, int):
+            raise ValueError("scf.parallel rank and init_count properties are required")
+        if len(op.regions) != 1:
+            raise ValueError("scf.parallel must have one body region")
+        expected_operand_count = rank * 3 + init_count
+        if len(op.operands) != expected_operand_count:
+            raise ValueError("scf.parallel operand count does not match rank/init_count")
+        _verify_index_triplets(
+            tuple(op.operands[:rank]),
+            tuple(op.operands[rank : rank * 2]),
+            tuple(op.operands[rank * 2 : rank * 3]),
+            "scf.parallel",
+        )
+        block = _single_block(op.regions[0], "scf.parallel body")
+        _verify_block_argument_types(block, (index,) * rank, "scf.parallel body")
+        terminator = _required_terminator(block, "scf.reduce", "scf.parallel body")
+        if init_count == 0 and terminator.operands:
+            raise ValueError("scf.parallel no-result reduce terminator must not have operands")
+        _verify_reduce_operation(terminator, tuple(result.type for result in op.results), "scf.parallel")
+        return
+    if op.name == "scf.reduce":
+        _verify_reduce_operation(
+            op,
+            tuple(operand.type for operand in op.operands),
+            "scf.reduce",
+        )
+        return
+    if op.name == "scf.forall":
+        rank = op.properties.get("rank")
+        shared_output_count = op.properties.get("shared_output_count", len(op.results))
+        if not isinstance(rank, int) or not isinstance(shared_output_count, int):
+            raise ValueError("scf.forall rank and shared_output_count properties are required")
+        mapping = op.properties.get("mapping", ())
+        if mapping and len(mapping) != rank:
+            raise ValueError("scf.forall mapping attribute count must match rank")
+        if len(op.regions) != 1:
+            raise ValueError("scf.forall must have one body region")
+        expected_operand_count = rank * 3 + shared_output_count
+        if len(op.operands) != expected_operand_count:
+            raise ValueError("scf.forall operand count does not match rank/shared outputs")
+        _verify_index_triplets(
+            tuple(op.operands[:rank]),
+            tuple(op.operands[rank : rank * 2]),
+            tuple(op.operands[rank * 2 : rank * 3]),
+            "scf.forall",
+        )
+        shared_types = tuple(value.type for value in op.operands[rank * 3 :])
+        block = _single_block(op.regions[0], "scf.forall body")
+        _verify_block_argument_types(block, ((index,) * rank) + shared_types, "scf.forall body")
+        terminator = _required_terminator(block, "scf.forall.in_parallel", "scf.forall body")
+        if len(terminator.operands) != shared_output_count:
+            raise ValueError("scf.forall.in_parallel operand count must match shared outputs")
+        if len(terminator.regions) != shared_output_count:
+            raise ValueError("scf.forall.in_parallel yielding region count must match shared outputs")
+        _verify_value_types(terminator.operands, shared_types, "scf.forall shared output")
+        for region, type_ in zip(terminator.regions, shared_types):
+            _verify_forall_yield_region(region, type_, "scf.forall.in_parallel yielding region")
 
 
 def _single_block(region: Region, owner: str) -> Block:
