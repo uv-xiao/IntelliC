@@ -1,7 +1,18 @@
 import unittest
 
 from intellic.ir.dialects import affine, arith, builtin, func, memref, scf, vector
-from intellic.ir.syntax import Block, Builder, Operation, Region, Type, i1, i32, index
+from intellic.ir.syntax import (
+    Block,
+    Builder,
+    Operation,
+    Region,
+    Type,
+    VerificationError,
+    i1,
+    i32,
+    index,
+    verify_operation,
+)
 
 
 class DialectTests(unittest.TestCase):
@@ -109,6 +120,16 @@ class DialectTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "scf.yield"):
             scf.if_(condition, then_region=bad_then)
+
+    def test_scf_if_accepts_zero_result_regions_without_explicit_yield(self) -> None:
+        condition = arith.constant(1, i1).results[0]
+        then_region = Region.from_block_list([Block()])
+        else_region = Region.from_block_list([Block()])
+
+        op = scf.if_(condition, then_region=then_region, else_region=else_region)
+
+        self.assertEqual(op.name, "scf.if")
+        verify_operation(op)
 
     def test_scf_while_verifies_condition_payload_and_after_yield(self) -> None:
         initial = arith.constant(0, i32).results[0]
@@ -246,6 +267,24 @@ class DialectTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "scf.yield"):
             scf.index_switch(flag, (0,), (bad_case,), default_region)
 
+    def test_verify_rejects_index_switch_non_integer_case_values(self) -> None:
+        flag = arith.constant(0, index).results[0]
+        case_region = self._single_block_region(
+            terminator_factory=lambda _args: scf.yield_()
+        )
+        default_region = self._single_block_region(
+            terminator_factory=lambda _args: scf.yield_()
+        )
+        op = Operation.create(
+            "scf.index_switch",
+            operands=(flag,),
+            properties={"case_values": ("zero",)},
+            regions=(case_region, default_region),
+        )
+
+        with self.assertRaisesRegex(VerificationError, "case values"):
+            verify_operation(op)
+
     def test_scf_parallel_reduce_and_reduce_return_verify_rank_and_types(self) -> None:
         lower = arith.constant(0, index).results[0]
         upper = arith.constant(4, index).results[0]
@@ -352,6 +391,30 @@ class DialectTests(unittest.TestCase):
                 body=yield_body,
             )
 
+    def test_verify_rejects_parallel_result_init_type_mismatch(self) -> None:
+        lower = arith.constant(0, index).results[0]
+        upper = arith.constant(4, index).results[0]
+        step = arith.constant(1, index).results[0]
+        initial = arith.constant(0, i32).results[0]
+        reduce_region = self._single_block_region(
+            arg_types=(index, index),
+            terminator_factory=lambda args: scf.reduce_return(args[0]),
+        )
+        body = self._single_block_region(
+            arg_types=(index,),
+            terminator_factory=lambda _args: scf.reduce(lower, regions=(reduce_region,)),
+        )
+        op = Operation.create(
+            "scf.parallel",
+            operands=(lower, upper, step, initial),
+            result_types=(index,),
+            properties={"rank": 1, "init_count": 1},
+            regions=(body,),
+        )
+
+        with self.assertRaisesRegex(VerificationError, "result types"):
+            verify_operation(op)
+
     def test_scf_forall_verifies_parallel_terminator_and_shared_outputs(self) -> None:
         lower = arith.constant(0, index).results[0]
         upper = arith.constant(4, index).results[0]
@@ -412,6 +475,32 @@ class DialectTests(unittest.TestCase):
                 shared_outputs=(shared,),
                 body=bad_output_body,
             )
+
+    def test_verify_rejects_forall_result_shared_output_type_mismatch(self) -> None:
+        lower = arith.constant(0, index).results[0]
+        upper = arith.constant(4, index).results[0]
+        step = arith.constant(1, index).results[0]
+        shared = arith.constant(0, i32).results[0]
+        yield_region = self._single_block_region(
+            arg_types=(i32,),
+            terminator_factory=lambda args: scf.yield_(args[0]),
+        )
+        body = self._single_block_region(
+            arg_types=(index, i32),
+            terminator_factory=lambda args: scf.forall_in_parallel(
+                scf.forall_yield(args[1], region=yield_region)
+            ),
+        )
+        op = Operation.create(
+            "scf.forall",
+            operands=(lower, upper, step, shared),
+            result_types=(index,),
+            properties={"rank": 1, "shared_output_count": 1},
+            regions=(body,),
+        )
+
+        with self.assertRaisesRegex(VerificationError, "result types"):
+            verify_operation(op)
 
     def test_affine_map_apply_and_memory_ops_verify_types(self) -> None:
         idx0 = arith.constant(0, index).results[0]

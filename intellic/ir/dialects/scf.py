@@ -76,10 +76,10 @@ def if_(
         raise TypeError("scf.if condition must be i1 typed")
     if result_types and else_region is None:
         raise ValueError("scf.if result types require an else region")
-    _verify_yielding_region(then_region, result_types, "scf.if then region")
+    _verify_if_region(then_region, result_types, "scf.if then region")
     regions = [then_region]
     if else_region is not None:
-        _verify_yielding_region(else_region, result_types, "scf.if else region")
+        _verify_if_region(else_region, result_types, "scf.if else region")
         regions.append(else_region)
     return Operation.create(
         "scf.if",
@@ -177,11 +177,7 @@ def index_switch(
         raise TypeError("scf.index_switch index flag must be index typed")
     if len(case_values) != len(case_regions):
         raise ValueError("scf.index_switch case values must match case regions")
-    if len(set(case_values)) != len(case_values):
-        raise ValueError("scf.index_switch case values must be unique")
-    for value in case_values:
-        if not isinstance(value, int):
-            raise TypeError("scf.index_switch case values must be integers")
+    _verify_index_switch_case_values(case_values)
     for region in case_regions:
         _verify_yielding_region(region, result_types, "scf.index_switch case region")
     _verify_yielding_region(default_region, result_types, "scf.index_switch default region")
@@ -325,9 +321,9 @@ def verify_operation_contract(op: Operation) -> None:
             raise ValueError("scf.if result types require both regions")
         if len(op.regions) not in (1, 2):
             raise ValueError("scf.if must have then and optional else regions")
-        _verify_yielding_region(op.regions[0], result_types, "scf.if then region")
+        _verify_if_region(op.regions[0], result_types, "scf.if then region")
         if len(op.regions) == 2:
-            _verify_yielding_region(op.regions[1], result_types, "scf.if else region")
+            _verify_if_region(op.regions[1], result_types, "scf.if else region")
         return
     if op.name == "scf.for":
         if len(op.operands) < 3:
@@ -384,10 +380,9 @@ def verify_operation_contract(op: Operation) -> None:
         if len(op.operands) != 1 or op.operands[0].type != index:
             raise TypeError("scf.index_switch index flag must be index typed")
         case_values = op.properties.get("case_values", ())
+        _verify_index_switch_case_values(case_values)
         if len(op.regions) != len(case_values) + 1:
             raise ValueError("scf.index_switch case values must match case regions")
-        if len(set(case_values)) != len(case_values):
-            raise ValueError("scf.index_switch case values must be unique")
         result_types = tuple(result.type for result in op.results)
         for region in op.regions[:-1]:
             _verify_yielding_region(region, result_types, "scf.index_switch case region")
@@ -403,6 +398,10 @@ def verify_operation_contract(op: Operation) -> None:
         expected_operand_count = rank * 3 + init_count
         if len(op.operands) != expected_operand_count:
             raise ValueError("scf.parallel operand count does not match rank/init_count")
+        result_types = tuple(result.type for result in op.results)
+        init_types = tuple(value.type for value in op.operands[rank * 3 :])
+        if result_types != init_types:
+            raise TypeError("scf.parallel result types must match init values")
         _verify_index_triplets(
             tuple(op.operands[:rank]),
             tuple(op.operands[rank : rank * 2]),
@@ -414,7 +413,7 @@ def verify_operation_contract(op: Operation) -> None:
         terminator = _required_terminator(block, "scf.reduce", "scf.parallel body")
         if init_count == 0 and terminator.operands:
             raise ValueError("scf.parallel no-result reduce terminator must not have operands")
-        _verify_reduce_operation(terminator, tuple(result.type for result in op.results), "scf.parallel")
+        _verify_reduce_operation(terminator, result_types, "scf.parallel")
         return
     if op.name == "scf.reduce":
         _verify_reduce_operation(
@@ -443,6 +442,8 @@ def verify_operation_contract(op: Operation) -> None:
             "scf.forall",
         )
         shared_types = tuple(value.type for value in op.operands[rank * 3 :])
+        if tuple(result.type for result in op.results) != shared_types:
+            raise TypeError("scf.forall result types must match shared outputs")
         block = _single_block(op.regions[0], "scf.forall body")
         _verify_block_argument_types(block, ((index,) * rank) + shared_types, "scf.forall body")
         terminator = _required_terminator(block, "scf.forall.in_parallel", "scf.forall body")
@@ -531,6 +532,21 @@ def _required_terminator(block: Block, name: str, owner: str) -> Operation:
     return terminator
 
 
+def _verify_if_region(region: Region, result_types: tuple[Type, ...], owner: str) -> None:
+    block = _single_block(region, owner)
+    if result_types:
+        _verify_yield_terminator(block, result_types, owner)
+        return
+    if not block.operations:
+        return
+    terminator = block.operations[-1]
+    if terminator.name == "scf.yield":
+        _verify_yield_terminator(block, (), owner)
+        return
+    if terminator.name.startswith("scf."):
+        raise ValueError(f"{owner} must terminate with scf.yield or use implicit empty yield")
+
+
 def _verify_yielding_region(region: Region, result_types: tuple[Type, ...], owner: str) -> None:
     block = _single_block(region, owner)
     _verify_yield_terminator(block, result_types, owner)
@@ -560,6 +576,16 @@ def _verify_reduce_operation(op: Operation, result_types: tuple[Type, ...], owne
             raise ValueError("scf.reduce.return must have one operand")
         if terminator.operands[0].type != operand.type:
             raise TypeError("scf.reduce.return operand type must match reduce operand")
+
+
+def _verify_index_switch_case_values(case_values: object) -> None:
+    if not isinstance(case_values, tuple):
+        raise TypeError("scf.index_switch case values must be a tuple")
+    for value in case_values:
+        if type(value) is not int:
+            raise TypeError("scf.index_switch case values must be integers")
+    if len(set(case_values)) != len(case_values):
+        raise ValueError("scf.index_switch case values must be unique")
 
 
 def _verify_forall_yield_region(region: Region, type_: Type, owner: str) -> None:
