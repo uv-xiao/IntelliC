@@ -218,6 +218,57 @@ class ParserPrinterTests(unittest.TestCase):
         with self.assertRaisesRegex(VerificationError, "scf.if"):
             verify_operation(parsed)
 
+    def test_verify_rejects_scf_condition_outside_while_before_region(self) -> None:
+        text = """
+        "builtin.module"() ({
+          %0 = "arith.constant"() {'value': 1} : () -> (i1)
+          "scf.condition"(%0) : () -> ()
+        }) : () -> ()
+        """
+
+        parsed = parse_operation(text)
+
+        with self.assertRaisesRegex(VerificationError, "scf.condition"):
+            verify_operation(parsed)
+
+    def test_verify_rejects_scf_reduce_return_outside_reduce_region(self) -> None:
+        text = """
+        "builtin.module"() ({
+          %0 = "arith.constant"() {'value': 1} : () -> (i32)
+          "scf.reduce.return"(%0) : () -> ()
+        }) : () -> ()
+        """
+
+        parsed = parse_operation(text)
+
+        with self.assertRaisesRegex(VerificationError, "scf.reduce.return"):
+            verify_operation(parsed)
+
+    def test_verify_rejects_non_terminal_scf_yield(self) -> None:
+        text = """
+        "builtin.module"() ({
+          "scf.yield"() : () -> ()
+          %0 = "arith.constant"() {'value': 1} : () -> (i32)
+        }) : () -> ()
+        """
+
+        parsed = parse_operation(text)
+
+        with self.assertRaisesRegex(VerificationError, "scf.yield"):
+            verify_operation(parsed)
+
+    def test_verify_rejects_standalone_scf_forall_in_parallel(self) -> None:
+        text = """
+        "builtin.module"() ({
+          "scf.forall.in_parallel"() {'yield_count': 0} : () -> ()
+        }) : () -> ()
+        """
+
+        parsed = parse_operation(text)
+
+        with self.assertRaisesRegex(VerificationError, "scf.forall.in_parallel"):
+            verify_operation(parsed)
+
 
 if __name__ == "__main__":
     unittest.main()

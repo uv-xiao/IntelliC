@@ -27,6 +27,7 @@ def verify_operation(op: Operation) -> None:
             for child in block.operations:
                 if child.parent is not block:
                     raise VerificationError("operation has wrong parent")
+    _verify_scf_terminator_context(op)
     _verify_dialect_contract(op)
 
     for region in op.regions:
@@ -44,3 +45,59 @@ def _verify_dialect_contract(op: Operation) -> None:
         scf.verify_operation_contract(op)
     except (TypeError, ValueError) as exc:
         raise VerificationError(f"{op.name}: {exc}") from exc
+
+
+def _verify_scf_terminator_context(op: Operation) -> None:
+    if op.name == "scf.yield":
+        _require_last_in_block(op)
+        owner = _containing_operation(op)
+        region = op.parent.parent
+        if owner.name in ("scf.if", "scf.for", "scf.execute_region", "scf.index_switch"):
+            if region in owner.regions:
+                return
+        if owner.name == "scf.while" and len(owner.regions) > 1 and region is owner.regions[1]:
+            return
+        if owner.name == "scf.forall.in_parallel" and region in owner.regions:
+            return
+        raise VerificationError("scf.yield has invalid parent context")
+
+    if op.name == "scf.condition":
+        _require_last_in_block(op)
+        owner = _containing_operation(op)
+        region = op.parent.parent
+        if owner.name == "scf.while" and owner.regions and region is owner.regions[0]:
+            return
+        raise VerificationError("scf.condition has invalid parent context")
+
+    if op.name == "scf.reduce.return":
+        _require_last_in_block(op)
+        owner = _containing_operation(op)
+        region = op.parent.parent
+        if owner.name == "scf.reduce" and region in owner.regions:
+            return
+        raise VerificationError("scf.reduce.return has invalid parent context")
+
+    if op.name == "scf.forall.in_parallel":
+        _require_last_in_block(op)
+        owner = _containing_operation(op)
+        region = op.parent.parent
+        if owner.name == "scf.forall" and owner.regions and region is owner.regions[0]:
+            return
+        raise VerificationError("scf.forall.in_parallel has invalid parent context")
+
+
+def _require_last_in_block(op: Operation) -> None:
+    block = op.parent
+    if block is None or not hasattr(block, "operations"):
+        raise VerificationError(f"{op.name} has no parent block")
+    if not block.operations or block.operations[-1] is not op:
+        raise VerificationError(f"{op.name} must be last in its block")
+
+
+def _containing_operation(op: Operation) -> Operation:
+    block = op.parent
+    region = block.parent
+    owner = region.parent
+    if not isinstance(owner, Operation):
+        raise VerificationError(f"{op.name} has invalid parent context")
+    return owner
