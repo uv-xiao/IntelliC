@@ -2,7 +2,7 @@ import unittest
 
 from intellic.ir.actions import CompilerAction, MutationIntent, MutatorStage, PendingRecordGate, PipelineRun, passes
 from intellic.ir.dialects import affine, arith, builtin, func, memref, scf
-from intellic.ir.syntax import Attribute, Block, Builder, Operation, Region, i32, index
+from intellic.ir.syntax import Attribute, Block, Builder, Operation, Region, i1, i32, index
 
 
 class ActionTests(unittest.TestCase):
@@ -30,6 +30,20 @@ class ActionTests(unittest.TestCase):
         self.assertNotIn(add, block.operations)
         self.assertEqual(len(run.db.query("MutationApplied")), 1)
         PendingRecordGate().run(run)
+
+    def test_verify_structure_records_diagnostic_and_evidence_link(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        run = PipelineRun(module)
+
+        passes.verify_structure().run(run)
+
+        diagnostic = run.db.require("Diagnostic", module.id).value
+        evidence = run.db.require("EvidenceLink", module.id).value
+        self.assertEqual(diagnostic["action"], "verify-structure")
+        self.assertEqual(diagnostic["severity"], "info")
+        self.assertEqual(evidence["action"], "verify-structure")
+        self.assertEqual(evidence["subject"], module.id)
 
     def test_action_apply_direct_operand_mutation_is_rejected(self) -> None:
         block = Block()
@@ -748,6 +762,37 @@ class ActionTests(unittest.TestCase):
         passes.sparse_constant_propagation().run(run)
 
         self.assertEqual(run.db.require("ValueConcrete", const.results[0].id).value, 42)
+        value_range = run.db.require("ValueRange", const.results[0].id).value
+        self.assertEqual(value_range["min"], 42)
+        self.assertEqual(value_range["max"], 42)
+
+    def test_constant_propagation_records_branch_and_region_reachability(self) -> None:
+        block = Block()
+        then_block = Block()
+        else_block = Block()
+        then_region = Region.from_block_list([then_block])
+        else_region = Region.from_block_list([else_block])
+        with Builder().insert_at_end(then_block) as builder:
+            builder.insert(scf.yield_())
+        with Builder().insert_at_end(else_block) as builder:
+            builder.insert(scf.yield_())
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            condition = builder.insert(arith.constant(1, i1))
+            if_op = builder.insert(
+                scf.if_(condition.results[0], then_region=then_region, else_region=else_region)
+            )
+        run = PipelineRun(module)
+
+        passes.sparse_constant_propagation().run(run)
+
+        branch = run.db.require("BranchReachability", if_op.id).value
+        then_reachability = run.db.require("RegionReachability", then_region.id).value
+        else_reachability = run.db.require("RegionReachability", else_region.id).value
+        self.assertTrue(branch["then_reachable"])
+        self.assertFalse(branch["else_reachable"])
+        self.assertTrue(then_reachability["reachable"])
+        self.assertFalse(else_reachability["reachable"])
 
     def test_named_shared_passes_record_action_evidence(self) -> None:
         module = builtin.module(Region.from_block_list([Block()]))
@@ -865,8 +910,12 @@ class ActionTests(unittest.TestCase):
 
         self.assertEqual(run.db.require("CallGraphEdge", call.id).value["callee"], callee.id)
         inline = run.db.require("InlineIntent", call.id).value
+        mapping = run.db.require("ClonedRegionMapping", call.id).value
         self.assertEqual(inline["callee"], callee.id)
         self.assertEqual(inline["strategy"], "single-return-forward")
+        self.assertEqual(mapping["strategy"], "single-return-forward")
+        self.assertEqual(mapping["call_results"], (call.results[0].id,))
+        self.assertEqual(mapping["replacements"], (caller_block.arguments[0].id,))
 
     def test_inline_single_call_mutator_applies_block_argument_forwarding(self) -> None:
         module_block = Block()
@@ -921,8 +970,13 @@ class ActionTests(unittest.TestCase):
 
         self.assertEqual(run.db.require("LoopScope", loop.id).value["kind"], "scf.for")
         move = run.db.require("LoopInvariantCandidate", invariant.id).value
+        side_effect = run.db.require("SideEffectFact", invariant.id).value
+        moved = run.db.require("MovedOpEvidence", invariant.id).value
         self.assertEqual(move["loop"], loop.id)
         self.assertEqual(move["action"], "would_move_before_loop")
+        self.assertEqual(side_effect["effect"], "none")
+        self.assertEqual(moved["target"], "before-loop")
+        self.assertEqual(moved["status"], "record-only")
 
     def test_lower_affine_to_scf_records_dim_symbol_mapping_for_affine_apply(self) -> None:
         block = Block()

@@ -12,6 +12,24 @@ from .pipeline import PipelineRun
 def verify_structure() -> CompilerAction:
     def apply(run: PipelineRun) -> None:
         verify_operation(run.module)
+        run.db.put(
+            "Diagnostic",
+            run.module.id,
+            {
+                "action": "verify-structure",
+                "severity": "info",
+                "message": "structure verified",
+            },
+        )
+        run.db.put(
+            "EvidenceLink",
+            run.module.id,
+            {
+                "action": "verify-structure",
+                "subject": run.module.id,
+                "artifact": "in-memory-verifier",
+            },
+        )
 
     return CompilerAction("verify-structure", apply)
 
@@ -74,7 +92,11 @@ def sparse_constant_propagation() -> CompilerAction:
     def apply(run: PipelineRun) -> None:
         for op in _walk(run.module):
             if op.name == "arith.constant":
-                run.db.put("ValueConcrete", op.results[0].id, op.properties["value"])
+                value = op.properties["value"]
+                run.db.put("ValueConcrete", op.results[0].id, value)
+                run.db.put("ValueRange", op.results[0].id, {"min": value, "max": value})
+            elif op.name == "scf.if":
+                _record_if_reachability(op, run)
 
     return CompilerAction("sparse-constant-propagation", apply)
 
@@ -145,6 +167,20 @@ def inline_single_call() -> CompilerAction:
                         "result_replacements": tuple(value.id for value in mapping),
                     },
                 )
+                run.db.put(
+                    "ClonedRegionMapping",
+                    call.id,
+                    {
+                        "callee": callee.id,
+                        "call": call.id,
+                        "strategy": "single-return-forward",
+                        "source_region": callee.regions[0].id if callee.regions else None,
+                        "call_operands": tuple(value.id for value in call.operands),
+                        "call_results": tuple(value.id for value in call.results),
+                        "replacements": tuple(value.id for value in mapping),
+                        "boundary": "no body clone; forwarding map only",
+                    },
+                )
                 if len(call.results) == 1 and len(mapping) == 1:
                     run.db.put(
                         "MutationIntent",
@@ -184,6 +220,14 @@ def loop_invariant_code_motion() -> CompilerAction:
                 },
             )
             for op in _region_ops(loop):
+                run.db.put(
+                    "SideEffectFact",
+                    op.id,
+                    {
+                        "effect": "none" if _is_pure_op(op) else "unknown",
+                        "reason": "known pure op" if _is_pure_op(op) else "not in first-slice pure set",
+                    },
+                )
                 if _is_loop_invariant(loop, op):
                     run.db.put(
                         "LoopInvariantCandidate",
@@ -201,6 +245,17 @@ def loop_invariant_code_motion() -> CompilerAction:
                             "action": "loop-invariant-code-motion",
                             "loop": loop.id,
                             "boundary": "record-only first slice",
+                        },
+                    )
+                    run.db.put(
+                        "MovedOpEvidence",
+                        op.id,
+                        {
+                            "action": "loop-invariant-code-motion",
+                            "loop": loop.id,
+                            "target": "before-loop",
+                            "status": "record-only",
+                            "reason": "pure op operands defined outside loop",
                         },
                     )
 
@@ -307,6 +362,43 @@ def _cse_memory_effect(op: Operation, run: PipelineRun) -> str | None:
         },
     )
     return effect
+
+
+def _record_if_reachability(op: Operation, run: PipelineRun) -> None:
+    condition = _constant_value(op.operands[0]) if op.operands else None
+    if condition is None:
+        return
+    then_reachable = bool(condition)
+    else_reachable = not then_reachable and len(op.regions) > 1
+    run.db.put(
+        "BranchReachability",
+        op.id,
+        {
+            "condition": op.operands[0].id,
+            "then_reachable": then_reachable,
+            "else_reachable": else_reachable,
+        },
+    )
+    if op.regions:
+        run.db.put(
+            "RegionReachability",
+            op.regions[0].id,
+            {
+                "owner": op.id,
+                "index": 0,
+                "reachable": then_reachable,
+            },
+        )
+    if len(op.regions) > 1:
+        run.db.put(
+            "RegionReachability",
+            op.regions[1].id,
+            {
+                "owner": op.id,
+                "index": 1,
+                "reachable": else_reachable,
+            },
+        )
 
 
 def _called_symbols(root: Operation) -> set[object]:
