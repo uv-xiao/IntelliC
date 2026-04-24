@@ -8,6 +8,7 @@ class _Printer:
     def __init__(self) -> None:
         self._names: dict[Value, str] = {}
         self._next_value = 0
+        self._next_block = 0
 
     def print_operation(self, op: Operation, indent: int = 0) -> str:
         prefix = " " * indent
@@ -20,11 +21,21 @@ class _Printer:
             ]
             for region in op.regions:
                 for block in region.blocks:
+                    child_indent = indent + 2
+                    if block.arguments:
+                        lines.append(self._print_block_header(block, indent + 2))
+                        child_indent = indent + 4
                     for child in block.operations:
-                        lines.append(self.print_operation(child, indent + 2))
+                        lines.append(self.print_operation(child, child_indent))
             lines.append(f"{prefix}}}) : () -> ({result_types})")
             return "\n".join(lines)
         return f'{prefix}{result_prefix}"{op.name}"({operands}) : () -> ({result_types})'
+
+    def _print_block_header(self, block, indent: int) -> str:
+        name = f"^bb{self._next_block}"
+        self._next_block += 1
+        args = ", ".join(f"{self._assign_name(argument)}: {argument.type}" for argument in block.arguments)
+        return f"{' ' * indent}{name}({args}):"
 
     def _result_prefix(self, op: Operation) -> str:
         if not op.results:

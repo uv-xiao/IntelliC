@@ -34,10 +34,10 @@ prove the system works end to end.
   canonicalization, CSE, SCCP-style propagation, symbol/dead-code cleanup,
   single-call inlining, LICM, affine lowering/normalization, and pending-record
   gate
-- [ ] Add examples and tests for `sum_to_n`, affine tiled access facts, parser
+- [x] Add examples and tests for `sum_to_n`, affine tiled access facts, parser
   round-trip, construction evidence, semantic execution, and action evidence
-- [ ] Verify locally
-- [ ] Sync `docs/design/`, `docs/todo/`, and `docs/in_progress/`
+- [x] Verify locally
+- [x] Sync `docs/design/`, `docs/todo/`, and `docs/in_progress/`
 
 ## Input
 
@@ -163,6 +163,15 @@ Batch 7 verification:
 ```bash
 python -m unittest tests/test_actions.py
 python -m unittest discover -s tests
+```
+
+Batch 8 verification:
+
+```bash
+python -m unittest tests/test_examples.py
+python -m unittest tests/test_parser_printer.py
+python -m unittest discover -s tests
+python scripts/check_repo_harness.py
 ```
 
 Expected implementation test groups:

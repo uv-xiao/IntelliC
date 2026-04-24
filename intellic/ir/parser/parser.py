@@ -16,6 +16,7 @@ _REGION_START_RE = re.compile(
     r'"(?P<name>[^"]+)"\((?P<operands>[^)]*)\)\s*\(\{$'
 )
 _REGION_END_RE = re.compile(r"^\}\)\s*:\s*\(\)\s*->\s*\((?P<result_types>[^)]*)\)$")
+_BLOCK_RE = re.compile(r"^\^(?P<label>[\w.]+)\((?P<args>.*)\):$")
 
 
 def parse_operation(text: str) -> Operation:
@@ -58,7 +59,7 @@ class _Parser:
 
     def _parse_region_operation(self, match: re.Match[str]) -> Operation:
         self.index += 1
-        block = Block()
+        block = self._parse_optional_block()
         region = Region.from_block_list([block])
         children: list[Operation] = []
         while self.has_more and not _REGION_END_RE.match(self.lines[self.index]):
@@ -76,6 +77,29 @@ class _Parser:
         op = Operation.create(match.group("name"), operands=operands, result_types=result_types, regions=(region,))
         self._bind_results(match.group("results"), op)
         return op
+
+    def _parse_optional_block(self) -> Block:
+        if not self.has_more:
+            return Block()
+        block_match = _BLOCK_RE.match(self.lines[self.index])
+        if block_match is None:
+            return Block()
+        self.index += 1
+        arg_specs = [part.strip() for part in block_match.group("args").split(",") if part.strip()]
+        names: list[str] = []
+        types: list[Type] = []
+        for spec in arg_specs:
+            if ":" not in spec:
+                raise ValueError("expected block argument type")
+            name, type_text = [part.strip() for part in spec.split(":", 1)]
+            names.append(name)
+            types.append(Type(type_text))
+        block = Block(arg_types=types)
+        for name, argument in zip(names, block.arguments):
+            if name in self.values:
+                raise ValueError(f"duplicate SSA value: {name}")
+            self.values[name] = argument
+        return block
 
     def _parse_operands(self, text: str) -> tuple[Value, ...]:
         names = [part.strip() for part in text.split(",") if part.strip()]
