@@ -77,6 +77,85 @@ class ParserPrinterTests(unittest.TestCase):
             ["scf.yield", "scf.yield"],
         )
 
+    def test_generic_roundtrip_preserves_execute_region_blocks(self) -> None:
+        region = Region.from_block_list([Block(), Block()])
+        for index, block in enumerate(region.blocks):
+            with Builder().insert_at_end(block) as builder:
+                builder.insert(arith.constant(index, i32))
+        op = scf.execute_region(region, no_inline=True)
+
+        text = print_operation(op)
+        parsed = parse_operation(text)
+
+        self.assertEqual(parsed.name, "scf.execute_region")
+        self.assertEqual(len(parsed.regions), 1)
+        self.assertEqual(len(parsed.regions[0].blocks), 2)
+        self.assertEqual(
+            [block.operations[0].name for block in parsed.regions[0].blocks],
+            ["arith.constant", "arith.constant"],
+        )
+
+    def test_generic_roundtrip_preserves_scf_contract_properties(self) -> None:
+        module_region = Region.from_block_list([Block()])
+        module = builtin.module(module_region)
+
+        execute_region = Region.from_block_list([Block()])
+        with Builder().insert_at_end(execute_region.blocks[0]) as builder:
+            builder.insert(arith.constant(42, i32))
+
+        switch_region = Region.from_block_list([Block()])
+        default_region = Region.from_block_list([Block()])
+        forall_yield_region = Region.from_block_list([Block(arg_types=(i32,))])
+        with Builder().insert_at_end(forall_yield_region.blocks[0]) as builder:
+            builder.insert(scf.yield_(forall_yield_region.blocks[0].arguments[0]))
+        forall_body = Region.from_block_list([Block(arg_types=(Type("index"), i32))])
+        with Builder().insert_at_end(module_region.blocks[0]) as module_builder:
+            flag = module_builder.insert(arith.constant(0, Type("index"))).results[0]
+            lower = module_builder.insert(arith.constant(0, Type("index"))).results[0]
+            upper = module_builder.insert(arith.constant(4, Type("index"))).results[0]
+            step = module_builder.insert(arith.constant(1, Type("index"))).results[0]
+            result = module_builder.insert(arith.constant(9, i32)).results[0]
+            with Builder().insert_at_end(switch_region.blocks[0]) as builder:
+                builder.insert(scf.yield_(result))
+            with Builder().insert_at_end(default_region.blocks[0]) as builder:
+                builder.insert(scf.yield_(result))
+            with Builder().insert_at_end(forall_body.blocks[0]) as builder:
+                builder.insert(
+                    scf.forall_in_parallel(
+                        scf.forall_yield(
+                            forall_body.blocks[0].arguments[1],
+                            region=forall_yield_region,
+                        )
+                    )
+                )
+            module_builder.insert(scf.execute_region(execute_region, no_inline=True))
+            module_builder.insert(
+                scf.index_switch(
+                    flag,
+                    (3,),
+                    (switch_region,),
+                    default_region,
+                    result_types=(i32,),
+                )
+            )
+            module_builder.insert(
+                scf.forall(
+                    lower_bounds=(lower,),
+                    upper_bounds=(upper,),
+                    steps=(step,),
+                    shared_outputs=(result,),
+                    body=forall_body,
+                    mapping=("thread-x",),
+                )
+            )
+
+        parsed = parse_operation(print_operation(module))
+        parsed_execute, parsed_switch, parsed_forall = parsed.regions[0].blocks[0].operations[-3:]
+
+        self.assertEqual(parsed_execute.properties["no_inline"], True)
+        self.assertEqual(parsed_switch.properties["case_values"], (3,))
+        self.assertEqual(parsed_forall.properties["mapping"], ("thread-x",))
+
 
 if __name__ == "__main__":
     unittest.main()

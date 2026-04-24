@@ -1,19 +1,24 @@
 from __future__ import annotations
 
+import ast
 import re
 
 from intellic.ir.syntax import Block, Builder, Operation, Region, Type, Value
 from intellic.ir.parser.lexer import strip_comments
 
 
+_PROPERTIES_RE = r"(?:\s+(?P<properties>\{.*\}))?"
 _OP_RE = re.compile(
     r'^(?:(?P<results>%[\w.]+(?:\s*,\s*%[\w.]+)*)\s*=\s*)?'
     r'"(?P<name>[^"]+)"\((?P<operands>[^)]*)\)'
+    + _PROPERTIES_RE +
     r'(?P<region>\s*\(\{)?\s*:\s*\(\)\s*->\s*\((?P<result_types>[^)]*)\)$'
 )
 _REGION_START_RE = re.compile(
     r'^(?:(?P<results>%[\w.]+(?:\s*,\s*%[\w.]+)*)\s*=\s*)?'
-    r'"(?P<name>[^"]+)"\((?P<operands>[^)]*)\)\s*\(\{$'
+    r'"(?P<name>[^"]+)"\((?P<operands>[^)]*)\)'
+    + _PROPERTIES_RE +
+    r"\s*\(\{$"
 )
 _REGION_SEPARATOR_RE = re.compile(r"^\},\s*\{$")
 _REGION_END_RE = re.compile(r"^\}\)\s*:\s*\(\)\s*->\s*\((?P<result_types>[^)]*)\)$")
@@ -53,8 +58,14 @@ class _Parser:
             raise ValueError("expected operation")
         self.index += 1
         operands = self._parse_operands(op_match.group("operands"))
+        properties = self._parse_properties(op_match.group("properties"))
         result_types = self._parse_types(op_match.group("result_types"))
-        op = Operation.create(op_match.group("name"), operands=operands, result_types=result_types)
+        op = Operation.create(
+            op_match.group("name"),
+            operands=operands,
+            result_types=result_types,
+            properties=properties,
+        )
         self._bind_results(op_match.group("results"), op)
         return op
 
@@ -63,20 +74,9 @@ class _Parser:
         regions: list[Region] = []
         end_match: re.Match[str] | None = None
         while True:
-            block = self._parse_optional_block()
-            region = Region.from_block_list([block])
-            children: list[Operation] = []
-            while (
-                self.has_more
-                and not _REGION_SEPARATOR_RE.match(self.lines[self.index])
-                and not _REGION_END_RE.match(self.lines[self.index])
-            ):
-                children.append(self.parse_one())
+            region = self._parse_region_body()
             if not self.has_more:
                 raise ValueError("unterminated region")
-            with Builder().insert_at_end(block) as builder:
-                for child in children:
-                    builder.insert(child)
             regions.append(region)
             if _REGION_SEPARATOR_RE.match(self.lines[self.index]):
                 self.index += 1
@@ -86,22 +86,59 @@ class _Parser:
             self.index += 1
             break
         operands = self._parse_operands(match.group("operands"))
+        properties = self._parse_properties(match.group("properties"))
         result_types = self._parse_types(end_match.group("result_types"))
         op = Operation.create(
             match.group("name"),
             operands=operands,
             result_types=result_types,
+            properties=properties,
             regions=tuple(regions),
         )
         self._bind_results(match.group("results"), op)
         return op
 
-    def _parse_optional_block(self) -> Block:
-        if not self.has_more:
-            return Block()
+    def _parse_region_body(self) -> Region:
+        blocks: list[Block] = []
+        if self._at_region_boundary():
+            return Region.from_block_list([Block()])
+        while self.has_more and not self._at_region_boundary():
+            if _BLOCK_RE.match(self.lines[self.index]):
+                block = self._parse_block_header()
+                self._parse_block_operations(block)
+                blocks.append(block)
+                continue
+            if blocks:
+                raise ValueError("expected block header")
+            block = Block()
+            self._parse_block_operations(block)
+            blocks.append(block)
+        return Region.from_block_list(blocks)
+
+    def _parse_block_operations(self, block: Block) -> None:
+        children: list[Operation] = []
+        while (
+            self.has_more
+            and not self._at_region_boundary()
+            and not _BLOCK_RE.match(self.lines[self.index])
+        ):
+            children.append(self.parse_one())
+        with Builder().insert_at_end(block) as builder:
+            for child in children:
+                builder.insert(child)
+
+    def _at_region_boundary(self) -> bool:
+        return (
+            self.has_more
+            and (
+                _REGION_SEPARATOR_RE.match(self.lines[self.index]) is not None
+                or _REGION_END_RE.match(self.lines[self.index]) is not None
+            )
+        )
+
+    def _parse_block_header(self) -> Block:
         block_match = _BLOCK_RE.match(self.lines[self.index])
-        if block_match is None:
-            return Block()
+        assert block_match is not None
         self.index += 1
         arg_specs = [part.strip() for part in block_match.group("args").split(",") if part.strip()]
         names: list[str] = []
@@ -131,6 +168,14 @@ class _Parser:
 
     def _parse_types(self, text: str) -> tuple[Type, ...]:
         return tuple(Type(part.strip()) for part in text.split(",") if part.strip())
+
+    def _parse_properties(self, text: str | None) -> dict[str, object]:
+        if not text:
+            return {}
+        value = ast.literal_eval(text)
+        if not isinstance(value, dict):
+            raise ValueError("operation properties must be a dictionary")
+        return value
 
     def _bind_results(self, names_text: str | None, op: Operation) -> None:
         if not names_text:
