@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from intellic.ir.syntax import Operation
-from intellic.ir.syntax.mutation_guard import direct_mutation_guard
+from intellic.ir.syntax.mutation_guard import GuardedDict, GuardedList, direct_mutation_guard
 
 from .pipeline import PipelineRun
 
@@ -60,10 +60,13 @@ def _collect_syntax(
     operations[op.id] = {
         "object": op,
         "operands": tuple(operand.id for operand in op.operands),
+        "operands_guarded": isinstance(op.operands, tuple),
         "operand_values": tuple(op.operands),
         "parent": getattr(op.parent, "id", None),
         "parent_object": op.parent,
+        "properties_guarded": isinstance(op.properties, GuardedDict),
         "properties": dict(op.properties),
+        "attributes_guarded": isinstance(op.attributes, GuardedDict),
         "attributes": dict(op.attributes),
     }
     for result in op.results:
@@ -75,12 +78,14 @@ def _collect_syntax(
     for region in op.regions:
         regions[region.id] = {
             "object": region,
+            "blocks_guarded": isinstance(region._blocks, GuardedList),
             "blocks": tuple(region.blocks),
             "block_ids": tuple(block.id for block in region.blocks),
         }
         for block in region.blocks:
             blocks[block.id] = {
                 "object": block,
+                "operations_guarded": isinstance(block._operations, GuardedList),
                 "operations": tuple(block.operations),
                 "operation_ids": tuple(child.id for child in block.operations),
             }
@@ -110,6 +115,12 @@ def _direct_mutation_violation(
                         "after": after_operand,
                     }
             return {"kind": "operand_count_changed", "operation": op_id}
+        if (
+            not after_op["operands_guarded"]
+            or not after_op["properties_guarded"]
+            or not after_op["attributes_guarded"]
+        ):
+            return {"kind": "operation_storage_changed", "operation": op_id}
         if before_op["parent"] != after_op["parent"]:
             return {
                 "kind": "parent_changed",
@@ -133,10 +144,14 @@ def _direct_mutation_violation(
             }
     for block_id, before_ops in before["blocks"].items():
         after_ops = after["blocks"].get(block_id)
+        if after_ops is not None and not after_ops["operations_guarded"]:
+            return {"kind": "block_storage_changed", "block": block_id}
         if after_ops is None or before_ops["operation_ids"] != after_ops["operation_ids"]:
             return {"kind": "block_operations_changed", "block": block_id}
     for region_id, before_blocks in before["regions"].items():
         after_blocks = after["regions"].get(region_id)
+        if after_blocks is not None and not after_blocks["blocks_guarded"]:
+            return {"kind": "region_storage_changed", "region": region_id}
         if after_blocks is None or before_blocks["block_ids"] != after_blocks["block_ids"]:
             return {"kind": "region_blocks_changed", "region": region_id}
     for value_id, before_uses in before["uses"].items():

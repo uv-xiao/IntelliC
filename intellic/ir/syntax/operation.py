@@ -15,14 +15,47 @@ class Operation:
     """MLIR-style operation with operands, results, attributes, and regions."""
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if name == "operands" and hasattr(self, "operands"):
-            record_direct_mutation_attempt("operand_assignment", self)
-        if name in {"properties", "attributes"}:
-            if hasattr(self, name):
+        if name == "operands":
+            if hasattr(self, "operands"):
+                record_direct_mutation_attempt("operand_assignment", self)
+            self._set_operands_unchecked(value)
+            return
+        if name == "properties":
+            if hasattr(self, "properties"):
                 record_direct_mutation_attempt("metadata_assignment", self, field=name)
             if not isinstance(value, GuardedDict):
                 value = GuardedDict(self, name, value)
+            self._set_properties_unchecked(value)
+            return
+        if name == "attributes":
+            if hasattr(self, "attributes"):
+                record_direct_mutation_attempt("metadata_assignment", self, field=name)
+            if not isinstance(value, GuardedDict):
+                value = GuardedDict(self, name, value)
+            self._set_attributes_unchecked(value)
+            return
         super().__setattr__(name, value)
+
+    @property
+    def operands(self) -> tuple[Value, ...]:
+        return self.__operands
+
+    @property
+    def properties(self) -> GuardedDict:
+        return self.__properties
+
+    @property
+    def attributes(self) -> GuardedDict:
+        return self.__attributes
+
+    def _set_operands_unchecked(self, operands: tuple[Value, ...]) -> None:
+        super().__setattr__("_Operation__operands", tuple(operands))
+
+    def _set_properties_unchecked(self, properties: GuardedDict) -> None:
+        super().__setattr__("_Operation__properties", properties)
+
+    def _set_attributes_unchecked(self, attributes: GuardedDict) -> None:
+        super().__setattr__("_Operation__attributes", attributes)
 
     def __init__(
         self,

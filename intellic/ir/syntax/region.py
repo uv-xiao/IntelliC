@@ -17,7 +17,11 @@ class Block:
         self.arguments = tuple(
             BlockArgument(self, index, type) for index, type in enumerate(arg_types)
         )
-        self._operations: list[object] = GuardedList(self, "_operations")
+        super().__setattr__("_Block__operations", GuardedList(self, "_operations"))
+
+    @property
+    def _operations(self) -> GuardedList:
+        return self.__operations
 
     @property
     def operations(self) -> tuple[object, ...]:
@@ -33,9 +37,13 @@ class Region:
     def __init__(self, blocks: Iterable[Block] = ()) -> None:
         self.id = SyntaxId.fresh()
         self.parent: object | None = None
-        self._blocks: list[Block] = GuardedList(self, "_blocks")
+        super().__setattr__("_Region__blocks", GuardedList(self, "_blocks"))
         for block in blocks:
             self.append_block(block)
+
+    @property
+    def _blocks(self) -> GuardedList:
+        return self.__blocks
 
     @classmethod
     def from_block_list(cls, blocks: Iterable[Block]) -> "Region":

@@ -32,7 +32,7 @@ def record_direct_mutation_attempt(kind: str, subject: object, **details: object
 
 class GuardedDict(MutableMapping):
     def __init__(self, owner: object, field: str, values: Mapping[str, Any]) -> None:
-        super().__setattr__("_data", tuple(dict(values).items()))
+        super().__setattr__("_GuardedDict__data", tuple(dict(values).items()))
         super().__setattr__("_owner", owner)
         super().__setattr__("_field", field)
 
@@ -43,8 +43,20 @@ class GuardedDict(MutableMapping):
                 self._owner,
                 field=self._field,
             )
-            value = tuple(dict(value).items()) if isinstance(value, Mapping) else tuple(value)
+            self._replace_data(value)
+            return
         super().__setattr__(name, value)
+
+    @property
+    def _data(self) -> tuple[tuple[str, Any], ...]:
+        return self.__data
+
+    def _replace_data(self, values: object) -> None:
+        if isinstance(values, Mapping):
+            data = tuple(dict(values).items())
+        else:
+            data = tuple(values)
+        super().__setattr__("_GuardedDict__data", data)
 
     def __getitem__(self, key: str) -> Any:
         for existing_key, value in self._data:
@@ -82,7 +94,7 @@ class GuardedDict(MutableMapping):
             field=self._field,
             key=key,
         )
-        super().__setattr__("_data", self._with_item(key, value))
+        self._replace_data(self._with_item(key, value))
 
     def __delitem__(self, key: str) -> None:
         record_direct_mutation_attempt(
@@ -91,11 +103,11 @@ class GuardedDict(MutableMapping):
             field=self._field,
             key=key,
         )
-        super().__setattr__("_data", self._without_item(key))
+        self._replace_data(self._without_item(key))
 
     def clear(self) -> None:
         record_direct_mutation_attempt("metadata_clear", self._owner, field=self._field)
-        super().__setattr__("_data", ())
+        self._replace_data(())
 
     def pop(self, key: str, default: Any = _MISSING) -> Any:
         record_direct_mutation_attempt(
@@ -110,7 +122,7 @@ class GuardedDict(MutableMapping):
             if default is _MISSING:
                 raise
             return default
-        super().__setattr__("_data", self._without_item(key))
+        self._replace_data(self._without_item(key))
         return value
 
     def popitem(self) -> tuple[str, Any]:
@@ -118,7 +130,7 @@ class GuardedDict(MutableMapping):
         if not self._data:
             raise KeyError("dictionary is empty")
         item = self._data[-1]
-        super().__setattr__("_data", self._data[:-1])
+        self._replace_data(self._data[:-1])
         return item
 
     def setdefault(self, key: str, default: Any = None) -> Any:
@@ -129,7 +141,7 @@ class GuardedDict(MutableMapping):
                 field=self._field,
                 key=key,
             )
-            super().__setattr__("_data", self._with_item(key, default))
+            self._replace_data(self._with_item(key, default))
             return default
         return self[key]
 
@@ -138,7 +150,7 @@ class GuardedDict(MutableMapping):
             record_direct_mutation_attempt("metadata_update", self._owner, field=self._field)
         updates = dict(*args, **kwargs)
         for key, value in updates.items():
-            super().__setattr__("_data", self._with_item(key, value))
+            self._replace_data(self._with_item(key, value))
 
     def __ior__(self, other: object):
         record_direct_mutation_attempt("metadata_update", self._owner, field=self._field)
@@ -156,15 +168,23 @@ class GuardedDict(MutableMapping):
 
 class GuardedList(MutableSequence):
     def __init__(self, owner: object, field: str, values: Iterable[object] = ()) -> None:
-        super().__setattr__("_data", tuple(values))
+        super().__setattr__("_GuardedList__data", tuple(values))
         super().__setattr__("_owner", owner)
         super().__setattr__("_field", field)
 
     def __setattr__(self, name: str, value: object) -> None:
         if name == "_data" and hasattr(self, "_data"):
             self._record("backing_assignment")
-            value = tuple(value)
+            self._replace_data(value)
+            return
         super().__setattr__(name, value)
+
+    @property
+    def _data(self) -> tuple[object, ...]:
+        return self.__data
+
+    def _replace_data(self, values: Iterable[object]) -> None:
+        super().__setattr__("_GuardedList__data", tuple(values))
 
     def _record(self, kind: str) -> None:
         record_direct_mutation_attempt(f"{self._prefix}_{kind}", self._owner, field=self._field)
@@ -185,52 +205,52 @@ class GuardedList(MutableSequence):
         self._record("update")
         items = list(self._data)
         items[index] = value
-        super().__setattr__("_data", tuple(items))
+        self._replace_data(items)
 
     def __delitem__(self, index) -> None:
         self._record("delete")
         items = list(self._data)
         del items[index]
-        super().__setattr__("_data", tuple(items))
+        self._replace_data(items)
 
     def clear(self) -> None:
         self._record("clear")
-        super().__setattr__("_data", ())
+        self._replace_data(())
 
     def extend(self, values: Iterable[object]) -> None:
         self._record("extend")
-        super().__setattr__("_data", (*self._data, *tuple(values)))
+        self._replace_data((*self._data, *tuple(values)))
 
     def insert(self, index: int, value: object) -> None:
         self._record("insert")
         items = list(self._data)
         items.insert(index, value)
-        super().__setattr__("_data", tuple(items))
+        self._replace_data(items)
 
     def pop(self, index: int = -1) -> object:
         self._record("delete")
         items = list(self._data)
         value = items.pop(index)
-        super().__setattr__("_data", tuple(items))
+        self._replace_data(items)
         return value
 
     def remove(self, value: object) -> None:
         self._record("delete")
         items = list(self._data)
         items.remove(value)
-        super().__setattr__("_data", tuple(items))
+        self._replace_data(items)
 
     def reverse(self) -> None:
         self._record("reorder")
-        super().__setattr__("_data", tuple(reversed(self._data)))
+        self._replace_data(reversed(self._data))
 
     def sort(self, *args: object, **kwargs: Any) -> None:
         self._record("reorder")
-        super().__setattr__("_data", tuple(sorted(self._data, *args, **kwargs)))
+        self._replace_data(sorted(self._data, *args, **kwargs))
 
     def __iadd__(self, values: Iterable[object]):
         self._record("extend")
-        super().__setattr__("_data", (*self._data, *tuple(values)))
+        self._replace_data((*self._data, *tuple(values)))
         return self
 
     def __repr__(self) -> str:
