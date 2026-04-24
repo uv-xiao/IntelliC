@@ -578,15 +578,23 @@ No separate gate subsystem is needed unless implementation proves otherwise.
 ### Example 1: Rewrite As Fixed Action
 
 ```text
-action add-zero-canonicalize kind=Fixed
+variant fixture:
+  scf.for body contains:
+    %zero = arith.constant 0 : i32
+    %same = arith.addi %total, %zero : i32
+    %next = arith.addi %same, %i_i32 : i32
+    scf.yield %next : i32
+
+action loop-body-add-zero-canonicalize kind=Fixed
   match:
-    find arith.addi(%x, %zero)
+    find arith.addi(%total, %zero) inside an scf.for body
     read ConstValue(%zero, 0)
-    write MatchRecord(match_id=m1, bindings=(add=%add, lhs=%x, rhs=%zero))
+    write MatchRecord(match_id=m1,
+      bindings=(loop=%loop, add=%same, lhs=%total, rhs=%zero))
 
   apply:
-    write MutationIntent.ReplaceUses(intent=i1, old=%add.result, new=%x)
-    write RewriteEvidence(rule=add-zero, match=m1)
+    write MutationIntent.ReplaceUses(intent=i1, old=%same.result, new=%total)
+    write RewriteEvidence(rule=add-zero, match=m1, scope=scf.for.body)
 
   stages:
     MutatorStage consumes i1 -> MutationApplied(i1)
@@ -594,10 +602,12 @@ action add-zero-canonicalize kind=Fixed
 ```
 
 Feature shown: rewrite actions record a mutation intent; mutation happens only
-in the mutator stage.
+in the mutator stage. The challenging case proves matching inside nested regions
+and preserving loop-carried uses after mutation.
 
 Verification mapping: evidence checks match record, mutation intent,
-mutation-applied record, and absence of pending intents.
+mutation-applied record, preserved `scf.yield` operand ownership, and absence of
+pending intents.
 
 ### Example 2: Analysis As Fixed Action
 
@@ -718,6 +728,153 @@ action infer-loop-invariants kind=Fixed
 Feature shown: an action may use its own `TraceDB`-like workspace, but only the
 explicitly exported facts/evidence become part of the pipeline record.
 
+### Example 7: Affine Transform Requires Legality Evidence
+
+```text
+action affine-tile-fusion-legality kind=Fixed
+  match:
+    find adjacent affine.for nests over %A
+    read AffineAccess(read/write facts)
+    read AffineLoopBounds
+    write MatchRecord(match_id=m1, bindings=(producer=%p, consumer=%c))
+
+  apply:
+    compute dependence relation in auxiliary_db
+    export AffineDependence(src=%p.store, dst=%c.load, relation=no_conflict)
+    export AffineTransformLegality(action=tile-fuse, subject=(%p, %c),
+                                   status=accepted)
+
+action affine-tile-fuse kind=Fixed
+  match:
+    require AffineTransformLegality(status=accepted)
+  apply:
+    write MutationIntent.ReplaceOps(old=(%p, %c), new=%fused)
+```
+
+Feature shown: affine transforms do not mutate syntax just because a pattern
+matches. They require prior legality evidence derived from affine access and
+dependence facts.
+
+Verification mapping: `tests/test_affine_actions.py` includes an accepted
+no-dependence case, a rejected dependence case, and a failure case where
+`affine-tile-fuse` runs without an accepted legality record.
+
+## Implementation-Ready Module Contracts
+
+The first action implementation should expose these modules and contracts:
+
+```text
+intellic/ir/actions/
+  action.py          # CompilerAction, Fixed, AgentAct, action metadata
+  scope.py           # ActionScope over module, operation, region, block
+  match.py           # MatchRecord, MatchSet, read-set evidence
+  mutation.py        # MutationIntent schemas and controlled syntax edits
+  stages.py          # MutatorStage, PendingRecordGate
+  pipeline.py        # PipelineRun, ActionFrame, transactions, checkpoints
+  host.py            # Python action host and future cross-language record shape
+  agent_api.py       # limited AgentAct hooks over TraceDB and syntax queries
+```
+
+First-slice invariants:
+
+- `match` records why a scope was selected or rejected; hidden boolean matches
+  are not enough.
+- `apply` appends `TraceDB` records and does not mutate syntax directly.
+- `MutatorStage` is the first public syntax-mutating action stage.
+- Required-to-handle records, such as mutation intents, must be consumed or
+  rejected before the action succeeds.
+- A pipeline run has one authoritative pipeline `TraceDB`; action-local
+  auxiliary databases affect the pipeline only through explicit exported
+  records.
+- Failed actions keep failure evidence and do not commit staged syntax
+  mutations unless an explicit recovery policy exists.
+- `AgentAct` may query, explain, and propose typed records through agent APIs;
+  it may not perform unrecorded mutation.
+
+First-slice failure tests:
+
+- an unconsumed `MutationIntent` fails `PendingRecordGate`.
+- a mutation intent for a stale syntax id is rejected with evidence.
+- direct mutation inside `apply` is impossible through the public action API.
+- auxiliary facts are invisible to later pipeline actions until exported.
+- an `AgentAct` proposal that violates policy is recorded as rejected, not
+  silently ignored or applied.
+
+## First-Slice Pass Set
+
+The first implementation slice should prioritize passes that MLIR and xDSL both
+treat as shared compiler infrastructure. Dialect-specific passes are included
+only when they cover core dialect contracts that shared passes depend on. These
+are the selected passes/actions, in pipeline order:
+
+| Order | Pass/action | Upstream anchor | Dialects covered | Required records |
+| --- | --- | --- | --- | --- |
+| 1 | `verify-structure` | MLIR verifier/xDSL op verifiers | builtin, func, arith, scf, affine, memref types, vector types | `Diagnostic`, `EvidenceLink` |
+| 2 | `canonicalize-greedy` | MLIR `Canonicalizer`, xDSL `canonicalize.py` and dialect canonicalization patterns | arith, scf, affine, memref, vector type users | `MatchRecord`, `MutationIntent`, `RewriteEvidence` |
+| 3 | `common-subexpression-elimination` | MLIR `CSE`, xDSL `common_subexpression_elimination.py` | arith, affine.apply, pure shape/index computations, side-effect-aware memory users | `MatchRecord`, `MutationIntent`, memory-effect read evidence |
+| 4 | `sparse-constant-propagation` | MLIR `SCCP`, xDSL constant-fold/interpreter patterns | arith, func regions, scf branches/loops where facts are bounded | `ValueConcrete`, `ValueRange`, branch/region reachability facts |
+| 5 | `symbol-dce-and-dead-code` | MLIR `SymbolDCE`/dead-value removal, xDSL `dead_code_elimination.py` | builtin.module, func.func, func.call users, unused pure ops | symbol liveness facts, `MutationIntent.EraseOp` |
+| 6 | `inline-single-call` | MLIR `Inliner`, xDSL function transformation patterns | func.func, func.call, func.return, canonicalization cleanup | callgraph facts, cloned-region mapping, result replacement evidence |
+| 7 | `loop-invariant-code-motion` | MLIR `LoopInvariantCodeMotion`, xDSL `loop_invariant_code_motion.py` | scf.for, scf.while where legal, affine.for, affine.parallel | loop-scope facts, side-effect facts, moved-op evidence |
+| 8 | `lower-affine-to-scf` | MLIR affine lowering/decompose passes, xDSL `lower_affine.py` | affine maps/sets/loops/memory ops into arith/scf/memref-indexing form | affine expansion facts, dim/symbol mapping, semantic-preservation evidence |
+| 9 | `normalize-and-simplify-affine-loops` | MLIR affine loop normalize/simplify passes plus xDSL loop range folding analogs | affine.for, affine.parallel, affine.min/max/apply, scf loop bounds after lowering | `AffineLoopBounds`, `AffineLoopBand`, normalized-bound evidence |
+| 10 | `pending-record-gate` | IntelliC action safety gate around MLIR/xDSL-style rewrites | all dialects touched by prior passes | required-record completion or rejection evidence |
+
+Selection rules:
+
+- Shared MLIR/xDSL pass families win over bespoke examples. `canonicalize`,
+  `CSE`, constant propagation, symbol/dead-code cleanup, inlining, and LICM are
+  first because they stress the common operation, region, dominance, side-effect,
+  and mutation contracts every later pass needs.
+- Dialect coverage still matters. The first slice must include enough arith,
+  func, scf, affine, memref-type, and vector-type examples for each selected
+  shared pass to prove it respects dialect verification and side-effect
+  contracts.
+- Affine remains important, but the first affine work should be MLIR/xDSL-shaped:
+  lower/decompose affine constructs, normalize/simplify affine loops and maps,
+  and record dependence/legality facts needed by later tiling/fusion.
+- `execute-sum-to-n` stays as verification evidence for semantics, not as a
+  selected optimization pass. `canonicalize-add-zero` is now a test case inside
+  `canonicalize-greedy`, not a standalone pass.
+
+The first slice defers production affine fusion/tiling, full bufferization,
+backend conversion, and target-specific vector lowering. It must still include
+accepted and rejected legality cases for affine memory effects so later loop
+transforms cannot bypass evidence.
+
+## SCF And Affine Action Contracts
+
+SCF and affine are the first action-heavy dialect families. Their actions must
+be designed before implementation because most interesting optimizations depend
+on legality evidence, not only syntax rewrites.
+
+SCF action families:
+
+| Action family | Required records |
+| --- | --- |
+| loop-body canonicalization | nested-region `MatchRecord`, `MutationIntent`, use/yield preservation evidence |
+| `scf.if` simplification | condition fact, selected branch, replacement/yield mapping, removed-region evidence |
+| `scf.for` simplification/peeling/unrolling | bound facts, trip-count facts when known, carried-value mapping, remainder-loop evidence |
+| `scf.while` rotation/uplift | before/after region mapping, condition payload facts, fuel/fixpoint evidence |
+| `scf.parallel` and `scf.forall` lowering | isolation/reduction facts, synchronization records, mapping attributes, destination/shared-output evidence |
+| SCF-to-SCF conversions | source operation ids, destination operation ids, region argument mapping, semantic-preservation evidence |
+
+Affine action families:
+
+| Action family | Required records |
+| --- | --- |
+| affine simplification | normalized map/set, folded constants, preserved dimension/symbol bindings |
+| affine dependence analysis | `AffineAccess`, read/write effect facts, dependence relation, no-dependence evidence |
+| loop interchange/fusion/tiling | dependence legality, transformed loop nest mapping, before/after access facts |
+| affine-to-SCF lowering | bound map expansion, dimension/symbol operand mapping, yielded value mapping |
+| memory access canonicalization | map composition, load/store index rewrite, element type and memref evidence |
+| DMA/prefetch scheduling | pending-transfer facts, wait/fence matching, prefetch intent records |
+
+No affine transform may mutate syntax until a legality action has written an
+accepted `AffineTransformLegality` record for the same subject and action
+version. Failed legality checks are useful evidence and should remain in
+`TraceDB`.
+
 ## Planned Verification Evidence
 
 - Pipeline sketches showing `Fixed` actions, `AgentAct` actions, and
@@ -734,6 +891,15 @@ explicitly exported facts/evidence become part of the pipeline record.
 - Example action-local auxiliary `TraceDB` evidence showing explicit export into
   the authoritative pipeline database.
 - Negative evidence where an unconsumed mutation intent causes action failure.
+- First-slice pipeline evidence for `verify-structure`, `canonicalize-greedy`,
+  `common-subexpression-elimination`, `sparse-constant-propagation`,
+  `symbol-dce-and-dead-code`, `inline-single-call`,
+  `loop-invariant-code-motion`, `lower-affine-to-scf`,
+  `normalize-and-simplify-affine-loops`, and `pending-record-gate`.
+- SCF evidence covering `if`, `for`, `while`, `execute_region`, `index_switch`,
+  `parallel`, `reduce`, `forall`, and their terminators.
+- Affine action evidence covering map simplification, dependence facts, and one
+  legality-gated loop transform.
 - Example `AgentEvolve` JIT-like candidate registration flow.
 - Example `AgentAct` review flow through typed agent APIs, with mutation blocked
   unless policy-gated.

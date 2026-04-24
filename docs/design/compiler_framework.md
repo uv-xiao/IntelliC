@@ -175,6 +175,119 @@ actions depend on both `Sy` and `Se` and record semantic changes in `TraceDB`.
   documentation-only work, evidence may be a focused reread, link/path check,
   or policy check rather than automated tests.
 
+## Implementation-Ready Build Order
+
+The first executable compiler slice should be built in dependency order. Later
+layers may define interfaces early, but they must not force lower layers to
+depend on higher-level conveniences.
+
+1. `intellic.ir.syntax`: identity objects, parent links, use lists, regions,
+   blocks, operation creation, structural verification, and mutation APIs.
+2. `intellic.ir.dialects`: `builtin`, `func`, `arith`, full `scf`, and
+   first-class `affine` syntax definitions needed for loop, control-flow,
+   affine-map, affine-set, and memory-indexing examples.
+3. `intellic.ir.parser` and printer: canonical MLIR/xDSL-compatible text for
+   the selected operation forms, with round-trip evidence.
+4. `intellic.surfaces.api`: builder stack, insertion points, named dialect
+   builders, `func.ir_function`, optional `Value.__add__`, and construction
+   evidence over `Sy`.
+5. `intellic.ir.semantics`: minimal `TraceDB`, typed relation schemas, semantic
+   level keys, typed owner registration, registry resolution, and generated
+   concrete interpreter for straight-line and loop-carried region examples.
+6. `intellic.ir.actions`: `Fixed` action host, match records, mutation intents,
+   mutator stage, pending-record gate, and one pipeline `TraceDB`.
+
+The build order is also the dependency rule: syntax must not import semantics,
+actions, or surfaces; semantics may import syntax and `TraceDB`; actions may
+import syntax and semantics; surfaces may import syntax and dialect builders but
+must not own semantic meaning.
+
+## First Implementation Slice Contract
+
+The first slice is complete only when one challenging program crosses the
+planned layers with evidence. Tiny straight-line functions are useful local
+smoke tests, but they are too easy to prove the architecture. The
+implementation-ready proof point is a loop-carried `sum_to_n` example:
+
+```python
+@func.ir_function
+def sum_to_n(n: index) -> i32:
+    zero_i = arith.constant(0, index)
+    one_i = arith.constant(1, index)
+    zero = arith.constant(0, i32)
+
+    with scf.for_(zero_i, n, one_i, iter_args=(zero,)) as loop:
+        i, total = loop.arguments
+        total_next = arith.addi(total, arith.index_cast(i, i32))
+        scf.yield_(total_next)
+
+    return loop.results[0]
+```
+
+Required evidence:
+
+- Python builders create native `Sy` objects for `builtin.module`, `func.func`,
+  `arith.constant`, `arith.addi`, `arith.index_cast`, `scf.for`, `scf.yield`,
+  and `func.return`.
+- The printer emits canonical MLIR/xDSL-compatible text, and the strict parser
+  round-trips that text into an equivalent object graph.
+- Structural verification checks parent links, region/block ownership, result
+  types, block arguments, loop-carried argument/result pairing, terminators, and
+  use lists.
+- Concrete semantic execution records `ValueConcrete`, `Evaluated`, and
+  `RegionResult` facts/events in `TraceDB` and computes `sum_to_n(5) -> 10`.
+- A `Fixed` action records at least one loop-body canonicalization match, such
+  as replacing `addi(total, 0)` if present in a variant fixture, writes a
+  mutation intent, applies it through `MutatorStage`, and fails if required
+  pending records remain unhandled.
+- The first action pipeline is fixed and named from important shared MLIR/xDSL
+  pass families: `verify-structure`, `canonicalize-greedy`,
+  `common-subexpression-elimination`, `sparse-constant-propagation`,
+  `symbol-dce-and-dead-code`, `inline-single-call`,
+  `loop-invariant-code-motion`, `lower-affine-to-scf`,
+  `normalize-and-simplify-affine-loops`, and `pending-record-gate`.
+
+The first slice does not need broad dialect coverage. It needs enough depth for
+the object model, semantics model, and action model to prove their contracts.
+One exception is dialect scope: `scf` is not a partial follow-up dialect, and
+`affine` is a first-class optimization dialect. The first implementation plan
+may batch their operations, but the design and public contracts must cover the
+whole dialect families before implementation starts.
+
+## Dialect Coverage Contract
+
+Implementation-ready design means dialect coverage is explicit, not implied by
+examples.
+
+`scf` support must cover the whole structured-control-flow family:
+
+| Operation family | Required contract |
+| --- | --- |
+| `scf.if` | typed condition, optional results, then/else region ownership, implicit/explicit `scf.yield`, branch-result verification |
+| `scf.for` | lower/upper/step operands, induction variable, loop-carried `iter_args`, yield/result pairing, canonical loop-body builders |
+| `scf.while` and `scf.condition` | before/after region scheduling, condition payload forwarding, result type matching, fuel/widening evidence |
+| `scf.execute_region` | exactly-once region execution, multi-block region allowance, yielded result typing |
+| `scf.index_switch` | case/default region ownership, multi-result yields, selected-case evidence |
+| `scf.parallel`, `scf.reduce`, `scf.reduce.return` | multidimensional bounds, reduction regions, result/init/reduction type matching, ordering/reduction semantics |
+| `scf.forall` and `scf.forall.in_parallel` | MLIR full-dialect support even where xDSL lacks a native class; shared outputs, mapping attributes, implicit synchronization, in-parallel terminator semantics |
+
+`affine` support must be designed as a core compiler dialect, not a later
+backend detail:
+
+| Operation/structure family | Required contract |
+| --- | --- |
+| `AffineExpr`, `AffineMap`, `AffineSet` | dimensions vs symbols, pure/quasi/semi-affine distinction, eval/compose/simplify hooks, canonical text |
+| `affine.apply`, `affine.min`, `affine.max` | operand count checks against map dimensions/symbols, index result typing, constant folding evidence |
+| `affine.for`, `affine.if`, `affine.parallel`, `affine.yield` | affine bound/set verification, region conventions, loop-carried/reduction results, affine scope evidence |
+| `affine.load`, `affine.store`, `affine.vector_load`, `affine.vector_store` | memref/vector element typing, index map verification, memory-access facts |
+| `affine.prefetch`, `affine.dma_start`, `affine.dma_wait` | side-effect/evidence records for prefetch and DMA behavior without pretending they are pure computation |
+| `affine.delinearize_index`, `affine.linearize_index` | index decomposition/composition semantics and proof/evidence for round-trip cases |
+
+When xDSL already has an operation, IntelliC may copy/adapt it. When MLIR has an
+operation that the current xDSL checkout lacks, IntelliC still owns the design
+contract and should implement it natively behind the same syntax/semantics/action
+interfaces.
+
 ## Examples
 
 ### Example 1: One Feature Crosses All Subsystems
@@ -183,18 +296,34 @@ Surface:
 
 ```python
 @func.ir_function
-def add_one(x: i32) -> i32:
-    return x + 1
+def sum_to_n(n: index) -> i32:
+    zero_i = arith.constant(0, index)
+    one_i = arith.constant(1, index)
+    zero = arith.constant(0, i32)
+
+    with scf.for_(zero_i, n, one_i, iter_args=(zero,)) as loop:
+        i, total = loop.arguments
+        total_next = arith.addi(total, arith.index_cast(i, i32))
+        scf.yield_(total_next)
+
+    return loop.results[0]
 ```
 
 Canonical IR sketch:
 
 ```mlir
 "builtin.module"() ({
-  func.func @add_one(%x: i32) -> i32 {
-    %c1 = arith.constant 1 : i32
-    %y = arith.addi %x, %c1 : i32
-    func.return %y : i32
+  func.func @sum_to_n(%n: index) -> i32 {
+    %c0_i = arith.constant 0 : index
+    %c1_i = arith.constant 1 : index
+    %c0 = arith.constant 0 : i32
+    %sum = scf.for %i = %c0_i to %n step %c1_i
+        iter_args(%total = %c0) -> (i32) {
+      %i32 = arith.index_cast %i : index to i32
+      %next = arith.addi %total, %i32 : i32
+      scf.yield %next : i32
+    }
+    func.return %sum : i32
   }
 }) : () -> ()
 ```
@@ -205,8 +334,9 @@ Decomposition:
 surface_api:
   create symbolic function arguments
   execute the Python function under an insertion context
-  lower x + 1 through registered value/operator builders
-  produce Sy objects plus builder-call evidence
+  build scf.for with nested body region and loop-carried values
+  lower index_cast/addi/yield/return through registered builders
+  produce Sy objects plus builder-call and region-construction evidence
 
 ir_parser:
   parse strict MLIR/xDSL-style canonical text when reading or round-tripping IR
@@ -216,14 +346,17 @@ compiler_syntax.md:
   and high-level Python construction APIs
 
 compiler_semantics.md:
-  attach one or more level-keyed SemanticDef records to builtin/func/arith operations
+  attach level-keyed SemanticDef records to builtin/func/arith/scf operations
+  execute child regions through TraceDB-backed region conventions
 
 compiler_passes.md:
-  run unified actions for interpretation, rewriting, eqsat, gates, and review
+  run unified actions for interpretation, loop-body rewriting, eqsat, gates,
+  and review
 ```
 
-Verification mapping: construction API example evidence, IR round-trip evidence,
-semantic database evidence, and action-pipeline evidence.
+Verification mapping: construction API example evidence, nested-region
+round-trip evidence, semantic database evidence for `sum_to_n(5) -> 10`, and
+action-pipeline evidence for loop-body canonicalization.
 
 ### Example 2: E-Graph Reasoning Is A Mechanism, Not Per-Op Equivalence Fields
 

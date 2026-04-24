@@ -13,4 +13,4 @@ Rules:
 
 ## Active Tasks
 
-- None currently.
+No active tasks.

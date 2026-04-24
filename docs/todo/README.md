@@ -6,6 +6,7 @@
 
 - [x] Agent harness scaffold
 - [x] Compiler story and architecture design (`docs/design/compiler_framework.md`)
+- [x] Implementation-ready compiler design
 - [ ] Minimal package and verification tooling
 - [ ] First executable compiler slice
 

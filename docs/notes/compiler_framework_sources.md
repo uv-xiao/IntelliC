@@ -27,7 +27,10 @@
 | xDSL IR core | Python `Operation`, `Region`, `Block`, `Attribute` classes | Python-native MLIR-style syntax | IntelliC Python-native IR objects |
 | xDSL parser/printer | MLIR-compatible generic/custom operation syntax | Existing Python `ir_parser` shape | Native IntelliC `ir_parser` copied/adapted from xDSL |
 | xDSL interpreter | Operation implementation dispatch and execution trace hooks | Executable operation behavior | `Se` semantics functions |
-| xDSL SCF interpreter | `scf.if`, `scf.for`, `scf.yield`, and while-like scheduling examples | Control operations run child regions through the interpreter | Operation-owned control semantics with region runner support |
+| xDSL SCF dialect/interpreter | `scf.if`, `scf.for`, `scf.while`, `scf.execute_region`, `scf.index_switch`, `scf.parallel`, reductions, yields, and condition scheduling examples | Control operations run child regions through the interpreter | Operation-owned control semantics with region runner support |
+| MLIR SCF operation definitions | Full `scf` dialect, including `scf.forall` and `scf.forall.in_parallel` beyond the current xDSL subset | Full structured-control-flow operation contracts | IntelliC full-SCF syntax/semantics/action coverage |
+| xDSL affine dialect and affine IR | `AffineExpr`, `AffineMap`, `AffineSet`, `affine.apply`, `affine.for`, `affine.if`, `affine.parallel`, load/store, min, yield | Python-native affine syntax and verifier patterns | IntelliC affine syntax and first semantic/action contracts |
+| MLIR affine operation definitions | Full affine operation family: maps/sets, apply/min/max, loops, memory, prefetch, DMA, index transforms | Complete affine dialect contract | IntelliC affine design source of truth where xDSL lacks operations |
 | xDSL eqsat docs/transforms | E-class insertion, PDL-interp eqsat rewrites, costs, extraction | E-graph pipeline embedded in IR | Equality reasoning as operation-modeled IR plus actions |
 | Fjfj PLDI 2025 paper | Rule/method semantics, partial transition relations, modular verification | Trace-updating semantics with restrictions | `Se` trace model and modular semantic domains |
 | egg | E-graphs, rewrites, analyses, cost functions, extraction, explanations | Equality saturation core ideas | Possible backend for equivalence actions |
@@ -47,7 +50,12 @@ cover most of the planned `Sy` implementation:
 | Printing and SSA/block name allocation | `.repositories/xdsl/xdsl/printer.py` |
 | Insertion points and mutation discipline | `.repositories/xdsl/xdsl/rewriter.py`, `.repositories/xdsl/docs/marimo/builders.py` |
 | Human-readable MLIR/xDSL syntax examples | `.repositories/xdsl/docs/marimo/mlir_ir.py`, `.repositories/xdsl/docs/marimo/xdsl_introduction.py` |
-| First-slice dialect examples | `.repositories/xdsl/xdsl/dialects/builtin.py`, `.repositories/xdsl/xdsl/dialects/func.py`, `.repositories/xdsl/xdsl/dialects/arith.py`, `.repositories/xdsl/xdsl/dialects/cf.py`, `.repositories/xdsl/xdsl/dialects/scf.py` |
+| First-slice dialect examples | `.repositories/xdsl/xdsl/dialects/builtin.py`, `.repositories/xdsl/xdsl/dialects/func.py`, `.repositories/xdsl/xdsl/dialects/arith.py`, `.repositories/xdsl/xdsl/dialects/cf.py`, `.repositories/xdsl/xdsl/dialects/scf.py`, `.repositories/xdsl/xdsl/dialects/affine.py`, `.repositories/xdsl/xdsl/dialects/memref.py`, `.repositories/xdsl/xdsl/dialects/vector.py` |
+| Shared MLIR transform references | `.repositories/llvm-project/mlir/lib/Transforms/Canonicalizer.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/CSE.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/SCCP.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/SymbolDCE.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/RemoveDeadValues.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/InlinerPass.cpp`, `.repositories/llvm-project/mlir/lib/Transforms/LoopInvariantCodeMotion.cpp` |
+| xDSL transform references | `.repositories/xdsl/xdsl/transforms/canonicalize.py`, `.repositories/xdsl/xdsl/transforms/common_subexpression_elimination.py`, `.repositories/xdsl/xdsl/transforms/dead_code_elimination.py`, `.repositories/xdsl/xdsl/transforms/constant_fold_interp.py`, `.repositories/xdsl/xdsl/transforms/function_transformations.py`, `.repositories/xdsl/xdsl/transforms/loop_invariant_code_motion.py`, `.repositories/xdsl/xdsl/transforms/lower_affine.py`, `.repositories/xdsl/xdsl/transforms/convert_scf_to_cf.py` |
+| Affine/SCF transform references | `.repositories/llvm-project/mlir/lib/Dialect/Affine/Transforms/DecomposeAffineOps.cpp`, `.repositories/llvm-project/mlir/lib/Dialect/Affine/Transforms/AffineLoopNormalize.cpp`, `.repositories/llvm-project/mlir/lib/Dialect/Affine/Transforms/SimplifyAffineStructures.cpp`, `.repositories/llvm-project/mlir/lib/Dialect/Affine/Transforms/LoopTiling.cpp`, `.repositories/xdsl/xdsl/transforms/scf_for_loop_range_folding.py`, `.repositories/xdsl/xdsl/transforms/scf_parallel_loop_tiling.py` |
+| Full SCF operation contract | `.repositories/llvm-project/mlir/include/mlir/Dialect/SCF/IR/SCFOps.td` |
+| Full affine operation contract | `.repositories/llvm-project/mlir/include/mlir/Dialect/Affine/IR/AffineOps.td`, `.repositories/llvm-project/mlir/docs/Dialects/Affine.md` |
 | MLIR textual and operation-definition background | `.repositories/llvm-project/mlir/docs/LangRef.md`, `.repositories/llvm-project/mlir/docs/DefiningDialects/Operations.md` |
 
 The local reference checkout is evidence for design and implementation. It must
@@ -244,6 +252,10 @@ Need transform equivalence
   -> model eqsat as operations/actions, learning first from xDSL eqsat
 Need pass simplicity
   -> unify analysis/rewrite/pass/gate/execution/LLM review as actions
+Need implementation-worthy first passes
+  -> prefer shared MLIR/xDSL transform families before bespoke examples
+  -> select canonicalizer, CSE, SCCP/constant folding, SymbolDCE/DCE, inliner,
+     LICM, affine lowering, and affine loop normalization/simplification
 Need agent-safe mutation
   -> classify actions as Fixed or AgentAct
   -> keep AgentEvolve as a JIT-like workflow that generates Fixed actions
@@ -278,6 +290,23 @@ Need pipeline replay
   induction variable and loop-carried values, and `scf.yield` returns values to
   the containing control operation. The same shape should be expressed in
   IntelliC as operation-owned `SemanticDef` records using a shared region runner.
+- MLIR SCF is broader than the current xDSL operation subset. IntelliC should
+  support the full SCF dialect contract, including `scf.forall` and
+  `scf.forall.in_parallel`, while still using xDSL's Python-native operations
+  where available.
+- Affine is central to optimization. xDSL provides a good Python-native base for
+  affine expressions, maps, sets, and common affine ops, but MLIR's affine
+  operation definitions are the completeness target. IntelliC should treat
+  affine maps/sets, affine memory-access facts, and transform legality evidence
+  as first-class design contracts.
+- The first pass set should be grounded in shared MLIR/xDSL infrastructure:
+  greedy canonicalization, CSE, constant propagation, symbol/dead-code cleanup,
+  inlining, and LICM are more valuable first than bespoke one-off rewrites
+  because they exercise common dominance, region, side-effect, symbol, and
+  mutation contracts across dialects.
+- Affine-specific first passes should look like upstream affine infrastructure:
+  lower/decompose affine constructs, normalize/simplify affine loops and maps,
+  and record legality/dependence evidence before later tiling or fusion.
 - The Fjfj paper shows that semantic modularity may come from a combination of
   restrictions, partial transition relations, and tracked calls/events. IntelliC
   should consider a shared semantic state/fact/event database before freezing

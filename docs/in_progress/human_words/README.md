@@ -13,21 +13,3 @@ they become project rules, task scope, or implemented design.
 When the active PR closes, move that PR's records into
 `docs/archive/<pr-number-or-slug>-<pr-title-slug>/human_words/` and recreate
 this README for the next active task.
-
-Suggested entry shape:
-
-```text
-# <topic>
-
-- Date:
-- Context:
-- Related task/design:
-
-## Human Instructions
-
-> <quoted or closely preserved user wording>
-
-## Agent Interpretation
-
-- <brief interpretation or follow-up action>
-```
