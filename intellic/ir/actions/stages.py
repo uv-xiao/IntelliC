@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from intellic.ir.syntax import Value
+
 from .mutation import MutationApplied, MutationIntent, MutationRejected
 from .pipeline import PipelineRun
 
@@ -28,7 +30,22 @@ class MutatorStage:
             return "stale mutation subject"
         if intent.kind == "erase_op" and any(result.uses for result in intent.subject.results):
             return "used result producer"
+        if intent.kind == "replace_uses_and_erase":
+            if intent.replacement is None:
+                return "missing replacement value"
+            if not self._is_attached_value(intent.replacement):
+                return "stale replacement value"
         return None
+
+    def _is_attached_value(self, value: Value) -> bool:
+        owner = getattr(value, "owner", None)
+        operations = getattr(getattr(owner, "parent", None), "_operations", None)
+        if operations is not None:
+            return owner in operations
+        blocks = getattr(getattr(owner, "parent", None), "_blocks", None)
+        if blocks is not None:
+            return owner in blocks
+        return False
 
     def _apply_intent(self, intent: MutationIntent) -> None:
         parent = intent.subject.parent

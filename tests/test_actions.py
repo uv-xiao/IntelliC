@@ -90,6 +90,29 @@ class ActionTests(unittest.TestCase):
             any(use.owner is user and use.operand_index == 0 for use in representative.results[0].uses)
         )
 
+    def test_dce_before_cse_rejects_replacement_to_erased_representative(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            representative = builder.insert(arith.constant(1, i32))
+            duplicate = builder.insert(arith.constant(1, i32))
+            two = builder.insert(arith.constant(2, i32))
+            user = builder.insert(arith.addi(duplicate.results[0], two.results[0]))
+            builder.insert(Operation.create("test.consume", operands=(user.results[0],)))
+        run = PipelineRun(module)
+
+        passes.symbol_dce_and_dead_code().run(run)
+        passes.common_subexpression_elimination().run(run)
+
+        MutatorStage().run(run)
+
+        rejection = run.db.require("MutationRejected", duplicate.id).value
+        self.assertEqual(rejection.reason, "stale replacement value")
+        self.assertNotIn(representative, block.operations)
+        self.assertIn(duplicate, block.operations)
+        self.assertIs(user.operands[0], duplicate.results[0])
+        self.assertNoDetachedOperands(block)
+
     def test_constant_propagation_records_constant_facts(self) -> None:
         block = Block()
         module = builtin.module(Region.from_block_list([block]))
@@ -327,6 +350,14 @@ class ActionTests(unittest.TestCase):
         self.assertIs(user.operands[0], used.results[0])
         self.assertEqual(run.db.query("MutationIntent", used.id), ())
         PendingRecordGate().run(run)
+
+    def assertNoDetachedOperands(self, block: Block) -> None:
+        operations = set(block.operations)
+        for op in block.operations:
+            for operand in op.operands:
+                owner = getattr(operand, "owner", None)
+                if isinstance(owner, Operation):
+                    self.assertIn(owner, operations)
 
 
 if __name__ == "__main__":
