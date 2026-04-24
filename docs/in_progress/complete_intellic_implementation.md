@@ -19,7 +19,7 @@ prove the system works end to end.
 ## Scope Checklist
 
 - [x] Define input, output, and verification criteria
-- [ ] Implement minimal package and verification tooling
+- [x] Implement minimal package and verification tooling
 - [ ] Implement `intellic.ir.syntax` identity, ownership, use-list, builder, and
   verifier contracts
 - [ ] Implement first-slice dialects: builtin, func, arith, full SCF contracts,
@@ -112,6 +112,15 @@ Initial verification for PR start:
 ```bash
 python scripts/check_repo_harness.py
 python -m unittest tests/test_repo_harness.py
+```
+
+Batch 1 verification:
+
+```bash
+python -c "import intellic; print(intellic.__version__)"
+python -m unittest tests/test_imports.py
+python scripts/check_repo_harness.py
+python -m unittest discover -s tests
 ```
 
 Expected implementation test groups:
