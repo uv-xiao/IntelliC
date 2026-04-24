@@ -30,7 +30,7 @@ prove the system works end to end.
   examples
 - [x] Implement `TraceDB`, semantic registry, concrete interpreter, and selected
   first-slice semantic definitions
-- [ ] Implement shared-pass-style actions and gates selected from MLIR/xDSL:
+- [x] Implement shared-pass-style actions and gates selected from MLIR/xDSL:
   canonicalization, CSE, SCCP-style propagation, symbol/dead-code cleanup,
   single-call inlining, LICM, affine lowering/normalization, and pending-record
   gate
@@ -155,6 +155,13 @@ Batch 6 verification:
 
 ```bash
 python -m unittest tests/test_semantics.py
+python -m unittest discover -s tests
+```
+
+Batch 7 verification:
+
+```bash
+python -m unittest tests/test_actions.py
 python -m unittest discover -s tests
 ```
 
