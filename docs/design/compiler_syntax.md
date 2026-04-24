@@ -586,6 +586,65 @@ Still follow-up work:
 - Semantic execution, pass scheduling, and action database history.
 - Backend lowering.
 
+## Implementation-Ready Module Contracts
+
+The first syntax implementation should expose these modules and contracts:
+
+```text
+intellic/ir/syntax/
+  ids.py             # stable internal ids for operations, values, blocks, regions
+  location.py        # source/generated/evidence locations
+  type.py            # immutable Type base and builtin integer/index types
+  attribute.py       # immutable Attribute base and builtin attrs
+  value.py           # Value, OpResult, BlockArgument, Use
+  operation.py       # Operation.create, result ownership, operand replacement
+  region.py          # Region, Block, parent ownership, terminator queries
+  builder.py         # Builder, InsertionPoint, controlled insertion/mutation
+  verify.py          # structural verifier and diagnostics
+  context.py         # Context, Dialect registration, operation lookup
+  printer.py         # canonical generic/custom printing
+
+intellic/ir/dialects/
+  builtin.py         # module op, builtin attrs/types needed by examples
+  func.py            # func.func, func.return, function type helpers
+  arith.py           # arith.constant, arith.addi, integer attrs/types
+
+intellic/ir/parser/
+  lexer.py           # copied/adapted MLIR lexer behavior
+  parser.py          # canonical IR parser for selected generic/custom forms
+
+intellic/surfaces/api/
+  builders.py        # active builder stack and construction evidence
+  func.py            # func.ir_function decorator facade
+  arith.py           # named builders and optional operator policy
+```
+
+First-slice invariants:
+
+- An operation has at most one parent block. Detached operations have no parent.
+- A block has at most one parent region. A region has at most one parent
+  operation unless it is a top-level detached region during construction.
+- Operation operands are updated only through controlled APIs that keep `Use`
+  records consistent.
+- Printed SSA and block names are presentation names; identity comes from
+  objects and stable internal ids.
+- Types and attributes are immutable after construction.
+- Direct list mutation of operation, block, and region children is not public.
+- A builder insertion point is scoped and explicit; named builders fail without
+  one unless documented to return a detached operation.
+
+First-slice failure tests:
+
+- parse rejects noncanonical syntax and unknown operations unless generic form
+  plus registered dialect rules allow them.
+- verifier rejects broken parent links, wrong region counts, missing
+  terminators, type mismatches, and stale uses.
+- builder rejects insertion without an insertion point, reparenting without an
+  explicit mutation API, and host Python boolean use of symbolic values.
+- `func.ir_function` rejects missing annotations, unsupported Python control
+  flow over symbolic values, and returns that cannot be lowered to
+  `func.return`.
+
 ## Acceptance Criteria
 
 - The first implementation slice includes xDSL-derived syntax core, parser,

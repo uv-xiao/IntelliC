@@ -1261,6 +1261,59 @@ saturation, extraction, and selected replacement.
   `equivalence.class`, `equivalence.const_class`, and `equivalence.yield`, plus
   action-owned cost/extraction evidence; defer egglog until this flow is proven.
 
+## Implementation-Ready Module Contracts
+
+The first semantics implementation should expose these modules and contracts:
+
+```text
+intellic/ir/semantics/
+  level.py           # typed SemanticLevelKey objects and level selections
+  schema.py          # typed TraceDB relation schemas and projection keys
+  trace_db.py        # TraceRecord store, put/event/require/query/retract APIs
+  semantic_def.py    # SemanticDef, owner keys, read/write declarations
+  registry.py        # typed owner/level registration and resolution policies
+  interpreter.py     # generated dispatch over selected SemanticDef records
+  regions.py         # RegionRunResult and control-region runner contracts
+  builtin.py         # builtin/func/arith first-slice semantic definitions
+```
+
+Minimal first-slice relation schemas:
+
+```text
+ValueConcrete(subject: ValueId, value: PythonValue)
+ValueRange(subject: ValueId, lower: int, upper: int)
+Evaluated(op: OperationId, results: tuple[ValueId, ...])
+RegionEntered(region: RegionId, inputs: tuple[ValueId, ...])
+RegionReturned(region: RegionId, values: tuple[PythonValue, ...])
+RegionResult(region: RegionId, values: tuple[PythonValue, ...])
+Diagnostic(subject: SyntaxId, severity, message, evidence)
+EvidenceLink(subject: SyntaxId | TraceRecordId, artifact)
+```
+
+First-slice invariants:
+
+- Semantic owners are typed operation, dialect, IR, or region-convention keys;
+  textual operation names are serialization and diagnostics only.
+- Semantic levels are typed keys; the core does not hardcode a fixed enum.
+- Registry lookup either resolves one definition, intentionally composes through
+  a typed policy, or fails with conflict evidence.
+- `TraceDB.require(schema, subject)` fails with a typed missing-fact diagnostic
+  instead of returning `None`.
+- Retraction and supersession change the current projection, not historical
+  replay evidence.
+- A generated interpreter records selected definitions, dispatch order, seeded
+  inputs, facts read, facts written, and region results.
+
+First-slice failure tests:
+
+- duplicate equal-specificity semantic definitions conflict without an explicit
+  composition policy.
+- missing concrete facts fail `arith.addi` execution with evidence.
+- exact operation semantics override typed fallback semantics without string
+  lookup.
+- `current` projection hides retracted facts while `history` still exposes them.
+- `func.return` outside a valid region convention is rejected.
+
 ## Planned Verification Evidence
 
 - Focused source reading of xDSL eqsat operations/transforms before designing

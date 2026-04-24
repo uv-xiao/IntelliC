@@ -175,6 +175,60 @@ actions depend on both `Sy` and `Se` and record semantic changes in `TraceDB`.
   documentation-only work, evidence may be a focused reread, link/path check,
   or policy check rather than automated tests.
 
+## Implementation-Ready Build Order
+
+The first executable compiler slice should be built in dependency order. Later
+layers may define interfaces early, but they must not force lower layers to
+depend on higher-level conveniences.
+
+1. `intellic.ir.syntax`: identity objects, parent links, use lists, regions,
+   blocks, operation creation, structural verification, and mutation APIs.
+2. `intellic.ir.dialects`: `builtin`, `func`, and `arith` syntax definitions
+   sufficient for straight-line examples.
+3. `intellic.ir.parser` and printer: canonical MLIR/xDSL-compatible text for
+   the selected operation forms, with round-trip evidence.
+4. `intellic.surfaces.api`: builder stack, insertion points, named dialect
+   builders, `func.ir_function`, optional `Value.__add__`, and construction
+   evidence over `Sy`.
+5. `intellic.ir.semantics`: minimal `TraceDB`, typed relation schemas, semantic
+   level keys, typed owner registration, registry resolution, and generated
+   concrete interpreter for straight-line examples.
+6. `intellic.ir.actions`: `Fixed` action host, match records, mutation intents,
+   mutator stage, pending-record gate, and one pipeline `TraceDB`.
+
+The build order is also the dependency rule: syntax must not import semantics,
+actions, or surfaces; semantics may import syntax and `TraceDB`; actions may
+import syntax and semantics; surfaces may import syntax and dialect builders but
+must not own semantic meaning.
+
+## First Implementation Slice Contract
+
+The first slice is complete only when one small program crosses the planned
+layers with evidence:
+
+```python
+@func.ir_function
+def add_one(x: i32) -> i32:
+    return x + 1
+```
+
+Required evidence:
+
+- Python builders create native `Sy` objects for `builtin.module`, `func.func`,
+  `arith.constant`, `arith.addi`, and `func.return`.
+- The printer emits canonical MLIR/xDSL-compatible text, and the strict parser
+  round-trips that text into an equivalent object graph.
+- Structural verification checks parent links, region/block ownership, result
+  types, block arguments, terminators, and use lists.
+- Concrete semantic execution records `ValueConcrete`, `Evaluated`, and
+  `RegionResult` facts/events in `TraceDB` and computes `add_one(41) -> 42`.
+- A `Fixed` action records an add-zero-style match, writes a mutation intent,
+  applies it through `MutatorStage`, and fails if required pending records
+  remain unhandled.
+
+The first slice does not need broad dialect coverage. It needs enough depth for
+the object model, semantics model, and action model to prove their contracts.
+
 ## Examples
 
 ### Example 1: One Feature Crosses All Subsystems

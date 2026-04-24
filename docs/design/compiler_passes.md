@@ -718,6 +718,47 @@ action infer-loop-invariants kind=Fixed
 Feature shown: an action may use its own `TraceDB`-like workspace, but only the
 explicitly exported facts/evidence become part of the pipeline record.
 
+## Implementation-Ready Module Contracts
+
+The first action implementation should expose these modules and contracts:
+
+```text
+intellic/ir/actions/
+  action.py          # CompilerAction, Fixed, AgentAct, action metadata
+  scope.py           # ActionScope over module, operation, region, block
+  match.py           # MatchRecord, MatchSet, read-set evidence
+  mutation.py        # MutationIntent schemas and controlled syntax edits
+  stages.py          # MutatorStage, PendingRecordGate
+  pipeline.py        # PipelineRun, ActionFrame, transactions, checkpoints
+  host.py            # Python action host and future cross-language record shape
+  agent_api.py       # limited AgentAct hooks over TraceDB and syntax queries
+```
+
+First-slice invariants:
+
+- `match` records why a scope was selected or rejected; hidden boolean matches
+  are not enough.
+- `apply` appends `TraceDB` records and does not mutate syntax directly.
+- `MutatorStage` is the first public syntax-mutating action stage.
+- Required-to-handle records, such as mutation intents, must be consumed or
+  rejected before the action succeeds.
+- A pipeline run has one authoritative pipeline `TraceDB`; action-local
+  auxiliary databases affect the pipeline only through explicit exported
+  records.
+- Failed actions keep failure evidence and do not commit staged syntax
+  mutations unless an explicit recovery policy exists.
+- `AgentAct` may query, explain, and propose typed records through agent APIs;
+  it may not perform unrecorded mutation.
+
+First-slice failure tests:
+
+- an unconsumed `MutationIntent` fails `PendingRecordGate`.
+- a mutation intent for a stale syntax id is rejected with evidence.
+- direct mutation inside `apply` is impossible through the public action API.
+- auxiliary facts are invisible to later pipeline actions until exported.
+- an `AgentAct` proposal that violates policy is recorded as rejected, not
+  silently ignored or applied.
+
 ## Planned Verification Evidence
 
 - Pipeline sketches showing `Fixed` actions, `AgentAct` actions, and

@@ -24,11 +24,11 @@ so an implementation agent can answer:
 
 - [x] Define input, output, and verification criteria
 - [x] Write or update design docs if architecture changes
-- [ ] Clarify implementation order across syntax, semantics, actions, and surfaces
-- [ ] Clarify first-slice module contracts and ownership
-- [ ] Map design examples to concrete tests or evidence artifacts
-- [ ] Verify locally
-- [ ] Sync `docs/design/`, `docs/todo/`, and `docs/in_progress/`
+- [x] Clarify implementation order across syntax, semantics, actions, and surfaces
+- [x] Clarify first-slice module contracts and ownership
+- [x] Map design examples to concrete tests or evidence artifacts
+- [x] Verify locally
+- [x] Sync `docs/design/`, `docs/todo/`, and `docs/in_progress/`
 
 ## Input
 
@@ -70,6 +70,12 @@ python -m unittest tests/test_repo_harness.py
 
 Also perform focused rereads of the changed design sections and path/link
 checks for referenced docs.
+
+Verification run:
+
+- `python scripts/check_repo_harness.py` — passed
+- `python -m unittest tests/test_repo_harness.py` — passed
+- `rg -n "Implementation-Ready|First-slice invariants|First-slice failure tests|Build Order|First Implementation Slice" docs/design/compiler_*.md docs/in_progress/implementation_ready_compiler_design.md` — confirmed the new design sections are present
 
 ## Docs
 
