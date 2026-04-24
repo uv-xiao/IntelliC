@@ -9,7 +9,12 @@ from .operation import Operation
 from .region import Block, Region
 from .type import Type, i1, i32, index
 from .value import BlockArgument, OpResult, Use, Value
-from .verify import VerificationError, register_operation_verifier, verify_operation
+from .verify import (
+    VerificationError,
+    register_operation_verifier,
+    register_operation_verifier_loader,
+    verify_operation,
+)
 
 __all__ = (
     "Attribute",
@@ -32,5 +37,6 @@ __all__ = (
     "i32",
     "index",
     "register_operation_verifier",
+    "register_operation_verifier_loader",
     "verify_operation",
 )

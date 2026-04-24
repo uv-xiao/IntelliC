@@ -10,14 +10,26 @@ class VerificationError(Exception):
 
 
 OperationVerifier = Callable[[Operation], None]
+OperationVerifierLoader = Callable[[], None]
 
 _OPERATION_VERIFIERS: dict[str, OperationVerifier] = {}
+_OPERATION_VERIFIER_LOADERS: dict[str, OperationVerifierLoader] = {}
+_LOADED_VERIFIER_PREFIXES: set[str] = set()
 
 
 def register_operation_verifier(name_prefix: str, verifier: OperationVerifier) -> None:
     if not name_prefix:
         raise ValueError("operation verifier prefix must be non-empty")
     _OPERATION_VERIFIERS[name_prefix] = verifier
+
+
+def register_operation_verifier_loader(
+    name_prefix: str,
+    loader: OperationVerifierLoader,
+) -> None:
+    if not name_prefix:
+        raise ValueError("operation verifier loader prefix must be non-empty")
+    _OPERATION_VERIFIER_LOADERS[name_prefix] = loader
 
 
 def verify_operation(op: Operation) -> None:
@@ -49,10 +61,31 @@ def verify_operation(op: Operation) -> None:
 
 
 def _verify_dialect_contract(op: Operation) -> None:
-    for name_prefix, verifier in _OPERATION_VERIFIERS.items():
+    if _run_registered_dialect_verifier(op):
+        return
+    _load_dialect_verifier(op.name)
+    _run_registered_dialect_verifier(op)
+
+
+def _run_registered_dialect_verifier(op: Operation) -> bool:
+    matched = False
+    for name_prefix, verifier in tuple(_OPERATION_VERIFIERS.items()):
         if not op.name.startswith(name_prefix):
             continue
+        matched = True
         try:
             verifier(op)
         except (TypeError, ValueError) as exc:
             raise VerificationError(f"{op.name}: {exc}") from exc
+    return matched
+
+
+def _load_dialect_verifier(op_name: str) -> None:
+    for name_prefix, loader in tuple(_OPERATION_VERIFIER_LOADERS.items()):
+        if name_prefix in _LOADED_VERIFIER_PREFIXES or not op_name.startswith(name_prefix):
+            continue
+        loader()
+        _LOADED_VERIFIER_PREFIXES.add(name_prefix)
+
+
+from intellic.ir.dialects import verification as _dialect_verification  # noqa: F401,E402

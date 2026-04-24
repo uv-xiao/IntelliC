@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import unittest
 
 from intellic.ir.syntax import (
@@ -99,6 +101,40 @@ class SyntaxCoreTests(unittest.TestCase):
 
         with self.assertRaisesRegex(VerificationError, "quality.custom"):
             verify_operation(Operation.create("quality.custom"))
+
+    def test_verify_bootstraps_scf_dialect_verifier_without_prior_dialect_import(self) -> None:
+        code = r'''
+import sys
+
+from intellic.ir.parser import parse_operation
+from intellic.ir.syntax import VerificationError, verify_operation
+
+assert "intellic.ir.dialects.scf" not in sys.modules
+
+text = """
+"builtin.module"() ({
+  %0 = "arith.constant"() {'value': 0} : () -> (index)
+  "scf.if"(%0) ({
+    "scf.condition"(%0) : () -> ()
+  }) : () -> ()
+}) : () -> ()
+"""
+parsed = parse_operation(text)
+try:
+    verify_operation(parsed)
+except VerificationError:
+    raise SystemExit(0)
+raise AssertionError("malformed parsed SCF verified without importing scf dialect")
+'''
+
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
 
 if __name__ == "__main__":
