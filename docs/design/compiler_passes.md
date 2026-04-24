@@ -728,6 +728,37 @@ action infer-loop-invariants kind=Fixed
 Feature shown: an action may use its own `TraceDB`-like workspace, but only the
 explicitly exported facts/evidence become part of the pipeline record.
 
+### Example 7: Affine Transform Requires Legality Evidence
+
+```text
+action affine-tile-fusion-legality kind=Fixed
+  match:
+    find adjacent affine.for nests over %A
+    read AffineAccess(read/write facts)
+    read AffineLoopBounds
+    write MatchRecord(match_id=m1, bindings=(producer=%p, consumer=%c))
+
+  apply:
+    compute dependence relation in auxiliary_db
+    export AffineDependence(src=%p.store, dst=%c.load, relation=no_conflict)
+    export AffineTransformLegality(action=tile-fuse, subject=(%p, %c),
+                                   status=accepted)
+
+action affine-tile-fuse kind=Fixed
+  match:
+    require AffineTransformLegality(status=accepted)
+  apply:
+    write MutationIntent.ReplaceOps(old=(%p, %c), new=%fused)
+```
+
+Feature shown: affine transforms do not mutate syntax just because a pattern
+matches. They require prior legality evidence derived from affine access and
+dependence facts.
+
+Verification mapping: `tests/test_affine_actions.py` includes an accepted
+no-dependence case, a rejected dependence case, and a failure case where
+`affine-tile-fuse` runs without an accepted legality record.
+
 ## Implementation-Ready Module Contracts
 
 The first action implementation should expose these modules and contracts:
@@ -769,6 +800,39 @@ First-slice failure tests:
 - an `AgentAct` proposal that violates policy is recorded as rejected, not
   silently ignored or applied.
 
+## SCF And Affine Action Contracts
+
+SCF and affine are the first action-heavy dialect families. Their actions must
+be designed before implementation because most interesting optimizations depend
+on legality evidence, not only syntax rewrites.
+
+SCF action families:
+
+| Action family | Required records |
+| --- | --- |
+| loop-body canonicalization | nested-region `MatchRecord`, `MutationIntent`, use/yield preservation evidence |
+| `scf.if` simplification | condition fact, selected branch, replacement/yield mapping, removed-region evidence |
+| `scf.for` simplification/peeling/unrolling | bound facts, trip-count facts when known, carried-value mapping, remainder-loop evidence |
+| `scf.while` rotation/uplift | before/after region mapping, condition payload facts, fuel/fixpoint evidence |
+| `scf.parallel` and `scf.forall` lowering | isolation/reduction facts, synchronization records, mapping attributes, destination/shared-output evidence |
+| SCF-to-SCF conversions | source operation ids, destination operation ids, region argument mapping, semantic-preservation evidence |
+
+Affine action families:
+
+| Action family | Required records |
+| --- | --- |
+| affine simplification | normalized map/set, folded constants, preserved dimension/symbol bindings |
+| affine dependence analysis | `AffineAccess`, read/write effect facts, dependence relation, no-dependence evidence |
+| loop interchange/fusion/tiling | dependence legality, transformed loop nest mapping, before/after access facts |
+| affine-to-SCF lowering | bound map expansion, dimension/symbol operand mapping, yielded value mapping |
+| memory access canonicalization | map composition, load/store index rewrite, element type and memref evidence |
+| DMA/prefetch scheduling | pending-transfer facts, wait/fence matching, prefetch intent records |
+
+No affine transform may mutate syntax until a legality action has written an
+accepted `AffineTransformLegality` record for the same subject and action
+version. Failed legality checks are useful evidence and should remain in
+`TraceDB`.
+
 ## Planned Verification Evidence
 
 - Pipeline sketches showing `Fixed` actions, `AgentAct` actions, and
@@ -785,6 +849,10 @@ First-slice failure tests:
 - Example action-local auxiliary `TraceDB` evidence showing explicit export into
   the authoritative pipeline database.
 - Negative evidence where an unconsumed mutation intent causes action failure.
+- SCF evidence covering `if`, `for`, `while`, `execute_region`, `index_switch`,
+  `parallel`, `reduce`, `forall`, and their terminators.
+- Affine action evidence covering map simplification, dependence facts, and one
+  legality-gated loop transform.
 - Example `AgentEvolve` JIT-like candidate registration flow.
 - Example `AgentAct` review flow through typed agent APIs, with mutation blocked
   unless policy-gated.

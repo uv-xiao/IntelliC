@@ -183,8 +183,9 @@ depend on higher-level conveniences.
 
 1. `intellic.ir.syntax`: identity objects, parent links, use lists, regions,
    blocks, operation creation, structural verification, and mutation APIs.
-2. `intellic.ir.dialects`: `builtin`, `func`, `arith`, and the minimal `scf`
-   syntax definitions needed for a loop-carried region example.
+2. `intellic.ir.dialects`: `builtin`, `func`, `arith`, full `scf`, and
+   first-class `affine` syntax definitions needed for loop, control-flow,
+   affine-map, affine-set, and memory-indexing examples.
 3. `intellic.ir.parser` and printer: canonical MLIR/xDSL-compatible text for
    the selected operation forms, with round-trip evidence.
 4. `intellic.surfaces.api`: builder stack, insertion points, named dialect
@@ -242,6 +243,44 @@ Required evidence:
 
 The first slice does not need broad dialect coverage. It needs enough depth for
 the object model, semantics model, and action model to prove their contracts.
+One exception is dialect scope: `scf` is not a partial follow-up dialect, and
+`affine` is a first-class optimization dialect. The first implementation plan
+may batch their operations, but the design and public contracts must cover the
+whole dialect families before implementation starts.
+
+## Dialect Coverage Contract
+
+Implementation-ready design means dialect coverage is explicit, not implied by
+examples.
+
+`scf` support must cover the whole structured-control-flow family:
+
+| Operation family | Required contract |
+| --- | --- |
+| `scf.if` | typed condition, optional results, then/else region ownership, implicit/explicit `scf.yield`, branch-result verification |
+| `scf.for` | lower/upper/step operands, induction variable, loop-carried `iter_args`, yield/result pairing, canonical loop-body builders |
+| `scf.while` and `scf.condition` | before/after region scheduling, condition payload forwarding, result type matching, fuel/widening evidence |
+| `scf.execute_region` | exactly-once region execution, multi-block region allowance, yielded result typing |
+| `scf.index_switch` | case/default region ownership, multi-result yields, selected-case evidence |
+| `scf.parallel`, `scf.reduce`, `scf.reduce.return` | multidimensional bounds, reduction regions, result/init/reduction type matching, ordering/reduction semantics |
+| `scf.forall` and `scf.forall.in_parallel` | MLIR full-dialect support even where xDSL lacks a native class; shared outputs, mapping attributes, implicit synchronization, in-parallel terminator semantics |
+
+`affine` support must be designed as a core compiler dialect, not a later
+backend detail:
+
+| Operation/structure family | Required contract |
+| --- | --- |
+| `AffineExpr`, `AffineMap`, `AffineSet` | dimensions vs symbols, pure/quasi/semi-affine distinction, eval/compose/simplify hooks, canonical text |
+| `affine.apply`, `affine.min`, `affine.max` | operand count checks against map dimensions/symbols, index result typing, constant folding evidence |
+| `affine.for`, `affine.if`, `affine.parallel`, `affine.yield` | affine bound/set verification, region conventions, loop-carried/reduction results, affine scope evidence |
+| `affine.load`, `affine.store`, `affine.vector_load`, `affine.vector_store` | memref/vector element typing, index map verification, memory-access facts |
+| `affine.prefetch`, `affine.dma_start`, `affine.dma_wait` | side-effect/evidence records for prefetch and DMA behavior without pretending they are pure computation |
+| `affine.delinearize_index`, `affine.linearize_index` | index decomposition/composition semantics and proof/evidence for round-trip cases |
+
+When xDSL already has an operation, IntelliC may copy/adapt it. When MLIR has an
+operation that the current xDSL checkout lacks, IntelliC still owns the design
+contract and should implement it natively behind the same syntax/semantics/action
+interfaces.
 
 ## Examples
 

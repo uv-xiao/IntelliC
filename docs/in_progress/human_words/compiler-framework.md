@@ -25,3 +25,13 @@
   - Related: docs/design/compiler_passes.md
   - Related: docs/in_progress/design/implementation_ready_compiler_design.md
   - Agent interpretation: Use harder examples such as region control flow, loop-carried values, TraceDB facts, and action-driven mutation to force detailed implementation contracts and verification evidence.
+
+- 2026-04-24 16:11 CST - Require affine and full SCF implementation design
+  > Review and improve the design documents further to make them concrete enough for implementation. One very important dialect is affine, which we need to support well. Also, we need to support all scf.
+  - Context: User refined PR #70 to require full SCF coverage and strong affine dialect support in the implementation-ready design.
+  - Related: docs/design/compiler_framework.md
+  - Related: docs/design/compiler_syntax.md
+  - Related: docs/design/compiler_semantics.md
+  - Related: docs/design/compiler_passes.md
+  - Related: docs/in_progress/design/implementation_ready_compiler_design.md
+  - Agent interpretation: Review accepted compiler design for implementation gaps, promote affine from future/nice-to-have to a first-class dialect family, and define full SCF syntax/semantics/action coverage rather than only scf.for.

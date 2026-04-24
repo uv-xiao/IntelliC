@@ -70,6 +70,17 @@ surfaces:
 6. Deferred work: clear boundaries for declarative op definitions, full custom
    assembly, advanced eqsat, C++ ABI, and broad agent workflows.
 
+This PR also makes two dialect requirements explicit:
+
+- `scf` is full-dialect scope. The implementation design must cover `if`,
+  `for`, `while`, `execute_region`, `index_switch`, `parallel`, `reduce`,
+  `reduce.return`, `condition`, `yield`, `forall`, and `forall.in_parallel`,
+  even if implementation lands in batches.
+- `affine` is a first-class optimization dialect. The design must cover affine
+  expressions, maps, sets, affine loops/conditionals/parallelism, affine memory
+  access, affine min/max/apply, DMA/prefetch/index transforms, and legality
+  evidence for transformations.
+
 ## Examples
 
 - Example: construct `sum_to_n` with `scf.for_`, loop-carried `iter_args`,
@@ -98,6 +109,14 @@ surfaces:
   use-list preservation, loop-yield preservation, and pending record gate.
 - Verification mapping: `tests/test_actions.py` with successful replacement,
   rejected replacement, and pending-intent failure cases.
+
+- Example: parse and verify an affine tiled loop nest with `affine.for`,
+  `affine.apply`, `affine.load`, `affine.store`, and affine map symbols.
+- Feature shown: dimension/symbol distinction, affine bound verification,
+  memory-access fact extraction, and legality-gated action prerequisites.
+- Verification mapping: `tests/test_affine_syntax.py`,
+  `tests/test_affine_semantics.py`, and `tests/test_affine_actions.py` with
+  invalid symbol-use, map-operand mismatch, and dependence-legality cases.
 
 ## Contracts
 

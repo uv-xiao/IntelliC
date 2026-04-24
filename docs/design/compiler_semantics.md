@@ -285,9 +285,67 @@ scheduling:
 - for-each/forall-style operations summarize per-element facts and require a
   declared order, isolation, or reduction contract.
 
-Terminator operations such as `scf.yield` and `scf.condition` are also ordinary
+Terminator operations such as `scf.yield`, `scf.condition`,
+`scf.reduce.return`, and `scf.forall.in_parallel` are also ordinary
 operation-owned semantic definitions, but they are only meaningful under a
 compatible containing operation or region convention.
+
+### Full SCF Semantic Coverage
+
+Full SCF support means every structured-control-flow operation has a semantic
+contract, even if the first implementation batches them:
+
+| Operation | Concrete semantic contract | Abstract/action contract |
+| --- | --- | --- |
+| `scf.if` | evaluate condition, run selected region, read region yield/result | run both branches for unknown conditions and join facts |
+| `scf.for` | evaluate bounds/step, run body with `(iv, carried...)`, update carried values | summarize loop with join/widening or bounded unroll evidence |
+| `scf.while`/`scf.condition` | alternate before/after regions, route condition payload to after or results | fixpoint over before/after regions with declared fuel/widening |
+| `scf.execute_region` | run contained region exactly once and return yielded values | preserve multi-block control evidence and yielded result facts |
+| `scf.index_switch` | select matching case/default region by index and return its yields | join reachable case facts when index is abstract |
+| `scf.parallel`/`scf.reduce`/`scf.reduce.return` | run iteration space under an explicit deterministic replay order, then combine reductions through reduction regions | require associativity/commutativity or record order-sensitive reduction evidence |
+| `scf.forall`/`scf.forall.in_parallel` | model independent logical iterations, shared outputs, in-parallel combining, and synchronization | require isolation, destination ownership, and merge-policy facts before treating it as reorderable |
+| `scf.yield` | write region-yield facts for the containing region convention | same relation shape at concrete and abstract levels |
+
+SCF operations must write enough `TraceDB` evidence to replay which regions ran,
+which payload values crossed region boundaries, and which facts were joined,
+widened, reduced, or rejected.
+
+### Affine Semantics
+
+Affine semantics is not just concrete execution of loops. It is the source of
+index algebra, memory-access facts, dependence evidence, and loop-transform
+legality.
+
+Semantic definitions should cover:
+
+| Affine family | Semantic contract |
+| --- | --- |
+| `AffineExpr`, `AffineMap`, `AffineSet` | concrete eval, symbolic normalization, used-dim/symbol facts, pure vs semi-affine classification |
+| `affine.apply` | evaluate or normalize one-result maps; write `AffineValue` and `ValueConcrete` when operands are concrete |
+| `affine.min/max` | compute concrete min/max and record bound facts over the result |
+| `affine.for` | run like `scf.for` with affine bound evaluation plus affine-scope facts for IV validity |
+| `affine.if` | evaluate integer-set constraints or branch abstractly with constraint facts |
+| `affine.parallel` | model multidimensional affine iteration spaces and reductions with explicit reduction evidence |
+| `affine.load/store/vector_load/vector_store` | write memory access facts: memref, element type, affine map, dim operands, symbol operands, read/write kind |
+| `affine.prefetch` | write prefetch intent/evidence facts without changing memory value facts |
+| `affine.dma_start/dma_wait` | write DMA token/fence facts and pending-transfer obligations |
+| `affine.delinearize_index/linearize_index` | prove index decomposition/composition or write diagnostics when basis constraints fail |
+| `affine.yield` | terminate affine region conventions and provide yielded values/reductions |
+
+Minimal affine relation schemas:
+
+```text
+AffineMapValue(map: AffineMapId, dims, symbols, results)
+AffineConstraintSet(set: AffineSetId, dims, symbols, constraints)
+AffineAccess(op: OperationId, memref: ValueId, indices, map, dims, symbols, kind)
+AffineLoopBounds(op: OperationId, lower_map, upper_map, step, operands)
+AffineDependence(src: OperationId, dst: OperationId, relation, evidence)
+AffineTransformLegality(action: ActionId, subject: OperationId, status, evidence)
+MemoryEffect(op: OperationId, kind: read | write | prefetch | dma_start | dma_wait)
+```
+
+Affine legality actions consume these facts before loop interchange, tiling,
+fusion, parallelization, or lowering actions can run.
 
 ### Registry
 
@@ -1264,6 +1322,40 @@ operation.
 Verification mapping: e-graph action evidence records e-class creation,
 saturation, extraction, and selected replacement.
 
+### Example 8: Affine Access Facts And Legality Evidence
+
+```mlir
+#tile = affine_map<(d0, d1)[s0] -> (d0 * 16 + d1 + s0)>
+
+affine.for %tile = 0 to %N step 16 {
+  affine.for %ii = 0 to 16 {
+    %idx = affine.apply #tile(%tile, %ii)[%offset]
+    %v = affine.load %A[%idx] : memref<?xf32>
+    affine.store %v, %A[%idx] : memref<?xf32>
+  }
+}
+```
+
+Semantic evidence:
+
+```text
+AffineMapValue(#tile, dims=(%tile, %ii), symbols=(%offset),
+               results=(%tile * 16 + %ii + %offset))
+AffineAccess(op=affine.load, memref=%A, indices=(%idx), map=#identity,
+             dims=(%idx), symbols=(), kind=read)
+AffineAccess(op=affine.store, memref=%A, indices=(%idx), map=#identity,
+             dims=(%idx), symbols=(), kind=write)
+MemoryEffect(op=affine.store, kind=write, subject=%A)
+```
+
+Feature shown: affine semantic definitions preserve symbolic indexing facts even
+when concrete memory contents are unavailable. This lets later actions ask
+whether loop interchange, tiling, or fusion is legal.
+
+Verification mapping: affine evidence checks map evaluation for concrete
+`tile/ii/offset`, rejects invalid symbol binding, records memory access facts,
+and feeds a legality action that can accept or reject a transform.
+
 ## Resolved Design Questions
 
 - Minimal `TraceDB` schema: use one `TraceRecord` table with typed relation
@@ -1300,7 +1392,7 @@ intellic/ir/semantics/
   registry.py        # typed owner/level registration and resolution policies
   interpreter.py     # generated dispatch over selected SemanticDef records
   regions.py         # RegionRunResult and control-region runner contracts
-  builtin.py         # builtin/func/arith/scf first-slice semantic definitions
+  builtin.py         # builtin/func/arith/scf/affine first-slice semantic definitions
 ```
 
 Minimal first-slice relation schemas:
@@ -1314,6 +1406,10 @@ RegionEntered(region: RegionId, inputs: tuple[ValueId, ...])
 RegionReturned(region: RegionId, values: tuple[PythonValue, ...])
 RegionResult(region: RegionId, values: tuple[PythonValue, ...])
 LoopIteration(op: OperationId, index: PythonValue, inputs, yielded)
+AffineMapValue(map: AffineMapId, dims, symbols, results)
+AffineAccess(op: OperationId, memref: ValueId, indices, map, dims, symbols, kind)
+AffineLoopBounds(op: OperationId, lower_map, upper_map, step, operands)
+MemoryEffect(op: OperationId, kind, subject, evidence)
 Diagnostic(subject: SyntaxId, severity, message, evidence)
 EvidenceLink(subject: SyntaxId | TraceRecordId, artifact)
 ```
@@ -1331,6 +1427,8 @@ First-slice invariants:
   replay evidence.
 - A generated interpreter records selected definitions, dispatch order, seeded
   inputs, facts read, facts written, and region results.
+- Affine semantics records both concrete values and symbolic/index facts when
+  both are available; concrete execution must not discard affine legality facts.
 
 First-slice failure tests:
 
@@ -1343,6 +1441,10 @@ First-slice failure tests:
 - `func.return` outside a valid region convention is rejected.
 - `scf.for` rejects mismatched iter-arg/yield/result counts and invalid step
   values before committing result facts.
+- affine map operands reject dimension/symbol count mismatches; invalid symbol
+  uses produce diagnostics instead of unsafely becoming dimensions.
+- affine memory operations reject element-type mismatches and record memory
+  effects even when concrete memory values are unavailable.
 
 ## Planned Verification Evidence
 
@@ -1356,9 +1458,11 @@ First-slice failure tests:
   typed interface fallback without using string operation names.
 - Generated-interpreter evidence for `sum_to_n(5) -> 10`, including selected
   definitions, dispatch table, seeded facts, and returned region result.
-- Control-operation evidence for `scf.for` and `scf.while`, including child
-  region invocations, terminator facts, loop-carried values, and any fuel,
-  join, or widening policy.
+- Control-operation evidence for all SCF operations, including child region
+  invocations, terminator facts, loop-carried values, reductions, synchronization,
+  and any fuel, join, or widening policy.
+- Affine evidence for map/set parsing, concrete evaluation, invalid symbol
+  rejection, affine access facts, and one legality-gated transform sketch.
 - Resolution-policy evidence showing `select_one`, `run_all`, and conflict
   failure for equal-specificity semantic definitions.
 - TraceDB schema evidence showing concrete, abstract, diagnostic, backend,

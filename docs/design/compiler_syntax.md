@@ -43,7 +43,8 @@ pieces behind native package names.
 | Printer | [xdsl/printer.py](../../../.repositories/xdsl/xdsl/printer.py) | SSA/block name allocation, generic/custom operation printing, round-trip text evidence |
 | Builder and insertion | [xdsl/rewriter.py](../../../.repositories/xdsl/xdsl/rewriter.py), [xDSL builders notebook](../../../.repositories/xdsl/docs/marimo/builders.py) | Insertion points, operation insertion, parent/use-list mutation discipline |
 | Introductory xDSL/MLIR docs | [xDSL MLIR IR notebook](../../../.repositories/xdsl/docs/marimo/mlir_ir.py), [xDSL introduction](../../../.repositories/xdsl/docs/marimo/xdsl_introduction.py) | Human-readable examples for `func`, `arith`, `scf`, textual IR, and dialect namespaces |
-| Dialect definitions used in examples | [builtin.py](../../../.repositories/xdsl/xdsl/dialects/builtin.py), [func.py](../../../.repositories/xdsl/xdsl/dialects/func.py), [arith.py](../../../.repositories/xdsl/xdsl/dialects/arith.py), [cf.py](../../../.repositories/xdsl/xdsl/dialects/cf.py), [scf.py](../../../.repositories/xdsl/xdsl/dialects/scf.py) | First-slice example dialects and operation constructors |
+| Dialect definitions used in examples | [builtin.py](../../../.repositories/xdsl/xdsl/dialects/builtin.py), [func.py](../../../.repositories/xdsl/xdsl/dialects/func.py), [arith.py](../../../.repositories/xdsl/xdsl/dialects/arith.py), [cf.py](../../../.repositories/xdsl/xdsl/dialects/cf.py), [scf.py](../../../.repositories/xdsl/xdsl/dialects/scf.py), [affine.py](../../../.repositories/xdsl/xdsl/dialects/affine.py) | First-slice example dialects and operation constructors |
+| MLIR SCF and Affine operation definitions | [SCFOps.td](../../../.repositories/llvm-project/mlir/include/mlir/Dialect/SCF/IR/SCFOps.td), [AffineOps.td](../../../.repositories/llvm-project/mlir/include/mlir/Dialect/Affine/IR/AffineOps.td), [Affine dialect doc](../../../.repositories/llvm-project/mlir/docs/Dialects/Affine.md) | Full SCF coverage beyond xDSL's current subset, affine maps/sets, affine operations, and verification rules |
 | xDSL verification/test evidence | [test_ir.py](../../../.repositories/xdsl/tests/test_ir.py), [test_parser.py](../../../.repositories/xdsl/tests/test_parser.py), [test_printer.py](../../../.repositories/xdsl/tests/test_printer.py), [test_context.py](../../../.repositories/xdsl/tests/test_context.py) | Expected behavior examples for structure, parser, printer, and context tests |
 | MLIR operation/dialect definition background | [MLIR ODS operations](../../../.repositories/llvm-project/mlir/docs/DefiningDialects/Operations.md), [MLIR dialect docs](../../../.repositories/llvm-project/mlir/docs/DefiningDialects/_index.md) | Background for later declarative operation-definition machinery; not required in the first syntax slice |
 
@@ -383,8 +384,64 @@ Use existing MLIR-style dialect names in examples:
 - `arith.addi`
 - `cf.br`
 - `scf.if`
+- `scf.forall`
+- `affine.apply`
+- `affine.for`
+- `affine.load`
 
 If IntelliC later adds domain dialects, those dialects need their own design docs.
+
+## Full SCF Syntax Coverage
+
+`scf` is an implementation-ready dialect family, not just a source of loop
+examples. The syntax layer must provide typed operation classes, parse/print
+coverage, builders, region conventions, and structural verification for the full
+MLIR SCF surface:
+
+| Operation | Syntax contract |
+| --- | --- |
+| `scf.if` | condition is `i1`; result types require both regions; regions are single-block; yields match result types |
+| `scf.for` | bounds/step share induction type; body block args are `(iv, iter_args...)`; yields match loop-carried values |
+| `scf.while` | before/after regions; `scf.condition` terminates before region; after region yields next operands; result type matching follows the condition payload |
+| `scf.execute_region` | region may contain multiple blocks; result types require `scf.yield`; optional no-inline-style attributes are preserved |
+| `scf.index_switch` | index flag, case values, case/default regions, and multi-result yields |
+| `scf.parallel` | lower/upper/step lists have equal rank; body block args are one index per dimension; optional reductions match results |
+| `scf.reduce` | terminator for `scf.parallel`; one reduction region per operand; region block args model accumulator and element |
+| `scf.reduce.return` | terminator for a reduce region; operand type matches reduce operand/result |
+| `scf.yield` | terminator for `scf.if`, `scf.for`, `scf.while` after-region, `scf.execute_region`, and `scf.index_switch` regions |
+| `scf.condition` | terminator for `scf.while` before-region; first operand is condition and remaining operands are payload/result candidates |
+| `scf.forall` | multidimensional parallel loop with shared outputs, mapping attributes, body block args, and implicit synchronization |
+| `scf.forall.in_parallel` | designated terminator for `scf.forall`; carries parallel combining/yielding operations for shared outputs |
+
+The xDSL checkout currently covers many SCF operations but not every MLIR SCF
+operation. IntelliC should copy/adapt xDSL where available and implement missing
+MLIR SCF operations natively. The public contract is MLIR-compatible SCF, not
+"whatever xDSL currently happens to expose."
+
+## Affine Syntax Coverage
+
+Affine is a core optimization dialect for IntelliC. Syntax must include both
+the polyhedral data structures and the operation classes that use them:
+
+| Syntax area | Contract |
+| --- | --- |
+| `AffineExpr` | immutable expression tree for constants, dims, symbols, add/sub/mul-by-constant, ceildiv/floordiv/mod by positive constants, and semi-affine extensions tracked explicitly |
+| `AffineMap` | dimension/symbol counts, result expressions, named and inline printing, eval, compose, simplify, used-dim/symbol analysis |
+| `AffineSet` | affine constraints over dims/symbols, integer-set parsing/printing, constraint evaluation |
+| `affine.apply` | one-result map, map operand count equals dims plus symbols, result type is `index` |
+| `affine.for` | lower/upper affine maps plus operands, positive integer step, induction variable, loop-carried values, region/yield verification |
+| `affine.if` | affine set condition, then/else regions, yielded result type checks |
+| `affine.parallel` | grouped lower/upper bounds, steps, reductions, and result type checks |
+| `affine.load/store/vector_load/vector_store` | memref/vector element typing, map/index operand checks |
+| `affine.min/max` | variadic affine-map operands, index result typing |
+| `affine.prefetch` | memref/index map syntax plus locality/cache metadata |
+| `affine.dma_start/dma_wait` | memory operand groups, tag operands, stride/size operands, side-effect syntax records |
+| `affine.delinearize_index/linearize_index` | index transform operands, static/dynamic basis handling, multi-result/index result checks |
+| `affine.yield` | terminator for affine region-owning operations |
+
+The affine parser/printer must support MLIR's dimension and symbol use lists:
+`(dims)[symbols]`. Verification must distinguish invalid symbol uses from
+invalid dimension uses because later affine analyses depend on that distinction.
 
 ## Copy Boundary
 
@@ -570,6 +627,33 @@ Verification mapping: construction evidence records the `arith.constant`,
 `arith.index_cast`, `arith.addi`, `scf.for_`, and `scf.yield_` builder calls and
 maps them to emitted operations.
 
+### Example 5: Affine Tiled Access Uses Dimensions And Symbols
+
+Canonical IR sketch:
+
+```mlir
+#tile = affine_map<(d0, d1)[s0] -> (d0 * 16 + d1 + s0)>
+
+func.func @affine_tile(%A: memref<?xf32>, %N: index, %offset: index) {
+  affine.for %tile = 0 to %N step 16 {
+    affine.for %ii = 0 to 16 {
+      %idx = affine.apply #tile(%tile, %ii)[%offset]
+      %v = affine.load %A[%idx] : memref<?xf32>
+      affine.store %v, %A[%idx] : memref<?xf32>
+    }
+  }
+  func.return
+}
+```
+
+Feature shown: affine syntax distinguishes dimensions `(%tile, %ii)` from
+symbols `[%offset]`, carries affine maps through apply/load/store operations,
+and nests affine loops with canonical region ownership.
+
+Verification mapping: `tests/test_affine_syntax.py` parses and prints the map
+definition, rejects a map operand count mismatch, rejects an invalid symbol use,
+and verifies that load/store element types match the memref element type.
+
 ## First Syntax Implementation Slice
 
 The first syntax implementation should be large enough to reuse xDSL's proven
@@ -581,12 +665,13 @@ IntelliC APIs.
 ```text
 Input:
   Canonical MLIR/xDSL-compatible IR text using builtin.module, func.func,
-  func.return, arith.constant, arith.addi, arith.index_cast, scf.for,
-  scf.yield, simple blocks, loop-carried block arguments, and nested regions
+  func.return, arith.constant, arith.addi, arith.index_cast, full scf syntax,
+  affine.apply, affine.for, affine.if, affine.load/store, affine.min/max,
+  simple blocks, loop-carried block arguments, and nested regions
 
   Python construction API examples using builtin.module, func.ir_function,
-  func.return_, arith.constant, arith.addi, arith.index_cast, scf.for_,
-  scf.yield_, Value.__add__, and construction evidence
+  func.return_, arith.constant, arith.addi, arith.index_cast, scf builders,
+  affine builders/map constructors, Value.__add__, and construction evidence
 
 Output:
   Native Sy object graph with Operation, Region, Block, Value, Use, Type,
@@ -602,7 +687,8 @@ Verification:
   structural verifier checks parent links, region ownership, block arguments,
   use lists, result types, and terminators
   Python builders/decorator produce the same structural IR as the canonical text,
-  including nested `scf.for` regions and loop-carried block arguments
+  including nested `scf` regions, loop-carried block arguments, and affine map
+  operands
   construction evidence maps each Python builder call to emitted operations
   negative parser and builder diagnostics are exercised
 ```
@@ -611,7 +697,8 @@ Included in the first slice:
 
 - xDSL-derived `Operation`, `Region`, `Block`, `Value`, `Use`, `Type`,
   `Attribute`, `Context`, `Dialect`, parser, printer, and structural verifier.
-- Builtin, func, arith, and minimal scf syntax sufficient for examples.
+- Builtin, func, arith, full scf, and affine syntax sufficient for examples and
+  for the first implementation plan.
 - Generic operation parsing/printing and the small selected custom forms needed
   for examples.
 - Builder and insertion-point APIs.
@@ -619,7 +706,11 @@ Included in the first slice:
   `scf.for_` loop-carried example.
 - Named builders for `builtin.module`, `func.func`, `func.return_`,
   `arith.constant`, `arith.addi`, `arith.index_cast`, `scf.for_`, and
-  `scf.yield_`.
+  `scf.yield_`; full SCF builders may land in batches but their contracts are
+  defined here.
+- Affine expression/map/set constructors and named builders for `affine.apply`,
+  `affine.for_`, `affine.if_`, `affine.load`, `affine.store`, `affine.min`,
+  and `affine.max`.
 - Basic operator sugar for `Value.__add__` when the active construction policy maps it to
   `arith.addi`.
 - Construction evidence for builder/decorator/operator-hook calls.
@@ -627,8 +718,8 @@ Included in the first slice:
 Still follow-up work:
 
 - Full MLIR/xDSL custom assembly coverage beyond the selected example forms.
-- `scf.if_`, `cf.br`, comparison hooks, and broader region helper coverage
-  beyond the first `scf.for_` loop-carried proof point.
+- `cf.br`, comparison hooks, broad memref/vector dialect implementation, and
+  optimized affine transformations beyond the first affine proof points.
 - Declarative operation-definition machinery.
 - Semantic execution, pass scheduling, and action database history.
 - Backend lowering.
@@ -655,6 +746,8 @@ intellic/ir/dialects/
   builtin.py         # module op, builtin attrs/types needed by examples
   func.py            # func.func, func.return, function type helpers
   arith.py           # arith.constant, arith.addi, integer attrs/types
+  scf.py             # full structured-control-flow dialect
+  affine.py          # affine expressions, maps, sets, and affine ops
 
 intellic/ir/parser/
   lexer.py           # copied/adapted MLIR lexer behavior
@@ -664,6 +757,8 @@ intellic/surfaces/api/
   builders.py        # active builder stack and construction evidence
   func.py            # func.ir_function decorator facade
   arith.py           # named builders and optional operator policy
+  scf.py             # region helpers for all SCF operations
+  affine.py          # affine expression/map/set helpers and affine op builders
 ```
 
 First-slice invariants:
@@ -691,6 +786,12 @@ First-slice failure tests:
 - `func.ir_function` rejects missing annotations, unsupported Python control
   flow over symbolic values, and returns that cannot be lowered to
   `func.return`.
+- SCF verification rejects missing required regions, invalid terminator
+  placement, mismatched yield/result counts, invalid reduction region types,
+  invalid `scf.condition` payloads, and malformed `scf.forall.in_parallel`.
+- Affine verification rejects dimension/symbol operand count mismatches,
+  invalid symbol binding, non-positive affine loop steps, memory element type
+  mismatches, and malformed affine DMA/prefetch operand groups.
 
 ## Acceptance Criteria
 
@@ -706,8 +807,10 @@ First-slice failure tests:
   verification contract.
 - Symbolic control flow is explicit through region helpers; host Python boolean
   control flow over symbolic values is rejected.
+- Full SCF coverage and affine dialect coverage are concrete enough to implement
+  in batches without changing public contracts.
 - Examples cover canonical IR parsing, Python builder construction, operator
-  sugar, and explicit region helpers.
+  sugar, explicit region helpers, affine map/set syntax, and affine access facts.
 - Each example names verification evidence before implementation.
 
 ## Planned Verification Evidence
@@ -722,6 +825,10 @@ First-slice failure tests:
 - Negative construction evidence for missing insertion point, missing function
   annotations, missing terminator, unsupported operator hook, and symbolic
   boolean use.
+- SCF parser/verifier evidence for every SCF operation family, including
+  `scf.forall` even though the current xDSL checkout does not expose it.
+- Affine parser/verifier evidence for maps, sets, apply, min/max, loops,
+  conditionals, parallelism, memory ops, DMA/prefetch, and index transforms.
 
 ## Out Of Scope
 
