@@ -100,10 +100,9 @@ Detailed execution plan: `docs/in_progress/complete_intellic_implementation_plan
   `sum_to_n` example.
 - Concrete semantic execution records `TraceDB` evidence and computes
   `sum_to_n(5) -> 10`.
-- Action tests show at least canonicalization, CSE, constant propagation,
-  dead-code cleanup, single-call inlining, LICM, affine lowering/normalization,
-  and pending-record-gate behavior or explicitly documented first-slice stubs
-  with failing tests pending implementation.
+- Action tests show canonicalization, CSE, constant propagation, dead-code
+  cleanup, single-call inlining, LICM, affine lowering/normalization, and
+  pending-record-gate behavior with concrete mutation/evidence contracts.
 
 ## Tests
 
@@ -173,6 +172,46 @@ python -m unittest tests/test_parser_printer.py
 python -m unittest discover -s tests
 python scripts/check_repo_harness.py
 ```
+
+Final review missing-contract verification:
+
+```bash
+python -m unittest tests/test_dialects.py
+# Ran 20 tests: OK
+
+python -m unittest tests/test_semantics.py
+# Ran 8 tests: OK
+
+python -m unittest tests/test_actions.py
+# Ran 62 tests: OK
+
+python -m unittest tests/test_parser_printer.py
+# Ran 17 tests: OK
+
+python -m unittest tests/test_examples.py
+# Ran 2 tests: OK
+
+python -m unittest discover -s tests
+# Ran 129 tests: OK
+
+python scripts/check_repo_harness.py
+# repo harness policy passed
+
+python -c "import intellic; print(intellic.__version__)"
+# 0.1.0
+```
+
+Final review gaps closed:
+
+- Full SCF syntax and verifier contracts are covered, including multi-region
+  forms, terminator context validation, round-trip parsing/printing, and lazy
+  dialect verifier bootstrap.
+- Direct `func.call` concrete execution is covered through symbol lookup,
+  argument/result validation, trace evidence, and recursion rejection.
+- First-slice shared actions now have concrete behavior and evidence for CSE,
+  symbol/dead-code cleanup, canonicalization, sparse constant propagation,
+  single-call inlining, LICM, affine lowering/normalization, and action mutation
+  safety/rollback.
 
 Expected implementation test groups:
 

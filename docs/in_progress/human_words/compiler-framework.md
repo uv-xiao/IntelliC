@@ -32,3 +32,13 @@
   - Related: examples/
   - Related: tests/test_examples.py
   - Agent interpretation: Move reusable example programs to top-level `examples/` so they remain project evidence rather than package internals, and update tests/docs to import from that location.
+
+- 2026-04-24 23:40 CST - Implement missing merge blockers with subagents
+  > Implement missing things with $superpowers:subagent-driven-development
+  - Context: Final review for PR #71 found merge blockers in full SCF support, direct `func.call` semantics, and concrete action/pass behavior.
+  - Related: docs/in_progress/complete_intellic_implementation.md
+  - Related: docs/in_progress/complete_intellic_implementation_plan.md
+  - Related: tests/test_dialects.py
+  - Related: tests/test_semantics.py
+  - Related: tests/test_actions.py
+  - Agent interpretation: Use the subagent-driven implementation workflow to close the blockers with implementation, spec review, code-quality review, and fresh verification evidence before PR merge readiness.

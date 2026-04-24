@@ -441,3 +441,19 @@ is the first review checkpoint.
 - Scope control: backend lowering, full bufferization, production optimizer
   quality, declarative op definitions, and target-specific vector lowering stay
   outside this PR unless required to satisfy the listed first-slice evidence.
+
+## Final Review Addendum
+
+The merge-readiness review found missing first-slice implementation depth after
+the original eight batches. The completed follow-up work is part of this plan's
+closeout scope:
+
+- Full SCF operation-family contracts, parser/printer round trips, and verifier
+  hooks are required for merge, not deferred.
+- Direct `func.call` execution is required for the concrete interpreter slice.
+- Shared pass/action implementations must exercise concrete mutation,
+  rollback, evidence, and gate behavior for the selected first-slice passes
+  rather than leaving pass-shaped placeholders.
+
+Final verification evidence is recorded in
+`docs/in_progress/complete_intellic_implementation.md`.
