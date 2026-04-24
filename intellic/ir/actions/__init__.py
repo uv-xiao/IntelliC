@@ -2,7 +2,7 @@
 
 from .action import CompilerAction
 from .match import MatchRecord
-from .mutation import MutationApplied, MutationIntent
+from .mutation import MutationApplied, MutationIntent, MutationRejected
 from .pipeline import PipelineRun
 from .stages import MutatorStage, PendingRecordGate
 
@@ -11,6 +11,7 @@ __all__ = (
     "MatchRecord",
     "MutationApplied",
     "MutationIntent",
+    "MutationRejected",
     "MutatorStage",
     "PendingRecordGate",
     "PipelineRun",

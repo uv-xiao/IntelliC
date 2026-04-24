@@ -16,3 +16,9 @@ class MutationIntent:
 @dataclass(frozen=True)
 class MutationApplied:
     intent: MutationIntent
+
+
+@dataclass(frozen=True)
+class MutationRejected:
+    intent: MutationIntent
+    reason: str

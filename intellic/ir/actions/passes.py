@@ -93,9 +93,11 @@ def symbol_dce_and_dead_code() -> CompilerAction:
                         {
                             "reason": "unused function",
                             "symbol": symbol,
-                            "mutation": "skipped without visibility contract",
+                            "mutation": "erase" if _is_private_symbol(op) else "skipped without visibility contract",
                         },
                     )
+                    if _is_private_symbol(op):
+                        run.db.put("MutationIntent", op.id, MutationIntent("erase_op", op, reason="unused private function"))
             elif _is_unused_pure_op(op):
                 run.db.put("Liveness", op.id, {"live": False, "reason": "all results unused"})
                 run.db.put("DeadCodeCandidate", op.id, {"reason": "unused pure op"})
@@ -331,6 +333,10 @@ def _is_unused_pure_op(op: Operation) -> bool:
     if op.parent is None or not _is_pure_op(op):
         return False
     return bool(op.results) and all(not result.uses for result in op.results)
+
+
+def _is_private_symbol(op: Operation) -> bool:
+    return op.properties.get("sym_visibility") == "private" or op.properties.get("visibility") == "private"
 
 
 def _is_pure_op(op: Operation) -> bool:

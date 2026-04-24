@@ -1,6 +1,6 @@
 import unittest
 
-from intellic.ir.actions import MutatorStage, PendingRecordGate, PipelineRun, passes
+from intellic.ir.actions import MutationIntent, MutatorStage, PendingRecordGate, PipelineRun, passes
 from intellic.ir.dialects import affine, arith, builtin, func, scf
 from intellic.ir.syntax import Block, Builder, Region, i32, index
 
@@ -111,6 +111,60 @@ class ActionTests(unittest.TestCase):
 
         self.assertNotIn(dead, block.operations)
 
+    def test_symbol_dce_erases_unused_private_function(self) -> None:
+        module_block = Block()
+        module = builtin.module(Region.from_block_list([module_block]))
+        function_type = func.FunctionType(inputs=(i32,), results=(i32,))
+        function_block = Block(arg_types=(i32,))
+        function_region = Region.from_block_list([function_block])
+        with Builder().insert_at_end(function_block) as builder:
+            builder.insert(func.return_(function_block.arguments[0]))
+        dead_function = func.func("dead_private", function_type, function_region)
+        dead_function.properties["sym_visibility"] = "private"
+        with Builder().insert_at_end(module_block) as builder:
+            builder.insert(dead_function)
+        run = PipelineRun(module)
+
+        passes.symbol_dce_and_dead_code().run(run)
+
+        self.assertFalse(run.db.require("SymbolLiveness", dead_function.id).value["live"])
+        self.assertEqual(run.db.require("DeadCodeCandidate", dead_function.id).value["reason"], "unused function")
+        self.assertEqual(run.db.require("MutationIntent", dead_function.id).value.kind, "erase_op")
+
+        MutatorStage().run(run)
+
+        self.assertNotIn(dead_function, module_block.operations)
+
+    def test_symbol_dce_preserves_called_private_function(self) -> None:
+        module_block = Block()
+        module = builtin.module(Region.from_block_list([module_block]))
+        function_type = func.FunctionType(inputs=(i32,), results=(i32,))
+
+        callee_block = Block(arg_types=(i32,))
+        callee_region = Region.from_block_list([callee_block])
+        with Builder().insert_at_end(callee_block) as builder:
+            builder.insert(func.return_(callee_block.arguments[0]))
+        callee = func.func("called_private", function_type, callee_region)
+        callee.properties["sym_visibility"] = "private"
+
+        caller_block = Block(arg_types=(i32,))
+        caller_region = Region.from_block_list([caller_block])
+        with Builder().insert_at_end(caller_block) as builder:
+            call = builder.insert(func.call("called_private", (caller_block.arguments[0],), function_type))
+            builder.insert(func.return_(call.results[0]))
+        caller = func.func("main", function_type, caller_region)
+
+        with Builder().insert_at_end(module_block) as builder:
+            builder.insert(callee)
+            builder.insert(caller)
+        run = PipelineRun(module)
+
+        passes.symbol_dce_and_dead_code().run(run)
+
+        self.assertTrue(run.db.require("SymbolLiveness", callee.id).value["live"])
+        with self.assertRaises(KeyError):
+            run.db.require("MutationIntent", callee.id)
+
     def test_inline_single_call_records_callgraph_and_inline_intent(self) -> None:
         module_block = Block()
         module = builtin.module(Region.from_block_list([module_block]))
@@ -212,6 +266,23 @@ class ActionTests(unittest.TestCase):
         PendingRecordGate().run(run)
 
         self.assertEqual(run.db.require("PendingRecordGate", module.id).value["status"], "passed")
+
+    def test_mutator_rejects_stale_mutation_intent_with_evidence(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            stale = builder.insert(arith.constant(11, i32))
+        run = PipelineRun(module)
+        run.db.put("MutationIntent", stale.id, MutationIntent("erase_op", stale, reason="stale test"))
+        block._operations.remove(stale)
+
+        MutatorStage().run(run)
+
+        rejection = run.db.require("MutationRejected", stale.id).value
+        self.assertEqual(rejection.intent.subject, stale)
+        self.assertEqual(rejection.reason, "stale mutation subject")
+        self.assertEqual(run.db.query("MutationIntent", stale.id), ())
+        PendingRecordGate().run(run)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .mutation import MutationApplied, MutationIntent
+from .mutation import MutationApplied, MutationIntent, MutationRejected
 from .pipeline import PipelineRun
 
 
@@ -10,9 +10,23 @@ class MutatorStage:
             intent = record.value
             if not isinstance(intent, MutationIntent):
                 continue
+            rejection_reason = self._rejection_reason(intent)
+            if rejection_reason is not None:
+                run.db.put("MutationRejected", intent.subject.id, MutationRejected(intent, rejection_reason))
+                run.db.retract(record.id, reason="rejected")
+                continue
             self._apply_intent(intent)
             run.db.put("MutationApplied", intent.subject.id, MutationApplied(intent))
             run.db.retract(record.id, reason="applied")
+
+    def _rejection_reason(self, intent: MutationIntent) -> str | None:
+        parent = intent.subject.parent
+        if parent is None:
+            return "stale mutation subject"
+        operations = getattr(parent, "_operations", None)
+        if operations is None or intent.subject not in operations:
+            return "stale mutation subject"
+        return None
 
     def _apply_intent(self, intent: MutationIntent) -> None:
         parent = intent.subject.parent
