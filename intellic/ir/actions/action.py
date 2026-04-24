@@ -16,12 +16,20 @@ class CompilerAction:
     def run(self, run: PipelineRun) -> None:
         run.db.put("ActionRun", self.name, {"name": self.name})
         before = _syntax_snapshot(run.module)
-        self.apply(run)
-        after = _syntax_snapshot(run.module)
-        violation = _direct_mutation_violation(before, after)
-        if violation is not None:
-            run.db.put("DirectMutationViolation", self.name, violation)
-            raise ValueError(f"direct syntax mutation in action {self.name}")
+        apply_error: BaseException | None = None
+        try:
+            self.apply(run)
+        except BaseException as exc:
+            apply_error = exc
+        finally:
+            after = _syntax_snapshot(run.module)
+            violation = _direct_mutation_violation(before, after)
+            if violation is not None:
+                run.db.put("DirectMutationViolation", self.name, violation)
+                if apply_error is None:
+                    raise ValueError(f"direct syntax mutation in action {self.name}")
+            if apply_error is not None:
+                raise apply_error
 
 
 def _syntax_snapshot(root: Operation) -> dict[str, dict[object, object]]:

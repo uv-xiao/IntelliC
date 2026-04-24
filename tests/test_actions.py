@@ -74,6 +74,29 @@ class ActionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 
+    def test_action_apply_direct_property_mutation_then_exception_records_violation(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            const = builder.insert(arith.constant(7, i32))
+        run = PipelineRun(module)
+
+        def mutate_then_raise(current_run):
+            const.properties["value"] = 8
+            raise RuntimeError("boom")
+
+        action = CompilerAction("bad-mutation-then-raise", mutate_then_raise)
+
+        with self.assertRaises(RuntimeError):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-mutation-then-raise").value
+        self.assertEqual(violation["kind"], "properties_changed")
+        self.assertEqual(violation["before"]["value"], 7)
+        self.assertEqual(violation["after"]["value"], 8)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
     def test_action_apply_direct_attribute_mutation_is_rejected(self) -> None:
         block = Block()
         module = builtin.module(Region.from_block_list([block]))
@@ -422,6 +445,34 @@ class ActionTests(unittest.TestCase):
         self.assertIn(used, block.operations)
         self.assertIs(user.operands[0], used.results[0])
         self.assertEqual(run.db.query("MutationIntent", used.id), ())
+        PendingRecordGate().run(run)
+
+    def test_mutator_rejects_self_replacement_with_evidence(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            subject = builder.insert(arith.constant(21, i32))
+            zero = builder.insert(arith.constant(0, i32))
+            user = builder.insert(arith.addi(subject.results[0], zero.results[0]))
+        run = PipelineRun(module)
+        run.db.put(
+            "MutationIntent",
+            subject.id,
+            MutationIntent(
+                "replace_uses_and_erase",
+                subject,
+                subject.results[0],
+                reason="self replacement test",
+            ),
+        )
+
+        MutatorStage().run(run)
+
+        rejection = run.db.require("MutationRejected", subject.id).value
+        self.assertEqual(rejection.reason, "self replacement value")
+        self.assertIn(subject, block.operations)
+        self.assertIs(user.operands[0], subject.results[0])
+        self.assertNoDetachedOperands(block)
         PendingRecordGate().run(run)
 
     def assertNoDetachedOperands(self, block: Block) -> None:

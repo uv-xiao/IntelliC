@@ -33,6 +33,8 @@ class MutatorStage:
         if intent.kind == "replace_uses_and_erase":
             if intent.replacement is None:
                 return "missing replacement value"
+            if getattr(intent.replacement, "owner", None) is intent.subject:
+                return "self replacement value"
             if not self._is_attached_value(intent.replacement):
                 return "stale replacement value"
         return None
