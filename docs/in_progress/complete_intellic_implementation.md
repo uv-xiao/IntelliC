@@ -1,7 +1,7 @@
 # Feature Task: Complete IntelliC Implementation Slice
 
 - Branch: `implement/complete-intellic-slice`
-- PR: draft
+- PR: #71
 - Owner: Codex
 - Status: Active
 
