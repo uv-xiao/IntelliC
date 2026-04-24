@@ -2,7 +2,7 @@ import unittest
 
 from intellic.ir.actions import MutationIntent, MutatorStage, PendingRecordGate, PipelineRun, passes
 from intellic.ir.dialects import affine, arith, builtin, func, scf
-from intellic.ir.syntax import Block, Builder, Region, i32, index
+from intellic.ir.syntax import Block, Builder, Operation, Region, i32, index
 
 
 class ActionTests(unittest.TestCase):
@@ -61,6 +61,31 @@ class ActionTests(unittest.TestCase):
         self.assertNotIn(duplicate, block.operations)
         self.assertIs(user.operands[0], representative.results[0])
         self.assertEqual(duplicate.results[0].uses, ())
+        self.assertTrue(
+            any(use.owner is user and use.operand_index == 0 for use in representative.results[0].uses)
+        )
+
+    def test_cse_replacement_target_survives_symbol_dce_before_mutation(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            representative = builder.insert(arith.constant(1, i32))
+            duplicate = builder.insert(arith.constant(1, i32))
+            two = builder.insert(arith.constant(2, i32))
+            user = builder.insert(arith.addi(duplicate.results[0], two.results[0]))
+            builder.insert(Operation.create("test.consume", operands=(user.results[0],)))
+        run = PipelineRun(module)
+
+        passes.common_subexpression_elimination().run(run)
+        passes.symbol_dce_and_dead_code().run(run)
+
+        self.assertEqual(run.db.query("MutationIntent", representative.id), ())
+
+        MutatorStage().run(run)
+
+        self.assertIn(representative, block.operations)
+        self.assertNotIn(duplicate, block.operations)
+        self.assertIs(user.operands[0], representative.results[0])
         self.assertTrue(
             any(use.owner is user and use.operand_index == 0 for use in representative.results[0].uses)
         )
@@ -282,6 +307,25 @@ class ActionTests(unittest.TestCase):
         self.assertEqual(rejection.intent.subject, stale)
         self.assertEqual(rejection.reason, "stale mutation subject")
         self.assertEqual(run.db.query("MutationIntent", stale.id), ())
+        PendingRecordGate().run(run)
+
+    def test_mutator_rejects_erasing_used_result_producer_with_evidence(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            used = builder.insert(arith.constant(13, i32))
+            zero = builder.insert(arith.constant(0, i32))
+            user = builder.insert(arith.addi(used.results[0], zero.results[0]))
+        run = PipelineRun(module)
+        run.db.put("MutationIntent", used.id, MutationIntent("erase_op", used, reason="unsafe test"))
+
+        MutatorStage().run(run)
+
+        rejection = run.db.require("MutationRejected", used.id).value
+        self.assertEqual(rejection.reason, "used result producer")
+        self.assertIn(used, block.operations)
+        self.assertIs(user.operands[0], used.results[0])
+        self.assertEqual(run.db.query("MutationIntent", used.id), ())
         PendingRecordGate().run(run)
 
 

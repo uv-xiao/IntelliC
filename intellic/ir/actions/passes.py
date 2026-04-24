@@ -77,6 +77,7 @@ def sparse_constant_propagation() -> CompilerAction:
 def symbol_dce_and_dead_code() -> CompilerAction:
     def apply(run: PipelineRun) -> None:
         live_symbols = _called_symbols(run.module) | {"main"}
+        pending_replacement_targets = _pending_replacement_target_ids(run)
         for op in _walk(run.module):
             if op.name == "func.func":
                 symbol = op.properties.get("sym_name")
@@ -98,6 +99,8 @@ def symbol_dce_and_dead_code() -> CompilerAction:
                     )
                     if _is_private_symbol(op):
                         run.db.put("MutationIntent", op.id, MutationIntent("erase_op", op, reason="unused private function"))
+            elif any(result.id in pending_replacement_targets for result in op.results):
+                run.db.put("Liveness", op.id, {"live": True, "reason": "pending replacement target"})
             elif _is_unused_pure_op(op):
                 run.db.put("Liveness", op.id, {"live": False, "reason": "all results unused"})
                 run.db.put("DeadCodeCandidate", op.id, {"reason": "unused pure op"})
@@ -333,6 +336,15 @@ def _is_unused_pure_op(op: Operation) -> bool:
     if op.parent is None or not _is_pure_op(op):
         return False
     return bool(op.results) and all(not result.uses for result in op.results)
+
+
+def _pending_replacement_target_ids(run: PipelineRun) -> set[object]:
+    target_ids = set()
+    for record in run.db.query("MutationIntent"):
+        intent = record.value
+        if isinstance(intent, MutationIntent) and intent.kind == "replace_uses_and_erase" and intent.replacement is not None:
+            target_ids.add(intent.replacement.id)
+    return target_ids
 
 
 def _is_private_symbol(op: Operation) -> bool:

@@ -26,6 +26,8 @@ class MutatorStage:
         operations = getattr(parent, "_operations", None)
         if operations is None or intent.subject not in operations:
             return "stale mutation subject"
+        if intent.kind == "erase_op" and any(result.uses for result in intent.subject.results):
+            return "used result producer"
         return None
 
     def _apply_intent(self, intent: MutationIntent) -> None:
