@@ -249,6 +249,59 @@ class ActionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 
+    def test_action_apply_transient_raw_properties_assignment_is_rejected(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            const = builder.insert(arith.constant(7, i32))
+        original = const.properties
+        run = PipelineRun(module)
+
+        def assign_then_restore(current_run):
+            const.properties = {"value": 8}
+            const.properties = original
+
+        action = CompilerAction("bad-raw-properties-assignment", assign_then_restore)
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-raw-properties-assignment").value
+        self.assertEqual(violation["kind"], "mutation_attempt")
+        self.assertIn("metadata_assignment", violation["attempts"])
+        self.assertEqual(const.properties["value"], 7)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_transient_raw_attributes_assignment_is_rejected(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            op = builder.insert(
+                Operation.create(
+                    "test.with_attr",
+                    attributes={"tag": Attribute("tag", "before")},
+                )
+            )
+        original = op.attributes
+        run = PipelineRun(module)
+
+        def assign_then_restore(current_run):
+            op.attributes = {"tag": Attribute("tag", "after")}
+            op.attributes = original
+
+        action = CompilerAction("bad-raw-attributes-assignment", assign_then_restore)
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-raw-attributes-assignment").value
+        self.assertEqual(violation["kind"], "mutation_attempt")
+        self.assertIn("metadata_assignment", violation["attempts"])
+        self.assertEqual(op.attributes["tag"], Attribute("tag", "before"))
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
     def test_cse_records_duplicate_erase_intent(self) -> None:
         block = Block()
         module = builtin.module(Region.from_block_list([block]))

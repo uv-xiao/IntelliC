@@ -17,6 +17,11 @@ class Operation:
     def __setattr__(self, name: str, value: Any) -> None:
         if name == "operands" and hasattr(self, "operands"):
             record_direct_mutation_attempt("operand_assignment", self)
+        if name in {"properties", "attributes"}:
+            if hasattr(self, name):
+                record_direct_mutation_attempt("metadata_assignment", self, field=name)
+            if not isinstance(value, GuardedDict):
+                value = GuardedDict(self, name, value)
         super().__setattr__(name, value)
 
     def __init__(
