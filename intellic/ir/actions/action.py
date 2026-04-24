@@ -33,7 +33,7 @@ class CompilerAction:
                         "details": tuple(attempts),
                     }
                 if violation is not None:
-                    _restore_syntax(before)
+                    _restore_syntax(before, after)
                     run.db.put("DirectMutationViolation", self.name, violation)
                     if apply_error is None:
                         raise ValueError(f"direct syntax mutation in action {self.name}")
@@ -172,7 +172,10 @@ def _direct_mutation_violation(
     return None
 
 
-def _restore_syntax(snapshot: dict[str, dict[object, object]]) -> None:
+def _restore_syntax(
+    snapshot: dict[str, dict[object, object]],
+    after: dict[str, dict[object, object]] | None = None,
+) -> None:
     for region_data in snapshot["regions"].values():
         region = region_data["object"]
         region._blocks.clear()
@@ -190,3 +193,20 @@ def _restore_syntax(snapshot: dict[str, dict[object, object]]) -> None:
     for use_data in snapshot["uses"].values():
         value = use_data["object"]
         value._uses = use_data["uses"]
+    if after is not None:
+        _detach_removed_syntax(snapshot, after)
+
+
+def _detach_removed_syntax(
+    snapshot: dict[str, dict[object, object]],
+    after: dict[str, dict[object, object]],
+) -> None:
+    for op_id, op_data in after["operations"].items():
+        if op_id not in snapshot["operations"]:
+            op_data["object"].parent = None
+    for block_id, block_data in after["blocks"].items():
+        if block_id not in snapshot["blocks"]:
+            block_data["object"].parent = None
+    for region_id, region_data in after["regions"].items():
+        if region_id not in snapshot["regions"]:
+            region_data["object"].parent = None

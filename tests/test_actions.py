@@ -1,7 +1,7 @@
 import unittest
 
 from intellic.ir.actions import CompilerAction, MutationIntent, MutatorStage, PendingRecordGate, PipelineRun, passes
-from intellic.ir.dialects import affine, arith, builtin, func, scf
+from intellic.ir.dialects import affine, arith, builtin, func, memref, scf
 from intellic.ir.syntax import Attribute, Block, Builder, Operation, Region, i32, index
 
 
@@ -19,6 +19,9 @@ class ActionTests(unittest.TestCase):
 
         self.assertEqual(block.operations[-1], add)
         self.assertEqual(len(run.db.query("MutationIntent")), 1)
+        evidence = run.db.require("RewriteEvidence", add.id).value
+        self.assertEqual(evidence["action"], "canonicalize-greedy")
+        self.assertEqual(evidence["replacement"], value.results[0].id)
         with self.assertRaisesRegex(ValueError, "pending records"):
             PendingRecordGate().run(run)
 
@@ -565,6 +568,46 @@ class ActionTests(unittest.TestCase):
 
         self.assertEqual(block.operations, (first, second))
 
+    def test_direct_inserted_operation_is_detached_after_rejected_action_rollback(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        inserted = arith.constant(9, i32)
+        run = PipelineRun(module)
+
+        def insert_directly(current_run):
+            with Builder().insert_at_end(block) as builder:
+                builder.insert(inserted)
+
+        action = CompilerAction("bad-direct-insert", insert_directly)
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        self.assertEqual(block.operations, ())
+        self.assertIsNone(inserted.parent)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_direct_inserted_block_is_detached_after_rejected_action_rollback(self) -> None:
+        original_block = Block()
+        new_block = Block()
+        region = Region.from_block_list([original_block])
+        module = builtin.module(region)
+        run = PipelineRun(module)
+
+        action = CompilerAction(
+            "bad-direct-block-insert",
+            lambda current_run: region.append_block(new_block),
+        )
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        self.assertEqual(region.blocks, (original_block,))
+        self.assertIsNone(new_block.parent)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
     def test_cse_records_duplicate_erase_intent(self) -> None:
         block = Block()
         module = builtin.module(Region.from_block_list([block]))
@@ -577,6 +620,51 @@ class ActionTests(unittest.TestCase):
 
         intent = run.db.require("MutationIntent", duplicate.id).value
         self.assertEqual(intent.kind, "replace_uses_and_erase")
+
+    def test_cse_records_memory_read_evidence_for_affine_load_without_erasing_it(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        memref_type = memref.MemRefType(i32, (None,))
+        mem = Operation.create("test.arg", result_types=(memref_type,)).results[0]
+        map_ = affine.AffineMap(1, 0, ("d0",))
+        with Builder().insert_at_end(block) as builder:
+            idx = builder.insert(arith.constant(0, index))
+            first_load = builder.insert(affine.load(mem, map_, dims=(idx.results[0],), symbols=()))
+            second_load = builder.insert(affine.load(mem, map_, dims=(idx.results[0],), symbols=()))
+        run = PipelineRun(module)
+
+        passes.common_subexpression_elimination().run(run)
+
+        self.assertEqual(run.db.require("MemoryEffect", first_load.id).value["kind"], "read")
+        self.assertEqual(run.db.require("MemoryEffect", second_load.id).value["kind"], "read")
+        self.assertEqual(run.db.require("CSEMemoryEffect", first_load.id).value["action"], "read-observed")
+        self.assertEqual(run.db.require("CSEMemoryEffect", second_load.id).value["action"], "read-observed")
+        self.assertEqual(run.db.query("MutationIntent"), ())
+
+    def test_cse_skips_memory_writing_ops_with_side_effect_evidence(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        memref_type = memref.MemRefType(i32, (None,))
+        mem = Operation.create("test.arg", result_types=(memref_type,)).results[0]
+        map_ = affine.AffineMap(1, 0, ("d0",))
+        with Builder().insert_at_end(block) as builder:
+            idx = builder.insert(arith.constant(0, index))
+            value = builder.insert(arith.constant(7, i32))
+            first_store = builder.insert(
+                affine.store(value.results[0], mem, map_, dims=(idx.results[0],), symbols=())
+            )
+            second_store = builder.insert(
+                affine.store(value.results[0], mem, map_, dims=(idx.results[0],), symbols=())
+            )
+        run = PipelineRun(module)
+
+        passes.common_subexpression_elimination().run(run)
+
+        self.assertEqual(run.db.require("MemoryEffect", first_store.id).value["kind"], "write")
+        self.assertEqual(run.db.require("MemoryEffect", second_store.id).value["kind"], "write")
+        self.assertEqual(run.db.require("CSEMemoryEffect", first_store.id).value["action"], "skip-side-effect")
+        self.assertEqual(run.db.require("CSEMemoryEffect", second_store.id).value["action"], "skip-side-effect")
+        self.assertEqual(run.db.query("MutationIntent"), ())
 
     def test_cse_replaces_duplicate_result_uses_before_erasing(self) -> None:
         block = Block()

@@ -33,6 +33,11 @@ def common_subexpression_elimination() -> CompilerAction:
     def apply(run: PipelineRun) -> None:
         seen: dict[tuple, Operation] = {}
         for op in _walk(run.module):
+            memory_effect = _cse_memory_effect(op, run)
+            if memory_effect == "write":
+                continue
+            if memory_effect == "read":
+                continue
             key = _cse_key(op)
             if key is None:
                 continue
@@ -252,6 +257,15 @@ def normalize_and_simplify_affine_loops() -> CompilerAction:
 def _record_replace(run: PipelineRun, action: str, op: Operation, replacement, reason: str) -> None:
     run.db.put("MatchRecord", op.id, MatchRecord(action, op.id, reason))
     run.db.put("MutationIntent", op.id, MutationIntent("replace_uses_and_erase", op, replacement, reason))
+    run.db.put(
+        "RewriteEvidence",
+        op.id,
+        {
+            "action": action,
+            "replacement": replacement.id,
+            "reason": reason,
+        },
+    )
 
 
 def _walk(op: Operation) -> tuple[Operation, ...]:
@@ -276,6 +290,23 @@ def _cse_key(op: Operation) -> tuple | None:
     if op.name in {"arith.addi", "arith.index_cast", "affine.apply"}:
         return (op.name, tuple(id(operand) for operand in op.operands), tuple(result.type for result in op.results))
     return None
+
+
+def _cse_memory_effect(op: Operation, run: PipelineRun) -> str | None:
+    if op.name not in {"affine.load", "affine.store", "affine.vector_load", "affine.vector_store"}:
+        return None
+    record_affine_memory_effect(op, run.db)
+    effect = "read" if op.name in {"affine.load", "affine.vector_load"} else "write"
+    run.db.put(
+        "CSEMemoryEffect",
+        op.id,
+        {
+            "effect": effect,
+            "action": "read-observed" if effect == "read" else "skip-side-effect",
+            "reason": "memory read requires alias/order proof" if effect == "read" else "memory write has side effects",
+        },
+    )
+    return effect
 
 
 def _called_symbols(root: Operation) -> set[object]:
