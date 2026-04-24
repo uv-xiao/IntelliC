@@ -27,6 +27,8 @@ so an implementation agent can answer:
 - [x] Clarify implementation order across syntax, semantics, actions, and surfaces
 - [x] Clarify first-slice module contracts and ownership
 - [x] Map design examples to concrete tests or evidence artifacts
+- [x] Replace easy examples with challenging examples that prove nested regions,
+  loop-carried values, TraceDB semantics, and actions work together
 - [x] Verify locally
 - [x] Sync `docs/design/`, `docs/todo/`, and `docs/in_progress/`
 
@@ -76,6 +78,7 @@ Verification run:
 - `python scripts/check_repo_harness.py` — passed
 - `python -m unittest tests/test_repo_harness.py` — passed
 - `rg -n "Implementation-Ready|First-slice invariants|First-slice failure tests|Build Order|First Implementation Slice" docs/design/compiler_*.md docs/in_progress/implementation_ready_compiler_design.md` — confirmed the new design sections are present
+- `rg -n 'sum_to_n|loop-body|challenging|LoopIteration|ValueConcreteTuple|scf.for_' docs/design/compiler_*.md docs/in_progress/design/implementation_ready_compiler_design.md docs/in_progress/implementation_ready_compiler_design.md docs/in_progress/human_words/compiler-framework.md` — confirmed the challenging examples and evidence hooks are present
 
 ## Docs
 

@@ -501,17 +501,17 @@ Build process:
 6. Run regions by seeding input facts, applying operation definitions in the
    region's semantic order, and reading the region result facts/events.
 
-Tiny generated-interpreter example:
+Generated-interpreter proof example:
 
 ```python
-simple_arith_interp = Interpreter.from_semantics(
-    ir=SimpleArithIR,
+loop_arith_interp = Interpreter.from_semantics(
+    ir=LoopArithIR,
     entry=FuncOp,
     levels=(ConcreteCall, ConcreteValue),
 )
 
-result = simple_arith_interp.call("add_one", 41)
-assert result == 42
+result = loop_arith_interp.call("sum_to_n", 5)
+assert result == 10
 ```
 
 The interpreter is generated from these selected definitions:
@@ -519,19 +519,27 @@ The interpreter is generated from these selected definitions:
 ```text
 FuncOp          level=ConcreteCall
 ArithConstantOp level=ConcreteValue
+ArithIndexCastOp level=ConcreteValue
 ArithAddiOp     level=ConcreteValue
+ScfForOp        level=ConcreteValue
+ScfYieldOp      level=ConcreteValue
 FuncReturnOp    level=ConcreteValue
 CallableRegion  level=ConcreteCall
+ForBodyRegion   level=ConcreteValue
 ```
 
 Execution evidence:
 
 ```text
-seed  ValueConcrete(subject=%x, value=41)
-apply ArithConstantOp.ConcreteValue -> ValueConcrete(subject=%c1, value=1)
-apply ArithAddiOp.ConcreteValue     -> ValueConcrete(subject=%y, value=42)
-apply FuncReturnOp.ConcreteValue    -> RegionReturned(values=(42,))
-read  RegionResult(func.body)       -> 42
+seed  ValueConcrete(subject=%n, value=5)
+apply ArithConstantOp.ConcreteValue -> ValueConcrete(%c0_i, 0),
+                                       ValueConcrete(%c1_i, 1),
+                                       ValueConcrete(%c0, 0)
+apply ScfForOp.ConcreteValue        -> run body for i=0,1,2,3,4
+apply ArithIndexCastOp/ArithAddiOp  -> update carried total each iteration
+apply ScfYieldOp.ConcreteValue      -> RegionReturned(loop.body, carried=...)
+apply FuncReturnOp.ConcreteValue    -> RegionReturned(func.body, values=(10,))
+read  RegionResult(func.body)       -> 10
 ```
 
 Other levels can generate related engines, but with different scheduling rules:
@@ -569,20 +577,25 @@ as IntelliC's public interpreter dependency.
 An IR chooses a list of semantic definitions:
 
 ```text
-simple_arith_ir semantics:
+loop_arith_ir semantics:
   BuiltinModuleOp: Symbol
   FuncOp: Symbol, ConcreteCall
   ReturnOp: ConcreteValue
   ArithConstantOp: ConcreteValue, AbstractRange
+  ArithIndexCastOp: ConcreteValue
   ArithAddiOp: ConcreteValue, AbstractRange
+  ScfForOp: ConcreteValue, AbstractRange
+  ScfYieldOp: ConcreteValue
+  ForBodyRegion: ConcreteValue, AbstractRange
 ```
 
 Feature shown: an IR-level semantic design is just the set of definitions it
 enables for its dialects and operations. It does not need a separate composition
 object unless implementation later proves useful.
 
-Verification mapping: `add_one` evidence shows lookup for each operation and
-level before execution or abstract interpretation.
+Verification mapping: `sum_to_n` evidence shows lookup for each operation and
+level before execution or abstract interpretation, including the `scf.for` body
+region convention.
 
 ### Region Semantics
 
@@ -1046,52 +1059,65 @@ operation result into a region result.
 
 Verification mapping: registry evidence shows `lookup(ArithAddiOp,
 ConcreteValue)` and `lookup(ArithAddiOp, AbstractRange)` select different
-definitions, while `ArithConstantOp` and `FuncReturnOp` lookup evidence shows
-the surrounding straight-line function can execute.
+definitions, while the challenging `sum_to_n` fixture adds `ScfForOp`,
+`ScfYieldOp`, `ArithIndexCastOp`, and `FuncReturnOp` lookup evidence to prove a
+nested-region function can execute.
 
 ### Example 2: IR-Level Semantics Are A Definition Set
 
 ```text
-simple_arith_ir semantic defs:
+loop_arith_ir semantic defs:
   BuiltinModuleOp   level=Symbol
   FuncOp            level=Symbol
   FuncOp            level=ConcreteCall
   ReturnOp          level=ConcreteValue
   ArithConstantOp   level=ConcreteValue
+  ArithIndexCastOp  level=ConcreteValue
   ArithConstantOp   level=AbstractRange
   ArithAddiOp       level=ConcreteValue
   ArithAddiOp       level=AbstractRange
+  ScfForOp          level=ConcreteValue
+  ScfYieldOp        level=ConcreteValue
+  ForBodyRegion     level=ConcreteValue
 ```
 
 Feature shown: an IR-level semantic design is the set of semantic definitions it
 enables. No extra composition object is required at the design level.
 
-Verification mapping: `add_one` evidence shows lookup for each operation and
-level before concrete execution and abstract interpretation.
+Verification mapping: `sum_to_n` evidence shows lookup for each operation and
+level before concrete execution and abstract interpretation, including the
+region convention used by `scf.for`.
 
 ### Example 3: Generated Concrete Interpreter
 
 ```text
-interpreter simple_arith_concrete:
-  ir: SimpleArithIR
+interpreter loop_arith_concrete:
+  ir: LoopArithIR
   levels: ConcreteCall, ConcreteValue
   dispatch:
     FuncOp          -> ConcreteCall SemanticDef
     ArithConstantOp -> ConcreteValue SemanticDef
+    ArithIndexCastOp -> ConcreteValue SemanticDef
     ArithAddiOp     -> ConcreteValue SemanticDef
+    ScfForOp        -> ConcreteValue SemanticDef
+    ScfYieldOp      -> ConcreteValue SemanticDef
     FuncReturnOp    -> ConcreteValue SemanticDef
     CallableRegion  -> ConcreteCall SemanticDef
+    ForBodyRegion   -> ConcreteValue SemanticDef
 ```
 
 Run evidence:
 
 ```text
-call add_one(41)
-seed  ValueConcrete(%x, 41)
-apply ArithConstantOp -> ValueConcrete(%c1, 1)
-apply ArithAddiOp     -> ValueConcrete(%y, 42)
-apply FuncReturnOp    -> RegionReturned(values=(42,))
-return 42
+call sum_to_n(5)
+seed  ValueConcrete(%n, 5)
+apply constants       -> ValueConcrete(%c0_i, 0), ValueConcrete(%c1_i, 1),
+                         ValueConcrete(%c0, 0)
+apply ScfForOp        -> run body for i=0,1,2,3,4
+apply ArithIndexCastOp/ArithAddiOp in each body execution
+apply ScfYieldOp      -> RegionReturned(loop.body, carried=...)
+apply FuncReturnOp    -> RegionReturned(func.body, values=(10,))
+return 10
 ```
 
 Feature shown: a concrete interpreter can be generated from selected
@@ -1197,7 +1223,7 @@ semantic definitions. Their definitions orchestrate region execution and
 loop-carried state, while child operations still use normal typed semantic
 dispatch.
 
-Verification mapping: `sum_to_for(5) -> 10` evidence records `ScfForOp`
+Verification mapping: `sum_to_n(5) -> 10` evidence records `ScfForOp`
 lookup, five body-region executions, five `scf.yield` result events, and the
 final carried value. Abstract-loop evidence records the selected join/widening
 policy.
@@ -1274,7 +1300,7 @@ intellic/ir/semantics/
   registry.py        # typed owner/level registration and resolution policies
   interpreter.py     # generated dispatch over selected SemanticDef records
   regions.py         # RegionRunResult and control-region runner contracts
-  builtin.py         # builtin/func/arith first-slice semantic definitions
+  builtin.py         # builtin/func/arith/scf first-slice semantic definitions
 ```
 
 Minimal first-slice relation schemas:
@@ -1282,10 +1308,12 @@ Minimal first-slice relation schemas:
 ```text
 ValueConcrete(subject: ValueId, value: PythonValue)
 ValueRange(subject: ValueId, lower: int, upper: int)
+ValueConcreteTuple(subjects: tuple[ValueId, ...], values: tuple[PythonValue, ...])
 Evaluated(op: OperationId, results: tuple[ValueId, ...])
 RegionEntered(region: RegionId, inputs: tuple[ValueId, ...])
 RegionReturned(region: RegionId, values: tuple[PythonValue, ...])
 RegionResult(region: RegionId, values: tuple[PythonValue, ...])
+LoopIteration(op: OperationId, index: PythonValue, inputs, yielded)
 Diagnostic(subject: SyntaxId, severity, message, evidence)
 EvidenceLink(subject: SyntaxId | TraceRecordId, artifact)
 ```
@@ -1313,6 +1341,8 @@ First-slice failure tests:
   lookup.
 - `current` projection hides retracted facts while `history` still exposes them.
 - `func.return` outside a valid region convention is rejected.
+- `scf.for` rejects mismatched iter-arg/yield/result counts and invalid step
+  values before committing result facts.
 
 ## Planned Verification Evidence
 
@@ -1320,11 +1350,11 @@ First-slice failure tests:
   the first equality-saturation action; egg and egglog remain references for
   later engine choices.
 - Semantic registry evidence for typed owner/level lookup on
-  `ArithConstantOp`, `ArithAddiOp`, `FuncReturnOp`, and the `simple_arith_ir`
-  definition set.
+  `ArithConstantOp`, `ArithIndexCastOp`, `ArithAddiOp`, `ScfForOp`,
+  `ScfYieldOp`, `FuncReturnOp`, and the `loop_arith_ir` definition set.
 - Polymorphic lookup evidence showing exact operation semantics overriding a
   typed interface fallback without using string operation names.
-- Generated-interpreter evidence for `add_one(41) -> 42`, including selected
+- Generated-interpreter evidence for `sum_to_n(5) -> 10`, including selected
   definitions, dispatch table, seeded facts, and returned region result.
 - Control-operation evidence for `scf.for` and `scf.while`, including child
   region invocations, terminator facts, loop-carried values, and any fuel,

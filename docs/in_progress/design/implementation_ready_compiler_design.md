@@ -64,29 +64,38 @@ surfaces:
    transaction boundaries, pending mutation intents, symbolic Python control
    flow rejection, and strict parser rejection.
 5. Example-to-test mapping: every example in the accepted design maps to a
-   named test class, fixture, or manual evidence artifact.
+   named test class, fixture, or manual evidence artifact. Primary examples must
+   be challenging enough to force nested regions, loop-carried values, TraceDB
+   facts, and action-driven mutation to cooperate.
 6. Deferred work: clear boundaries for declarative op definitions, full custom
    assembly, advanced eqsat, C++ ABI, and broad agent workflows.
 
 ## Examples
 
-- Example: construct `arith.constant`, `arith.addi`, and `func.return` through
+- Example: construct `sum_to_n` with `scf.for_`, loop-carried `iter_args`,
+  `arith.index_cast`, `arith.addi`, `scf.yield_`, and `func.return_` through
   Python builders.
-- Feature shown: syntax object creation, active insertion point, use-list
-  updates, construction evidence, and structural verification.
+- Feature shown: syntax object creation, nested region ownership, active
+  insertion points, block arguments, use-list updates, loop result ownership,
+  construction evidence, and structural verification.
 - Verification mapping: `tests/test_syntax_builder.py` with assertions for
-  operation order, result ownership, operand uses, and expected failure when no
-  insertion point exists.
+  operation order, nested region/block parentage, loop-carried
+  argument/result/yield counts, result ownership, operand uses, and expected
+  failure when no insertion point exists.
 
-- Example: register concrete and abstract semantics for `arith.addi`.
+- Example: register concrete semantics for `arith.constant`, `arith.index_cast`,
+  `arith.addi`, `scf.for`, `scf.yield`, and `func.return`.
 - Feature shown: typed operation owner, typed level keys, registry conflict
-  checks, and TraceDB fact writes.
+  checks, TraceDB fact writes, child-region execution, and loop-carried value
+  updates.
 - Verification mapping: `tests/test_semantic_registry.py` and
-  `tests/test_trace_db.py` with conflict and missing-fact cases.
+  `tests/test_trace_db.py` with `sum_to_n(5) -> 10`, conflict,
+  missing-fact, bad step, and mismatched-yield cases.
 
-- Example: run add-zero canonicalization as a `Fixed` compiler action.
-- Feature shown: match records, mutation intents, mutator stage, and pending
-  record gate.
+- Example: run add-zero canonicalization inside the `scf.for` body as a `Fixed`
+  compiler action.
+- Feature shown: nested-region match records, mutation intents, mutator stage,
+  use-list preservation, loop-yield preservation, and pending record gate.
 - Verification mapping: `tests/test_actions.py` with successful replacement,
   rejected replacement, and pending-intent failure cases.
 

@@ -578,15 +578,23 @@ No separate gate subsystem is needed unless implementation proves otherwise.
 ### Example 1: Rewrite As Fixed Action
 
 ```text
-action add-zero-canonicalize kind=Fixed
+variant fixture:
+  scf.for body contains:
+    %zero = arith.constant 0 : i32
+    %same = arith.addi %total, %zero : i32
+    %next = arith.addi %same, %i_i32 : i32
+    scf.yield %next : i32
+
+action loop-body-add-zero-canonicalize kind=Fixed
   match:
-    find arith.addi(%x, %zero)
+    find arith.addi(%total, %zero) inside an scf.for body
     read ConstValue(%zero, 0)
-    write MatchRecord(match_id=m1, bindings=(add=%add, lhs=%x, rhs=%zero))
+    write MatchRecord(match_id=m1,
+      bindings=(loop=%loop, add=%same, lhs=%total, rhs=%zero))
 
   apply:
-    write MutationIntent.ReplaceUses(intent=i1, old=%add.result, new=%x)
-    write RewriteEvidence(rule=add-zero, match=m1)
+    write MutationIntent.ReplaceUses(intent=i1, old=%same.result, new=%total)
+    write RewriteEvidence(rule=add-zero, match=m1, scope=scf.for.body)
 
   stages:
     MutatorStage consumes i1 -> MutationApplied(i1)
@@ -594,10 +602,12 @@ action add-zero-canonicalize kind=Fixed
 ```
 
 Feature shown: rewrite actions record a mutation intent; mutation happens only
-in the mutator stage.
+in the mutator stage. The challenging case proves matching inside nested regions
+and preserving loop-carried uses after mutation.
 
 Verification mapping: evidence checks match record, mutation intent,
-mutation-applied record, and absence of pending intents.
+mutation-applied record, preserved `scf.yield` operand ownership, and absence of
+pending intents.
 
 ### Example 2: Analysis As Fixed Action
 

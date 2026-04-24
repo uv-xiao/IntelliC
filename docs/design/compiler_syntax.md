@@ -259,8 +259,14 @@ Contracts:
 
 ```python
 @func.ir_function
-def add_one(x: i32) -> i32:
-    return x + 1
+def sum_to_n(n: index) -> i32:
+    zero_i = arith.constant(0, index)
+    one_i = arith.constant(1, index)
+    zero = arith.constant(0, i32)
+    with scf.for_(zero_i, n, one_i, iter_args=(zero,)) as loop:
+        i, total = loop.arguments
+        scf.yield_(arith.addi(total, arith.index_cast(i, i32)))
+    return loop.results[0]
 ```
 
 Staging contract:
@@ -445,19 +451,29 @@ the architecture after copying.
 
 ```mlir
 "builtin.module"() ({
-  func.func @add_one(%x: i32) -> i32 {
-    %c1 = arith.constant 1 : i32
-    %y = arith.addi %x, %c1 : i32
-    func.return %y : i32
+  func.func @sum_to_n(%n: index) -> i32 {
+    %c0_i = arith.constant 0 : index
+    %c1_i = arith.constant 1 : index
+    %c0 = arith.constant 0 : i32
+    %sum = scf.for %i = %c0_i to %n step %c1_i
+        iter_args(%total = %c0) -> (i32) {
+      %i32 = arith.index_cast %i : index to i32
+      %next = arith.addi %total, %i32 : i32
+      scf.yield %next : i32
+    }
+    func.return %sum : i32
   }
 }) : () -> ()
 ```
 
 Feature shown: examples use existing MLIR-style dialect names, not
-infrastructure-name-prefixed placeholder operations.
+infrastructure-name-prefixed placeholder operations. The canonical text also
+contains nested regions, loop-carried block arguments, and a terminator, so it
+exercises more than straight-line operation parsing.
 
 Verification mapping: `ir_parser` parses the module; printer emits canonical
-MLIR/xDSL-compatible text; focused reread checks dialect names.
+MLIR/xDSL-compatible text; focused reread checks dialect names and region
+syntax.
 
 ### Example 2: Python Surface Constructs IR Without Parsing
 
@@ -465,17 +481,27 @@ Surface:
 
 ```python
 @func.ir_function
-def add_one(x: i32) -> i32:
-    return x + 1
+def sum_to_n(n: index) -> i32:
+    zero_i = arith.constant(0, index)
+    one_i = arith.constant(1, index)
+    zero = arith.constant(0, i32)
+
+    with scf.for_(zero_i, n, one_i, iter_args=(zero,)) as loop:
+        i, total = loop.arguments
+        scf.yield_(arith.addi(total, arith.index_cast(i, i32)))
+
+    return loop.results[0]
 ```
 
 Construction flow:
 
 ```text
 func.ir_function
-  -> create symbolic block argument %x: i32
+  -> create symbolic block argument %n: index
   -> execute Python body under insertion context
-  -> Value.__add__ lowers x + 1 through arith builders
+  -> scf.for_ creates a nested body region and loop-carried arguments
+  -> arith builders construct index_cast and addi in the loop body
+  -> scf.yield_ terminates the body region
   -> native Sy objects
   -> ir_parser round-trip
   -> Sy structural verifier
@@ -485,7 +511,8 @@ Feature shown: the Python surface composes builders, decorators, and value
 hooks instead of a Python source parser. The IR parser stays strict.
 
 Verification mapping: construction evidence maps builder/decorator calls to
-emitted operations, and round-trip evidence checks the strict IR parser.
+emitted operations, including nested region construction, and round-trip
+evidence checks the strict IR parser.
 
 ### Example 3: Symbolic Control Flow Is Explicit
 
@@ -493,21 +520,29 @@ Surface:
 
 ```python
 @func.ir_function
-def abs_i32(x: i32) -> i32:
-    with scf.if_(x > 0, result_types=(i32,)) as if_:
-        with if_.then():
-            scf.yield_(x)
-        with if_.else_():
-            scf.yield_(arith.neg(x))
-    return if_.result
+def sum_to_n(n: index) -> i32:
+    zero_i = arith.constant(0, index)
+    one_i = arith.constant(1, index)
+    zero = arith.constant(0, i32)
+
+    with scf.for_(zero_i, n, one_i, iter_args=(zero,)) as loop:
+        i, total = loop.arguments
+        total_next = arith.addi(total, arith.index_cast(i, i32))
+        scf.yield_(total_next)
+
+    return loop.results[0]
 ```
 
-Feature shown: symbolic conditions use IR region builders. The design does not
-try to parse Python `if x > 0:` or reinterpret host Python control flow.
+Feature shown: symbolic control flow uses IR region builders. The design does not
+try to parse Python `for` loops or reinterpret host Python control flow. The
+`scf.for_` helper explicitly creates the operation, body region, induction
+variable block argument, loop-carried block arguments, `scf.yield`, and loop
+results.
 
-Verification mapping: construction evidence shows `scf.if` owns two regions,
-branch terminators are present, and structural verification checks region
-ownership.
+Verification mapping: construction evidence shows `scf.for` owns one body
+region, block argument order is `(iv, iter_args...)`, `scf.yield` value count
+matches loop result count, and structural verification checks loop-carried
+argument/result ownership.
 
 ### Example 4: Named Builders Are The Ground Truth
 
@@ -515,18 +550,25 @@ Surface:
 
 ```python
 @func.ir_function
-def add_one_explicit(x: i32) -> i32:
-    c1 = arith.constant(1, i32)
-    y = arith.addi(x, c1)
-    return y
+def sum_to_n_explicit(n: index) -> i32:
+    zero_i = arith.constant(0, index)
+    one_i = arith.constant(1, index)
+    zero = arith.constant(0, i32)
+    with scf.for_(zero_i, n, one_i, iter_args=(zero,)) as loop:
+        i, total = loop.arguments
+        i32 = arith.index_cast(i, i32)
+        next_total = arith.addi(total, i32)
+        scf.yield_(next_total)
+    return loop.results[0]
 ```
 
 Feature shown: operator sugar is optional. The named builder path remains the
-canonical Python construction API and is the fallback when an operator hook is
-ambiguous or unavailable.
+canonical Python construction API and is the fallback when an operator hook or
+region helper shortcut is ambiguous or unavailable.
 
-Verification mapping: construction evidence records the `arith.constant` and
-`arith.addi` builder calls and maps them to emitted operations.
+Verification mapping: construction evidence records the `arith.constant`,
+`arith.index_cast`, `arith.addi`, `scf.for_`, and `scf.yield_` builder calls and
+maps them to emitted operations.
 
 ## First Syntax Implementation Slice
 
@@ -539,11 +581,12 @@ IntelliC APIs.
 ```text
 Input:
   Canonical MLIR/xDSL-compatible IR text using builtin.module, func.func,
-  func.return, arith.constant, arith.addi, simple blocks, and block arguments
+  func.return, arith.constant, arith.addi, arith.index_cast, scf.for,
+  scf.yield, simple blocks, loop-carried block arguments, and nested regions
 
   Python construction API examples using builtin.module, func.ir_function,
-  func.return_, arith.constant, arith.addi, Value.__add__, and construction
-  evidence
+  func.return_, arith.constant, arith.addi, arith.index_cast, scf.for_,
+  scf.yield_, Value.__add__, and construction evidence
 
 Output:
   Native Sy object graph with Operation, Region, Block, Value, Use, Type,
@@ -558,7 +601,8 @@ Verification:
   printer/parser round-trip preserves structure and operation identities
   structural verifier checks parent links, region ownership, block arguments,
   use lists, result types, and terminators
-  Python builders/decorator produce the same structural IR as the canonical text
+  Python builders/decorator produce the same structural IR as the canonical text,
+  including nested `scf.for` regions and loop-carried block arguments
   construction evidence maps each Python builder call to emitted operations
   negative parser and builder diagnostics are exercised
 ```
@@ -567,13 +611,15 @@ Included in the first slice:
 
 - xDSL-derived `Operation`, `Region`, `Block`, `Value`, `Use`, `Type`,
   `Attribute`, `Context`, `Dialect`, parser, printer, and structural verifier.
-- Builtin, func, and arith syntax sufficient for examples.
+- Builtin, func, arith, and minimal scf syntax sufficient for examples.
 - Generic operation parsing/printing and the small selected custom forms needed
   for examples.
 - Builder and insertion-point APIs.
-- `func.ir_function` staging for straight-line functions.
+- `func.ir_function` staging for straight-line functions and the first
+  `scf.for_` loop-carried example.
 - Named builders for `builtin.module`, `func.func`, `func.return_`,
-  `arith.constant`, and `arith.addi`.
+  `arith.constant`, `arith.addi`, `arith.index_cast`, `scf.for_`, and
+  `scf.yield_`.
 - Basic operator sugar for `Value.__add__` when the active construction policy maps it to
   `arith.addi`.
 - Construction evidence for builder/decorator/operator-hook calls.
@@ -581,7 +627,8 @@ Included in the first slice:
 Still follow-up work:
 
 - Full MLIR/xDSL custom assembly coverage beyond the selected example forms.
-- `scf.if_`, `cf.br`, comparison hooks, and broader region helper coverage.
+- `scf.if_`, `cf.br`, comparison hooks, and broader region helper coverage
+  beyond the first `scf.for_` loop-carried proof point.
 - Declarative operation-definition machinery.
 - Semantic execution, pass scheduling, and action database history.
 - Backend lowering.
