@@ -41,6 +41,8 @@ def _collect_syntax(
     operations[op.id] = {
         "operands": tuple(operand.id for operand in op.operands),
         "parent": getattr(op.parent, "id", None),
+        "properties": dict(op.properties),
+        "attributes": dict(op.attributes),
     }
     for result in op.results:
         uses[result.id] = tuple((use.owner.id, use.operand_index) for use in result.uses)
@@ -79,6 +81,20 @@ def _direct_mutation_violation(
                 "operation": op_id,
                 "before": before_op["parent"],
                 "after": after_op["parent"],
+            }
+        if before_op["properties"] != after_op["properties"]:
+            return {
+                "kind": "properties_changed",
+                "operation": op_id,
+                "before": before_op["properties"],
+                "after": after_op["properties"],
+            }
+        if before_op["attributes"] != after_op["attributes"]:
+            return {
+                "kind": "attributes_changed",
+                "operation": op_id,
+                "before": before_op["attributes"],
+                "after": after_op["attributes"],
             }
     for block_id, before_ops in before["blocks"].items():
         after_ops = after["blocks"].get(block_id)

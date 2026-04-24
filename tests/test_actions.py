@@ -2,7 +2,7 @@ import unittest
 
 from intellic.ir.actions import CompilerAction, MutationIntent, MutatorStage, PendingRecordGate, PipelineRun, passes
 from intellic.ir.dialects import affine, arith, builtin, func, scf
-from intellic.ir.syntax import Block, Builder, Operation, Region, i32, index
+from intellic.ir.syntax import Attribute, Block, Builder, Operation, Region, i32, index
 
 
 class ActionTests(unittest.TestCase):
@@ -49,6 +49,55 @@ class ActionTests(unittest.TestCase):
         violation = run.db.require("DirectMutationViolation", "bad-direct-mutation").value
         self.assertEqual(violation["before"], old_rhs.results[0].id)
         self.assertEqual(violation["after"], new_rhs.results[0].id)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_direct_property_mutation_is_rejected(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            const = builder.insert(arith.constant(7, i32))
+        run = PipelineRun(module)
+
+        action = CompilerAction(
+            "bad-property-mutation",
+            lambda current_run: const.properties.__setitem__("value", 8),
+        )
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-property-mutation").value
+        self.assertEqual(violation["kind"], "properties_changed")
+        self.assertEqual(violation["before"]["value"], 7)
+        self.assertEqual(violation["after"]["value"], 8)
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_direct_attribute_mutation_is_rejected(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            op = builder.insert(
+                Operation.create(
+                    "test.with_attr",
+                    attributes={"tag": Attribute("tag", "before")},
+                )
+            )
+        run = PipelineRun(module)
+
+        action = CompilerAction(
+            "bad-attribute-mutation",
+            lambda current_run: op.attributes.__setitem__("tag", Attribute("tag", "after")),
+        )
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-attribute-mutation").value
+        self.assertEqual(violation["kind"], "attributes_changed")
+        self.assertEqual(violation["before"]["tag"], Attribute("tag", "before"))
+        self.assertEqual(violation["after"]["tag"], Attribute("tag", "after"))
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 
