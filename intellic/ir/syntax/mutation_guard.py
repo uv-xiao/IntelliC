@@ -258,5 +258,5 @@ class GuardedList(MutableSequence):
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Iterable):
-            return self._data == list(other)
+            return self._data == tuple(other)
         return False

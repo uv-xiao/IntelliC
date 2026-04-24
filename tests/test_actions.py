@@ -635,6 +635,38 @@ class ActionTests(unittest.TestCase):
         intent = run.db.require("MutationIntent", duplicate.id).value
         self.assertEqual(intent.kind, "replace_uses_and_erase")
 
+    def test_cse_does_not_merge_affine_apply_with_different_maps(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        first_map = affine.AffineMap(1, 0, ("d0",))
+        second_map = affine.AffineMap(1, 0, ("d0 + 1",))
+        with Builder().insert_at_end(block) as builder:
+            dim = builder.insert(arith.constant(3, index)).results[0]
+            first_apply = builder.insert(affine.apply(first_map, (dim,), ()))
+            second_apply = builder.insert(affine.apply(second_map, (dim,), ()))
+        run = PipelineRun(module)
+
+        passes.common_subexpression_elimination().run(run)
+
+        self.assertEqual(run.db.query("MutationIntent", first_apply.id), ())
+        self.assertEqual(run.db.query("MutationIntent", second_apply.id), ())
+
+    def test_cse_merges_affine_apply_with_same_map_and_operands(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        map_ = affine.AffineMap(1, 0, ("d0 + 1",))
+        with Builder().insert_at_end(block) as builder:
+            dim = builder.insert(arith.constant(3, index)).results[0]
+            representative = builder.insert(affine.apply(map_, (dim,), ()))
+            duplicate = builder.insert(affine.apply(map_, (dim,), ()))
+        run = PipelineRun(module)
+
+        passes.common_subexpression_elimination().run(run)
+
+        intent = run.db.require("MutationIntent", duplicate.id).value
+        self.assertEqual(intent.kind, "replace_uses_and_erase")
+        self.assertIs(intent.replacement, representative.results[0])
+
     def test_cse_records_memory_read_evidence_for_affine_load_without_erasing_it(self) -> None:
         block = Block()
         module = builtin.module(Region.from_block_list([block]))

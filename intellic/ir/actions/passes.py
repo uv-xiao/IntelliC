@@ -342,7 +342,14 @@ def _constant_value(value) -> object | None:
 def _cse_key(op: Operation) -> tuple | None:
     if op.name == "arith.constant":
         return (op.name, op.properties["value"], tuple(result.type for result in op.results))
-    if op.name in {"arith.addi", "arith.index_cast", "affine.apply"}:
+    if op.name == "affine.apply":
+        return (
+            op.name,
+            op.properties.get("map"),
+            tuple(id(operand) for operand in op.operands),
+            tuple(result.type for result in op.results),
+        )
+    if op.name in {"arith.addi", "arith.index_cast"}:
         return (op.name, tuple(id(operand) for operand in op.operands), tuple(result.type for result in op.results))
     return None
 

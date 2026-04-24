@@ -42,6 +42,20 @@ class SyntaxCoreTests(unittest.TestCase):
             with builder.insert_at_end(Block()):
                 builder.insert(op)
 
+    def test_guarded_operation_lists_compare_equal_to_normal_sequences(self) -> None:
+        block = Block()
+        first = Operation.create("arith.constant", result_types=(Type("index"),))
+        second = Operation.create("arith.constant", result_types=(Type("index"),))
+
+        builder = Builder()
+        with builder.insert_at_end(block):
+            builder.insert(first)
+            builder.insert(second)
+
+        self.assertEqual(block._operations, [first, second])
+        self.assertEqual(block._operations, (first, second))
+        self.assertEqual(block._operations, block._operations)
+
     def test_operand_replacement_maintains_use_lists(self) -> None:
         i32 = Type("i32")
         lhs = Operation.create("arith.constant", result_types=(i32,))
