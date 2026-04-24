@@ -108,7 +108,7 @@ tests/test_examples.py
 **Implementation**
 
 - Add minimal project metadata with package name `intellic`, Python
-  requirement `>=3.11`, and no runtime dependencies.
+  requirement `>=3.10`, and no runtime dependencies.
 - Export a package version string from `intellic/__init__.py`.
 - Keep imports side-effect free.
 

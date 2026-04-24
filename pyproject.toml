@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "intellic"
 version = "0.1.0"
 description = "Intelligent compiler infrastructure"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = []
 
 [tool.setuptools.packages.find]

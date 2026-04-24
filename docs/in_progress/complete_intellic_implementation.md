@@ -20,7 +20,7 @@ prove the system works end to end.
 
 - [x] Define input, output, and verification criteria
 - [x] Implement minimal package and verification tooling
-- [ ] Implement `intellic.ir.syntax` identity, ownership, use-list, builder, and
+- [x] Implement `intellic.ir.syntax` identity, ownership, use-list, builder, and
   verifier contracts
 - [ ] Implement first-slice dialects: builtin, func, arith, full SCF contracts,
   affine contracts, and minimal memref/vector type substrate
@@ -120,6 +120,13 @@ Batch 1 verification:
 python -c "import intellic; print(intellic.__version__)"
 python -m unittest tests/test_imports.py
 python scripts/check_repo_harness.py
+python -m unittest discover -s tests
+```
+
+Batch 2 verification:
+
+```bash
+python -m unittest tests/test_syntax_core.py
 python -m unittest discover -s tests
 ```
 
