@@ -33,7 +33,7 @@ class Region:
     def __init__(self, blocks: Iterable[Block] = ()) -> None:
         self.id = SyntaxId.fresh()
         self.parent: object | None = None
-        self._blocks: list[Block] = []
+        self._blocks: list[Block] = GuardedList(self, "_blocks")
         for block in blocks:
             self.append_block(block)
 

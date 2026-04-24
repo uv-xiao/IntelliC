@@ -42,15 +42,17 @@ class CompilerAction:
 
 def _syntax_snapshot(root: Operation) -> dict[str, dict[object, object]]:
     operations: dict[object, object] = {}
+    regions: dict[object, object] = {}
     blocks: dict[object, object] = {}
     uses: dict[object, object] = {}
-    _collect_syntax(root, operations, blocks, uses)
-    return {"operations": operations, "blocks": blocks, "uses": uses}
+    _collect_syntax(root, operations, regions, blocks, uses)
+    return {"operations": operations, "regions": regions, "blocks": blocks, "uses": uses}
 
 
 def _collect_syntax(
     op: Operation,
     operations: dict[object, object],
+    regions: dict[object, object],
     blocks: dict[object, object],
     uses: dict[object, object],
 ) -> None:
@@ -63,10 +65,11 @@ def _collect_syntax(
     for result in op.results:
         uses[result.id] = tuple((use.owner.id, use.operand_index) for use in result.uses)
     for region in op.regions:
+        regions[region.id] = tuple(block.id for block in region.blocks)
         for block in region.blocks:
             blocks[block.id] = tuple(child.id for child in block.operations)
             for child in block.operations:
-                _collect_syntax(child, operations, blocks, uses)
+                _collect_syntax(child, operations, regions, blocks, uses)
 
 
 def _direct_mutation_violation(
@@ -116,6 +119,10 @@ def _direct_mutation_violation(
         after_ops = after["blocks"].get(block_id)
         if before_ops != after_ops:
             return {"kind": "block_operations_changed", "block": block_id}
+    for region_id, before_blocks in before["regions"].items():
+        after_blocks = after["regions"].get(region_id)
+        if before_blocks != after_blocks:
+            return {"kind": "region_blocks_changed", "region": region_id}
     for value_id, before_uses in before["uses"].items():
         after_uses = after["uses"].get(value_id)
         if before_uses != after_uses:
@@ -129,4 +136,6 @@ def _direct_mutation_violation(
         return {"kind": "operation_set_changed"}
     if set(before["blocks"]) != set(after["blocks"]):
         return {"kind": "block_set_changed"}
+    if set(before["regions"]) != set(after["regions"]):
+        return {"kind": "region_set_changed"}
     return None

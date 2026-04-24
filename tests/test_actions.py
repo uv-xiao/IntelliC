@@ -178,6 +178,50 @@ class ActionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 
+    def test_action_apply_raw_region_block_reorder_is_rejected(self) -> None:
+        first_block = Block()
+        second_block = Block()
+        region = Region.from_block_list([first_block, second_block])
+        module = builtin.module(region)
+        run = PipelineRun(module)
+
+        action = CompilerAction(
+            "bad-region-block-reorder",
+            lambda current_run: region._blocks.reverse(),
+        )
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-region-block-reorder").value
+        self.assertEqual(violation["kind"], "region_blocks_changed")
+        self.assertEqual(region.blocks, (second_block, first_block))
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_transient_raw_region_block_reorder_is_rejected(self) -> None:
+        first_block = Block()
+        second_block = Block()
+        region = Region.from_block_list([first_block, second_block])
+        module = builtin.module(region)
+        run = PipelineRun(module)
+
+        def reorder_then_restore(current_run):
+            region._blocks.reverse()
+            region._blocks.reverse()
+
+        action = CompilerAction("bad-transient-region-block-reorder", reorder_then_restore)
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-transient-region-block-reorder").value
+        self.assertEqual(violation["kind"], "mutation_attempt")
+        self.assertIn("region_blocks_reorder", violation["attempts"])
+        self.assertEqual(region.blocks, (first_block, second_block))
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
     def test_action_apply_direct_attribute_mutation_is_rejected(self) -> None:
         block = Block()
         module = builtin.module(Region.from_block_list([block]))
