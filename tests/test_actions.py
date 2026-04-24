@@ -1,8 +1,8 @@
 import unittest
 
 from intellic.ir.actions import MutatorStage, PendingRecordGate, PipelineRun, passes
-from intellic.ir.dialects import arith, builtin
-from intellic.ir.syntax import Block, Builder, Region, i32
+from intellic.ir.dialects import affine, arith, builtin, func, scf
+from intellic.ir.syntax import Block, Builder, Region, i32, index
 
 
 class ActionTests(unittest.TestCase):
@@ -39,7 +39,31 @@ class ActionTests(unittest.TestCase):
         passes.common_subexpression_elimination().run(run)
 
         intent = run.db.require("MutationIntent", duplicate.id).value
-        self.assertEqual(intent.kind, "erase_op")
+        self.assertEqual(intent.kind, "replace_uses_and_erase")
+
+    def test_cse_replaces_duplicate_result_uses_before_erasing(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            representative = builder.insert(arith.constant(1, i32))
+            duplicate = builder.insert(arith.constant(1, i32))
+            user = builder.insert(arith.addi(duplicate.results[0], representative.results[0]))
+        run = PipelineRun(module)
+
+        passes.common_subexpression_elimination().run(run)
+        intent = run.db.require("MutationIntent", duplicate.id).value
+
+        self.assertEqual(intent.kind, "replace_uses_and_erase")
+        self.assertIs(intent.replacement, representative.results[0])
+
+        MutatorStage().run(run)
+
+        self.assertNotIn(duplicate, block.operations)
+        self.assertIs(user.operands[0], representative.results[0])
+        self.assertEqual(duplicate.results[0].uses, ())
+        self.assertTrue(
+            any(use.owner is user and use.operand_index == 0 for use in representative.results[0].uses)
+        )
 
     def test_constant_propagation_records_constant_facts(self) -> None:
         block = Block()
@@ -70,6 +94,124 @@ class ActionTests(unittest.TestCase):
         self.assertIn("verify-structure", action_names)
         self.assertIn("inline-single-call", action_names)
         self.assertIn("lower-affine-to-scf", action_names)
+
+    def test_symbol_dce_records_liveness_and_erases_unused_pure_ops(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            dead = builder.insert(arith.constant(9, i32))
+        run = PipelineRun(module)
+
+        passes.symbol_dce_and_dead_code().run(run)
+
+        self.assertEqual(run.db.require("DeadCodeCandidate", dead.id).value["reason"], "unused pure op")
+        self.assertEqual(run.db.require("MutationIntent", dead.id).value.kind, "erase_op")
+
+        MutatorStage().run(run)
+
+        self.assertNotIn(dead, block.operations)
+
+    def test_inline_single_call_records_callgraph_and_inline_intent(self) -> None:
+        module_block = Block()
+        module = builtin.module(Region.from_block_list([module_block]))
+        callee_type = func.FunctionType(inputs=(i32,), results=(i32,))
+
+        callee_block = Block(arg_types=(i32,))
+        callee_region = Region.from_block_list([callee_block])
+        with Builder().insert_at_end(callee_block) as builder:
+            builder.insert(func.return_(callee_block.arguments[0]))
+        callee = func.func("identity", callee_type, callee_region)
+
+        caller_block = Block(arg_types=(i32,))
+        caller_region = Region.from_block_list([caller_block])
+        with Builder().insert_at_end(caller_block) as builder:
+            call = builder.insert(func.call("identity", (caller_block.arguments[0],), callee_type))
+            builder.insert(func.return_(call.results[0]))
+        caller = func.func("caller", callee_type, caller_region)
+
+        with Builder().insert_at_end(module_block) as builder:
+            builder.insert(callee)
+            builder.insert(caller)
+        run = PipelineRun(module)
+
+        passes.inline_single_call().run(run)
+
+        self.assertEqual(run.db.require("CallGraphEdge", call.id).value["callee"], callee.id)
+        inline = run.db.require("InlineIntent", call.id).value
+        self.assertEqual(inline["callee"], callee.id)
+        self.assertEqual(inline["strategy"], "single-return-forward")
+
+    def test_loop_invariant_code_motion_records_loop_scope_and_candidate(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            lower = builder.insert(arith.constant(0, index)).results[0]
+            upper = builder.insert(arith.constant(8, index)).results[0]
+            step = builder.insert(arith.constant(1, index)).results[0]
+
+        body_block = Block(arg_types=(index,))
+        body = Region.from_block_list([body_block])
+        with Builder().insert_at_end(body_block) as builder:
+            invariant = builder.insert(arith.constant(4, i32))
+            builder.insert(scf.yield_())
+
+        with Builder().insert_at_end(block) as builder:
+            loop = builder.insert(scf.for_(lower, upper, step, body=body))
+        run = PipelineRun(module)
+
+        passes.loop_invariant_code_motion().run(run)
+
+        self.assertEqual(run.db.require("LoopScope", loop.id).value["kind"], "scf.for")
+        move = run.db.require("LoopInvariantCandidate", invariant.id).value
+        self.assertEqual(move["loop"], loop.id)
+        self.assertEqual(move["action"], "would_move_before_loop")
+
+    def test_lower_affine_to_scf_records_dim_symbol_mapping_for_affine_apply(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            dim = builder.insert(arith.constant(3, index)).results[0]
+            symbol = builder.insert(arith.constant(5, index)).results[0]
+            affine_apply = builder.insert(
+                affine.apply(affine.AffineMap(1, 1, ("d0 + s0",)), (dim,), (symbol,))
+            )
+        run = PipelineRun(module)
+
+        passes.lower_affine_to_scf().run(run)
+
+        mapping = run.db.require("AffineDimSymbolMapping", affine_apply.id).value
+        expansion = run.db.require("AffineExpansion", affine_apply.id).value
+        self.assertEqual(mapping["dims"], (dim.id,))
+        self.assertEqual(mapping["symbols"], (symbol.id,))
+        self.assertEqual(expansion["results"], ("d0 + s0",))
+
+    def test_normalize_affine_loops_records_normalized_bounds(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        lower = affine.AffineMap(0, 0, ("0",))
+        upper = affine.AffineMap(0, 0, ("16",))
+        loop_body = Region.from_block_list([Block()])
+        with Builder().insert_at_end(block) as builder:
+            loop = builder.insert(affine.for_(lower, upper, 4, (), loop_body))
+        run = PipelineRun(module)
+
+        passes.normalize_and_simplify_affine_loops().run(run)
+
+        bounds = run.db.require("AffineLoopBounds", loop.id).value
+        band = run.db.require("AffineLoopBand", loop.id).value
+        normalized = run.db.require("AffineNormalizedBounds", loop.id).value
+        self.assertEqual(bounds["step"], 4)
+        self.assertEqual(band["loops"], (loop.id,))
+        self.assertEqual(normalized["lower"], ("0",))
+        self.assertEqual(normalized["upper"], ("16",))
+
+    def test_pending_record_gate_records_success_after_mutations_are_consumed(self) -> None:
+        module = builtin.module(Region.from_block_list([Block()]))
+        run = PipelineRun(module)
+
+        PendingRecordGate().run(run)
+
+        self.assertEqual(run.db.require("PendingRecordGate", module.id).value["status"], "passed")
 
 
 if __name__ == "__main__":
