@@ -1,10 +1,23 @@
 from __future__ import annotations
 
+from dataclasses import fields, is_dataclass
 from typing import Any
 
-from .attribute import Attribute
 from .operation import Operation
 from .value import Value
+
+
+_OBJECT_PROPERTY_TYPES = frozenset(
+    (
+        "intellic.ir.syntax.attribute.Attribute",
+        "intellic.ir.syntax.type.Type",
+        "intellic.ir.dialects.affine.AffineMap",
+        "intellic.ir.dialects.affine.AffineSet",
+        "intellic.ir.dialects.func.FunctionType",
+        "intellic.ir.dialects.memref.MemRefType",
+        "intellic.ir.dialects.vector.VectorType",
+    )
+)
 
 
 class _Printer:
@@ -54,7 +67,6 @@ class _Printer:
         properties = {
             key: _encode_property(value)
             for key, value in sorted(op.properties.items())
-            if _is_printable_property(value)
         }
         if not properties:
             return ""
@@ -78,26 +90,20 @@ def print_operation(op: Operation) -> str:
     return _Printer().print_operation(op)
 
 
-def _is_printable_property(value: Any) -> bool:
-    if value is None or isinstance(value, (bool, int, str)):
-        return True
-    if isinstance(value, Attribute):
-        return _is_printable_property(value.value)
-    if isinstance(value, tuple):
-        return all(_is_printable_property(element) for element in value)
-    return False
-
-
 def _encode_property(value: Any) -> Any:
     if value is None or isinstance(value, (bool, int, str)):
         return value
-    if isinstance(value, Attribute):
-        return {
-            "__intellic_attribute__": (
-                value.name,
-                _encode_property(value.value),
-            )
-        }
     if isinstance(value, tuple):
         return tuple(_encode_property(element) for element in value)
-    raise TypeError(f"unsupported printable property: {type(value).__name__}")
+    type_name = f"{type(value).__module__}.{type(value).__qualname__}"
+    if type_name in _OBJECT_PROPERTY_TYPES and is_dataclass(value):
+        return {
+            "__intellic_object__": (
+                type_name,
+                {
+                    field.name: _encode_property(getattr(value, field.name))
+                    for field in fields(value)
+                },
+            )
+        }
+    raise TypeError(f"unsupported property value: {type_name}")

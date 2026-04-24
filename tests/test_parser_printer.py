@@ -1,11 +1,12 @@
 import unittest
 
-from intellic.ir.dialects import arith, builtin, scf
+from intellic.ir.dialects import affine, arith, builtin, scf
 from intellic.ir.parser import parse_operation
 from intellic.ir.syntax import (
     Attribute,
     Block,
     Builder,
+    Operation,
     Region,
     Type,
     VerificationError,
@@ -50,6 +51,16 @@ class ParserPrinterTests(unittest.TestCase):
 
     def test_parser_rejects_unknown_value_use(self) -> None:
         text = '%0 = "arith.addi"(%missing, %missing) : () -> (i32)'
+
+        with self.assertRaisesRegex(ValueError, "unknown SSA value"):
+            parse_operation(text)
+
+    def test_parser_rejects_parent_use_of_region_local_value(self) -> None:
+        text = """
+        "test.parent"(%0) ({
+          %0 = "arith.constant"() {'value': 1} : () -> (i32)
+        }) : () -> ()
+        """
 
         with self.assertRaisesRegex(ValueError, "unknown SSA value"):
             parse_operation(text)
@@ -202,6 +213,25 @@ class ParserPrinterTests(unittest.TestCase):
         parsed_forall = parsed.regions[0].blocks[0].operations[-1]
 
         self.assertEqual(parsed_forall.properties["mapping"], mapping)
+
+    def test_generic_roundtrip_preserves_affine_map_property(self) -> None:
+        module_region = Region.from_block_list([Block()])
+        module = builtin.module(module_region)
+        map_ = affine.AffineMap(dim_count=1, symbol_count=0, results=("d0",))
+        with Builder().insert_at_end(module_region.blocks[0]) as builder:
+            dim = builder.insert(arith.constant(0, Type("index"))).results[0]
+            builder.insert(affine.min(map_, dims=(dim,), symbols=()))
+
+        parsed = parse_operation(print_operation(module))
+        parsed_min = parsed.regions[0].blocks[0].operations[-1]
+
+        self.assertEqual(parsed_min.properties["map"], map_)
+
+    def test_printer_rejects_unsupported_property_values(self) -> None:
+        op = Operation.create("test.unsupported", properties={"payload": object()})
+
+        with self.assertRaisesRegex(TypeError, "unsupported property"):
+            print_operation(op)
 
     def test_verify_rejects_malformed_parsed_scf_if(self) -> None:
         text = """

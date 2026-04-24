@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import ast
 import re
+from collections.abc import Callable
+from importlib import import_module
 
 from intellic.ir.syntax import Attribute, Block, Builder, Operation, Region, Type, Value
 from intellic.ir.parser.lexer import strip_comments
@@ -40,7 +42,7 @@ class _Parser:
     def __init__(self, lines: list[str]) -> None:
         self.lines = lines
         self.index = 0
-        self.values: dict[str, Value] = {}
+        self._value_scopes: list[dict[str, Value]] = [{}]
 
     @property
     def has_more(self) -> bool:
@@ -71,6 +73,8 @@ class _Parser:
 
     def _parse_region_operation(self, match: re.Match[str]) -> Operation:
         self.index += 1
+        operands = self._parse_operands(match.group("operands"))
+        properties = self._parse_properties(match.group("properties"))
         regions: list[Region] = []
         end_match: re.Match[str] | None = None
         while True:
@@ -85,8 +89,6 @@ class _Parser:
             assert end_match is not None
             self.index += 1
             break
-        operands = self._parse_operands(match.group("operands"))
-        properties = self._parse_properties(match.group("properties"))
         result_types = self._parse_types(end_match.group("result_types"))
         op = Operation.create(
             match.group("name"),
@@ -102,18 +104,22 @@ class _Parser:
         blocks: list[Block] = []
         if self._at_region_boundary():
             return Region.from_block_list([Block()])
-        while self.has_more and not self._at_region_boundary():
-            if _BLOCK_RE.match(self.lines[self.index]):
-                block = self._parse_block_header()
+        self._push_scope()
+        try:
+            while self.has_more and not self._at_region_boundary():
+                if _BLOCK_RE.match(self.lines[self.index]):
+                    block = self._parse_block_header()
+                    self._parse_block_operations(block)
+                    blocks.append(block)
+                    continue
+                if blocks:
+                    raise ValueError("expected block header")
+                block = Block()
                 self._parse_block_operations(block)
                 blocks.append(block)
-                continue
-            if blocks:
-                raise ValueError("expected block header")
-            block = Block()
-            self._parse_block_operations(block)
-            blocks.append(block)
-        return Region.from_block_list(blocks)
+            return Region.from_block_list(blocks)
+        finally:
+            self._pop_scope()
 
     def _parse_block_operations(self, block: Block) -> None:
         children: list[Operation] = []
@@ -151,19 +157,16 @@ class _Parser:
             types.append(Type(type_text))
         block = Block(arg_types=types)
         for name, argument in zip(names, block.arguments):
-            if name in self.values:
+            if name in self._value_scopes[-1]:
                 raise ValueError(f"duplicate SSA value: {name}")
-            self.values[name] = argument
+            self._value_scopes[-1][name] = argument
         return block
 
     def _parse_operands(self, text: str) -> tuple[Value, ...]:
         names = [part.strip() for part in text.split(",") if part.strip()]
         operands: list[Value] = []
         for name in names:
-            try:
-                operands.append(self.values[name])
-            except KeyError as exc:
-                raise ValueError(f"unknown SSA value: {name}") from exc
+            operands.append(self._lookup_value(name))
         return tuple(operands)
 
     def _parse_types(self, text: str) -> tuple[Type, ...]:
@@ -175,27 +178,19 @@ class _Parser:
         value = ast.literal_eval(text)
         if not isinstance(value, dict):
             raise ValueError("operation properties must be a dictionary")
-        return {
-            key: self._decode_property(property_value)
-            for key, property_value in value.items()
-        }
+        return {key: _decode_property(property_value) for key, property_value in value.items()}
 
-    def _decode_property(self, value: object) -> object:
-        if (
-            isinstance(value, dict)
-            and set(value) == {"__intellic_attribute__"}
-        ):
-            payload = value["__intellic_attribute__"]
-            if (
-                not isinstance(payload, tuple)
-                or len(payload) != 2
-                or not isinstance(payload[0], str)
-            ):
-                raise ValueError("malformed attribute property")
-            return Attribute(payload[0], self._decode_property(payload[1]))
-        if isinstance(value, tuple):
-            return tuple(self._decode_property(element) for element in value)
-        return value
+    def _lookup_value(self, name: str) -> Value:
+        for scope in reversed(self._value_scopes):
+            if name in scope:
+                return scope[name]
+        raise ValueError(f"unknown SSA value: {name}")
+
+    def _push_scope(self) -> None:
+        self._value_scopes.append({})
+
+    def _pop_scope(self) -> None:
+        self._value_scopes.pop()
 
     def _bind_results(self, names_text: str | None, op: Operation) -> None:
         if not names_text:
@@ -206,6 +201,61 @@ class _Parser:
         if len(names) != len(op.results):
             raise ValueError("SSA result count does not match operation result types")
         for name, value in zip(names, op.results):
-            if name in self.values:
+            if name in self._value_scopes[-1]:
                 raise ValueError(f"duplicate SSA value: {name}")
-            self.values[name] = value
+            self._value_scopes[-1][name] = value
+
+
+_PROPERTY_CODECS: dict[str, Callable[..., object]] = {}
+
+
+def _decode_property(value: object) -> object:
+    if isinstance(value, dict) and set(value) == {"__intellic_attribute__"}:
+        payload = value["__intellic_attribute__"]
+        if (
+            not isinstance(payload, tuple)
+            or len(payload) != 2
+            or not isinstance(payload[0], str)
+        ):
+            raise ValueError("malformed attribute property")
+        return Attribute(payload[0], _decode_property(payload[1]))
+    if isinstance(value, dict) and set(value) == {"__intellic_object__"}:
+        payload = value["__intellic_object__"]
+        if (
+            not isinstance(payload, tuple)
+            or len(payload) != 2
+            or not isinstance(payload[0], str)
+            or not isinstance(payload[1], dict)
+        ):
+            raise ValueError("malformed object property")
+        type_name, kwargs = payload
+        return _property_constructor(type_name)(
+            **{key: _decode_property(field_value) for key, field_value in kwargs.items()}
+        )
+    if isinstance(value, tuple):
+        return tuple(_decode_property(element) for element in value)
+    return value
+
+
+def _property_constructor(type_name: str) -> Callable[..., object]:
+    _ensure_property_codecs()
+    try:
+        return _PROPERTY_CODECS[type_name]
+    except KeyError as exc:
+        raise ValueError(f"unknown property codec: {type_name}") from exc
+
+
+def _ensure_property_codecs() -> None:
+    if _PROPERTY_CODECS:
+        return
+    for module_name, class_name in (
+        ("intellic.ir.syntax.attribute", "Attribute"),
+        ("intellic.ir.syntax.type", "Type"),
+        ("intellic.ir.dialects.affine", "AffineMap"),
+        ("intellic.ir.dialects.affine", "AffineSet"),
+        ("intellic.ir.dialects.func", "FunctionType"),
+        ("intellic.ir.dialects.memref", "MemRefType"),
+        ("intellic.ir.dialects.vector", "VectorType"),
+    ):
+        cls = getattr(import_module(module_name), class_name)
+        _PROPERTY_CODECS[f"{module_name}.{class_name}"] = cls

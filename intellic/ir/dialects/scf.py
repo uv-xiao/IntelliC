@@ -14,6 +14,7 @@ from intellic.ir.syntax import (
     i1,
     index,
 )
+from intellic.ir.syntax.verify import register_operation_verifier
 
 
 @contextmanager
@@ -297,6 +298,7 @@ def _verify_loop_body(body: Region, iter_args: tuple[Value, ...]) -> None:
 def verify_operation_contract(op: Operation) -> None:
     """Verify SCF operation contracts for parsed or manually-created operations."""
 
+    _verify_terminator_context(op)
     if op.name == "scf.yield":
         return
     if op.name == "scf.condition":
@@ -453,6 +455,67 @@ def verify_operation_contract(op: Operation) -> None:
             _verify_forall_yield_region(region, type_, "scf.forall.in_parallel yielding region")
 
 
+def _verify_terminator_context(op: Operation) -> None:
+    if op.name == "scf.yield":
+        _require_last_in_parent_block(op)
+        owner, region = _containing_operation_and_region(op)
+        if owner.name in ("scf.if", "scf.for", "scf.execute_region", "scf.index_switch"):
+            if region in owner.regions:
+                return
+        if owner.name == "scf.while" and len(owner.regions) > 1 and region is owner.regions[1]:
+            return
+        if owner.name == "scf.forall.in_parallel" and region in owner.regions:
+            return
+        raise ValueError("scf.yield has invalid parent context")
+
+    if op.name == "scf.condition":
+        _require_last_in_parent_block(op)
+        owner, region = _containing_operation_and_region(op)
+        if owner.name == "scf.while" and owner.regions and region is owner.regions[0]:
+            return
+        raise ValueError("scf.condition has invalid parent context")
+
+    if op.name == "scf.reduce.return":
+        _require_last_in_parent_block(op)
+        owner, region = _containing_operation_and_region(op)
+        if owner.name == "scf.reduce" and region in owner.regions:
+            return
+        raise ValueError("scf.reduce.return has invalid parent context")
+
+    if op.name == "scf.reduce":
+        _require_last_in_parent_block(op)
+        owner, region = _containing_operation_and_region(op)
+        if owner.name == "scf.parallel" and owner.regions and region is owner.regions[0]:
+            return
+        raise ValueError("scf.reduce has invalid parent context")
+
+    if op.name == "scf.forall.in_parallel":
+        _require_last_in_parent_block(op)
+        owner, region = _containing_operation_and_region(op)
+        if owner.name == "scf.forall" and owner.regions and region is owner.regions[0]:
+            return
+        raise ValueError("scf.forall.in_parallel has invalid parent context")
+
+
+def _require_last_in_parent_block(op: Operation) -> None:
+    block = op.parent
+    if block is None or not hasattr(block, "operations"):
+        raise ValueError(f"{op.name} has no parent block")
+    if not block.operations or block.operations[-1] is not op:
+        raise ValueError(f"{op.name} must be last in its block")
+
+
+def _containing_operation_and_region(op: Operation) -> tuple[Operation, Region]:
+    block = op.parent
+    if block is None or block.parent is None:
+        raise ValueError(f"{op.name} has invalid parent context")
+    region = block.parent
+    owner = region.parent
+    if not isinstance(owner, Operation):
+        raise ValueError(f"{op.name} has invalid parent context")
+    return owner, region
+
+
 def _single_block(region: Region, owner: str) -> Block:
     if len(region.blocks) != 1:
         raise ValueError(f"{owner} must be single-block")
@@ -533,3 +596,5 @@ def _verify_index_triplets(
         if value.type != index:
             raise TypeError(f"{owner} bounds and steps must be index typed")
     return len(lower_bounds)
+
+register_operation_verifier("scf.", verify_operation_contract)

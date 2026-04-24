@@ -9,6 +9,7 @@ from intellic.ir.syntax import (
     VerificationError,
     verify_operation,
 )
+from intellic.ir.syntax.verify import register_operation_verifier
 
 
 class SyntaxCoreTests(unittest.TestCase):
@@ -89,6 +90,15 @@ class SyntaxCoreTests(unittest.TestCase):
 
         with self.assertRaisesRegex(VerificationError, "parent"):
             verify_operation(module)
+
+    def test_verifier_uses_registered_dialect_verifier(self) -> None:
+        def reject_quality_op(op: Operation) -> None:
+            raise ValueError(f"{op.name} rejected by test verifier")
+
+        register_operation_verifier("quality.custom", reject_quality_op)
+
+        with self.assertRaisesRegex(VerificationError, "quality.custom"):
+            verify_operation(Operation.create("quality.custom"))
 
 
 if __name__ == "__main__":
