@@ -55,14 +55,26 @@ class MutatorStage:
         if intent.replacement is None:
             return False
         replacement_owner = getattr(intent.replacement, "owner", None)
-        if isinstance(replacement_owner, BlockArgument):
-            return True
+        if isinstance(intent.replacement, BlockArgument):
+            return self._block_argument_dominates_uses(intent.replacement, intent)
         if not isinstance(replacement_owner, Operation):
             return False
         replacement_block = replacement_owner.parent
         for result in intent.subject.results:
             for use in result.uses:
                 if not self._operation_dominates_use(replacement_owner, replacement_block, use.owner):
+                    return False
+        return True
+
+    def _block_argument_dominates_uses(
+        self,
+        replacement: BlockArgument,
+        intent: MutationIntent,
+    ) -> bool:
+        block = replacement.owner
+        for result in intent.subject.results:
+            for use in result.uses:
+                if use.owner.parent is not block:
                     return False
         return True
 

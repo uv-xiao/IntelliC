@@ -14,6 +14,11 @@ from .value import OpResult, Value
 class Operation:
     """MLIR-style operation with operands, results, attributes, and regions."""
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "operands" and hasattr(self, "operands"):
+            record_direct_mutation_attempt("operand_assignment", self)
+        super().__setattr__(name, value)
+
     def __init__(
         self,
         name: str,

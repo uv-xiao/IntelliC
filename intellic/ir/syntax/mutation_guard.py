@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any
@@ -91,3 +91,57 @@ class GuardedDict(dict):
     def __ior__(self, other: object):
         record_direct_mutation_attempt("metadata_update", self._owner, field=self._field)
         return super().__ior__(other)
+
+
+class GuardedList(list):
+    def __init__(self, owner: object, field: str, values: Iterable[object] = ()) -> None:
+        super().__init__(values)
+        self._owner = owner
+        self._field = field
+
+    def _record(self, kind: str) -> None:
+        record_direct_mutation_attempt(kind, self._owner, field=self._field)
+
+    def __setitem__(self, index, value) -> None:
+        self._record("block_operations_update")
+        super().__setitem__(index, value)
+
+    def __delitem__(self, index) -> None:
+        self._record("block_operations_delete")
+        super().__delitem__(index)
+
+    def append(self, value: object) -> None:
+        self._record("block_operations_append")
+        super().append(value)
+
+    def clear(self) -> None:
+        self._record("block_operations_clear")
+        super().clear()
+
+    def extend(self, values: Iterable[object]) -> None:
+        self._record("block_operations_extend")
+        super().extend(values)
+
+    def insert(self, index: int, value: object) -> None:
+        self._record("block_operations_insert")
+        super().insert(index, value)
+
+    def pop(self, index: int = -1) -> object:
+        self._record("block_operations_delete")
+        return super().pop(index)
+
+    def remove(self, value: object) -> None:
+        self._record("block_operations_delete")
+        super().remove(value)
+
+    def reverse(self) -> None:
+        self._record("block_operations_reorder")
+        super().reverse()
+
+    def sort(self, *args: object, **kwargs: Any) -> None:
+        self._record("block_operations_reorder")
+        super().sort(*args, **kwargs)
+
+    def __iadd__(self, values: Iterable[object]):
+        self._record("block_operations_extend")
+        return super().__iadd__(values)

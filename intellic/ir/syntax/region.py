@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from .ids import SyntaxId
+from .mutation_guard import GuardedList
 from .type import Type
 from .value import BlockArgument
 
@@ -16,7 +17,7 @@ class Block:
         self.arguments = tuple(
             BlockArgument(self, index, type) for index, type in enumerate(arg_types)
         )
-        self._operations: list[object] = []
+        self._operations: list[object] = GuardedList(self, "_operations")
 
     @property
     def operations(self) -> tuple[object, ...]:

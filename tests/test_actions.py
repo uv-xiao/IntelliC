@@ -128,6 +128,56 @@ class ActionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "direct mutation violations"):
             PendingRecordGate().run(run)
 
+    def test_action_apply_transient_raw_operand_assignment_is_rejected(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            lhs = builder.insert(arith.constant(7, i32))
+            old_rhs = builder.insert(arith.constant(1, i32))
+            new_rhs = builder.insert(arith.constant(2, i32))
+            add = builder.insert(arith.addi(lhs.results[0], old_rhs.results[0]))
+        run = PipelineRun(module)
+
+        def mutate_then_restore(current_run):
+            add.operands = (lhs.results[0], new_rhs.results[0])
+            add.operands = (lhs.results[0], old_rhs.results[0])
+
+        action = CompilerAction("bad-raw-operand-assignment", mutate_then_restore)
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-raw-operand-assignment").value
+        self.assertEqual(violation["kind"], "mutation_attempt")
+        self.assertIn("operand_assignment", violation["attempts"])
+        self.assertIs(add.operands[1], old_rhs.results[0])
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
+    def test_action_apply_transient_raw_block_reorder_is_rejected(self) -> None:
+        block = Block()
+        module = builtin.module(Region.from_block_list([block]))
+        with Builder().insert_at_end(block) as builder:
+            first = builder.insert(arith.constant(1, i32))
+            second = builder.insert(arith.constant(2, i32))
+        run = PipelineRun(module)
+
+        def reorder_then_restore(current_run):
+            block._operations.reverse()
+            block._operations.reverse()
+
+        action = CompilerAction("bad-raw-block-reorder", reorder_then_restore)
+
+        with self.assertRaisesRegex(ValueError, "direct syntax mutation"):
+            action.run(run)
+
+        violation = run.db.require("DirectMutationViolation", "bad-raw-block-reorder").value
+        self.assertEqual(violation["kind"], "mutation_attempt")
+        self.assertIn("block_operations_reorder", violation["attempts"])
+        self.assertEqual(block.operations, (first, second))
+        with self.assertRaisesRegex(ValueError, "direct mutation violations"):
+            PendingRecordGate().run(run)
+
     def test_action_apply_direct_attribute_mutation_is_rejected(self) -> None:
         block = Block()
         module = builtin.module(Region.from_block_list([block]))
@@ -369,6 +419,37 @@ class ActionTests(unittest.TestCase):
         inline = run.db.require("InlineIntent", call.id).value
         self.assertEqual(inline["callee"], callee.id)
         self.assertEqual(inline["strategy"], "single-return-forward")
+
+    def test_inline_single_call_mutator_applies_block_argument_forwarding(self) -> None:
+        module_block = Block()
+        module = builtin.module(Region.from_block_list([module_block]))
+        callee_type = func.FunctionType(inputs=(i32,), results=(i32,))
+
+        callee_block = Block(arg_types=(i32,))
+        callee_region = Region.from_block_list([callee_block])
+        with Builder().insert_at_end(callee_block) as builder:
+            builder.insert(func.return_(callee_block.arguments[0]))
+        callee = func.func("identity", callee_type, callee_region)
+
+        caller_block = Block(arg_types=(i32,))
+        caller_region = Region.from_block_list([caller_block])
+        with Builder().insert_at_end(caller_block) as builder:
+            call = builder.insert(func.call("identity", (caller_block.arguments[0],), callee_type))
+            ret = builder.insert(func.return_(call.results[0]))
+        caller = func.func("caller", callee_type, caller_region)
+
+        with Builder().insert_at_end(module_block) as builder:
+            builder.insert(callee)
+            builder.insert(caller)
+        run = PipelineRun(module)
+
+        passes.inline_single_call().run(run)
+        MutatorStage().run(run)
+
+        self.assertNotIn(call, caller_block.operations)
+        self.assertIs(ret.operands[0], caller_block.arguments[0])
+        self.assertEqual(run.db.query("MutationRejected", call.id), ())
+        PendingRecordGate().run(run)
 
     def test_loop_invariant_code_motion_records_loop_scope_and_candidate(self) -> None:
         block = Block()
