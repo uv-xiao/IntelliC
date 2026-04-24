@@ -269,6 +269,31 @@ class ParserPrinterTests(unittest.TestCase):
         with self.assertRaisesRegex(VerificationError, "scf.forall.in_parallel"):
             verify_operation(parsed)
 
+    def test_verify_rejects_standalone_scf_reduce(self) -> None:
+        text = """
+        "builtin.module"() ({
+          "scf.reduce"() {'operand_count': 0} : () -> ()
+        }) : () -> ()
+        """
+
+        parsed = parse_operation(text)
+
+        with self.assertRaisesRegex(VerificationError, "scf.reduce"):
+            verify_operation(parsed)
+
+    def test_verify_rejects_non_terminal_scf_reduce(self) -> None:
+        text = """
+        "builtin.module"() ({
+          "scf.reduce"() {'operand_count': 0} : () -> ()
+          %0 = "arith.constant"() {'value': 1} : () -> (i32)
+        }) : () -> ()
+        """
+
+        parsed = parse_operation(text)
+
+        with self.assertRaisesRegex(VerificationError, "scf.reduce"):
+            verify_operation(parsed)
+
 
 if __name__ == "__main__":
     unittest.main()

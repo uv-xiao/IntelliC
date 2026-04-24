@@ -77,6 +77,14 @@ def _verify_scf_terminator_context(op: Operation) -> None:
             return
         raise VerificationError("scf.reduce.return has invalid parent context")
 
+    if op.name == "scf.reduce":
+        _require_last_in_block(op)
+        owner = _containing_operation(op)
+        region = op.parent.parent
+        if owner.name == "scf.parallel" and owner.regions and region is owner.regions[0]:
+            return
+        raise VerificationError("scf.reduce has invalid parent context")
+
     if op.name == "scf.forall.in_parallel":
         _require_last_in_block(op)
         owner = _containing_operation(op)
