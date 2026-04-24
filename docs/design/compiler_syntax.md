@@ -776,7 +776,7 @@ intellic/ir/syntax/
   context.py         # Context, Dialect registration, operation lookup
   printer.py         # canonical generic/custom printing
 
-intellic/ir/dialects/
+intellic/dialects/
   builtin.py         # module op, builtin attrs/types needed by examples
   func.py            # func.func, func.call, func.return, function type helpers
   arith.py           # arith.constant, arith.addi, integer attrs/types

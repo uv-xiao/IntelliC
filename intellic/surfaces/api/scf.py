@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from types import TracebackType
 
-from intellic.ir.dialects import scf as scf_dialect
+from intellic.dialects import scf as scf_dialect
 from intellic.ir.syntax import Block, Region, Value, index
 from intellic.surfaces.api import builders
 

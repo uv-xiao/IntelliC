@@ -3,10 +3,10 @@ from __future__ import annotations
 from intellic.ir.semantics.builtin import record_affine_memory_effect
 from intellic.ir.syntax import Operation, verify_operation
 
-from .action import CompilerAction
-from .match import MatchRecord
-from .mutation import MutationIntent
-from .pipeline import PipelineRun
+from intellic.ir.actions.action import CompilerAction
+from intellic.ir.actions.match import MatchRecord
+from intellic.ir.actions.mutation import MutationIntent
+from intellic.ir.actions.pipeline import PipelineRun
 
 
 def verify_structure() -> CompilerAction:

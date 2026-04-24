@@ -49,14 +49,14 @@ intellic/ir/syntax/printer.py
 intellic/ir/parser/__init__.py
 intellic/ir/parser/lexer.py
 intellic/ir/parser/parser.py
-intellic/ir/dialects/__init__.py
-intellic/ir/dialects/builtin.py
-intellic/ir/dialects/func.py
-intellic/ir/dialects/arith.py
-intellic/ir/dialects/scf.py
-intellic/ir/dialects/affine.py
-intellic/ir/dialects/memref.py
-intellic/ir/dialects/vector.py
+intellic/dialects/__init__.py
+intellic/dialects/builtin.py
+intellic/dialects/func.py
+intellic/dialects/arith.py
+intellic/dialects/scf.py
+intellic/dialects/affine.py
+intellic/dialects/memref.py
+intellic/dialects/vector.py
 intellic/surfaces/__init__.py
 intellic/surfaces/api/__init__.py
 intellic/surfaces/api/builders.py
@@ -81,17 +81,17 @@ intellic/ir/actions/mutation.py
 intellic/ir/actions/stages.py
 intellic/ir/actions/pipeline.py
 intellic/ir/actions/host.py
-intellic/ir/actions/passes.py
+intellic/actions/passes.py
 examples/__init__.py
 examples/sum_to_n.py
 examples/affine_tile.py
 tests/test_imports.py
 tests/test_syntax_core.py
-tests/test_dialects.py
-tests/test_parser_printer.py
+tests/dialects/
+tests/parser/
 tests/test_surface_builders.py
 tests/test_semantics.py
-tests/test_actions.py
+tests/actions/
 tests/test_examples.py
 ```
 
@@ -181,14 +181,14 @@ git commit -m "feat: implement syntax core"
 
 **Files**
 
-- Create: `intellic/ir/dialects/builtin.py`
-- Create: `intellic/ir/dialects/func.py`
-- Create: `intellic/ir/dialects/arith.py`
-- Create: `intellic/ir/dialects/scf.py`
-- Create: `intellic/ir/dialects/affine.py`
-- Create: `intellic/ir/dialects/memref.py`
-- Create: `intellic/ir/dialects/vector.py`
-- Create: `tests/test_dialects.py`
+- Create: `intellic/dialects/builtin.py`
+- Create: `intellic/dialects/func.py`
+- Create: `intellic/dialects/arith.py`
+- Create: `intellic/dialects/scf.py`
+- Create: `intellic/dialects/affine.py`
+- Create: `intellic/dialects/memref.py`
+- Create: `intellic/dialects/vector.py`
+- Create: `tests/dialects/`
 
 **Implementation**
 
@@ -206,7 +206,7 @@ git commit -m "feat: implement syntax core"
 **Verification**
 
 ```bash
-python -m unittest tests/test_dialects.py
+python -m unittest discover -s tests/dialects
 python -m unittest discover -s tests
 ```
 
@@ -217,7 +217,7 @@ step, memref rank mismatch, and vector element mismatch.
 **Commit**
 
 ```bash
-git add intellic/ir/dialects tests/test_dialects.py docs/in_progress/complete_intellic_implementation.md
+git add intellic/dialects tests/dialects docs/in_progress/complete_intellic_implementation.md
 git commit -m "feat: implement first-slice dialect contracts"
 ```
 
@@ -228,7 +228,7 @@ git commit -m "feat: implement first-slice dialect contracts"
 - Create: `intellic/ir/parser/lexer.py`
 - Create: `intellic/ir/parser/parser.py`
 - Extend: `intellic/ir/syntax/printer.py`
-- Create: `tests/test_parser_printer.py`
+- Create: `tests/parser/`
 
 **Implementation**
 
@@ -243,7 +243,7 @@ git commit -m "feat: implement first-slice dialect contracts"
 **Verification**
 
 ```bash
-python -m unittest tests/test_parser_printer.py
+python -m unittest discover -s tests/parser
 python -m unittest discover -s tests
 ```
 
@@ -254,7 +254,7 @@ identity structure across round-trip.
 **Commit**
 
 ```bash
-git add intellic/ir/parser intellic/ir/syntax/printer.py tests/test_parser_printer.py docs/in_progress/complete_intellic_implementation.md
+git add intellic/ir/parser intellic/ir/syntax/printer.py tests/parser/ docs/in_progress/complete_intellic_implementation.md
 git commit -m "feat: add canonical parser printer roundtrip"
 ```
 
@@ -352,8 +352,8 @@ git commit -m "feat: implement trace semantics"
 - Create: `intellic/ir/actions/stages.py`
 - Create: `intellic/ir/actions/pipeline.py`
 - Create: `intellic/ir/actions/host.py`
-- Create: `intellic/ir/actions/passes.py`
-- Create: `tests/test_actions.py`
+- Create: `intellic/actions/passes.py`
+- Create: `tests/actions/`
 
 **Implementation**
 
@@ -372,7 +372,7 @@ git commit -m "feat: implement trace semantics"
 **Verification**
 
 ```bash
-python -m unittest tests/test_actions.py
+python -m unittest discover -s tests/actions
 python -m unittest discover -s tests
 ```
 
@@ -385,7 +385,7 @@ legality rejection.
 **Commit**
 
 ```bash
-git add intellic/ir/actions tests/test_actions.py docs/in_progress/complete_intellic_implementation.md
+git add intellic/ir/actions intellic/actions tests/actions docs/in_progress/complete_intellic_implementation.md
 git commit -m "feat: implement compiler actions"
 ```
 
@@ -457,3 +457,18 @@ closeout scope:
 
 Final verification evidence is recorded in
 `docs/in_progress/complete_intellic_implementation.md`.
+
+## Organization Hardening Addendum
+
+The final package layout separates common IR infrastructure from concrete
+definitions:
+
+- `intellic/ir/` owns syntax, parser, semantics, and common action framework
+  infrastructure.
+- `intellic/dialects/` owns concrete first-slice dialect definitions.
+- `intellic/actions/` owns concrete first-slice pass/action implementations.
+- Focused test folders replace large monolithic test files:
+  `tests/actions/`, `tests/dialects/`, `tests/parser/`, and
+  `tests/organization/`.
+- Parser/printer evidence includes golden IR assertions and parse-print
+  idempotence assertions.

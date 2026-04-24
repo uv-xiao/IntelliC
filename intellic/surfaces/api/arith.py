@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from intellic.ir.dialects import arith as arith_dialect
+from intellic.dialects import arith as arith_dialect
 from intellic.ir.syntax import Type, Value
 from intellic.surfaces.api import builders
 

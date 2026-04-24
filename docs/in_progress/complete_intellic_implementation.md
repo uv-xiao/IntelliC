@@ -132,14 +132,14 @@ python -m unittest discover -s tests
 Batch 3 verification:
 
 ```bash
-python -m unittest tests/test_dialects.py
+python -m unittest discover -s tests/dialects
 python -m unittest discover -s tests
 ```
 
 Batch 4 verification:
 
 ```bash
-python -m unittest tests/test_parser_printer.py
+python -m unittest discover -s tests/parser
 python -m unittest discover -s tests
 ```
 
@@ -160,7 +160,7 @@ python -m unittest discover -s tests
 Batch 7 verification:
 
 ```bash
-python -m unittest tests/test_actions.py
+python -m unittest discover -s tests/actions
 python -m unittest discover -s tests
 ```
 
@@ -168,7 +168,7 @@ Batch 8 verification:
 
 ```bash
 python -m unittest tests/test_examples.py
-python -m unittest tests/test_parser_printer.py
+python -m unittest discover -s tests/parser
 python -m unittest discover -s tests
 python scripts/check_repo_harness.py
 ```
@@ -176,16 +176,16 @@ python scripts/check_repo_harness.py
 Final review missing-contract verification:
 
 ```bash
-python -m unittest tests/test_dialects.py
+python -m unittest discover -s tests/dialects
 # Ran 20 tests: OK
 
 python -m unittest tests/test_semantics.py
 # Ran 8 tests: OK
 
-python -m unittest tests/test_actions.py
+python -m unittest discover -s tests/actions
 # Ran 62 tests: OK
 
-python -m unittest tests/test_parser_printer.py
+python -m unittest discover -s tests/parser
 # Ran 17 tests: OK
 
 python -m unittest tests/test_examples.py
@@ -213,14 +213,38 @@ Final review gaps closed:
   single-call inlining, LICM, affine lowering/normalization, and action mutation
   safety/rollback.
 
+Organization hardening verification:
+
+```bash
+python -m unittest tests.organization.test_public_layout
+# Ran 2 tests: OK
+
+python -m unittest tests.parser.test_golden_ir
+# Ran 1 test: OK
+
+python -m unittest discover -s tests
+# Ran 132 tests: OK
+```
+
+Organization changes:
+
+- Concrete dialect definitions live under `intellic/dialects/`; `intellic/ir/`
+  keeps the common syntax/parser/semantics/action infrastructure.
+- Concrete pass implementations live under `intellic/actions/`; common action
+  records, stages, and pipeline infrastructure remain under `intellic/ir/actions/`.
+- Large action, dialect, and parser/printer tests are split into focused
+  subfolders under `tests/actions/`, `tests/dialects/`, and `tests/parser/`.
+- Parser tests now include golden IR printing and `original ==
+  print(parse(original))` idempotence assertions.
+
 Expected implementation test groups:
 
 - `tests/test_syntax_core.py`
-- `tests/test_dialects.py`
-- `tests/test_parser_printer.py`
+- `tests/dialects/`
+- `tests/parser/`
 - `tests/test_surface_builders.py`
 - `tests/test_semantics.py`
-- `tests/test_actions.py`
+- `tests/actions/`
 - `tests/test_examples.py`
 
 ## Docs

@@ -38,7 +38,17 @@
   - Context: Final review for PR #71 found merge blockers in full SCF support, direct `func.call` semantics, and concrete action/pass behavior.
   - Related: docs/in_progress/complete_intellic_implementation.md
   - Related: docs/in_progress/complete_intellic_implementation_plan.md
-  - Related: tests/test_dialects.py
+  - Related: tests/dialects/
   - Related: tests/test_semantics.py
-  - Related: tests/test_actions.py
+  - Related: tests/actions/
   - Agent interpretation: Use the subagent-driven implementation workflow to close the blockers with implementation, spec review, code-quality review, and fresh verification evidence before PR merge readiness.
+
+- 2026-04-25 00:45 CST - Harden package and test organization
+  > We need to improve file organization. Common infra things should be put under intellic/ir. But the concrete passes should be put under intellic/actions/, while the specific dialect defination should be put under intellic/dialects/. And we should avoid very large test files. Instead, we should create sub-folders. Also, in tests, we should assert golden IR printing and "original == parsed-printed" assertions. This is an important step to make the project strong.
+  - Context: User requested structural hardening for PR #71 after the implementation and final-review blocker fixes were complete.
+  - Related: intellic/dialects/
+  - Related: intellic/actions/
+  - Related: tests/actions/
+  - Related: tests/dialects/
+  - Related: tests/parser/
+  - Agent interpretation: Move concrete definitions out of common IR infrastructure, split monolithic tests into focused subfolders, and strengthen parser/printer tests with golden text plus parse-print idempotence.

@@ -251,11 +251,11 @@ def _ensure_property_codecs() -> None:
     for module_name, class_name in (
         ("intellic.ir.syntax.attribute", "Attribute"),
         ("intellic.ir.syntax.type", "Type"),
-        ("intellic.ir.dialects.affine", "AffineMap"),
-        ("intellic.ir.dialects.affine", "AffineSet"),
-        ("intellic.ir.dialects.func", "FunctionType"),
-        ("intellic.ir.dialects.memref", "MemRefType"),
-        ("intellic.ir.dialects.vector", "VectorType"),
+        ("intellic.dialects.affine", "AffineMap"),
+        ("intellic.dialects.affine", "AffineSet"),
+        ("intellic.dialects.func", "FunctionType"),
+        ("intellic.dialects.memref", "MemRefType"),
+        ("intellic.dialects.vector", "VectorType"),
     ):
         cls = getattr(import_module(module_name), class_name)
         _PROPERTY_CODECS[f"{module_name}.{class_name}"] = cls

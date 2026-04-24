@@ -15,5 +15,4 @@ __all__ = (
     "MutatorStage",
     "PendingRecordGate",
     "PipelineRun",
-    "passes",
 )

@@ -123,7 +123,7 @@ import sys
 from intellic.ir.parser import parse_operation
 from intellic.ir.syntax import VerificationError, verify_operation
 
-assert "intellic.ir.dialects.scf" not in sys.modules
+assert "intellic.dialects.scf" not in sys.modules
 
 text = """
 "builtin.module"() ({

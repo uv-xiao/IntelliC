@@ -13,5 +13,5 @@ def _load_module(module_name: str) -> None:
 
 register_operation_verifier_loader(
     "scf.",
-    lambda: _load_module("intellic.ir.dialects.scf"),
+    lambda: _load_module("intellic.dialects.scf"),
 )

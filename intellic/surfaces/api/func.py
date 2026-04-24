@@ -4,7 +4,7 @@ import inspect
 from dataclasses import dataclass
 from typing import Callable
 
-from intellic.ir.dialects import func as func_dialect
+from intellic.dialects import func as func_dialect
 from intellic.ir.syntax import Block, Region, Type, Value
 from intellic.surfaces.api import builders
 

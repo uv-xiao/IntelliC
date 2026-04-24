@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from intellic.ir.dialects.affine import AffineMap
-from intellic.ir.dialects.memref import MemRefType
+from intellic.dialects.affine import AffineMap
+from intellic.dialects.memref import MemRefType
 from intellic.ir.syntax import Operation
 
 from .trace_db import TraceDB

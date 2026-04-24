@@ -11,11 +11,11 @@ _OBJECT_PROPERTY_TYPES = frozenset(
     (
         "intellic.ir.syntax.attribute.Attribute",
         "intellic.ir.syntax.type.Type",
-        "intellic.ir.dialects.affine.AffineMap",
-        "intellic.ir.dialects.affine.AffineSet",
-        "intellic.ir.dialects.func.FunctionType",
-        "intellic.ir.dialects.memref.MemRefType",
-        "intellic.ir.dialects.vector.VectorType",
+        "intellic.dialects.affine.AffineMap",
+        "intellic.dialects.affine.AffineSet",
+        "intellic.dialects.func.FunctionType",
+        "intellic.dialects.memref.MemRefType",
+        "intellic.dialects.vector.VectorType",
     )
 )
 

@@ -1,6 +1,6 @@
 import unittest
 
-from intellic.ir.dialects import affine, arith, builtin, func, memref
+from intellic.dialects import affine, arith, builtin, func, memref
 from intellic.ir.semantics import (
     Interpreter,
     RelationSchema,

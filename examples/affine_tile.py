@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from intellic.ir.dialects import affine, builtin
-from intellic.ir.dialects.memref import MemRefType
-from intellic.ir.dialects.vector import VectorType
+from intellic.dialects import affine, builtin
+from intellic.dialects.memref import MemRefType
+from intellic.dialects.vector import VectorType
 from intellic.ir.syntax import Block, Builder, Operation, Region, Type, index
 
 

@@ -183,7 +183,7 @@ depend on higher-level conveniences.
 
 1. `intellic.ir.syntax`: identity objects, parent links, use lists, regions,
    blocks, operation creation, structural verification, and mutation APIs.
-2. `intellic.ir.dialects`: `builtin`, `func`, `arith`, full `scf`, and
+2. `intellic.dialects`: `builtin`, `func`, `arith`, full `scf`, and
    first-class `affine` syntax definitions needed for loop, control-flow,
    affine-map, affine-set, and memory-indexing examples.
 3. `intellic.ir.parser` and printer: canonical MLIR/xDSL-compatible text for
@@ -194,13 +194,15 @@ depend on higher-level conveniences.
 5. `intellic.ir.semantics`: minimal `TraceDB`, typed relation schemas, semantic
    level keys, typed owner registration, registry resolution, and generated
    concrete interpreter for straight-line and loop-carried region examples.
-6. `intellic.ir.actions`: `Fixed` action host, match records, mutation intents,
-   mutator stage, pending-record gate, and one pipeline `TraceDB`.
+6. `intellic.ir.actions`: common `Fixed` action host, match records, mutation
+   intents, mutator stage, pending-record gate, and one pipeline `TraceDB`.
+7. `intellic.actions`: concrete pass/action implementations selected for the
+   first executable slice.
 
 The build order is also the dependency rule: syntax must not import semantics,
-actions, or surfaces; semantics may import syntax and `TraceDB`; actions may
-import syntax and semantics; surfaces may import syntax and dialect builders but
-must not own semantic meaning.
+actions, or surfaces; semantics may import syntax and `TraceDB`; concrete
+actions may import syntax, semantics, and common action infrastructure; surfaces
+may import syntax and dialect builders but must not own semantic meaning.
 
 ## First Implementation Slice Contract
 

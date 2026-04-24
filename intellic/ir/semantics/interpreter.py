@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from intellic.ir.dialects.func import FunctionType
+from intellic.dialects.func import FunctionType
 from intellic.ir.syntax import Operation, Value
 
 from .trace_db import TraceDB

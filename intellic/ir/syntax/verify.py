@@ -88,4 +88,4 @@ def _load_dialect_verifier(op_name: str) -> None:
         _LOADED_VERIFIER_PREFIXES.add(name_prefix)
 
 
-from intellic.ir.dialects import verification as _dialect_verification  # noqa: F401,E402
+from intellic.dialects import verification as _dialect_verification  # noqa: F401,E402
