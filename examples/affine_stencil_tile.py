@@ -9,13 +9,16 @@ from intellic.dialects.memref import MemRefType
 from intellic.dialects.vector import VectorType
 from intellic.ir.actions import PipelineRun
 from intellic.ir.parser import parse_operation
-from intellic.ir.syntax import Block, Builder, Region, i32, index, verify_operation
+from intellic.ir.syntax import Block, Builder, Operation, Region, i32, index, verify_operation
 from intellic.ir.syntax.printer import print_operation
 
 
 @dataclass(frozen=True)
 class AffineStencilTileExample:
     module: object
+    min_bound: Operation
+    max_bound: Operation
+    memory_ops: tuple[Operation, ...]
 
 
 def build_example() -> AffineStencilTileExample:
@@ -49,7 +52,7 @@ def build_example() -> AffineStencilTileExample:
         west_center = builder.insert(arith_dialect.addi(west.results[0], center.results[0]))
         stencil_sum = builder.insert(arith_dialect.addi(west_center.results[0], east.results[0]))
 
-        builder.insert(
+        center_store = builder.insert(
             affine.store(
                 stencil_sum.results[0],
                 memref,
@@ -58,7 +61,7 @@ def build_example() -> AffineStencilTileExample:
                 symbols=symbols,
             )
         )
-        builder.insert(
+        clamp_store = builder.insert(
             affine.store(
                 center.results[0],
                 memref,
@@ -76,7 +79,7 @@ def build_example() -> AffineStencilTileExample:
                 vector_type=vector_type,
             )
         )
-        builder.insert(
+        vector_store = builder.insert(
             affine.vector_store(
                 vector.results[0],
                 memref,
@@ -86,7 +89,20 @@ def build_example() -> AffineStencilTileExample:
             )
         )
 
-    return AffineStencilTileExample(module=module)
+    return AffineStencilTileExample(
+        module=module,
+        min_bound=bounded_row,
+        max_bound=bounded_column,
+        memory_ops=(
+            west,
+            center,
+            east,
+            center_store,
+            clamp_store,
+            vector,
+            vector_store,
+        ),
+    )
 
 
 def run_demo() -> ExampleRun:

@@ -1,6 +1,9 @@
 import unittest
 
 from examples.affine_tile import build_affine_tiled_access
+from examples.affine_stencil_tile import (
+    build_example as build_affine_stencil_example,
+)
 from examples.affine_stencil_tile import run_demo as run_affine_stencil_demo
 from examples.common import ExampleRun, print_example_run
 from examples.scf_piecewise_accumulate import run_demo as run_scf_piecewise_demo
@@ -136,15 +139,31 @@ class StrongExampleTests(unittest.TestCase):
         self.assertIn("scf.if concrete execution is not implemented", run.documented_gaps)
 
     def test_affine_stencil_tile_records_accesses_and_lowering_evidence(self) -> None:
+        example = build_affine_stencil_example()
         run = run_affine_stencil_demo()
+
+        bounded_dims = (example.min_bound.results[0], example.max_bound.results[0])
+        self.assertEqual(
+            [op.name for op in example.memory_ops],
+            [
+                "affine.load",
+                "affine.load",
+                "affine.load",
+                "affine.store",
+                "affine.store",
+                "affine.vector_load",
+                "affine.vector_store",
+            ],
+        )
+        for op in example.memory_ops:
+            if op.name in {"affine.load", "affine.vector_load"}:
+                self.assertEqual(op.operands[1:3], bounded_dims)
+            else:
+                self.assertEqual(op.operands[2:4], bounded_dims)
 
         self.assertTrue(run.parse_print_idempotent)
         self.assertIn('"affine.vector_load"', run.canonical_ir)
         self.assertIn('"affine.vector_store"', run.canonical_ir)
-        self.assertIn('"affine.load"(%0, %5, %6, %3, %4)', run.canonical_ir)
-        self.assertIn('"affine.store"(%11, %0, %5, %6, %3, %4)', run.canonical_ir)
-        self.assertIn('"affine.vector_load"(%0, %5, %6, %3, %4)', run.canonical_ir)
-        self.assertIn('"affine.vector_store"(%12, %0, %5, %6, %3, %4)', run.canonical_ir)
         self.assertIn("lower-affine-to-scf", run.action_names)
         self.assertEqual(run.relation_counts["UniqueAffineAccess"], 7)
         self.assertEqual(run.relation_counts["UniqueMemoryEffect"], 7)
