@@ -25,7 +25,8 @@ def build_example() -> ScfPiecewiseAccumulateExample:
 
         with scf.for_(zero_i, n, one_i, iter_args=(zero,)) as loop:
             iv, total = loop.arguments
-            cond = arith.constant(1, i1)
+            true_cond = arith.constant(1, i1)
+            false_cond = arith.constant(0, i1)
             iv_i32 = arith.index_cast(iv, i32)
 
             then_block = Block()
@@ -41,14 +42,35 @@ def build_example() -> ScfPiecewiseAccumulateExample:
 
             if_op = builders.emit(
                 scf_dialect.if_(
-                    cond,
+                    true_cond,
                     then_region=then_region,
                     else_region=else_region,
                     result_types=(i32,),
                 ),
                 "builder:scf.if",
             )
-            scf.yield_(if_op.results[0])
+
+            second_then_block = Block()
+            second_then_region = Region.from_block_list([second_then_block])
+            with Builder().insert_at_end(second_then_block) as builder:
+                builder.insert(scf_dialect.yield_(if_op.results[0]))
+
+            second_else_block = Block()
+            second_else_region = Region.from_block_list([second_else_block])
+            with Builder().insert_at_end(second_else_block) as builder:
+                adjusted = builder.insert(arith_dialect.addi(if_op.results[0], iv_i32))
+                builder.insert(scf_dialect.yield_(adjusted.results[0]))
+
+            second_if_op = builders.emit(
+                scf_dialect.if_(
+                    false_cond,
+                    then_region=second_then_region,
+                    else_region=second_else_region,
+                    result_types=(i32,),
+                ),
+                "builder:scf.if",
+            )
+            scf.yield_(second_if_op.results[0])
 
         return loop.results[0]
 
@@ -69,13 +91,21 @@ def run_demo() -> ExampleRun:
     ):
         action.run(run)
 
+    branch_records = run.db.query("BranchReachability")
+
     return ExampleRun(
         name="scf_piecewise_accumulate",
         canonical_ir=canonical_ir,
         parse_print_idempotent=parse_print_idempotent,
         action_names=tuple(record.value["name"] for record in run.db.query("ActionRun")),
         relation_counts={
-            "BranchReachability": len(run.db.query("BranchReachability")),
+            "BranchReachability": len(branch_records),
+            "ThenReachable": sum(
+                1 for record in branch_records if record.value["then_reachable"]
+            ),
+            "ElseReachable": sum(
+                1 for record in branch_records if record.value["else_reachable"]
+            ),
             "LoopInvariantCandidate": len(run.db.query("LoopInvariantCandidate")),
         },
         documented_gaps=("scf.if concrete execution is not implemented",),

@@ -129,7 +129,9 @@ class StrongExampleTests(unittest.TestCase):
         self.assertIn('"scf.if"', run.canonical_ir)
         self.assertIn('"scf.for"', run.canonical_ir)
         self.assertIn("sparse-constant-propagation", run.action_names)
-        self.assertGreaterEqual(run.relation_counts["BranchReachability"], 1)
+        self.assertGreaterEqual(run.relation_counts["BranchReachability"], 2)
+        self.assertGreaterEqual(run.relation_counts["ThenReachable"], 1)
+        self.assertGreaterEqual(run.relation_counts["ElseReachable"], 1)
         self.assertIn("scf.if concrete execution is not implemented", run.documented_gaps)
 
 
