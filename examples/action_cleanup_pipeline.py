@@ -99,16 +99,17 @@ def run_demo() -> ExampleRun:
     final_parsed = parse_operation(final_ir)
     final_parse_print_idempotent = final_ir == print_operation(final_parsed)
 
-    relation_names = (
-        "MutationApplied",
-        "MutationRejected",
-        "RewriteEvidence",
-        "SymbolLiveness",
-        "CallGraphEdge",
-    )
+    final_ops = _walk(example.module)
     relation_counts = {
-        name: len(run.db.query(name))
-        for name in relation_names
+        "MutationApplied": len(run.db.query("MutationApplied")),
+        "MutationRejected": len(run.db.query("MutationRejected")),
+        "RewriteEvidence": len(run.db.query("RewriteEvidence")),
+        "HistoricalCallGraphEdgeRecords": len(run.db.history("CallGraphEdge")),
+        "HistoricalSymbolLivenessRecords": len(run.db.history("SymbolLiveness")),
+        "FinalFuncCallOps": _count_ops_named(final_ops, "func.call"),
+        "FinalIdentitySymbols": _count_function_symbols_named(final_ops, "identity"),
+        "FinalDeadPrivateSymbols": _count_function_symbols_named(final_ops, "dead_private"),
+        "FinalZeroConstants": _count_i32_constants(final_ops, 0),
     }
     semantic_records = {
         "before.Evaluated": len(before_db.query("Evaluated")),
@@ -134,6 +135,39 @@ def run_demo() -> ExampleRun:
 
 def main() -> None:
     print(print_example_run(run_demo()), end="")
+
+
+def _walk(op: object) -> tuple[object, ...]:
+    found = [op]
+    for region in getattr(op, "regions", ()):
+        for block in region.blocks:
+            for child in block.operations:
+                found.extend(_walk(child))
+    return tuple(found)
+
+
+def _count_ops_named(ops: tuple[object, ...], name: str) -> int:
+    return sum(1 for op in ops if getattr(op, "name", None) == name)
+
+
+def _count_function_symbols_named(ops: tuple[object, ...], symbol: str) -> int:
+    return sum(
+        1
+        for op in ops
+        if getattr(op, "name", None) == "func.func"
+        and getattr(op, "properties", {}).get("sym_name") == symbol
+    )
+
+
+def _count_i32_constants(ops: tuple[object, ...], value: int) -> int:
+    return sum(
+        1
+        for op in ops
+        if getattr(op, "name", None) == "arith.constant"
+        and getattr(op, "properties", {}).get("value") == value
+        and op.results
+        and op.results[0].type == i32
+    )
 
 
 if __name__ == "__main__":
