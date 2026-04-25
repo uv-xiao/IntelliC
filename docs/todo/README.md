@@ -9,5 +9,6 @@
 - [x] Implementation-ready compiler design
 - [x] Minimal package and verification tooling
 - [x] First executable compiler slice
+- [ ] Strong self-running example showcase
 
 Each future feature should have a clear input, output, and verification contract.

@@ -13,4 +13,6 @@ Rules:
 
 ## Active Tasks
 
-No active tasks.
+- `docs/in_progress/strong_example_showcase.md` — add challenging standalone
+  examples that demonstrate parse/print, semantic execution where available,
+  and action evidence using the existing compiler slice.
