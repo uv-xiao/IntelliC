@@ -141,10 +141,18 @@ class StrongExampleTests(unittest.TestCase):
         self.assertTrue(run.parse_print_idempotent)
         self.assertIn('"affine.vector_load"', run.canonical_ir)
         self.assertIn('"affine.vector_store"', run.canonical_ir)
+        self.assertIn('"affine.load"(%0, %5, %6, %3, %4)', run.canonical_ir)
+        self.assertIn('"affine.store"(%11, %0, %5, %6, %3, %4)', run.canonical_ir)
+        self.assertIn('"affine.vector_load"(%0, %5, %6, %3, %4)', run.canonical_ir)
+        self.assertIn('"affine.vector_store"(%12, %0, %5, %6, %3, %4)', run.canonical_ir)
         self.assertIn("lower-affine-to-scf", run.action_names)
-        self.assertGreaterEqual(run.relation_counts["AffineAccess"], 6)
-        self.assertGreaterEqual(run.relation_counts["MemoryEffect"], 6)
-        self.assertGreaterEqual(run.relation_counts["AffineExpansion"], 6)
+        self.assertEqual(run.relation_counts["UniqueAffineAccess"], 7)
+        self.assertEqual(run.relation_counts["UniqueMemoryEffect"], 7)
+        self.assertEqual(run.relation_counts["ReadAccess"], 4)
+        self.assertEqual(run.relation_counts["WriteAccess"], 3)
+        self.assertEqual(run.relation_counts["CSEReadObserved"], 4)
+        self.assertEqual(run.relation_counts["CSESkipSideEffect"], 3)
+        self.assertEqual(run.relation_counts["UniqueAffineExpansion"], 9)
         self.assertIn(
             "affine concrete memory execution is not implemented",
             run.documented_gaps,

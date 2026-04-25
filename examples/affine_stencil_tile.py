@@ -33,21 +33,19 @@ def build_example() -> AffineStencilTileExample:
         symbol_count=2,
         results=("d0", "min(max(d1, s0), s1 - s0)"),
     )
-    tile_min_max_map = affine.AffineMap(
-        dim_count=2,
-        symbol_count=2,
-        results=("d1", "s1 - s0"),
-    )
+    min_bound_map = affine.AffineMap(dim_count=2, symbol_count=2, results=("d0",))
+    max_bound_map = affine.AffineMap(dim_count=2, symbol_count=2, results=("d1",))
     dims = (row, column)
     symbols = (tile, width)
 
     with Builder().insert_at_end(block) as builder:
-        builder.insert(affine.min(tile_min_max_map, dims=dims, symbols=symbols))
-        builder.insert(affine.max(tile_min_max_map, dims=dims, symbols=symbols))
+        bounded_row = builder.insert(affine.min(min_bound_map, dims=dims, symbols=symbols))
+        bounded_column = builder.insert(affine.max(max_bound_map, dims=dims, symbols=symbols))
+        access_dims = (bounded_row.results[0], bounded_column.results[0])
 
-        west = builder.insert(affine.load(memref, west_map, dims=dims, symbols=symbols))
-        center = builder.insert(affine.load(memref, center_map, dims=dims, symbols=symbols))
-        east = builder.insert(affine.load(memref, east_map, dims=dims, symbols=symbols))
+        west = builder.insert(affine.load(memref, west_map, dims=access_dims, symbols=symbols))
+        center = builder.insert(affine.load(memref, center_map, dims=access_dims, symbols=symbols))
+        east = builder.insert(affine.load(memref, east_map, dims=access_dims, symbols=symbols))
         west_center = builder.insert(arith_dialect.addi(west.results[0], center.results[0]))
         stencil_sum = builder.insert(arith_dialect.addi(west_center.results[0], east.results[0]))
 
@@ -56,7 +54,7 @@ def build_example() -> AffineStencilTileExample:
                 stencil_sum.results[0],
                 memref,
                 center_map,
-                dims=dims,
+                dims=access_dims,
                 symbols=symbols,
             )
         )
@@ -65,7 +63,7 @@ def build_example() -> AffineStencilTileExample:
                 center.results[0],
                 memref,
                 clamp_map,
-                dims=dims,
+                dims=access_dims,
                 symbols=symbols,
             )
         )
@@ -73,7 +71,7 @@ def build_example() -> AffineStencilTileExample:
             affine.vector_load(
                 memref,
                 clamp_map,
-                dims=dims,
+                dims=access_dims,
                 symbols=symbols,
                 vector_type=vector_type,
             )
@@ -83,7 +81,7 @@ def build_example() -> AffineStencilTileExample:
                 vector.results[0],
                 memref,
                 east_map,
-                dims=dims,
+                dims=access_dims,
                 symbols=symbols,
             )
         )
@@ -105,16 +103,36 @@ def run_demo() -> ExampleRun:
     ):
         action.run(run)
 
+    affine_accesses = run.db.query("AffineAccess")
+    memory_effects = run.db.query("MemoryEffect")
+    affine_expansions = run.db.query("AffineExpansion")
+    cse_memory_effects = run.db.query("CSEMemoryEffect")
+
     return ExampleRun(
         name="affine_stencil_tile",
         canonical_ir=canonical_ir,
         parse_print_idempotent=parse_print_idempotent,
         action_names=tuple(record.value["name"] for record in run.db.query("ActionRun")),
         relation_counts={
-            "AffineAccess": len(run.db.query("AffineAccess")),
-            "MemoryEffect": len(run.db.query("MemoryEffect")),
-            "AffineExpansion": len(run.db.query("AffineExpansion")),
-            "CSEMemoryEffect": len(run.db.query("CSEMemoryEffect")),
+            "UniqueAffineAccess": len({record.subject for record in affine_accesses}),
+            "UniqueMemoryEffect": len({record.subject for record in memory_effects}),
+            "ReadAccess": len(
+                {record.subject for record in affine_accesses if record.value["kind"] == "read"}
+            ),
+            "WriteAccess": len(
+                {record.subject for record in affine_accesses if record.value["kind"] == "write"}
+            ),
+            "CSEReadObserved": sum(
+                1
+                for record in cse_memory_effects
+                if record.value["action"] == "read-observed"
+            ),
+            "CSESkipSideEffect": sum(
+                1
+                for record in cse_memory_effects
+                if record.value["action"] == "skip-side-effect"
+            ),
+            "UniqueAffineExpansion": len({record.subject for record in affine_expansions}),
         },
         documented_gaps=("affine concrete memory execution is not implemented",),
     )
