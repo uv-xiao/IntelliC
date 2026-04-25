@@ -1,6 +1,7 @@
 import unittest
 
 from examples.affine_tile import build_affine_tiled_access
+from examples.common import ExampleRun, print_example_run
 from examples.sum_to_n import build_sum_to_n
 from intellic.actions import passes
 from intellic.ir.actions import MutatorStage, PendingRecordGate, PipelineRun
@@ -17,6 +18,29 @@ def operation_names(op):
             for child in block.operations:
                 names.extend(operation_names(child))
     return names
+
+
+class ExampleCommonTests(unittest.TestCase):
+    def test_example_run_records_structured_evidence_and_prints_sections(self) -> None:
+        run = ExampleRun(
+            name="demo",
+            canonical_ir='"demo.op"() : () -> ()',
+            parse_print_idempotent=True,
+            semantic_result=(5,),
+            action_names=("verify-structure",),
+            relation_counts={"ActionRun": 1},
+            mutation_applied_count=0,
+            documented_gaps=("no gap",),
+        )
+
+        text = print_example_run(run)
+
+        self.assertIn("== demo ==", text)
+        self.assertIn("parse_print_idempotent: true", text)
+        self.assertIn("semantic_result: (5,)", text)
+        self.assertIn("actions: verify-structure", text)
+        self.assertIn("ActionRun: 1", text)
+        self.assertIn("documented_gaps:", text)
 
 
 class ExampleTests(unittest.TestCase):
