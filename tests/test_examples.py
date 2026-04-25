@@ -1,6 +1,7 @@
 import unittest
 
 from examples.affine_tile import build_affine_tiled_access
+from examples.affine_stencil_tile import run_demo as run_affine_stencil_demo
 from examples.common import ExampleRun, print_example_run
 from examples.scf_piecewise_accumulate import run_demo as run_scf_piecewise_demo
 from examples.sum_to_n import build_sum_to_n
@@ -133,6 +134,21 @@ class StrongExampleTests(unittest.TestCase):
         self.assertGreaterEqual(run.relation_counts["ThenReachable"], 1)
         self.assertGreaterEqual(run.relation_counts["ElseReachable"], 1)
         self.assertIn("scf.if concrete execution is not implemented", run.documented_gaps)
+
+    def test_affine_stencil_tile_records_accesses_and_lowering_evidence(self) -> None:
+        run = run_affine_stencil_demo()
+
+        self.assertTrue(run.parse_print_idempotent)
+        self.assertIn('"affine.vector_load"', run.canonical_ir)
+        self.assertIn('"affine.vector_store"', run.canonical_ir)
+        self.assertIn("lower-affine-to-scf", run.action_names)
+        self.assertGreaterEqual(run.relation_counts["AffineAccess"], 6)
+        self.assertGreaterEqual(run.relation_counts["MemoryEffect"], 6)
+        self.assertGreaterEqual(run.relation_counts["AffineExpansion"], 6)
+        self.assertIn(
+            "affine concrete memory execution is not implemented",
+            run.documented_gaps,
+        )
 
 
 if __name__ == "__main__":
