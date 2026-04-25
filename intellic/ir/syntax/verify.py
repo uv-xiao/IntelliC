@@ -38,6 +38,7 @@ def verify_operation(op: Operation) -> None:
             raise VerificationError(f"result {result_index} has wrong owner")
         if result.index != result_index:
             raise VerificationError(f"result {result_index} has wrong index")
+        _verify_value_uses(result)
 
     for operand_index, operand in enumerate(op.operands):
         if not any(use.owner is op and use.operand_index == operand_index for use in operand.uses):
@@ -49,6 +50,8 @@ def verify_operation(op: Operation) -> None:
         for block in region.blocks:
             if block.parent is not region:
                 raise VerificationError("block has wrong parent")
+            for argument in block.arguments:
+                _verify_value_uses(argument)
             for child in block.operations:
                 if child.parent is not block:
                     raise VerificationError("operation has wrong parent")
@@ -89,3 +92,13 @@ def _load_dialect_verifier(op_name: str) -> None:
 
 
 from intellic.dialects import verification as _dialect_verification  # noqa: F401,E402
+
+
+def _verify_value_uses(value) -> None:
+    for use in value.uses:
+        if use.value is not value:
+            raise VerificationError("stale use has wrong value")
+        if use.operand_index >= len(use.owner.operands):
+            raise VerificationError("stale use operand index is out of range")
+        if use.owner.operands[use.operand_index] is not value:
+            raise VerificationError("stale use does not match owner operand")

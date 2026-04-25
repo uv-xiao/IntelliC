@@ -31,6 +31,27 @@ class ExampleTests(unittest.TestCase):
         text = print_operation(example.operation)
         parsed = parse_operation(text)
         self.assertEqual(operation_names(parsed), operation_names(example.operation))
+        self.assertEqual(text, print_operation(parsed))
+        self.assertEqual(
+            text,
+            "\n".join(
+                (
+                    '"func.func"() <{function_type = #intellic.object<"intellic.dialects.func.FunctionType", {inputs = [!intellic.type<"index">], results = [!intellic.type<"i32">]}>, sym_name = "sum_to_n"}> ({',
+                    "  ^bb0(%0: index):",
+                    '    %1 = "arith.constant"() <{value = 0}> : () -> index',
+                    '    %2 = "arith.constant"() <{value = 1}> : () -> index',
+                    '    %3 = "arith.constant"() <{value = 0}> : () -> i32',
+                    '    %4 = "scf.for"(%1, %0, %2, %3) <{iter_arg_count = 1}> ({',
+                    "      ^bb1(%5: index, %6: i32):",
+                    '        %7 = "arith.index_cast"(%5) <{to_type = !intellic.type<"i32">}> : (index) -> i32',
+                    '        %8 = "arith.addi"(%6, %7) : (i32, i32) -> i32',
+                    '        "scf.yield"(%8) : (i32) -> ()',
+                    "    }) : (index, index, index, i32) -> i32",
+                    '    "func.return"(%4) : (i32) -> ()',
+                    "}) : () -> ()",
+                )
+            ),
+        )
 
         run = PipelineRun(example.operation)
         for action in (
@@ -59,6 +80,9 @@ class ExampleTests(unittest.TestCase):
         text = print_operation(example.module)
         parsed = parse_operation(text)
         self.assertEqual(operation_names(parsed), operation_names(example.module))
+        self.assertEqual(text, print_operation(parsed))
+        self.assertIn('"affine.vector_load"', text)
+        self.assertIn('#intellic.object<"intellic.dialects.affine.AffineMap"', text)
 
         run = PipelineRun(example.module)
         passes.lower_affine_to_scf().run(run)

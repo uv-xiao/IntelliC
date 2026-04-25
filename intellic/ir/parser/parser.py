@@ -9,12 +9,12 @@ from intellic.ir.syntax import Attribute, Block, Builder, Operation, Region, Typ
 from intellic.ir.parser.lexer import strip_comments
 
 
-_PROPERTIES_RE = r"(?:\s+(?P<properties>\{.*\}))?"
+_PROPERTIES_RE = r"(?:\s+<\{(?P<properties>.*)\}>)?"
 _OP_RE = re.compile(
     r'^(?:(?P<results>%[\w.]+(?:\s*,\s*%[\w.]+)*)\s*=\s*)?'
     r'"(?P<name>[^"]+)"\((?P<operands>[^)]*)\)'
     + _PROPERTIES_RE +
-    r'(?P<region>\s*\(\{)?\s*:\s*\(\)\s*->\s*\((?P<result_types>[^)]*)\)$'
+    r'(?P<region>\s*\(\{)?\s*:\s*\((?P<operand_types>[^)]*)\)\s*->\s*(?P<result_types>.+)$'
 )
 _REGION_START_RE = re.compile(
     r'^(?:(?P<results>%[\w.]+(?:\s*,\s*%[\w.]+)*)\s*=\s*)?'
@@ -23,7 +23,7 @@ _REGION_START_RE = re.compile(
     r"\s*\(\{$"
 )
 _REGION_SEPARATOR_RE = re.compile(r"^\},\s*\{$")
-_REGION_END_RE = re.compile(r"^\}\)\s*:\s*\(\)\s*->\s*\((?P<result_types>[^)]*)\)$")
+_REGION_END_RE = re.compile(r"^\}\)\s*:\s*\((?P<operand_types>[^)]*)\)\s*->\s*(?P<result_types>.+)$")
 _BLOCK_RE = re.compile(r"^\^(?P<label>[\w.]+)\((?P<args>.*)\):$")
 
 
@@ -61,7 +61,7 @@ class _Parser:
         self.index += 1
         operands = self._parse_operands(op_match.group("operands"))
         properties = self._parse_properties(op_match.group("properties"))
-        result_types = self._parse_types(op_match.group("result_types"))
+        result_types = self._parse_result_types(op_match.group("result_types"))
         op = Operation.create(
             op_match.group("name"),
             operands=operands,
@@ -89,7 +89,7 @@ class _Parser:
             assert end_match is not None
             self.index += 1
             break
-        result_types = self._parse_types(end_match.group("result_types"))
+        result_types = self._parse_result_types(end_match.group("result_types"))
         op = Operation.create(
             match.group("name"),
             operands=operands,
@@ -172,13 +172,18 @@ class _Parser:
     def _parse_types(self, text: str) -> tuple[Type, ...]:
         return tuple(Type(part.strip()) for part in text.split(",") if part.strip())
 
+    def _parse_result_types(self, text: str) -> tuple[Type, ...]:
+        text = text.strip()
+        if text == "()":
+            return ()
+        if text.startswith("(") and text.endswith(")"):
+            return self._parse_types(text[1:-1])
+        return (Type(text),)
+
     def _parse_properties(self, text: str | None) -> dict[str, object]:
         if not text:
             return {}
-        value = ast.literal_eval(text)
-        if not isinstance(value, dict):
-            raise ValueError("operation properties must be a dictionary")
-        return {key: _decode_property(property_value) for key, property_value in value.items()}
+        return _parse_property_dict_body(text)
 
     def _lookup_value(self, name: str) -> Value:
         for scope in reversed(self._value_scopes):
@@ -209,32 +214,102 @@ class _Parser:
 _PROPERTY_CODECS: dict[str, Callable[..., object]] = {}
 
 
-def _decode_property(value: object) -> object:
-    if isinstance(value, dict) and set(value) == {"__intellic_attribute__"}:
-        payload = value["__intellic_attribute__"]
-        if (
-            not isinstance(payload, tuple)
-            or len(payload) != 2
-            or not isinstance(payload[0], str)
-        ):
+def _parse_property_dict_body(text: str) -> dict[str, object]:
+    text = text.strip()
+    if not text:
+        return {}
+    properties: dict[str, object] = {}
+    for entry in _split_top_level(text):
+        if "=" not in entry:
+            raise ValueError("expected property assignment")
+        key, value_text = [part.strip() for part in entry.split("=", 1)]
+        if not key:
+            raise ValueError("expected property name")
+        properties[key] = _parse_property_value(value_text)
+    return properties
+
+
+def _parse_property_value(text: str) -> object:
+    text = text.strip()
+    if text == "true":
+        return True
+    if text == "false":
+        return False
+    if text == "none":
+        return None
+    if re.fullmatch(r"-?\d+", text):
+        return int(text)
+    if text.startswith('"') and text.endswith('"'):
+        return ast.literal_eval(text)
+    if text.startswith("[") and text.endswith("]"):
+        body = text[1:-1].strip()
+        if not body:
+            return ()
+        return tuple(_parse_property_value(element) for element in _split_top_level(body))
+    if text.startswith("!intellic.type<") and text.endswith(">"):
+        return Type(ast.literal_eval(text.removeprefix("!intellic.type<")[:-1]))
+    if text.startswith("#intellic.attr<") and text.endswith(">"):
+        payload = text.removeprefix("#intellic.attr<")[:-1]
+        parts = _split_top_level(payload)
+        if len(parts) != 2:
             raise ValueError("malformed attribute property")
-        return Attribute(payload[0], _decode_property(payload[1]))
-    if isinstance(value, dict) and set(value) == {"__intellic_object__"}:
-        payload = value["__intellic_object__"]
-        if (
-            not isinstance(payload, tuple)
-            or len(payload) != 2
-            or not isinstance(payload[0], str)
-            or not isinstance(payload[1], dict)
-        ):
+        return Attribute(ast.literal_eval(parts[0].strip()), _parse_property_value(parts[1]))
+    if text.startswith("#intellic.object<") and text.endswith(">"):
+        payload = text.removeprefix("#intellic.object<")[:-1]
+        parts = _split_top_level(payload)
+        if len(parts) != 2:
             raise ValueError("malformed object property")
-        type_name, kwargs = payload
-        return _property_constructor(type_name)(
-            **{key: _decode_property(field_value) for key, field_value in kwargs.items()}
-        )
-    if isinstance(value, tuple):
-        return tuple(_decode_property(element) for element in value)
-    return value
+        type_name = ast.literal_eval(parts[0].strip())
+        fields_text = parts[1].strip()
+        if not fields_text.startswith("{") or not fields_text.endswith("}"):
+            raise ValueError("malformed object property fields")
+        return _property_constructor(type_name)(**_parse_property_dict_body(fields_text[1:-1]))
+    raise ValueError(f"unsupported property value: {text}")
+
+
+def _split_top_level(text: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    angle_depth = 0
+    square_depth = 0
+    brace_depth = 0
+    paren_depth = 0
+    in_string = False
+    escape = False
+    for index, char in enumerate(text):
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "<":
+            angle_depth += 1
+        elif char == ">":
+            angle_depth -= 1
+        elif char == "[":
+            square_depth += 1
+        elif char == "]":
+            square_depth -= 1
+        elif char == "{":
+            brace_depth += 1
+        elif char == "}":
+            brace_depth -= 1
+        elif char == "(":
+            paren_depth += 1
+        elif char == ")":
+            paren_depth -= 1
+        elif char == "," and not any((angle_depth, square_depth, brace_depth, paren_depth)):
+            parts.append(text[start:index].strip())
+            start = index + 1
+    tail = text[start:].strip()
+    if tail:
+        parts.append(tail)
+    return parts
 
 
 def _property_constructor(type_name: str) -> Callable[..., object]:

@@ -52,3 +52,14 @@
   - Related: tests/dialects/
   - Related: tests/parser/
   - Agent interpretation: Move concrete definitions out of common IR infrastructure, split monolithic tests into focused subfolders, and strengthen parser/printer tests with golden text plus parse-print idempotence.
+
+- 2026-04-25 11:52 CST - Fix all final merge review issues
+  > all issues need to be fixed.
+  - Context: User accepted the final merge review findings and directed all blockers to be fixed before merge.
+  - Related: intellic/ir/syntax/printer.py
+  - Related: intellic/ir/parser/parser.py
+  - Related: intellic/ir/syntax/verify.py
+  - Related: intellic/dialects/scf.py
+  - Related: tests/parser/test_golden_ir.py
+  - Related: tests/test_examples.py
+  - Agent interpretation: Close all merge review blockers: MLIR-like canonical IR printing/parsing, stale use verification, SCF terminator strictness, and robust golden/idempotent example tests.

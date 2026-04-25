@@ -83,6 +83,15 @@ class ScfControlTests(unittest.TestCase):
         self.assertEqual(op.name, "scf.if")
         verify_operation(op)
 
+    def test_scf_if_rejects_nonempty_zero_result_region_without_yield(self) -> None:
+        condition = arith.constant(1, i1).results[0]
+        then_region = Region.from_block_list([Block()])
+        with Builder().insert_at_end(then_region.blocks[0]) as builder:
+            builder.insert(arith.constant(7, i32))
+
+        with self.assertRaisesRegex(ValueError, "scf.yield"):
+            scf.if_(condition, then_region=then_region)
+
     def test_scf_while_verifies_condition_payload_and_after_yield(self) -> None:
         initial = arith.constant(0, i32).results[0]
         condition = arith.constant(1, i1).results[0]

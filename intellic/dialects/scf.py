@@ -540,11 +540,9 @@ def _verify_if_region(region: Region, result_types: tuple[Type, ...], owner: str
     if not block.operations:
         return
     terminator = block.operations[-1]
-    if terminator.name == "scf.yield":
-        _verify_yield_terminator(block, (), owner)
-        return
-    if terminator.name.startswith("scf."):
-        raise ValueError(f"{owner} must terminate with scf.yield or use implicit empty yield")
+    if terminator.name != "scf.yield":
+        raise ValueError(f"{owner} must terminate with scf.yield or be empty")
+    _verify_yield_terminator(block, (), owner)
 
 
 def _verify_yielding_region(region: Region, result_types: tuple[Type, ...], owner: str) -> None:

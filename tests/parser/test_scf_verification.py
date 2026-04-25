@@ -30,7 +30,7 @@ class ScfVerificationTests(unittest.TestCase):
     def test_verify_rejects_malformed_parsed_scf_if(self) -> None:
         text = """
         "builtin.module"() ({
-          %0 = "arith.constant"() {'value': 0} : () -> (index)
+          %0 = "arith.constant"() <{value = 0}> : () -> index
           "scf.if"(%0) ({
             "scf.condition"(%0) : () -> ()
           }) : () -> ()
@@ -45,7 +45,7 @@ class ScfVerificationTests(unittest.TestCase):
     def test_verify_rejects_scf_condition_outside_while_before_region(self) -> None:
         text = """
         "builtin.module"() ({
-          %0 = "arith.constant"() {'value': 1} : () -> (i1)
+          %0 = "arith.constant"() <{value = 1}> : () -> i1
           "scf.condition"(%0) : () -> ()
         }) : () -> ()
         """
@@ -58,7 +58,7 @@ class ScfVerificationTests(unittest.TestCase):
     def test_verify_rejects_scf_reduce_return_outside_reduce_region(self) -> None:
         text = """
         "builtin.module"() ({
-          %0 = "arith.constant"() {'value': 1} : () -> (i32)
+          %0 = "arith.constant"() <{value = 1}> : () -> i32
           "scf.reduce.return"(%0) : () -> ()
         }) : () -> ()
         """
@@ -72,7 +72,7 @@ class ScfVerificationTests(unittest.TestCase):
         text = """
         "builtin.module"() ({
           "scf.yield"() : () -> ()
-          %0 = "arith.constant"() {'value': 1} : () -> (i32)
+          %0 = "arith.constant"() <{value = 1}> : () -> i32
         }) : () -> ()
         """
 
@@ -84,7 +84,7 @@ class ScfVerificationTests(unittest.TestCase):
     def test_verify_rejects_standalone_scf_forall_in_parallel(self) -> None:
         text = """
         "builtin.module"() ({
-          "scf.forall.in_parallel"() {'yield_count': 0} : () -> ()
+          "scf.forall.in_parallel"() <{yield_count = 0}> : () -> ()
         }) : () -> ()
         """
 
@@ -96,7 +96,7 @@ class ScfVerificationTests(unittest.TestCase):
     def test_verify_rejects_standalone_scf_reduce(self) -> None:
         text = """
         "builtin.module"() ({
-          "scf.reduce"() {'operand_count': 0} : () -> ()
+          "scf.reduce"() <{operand_count = 0}> : () -> ()
         }) : () -> ()
         """
 
@@ -108,8 +108,8 @@ class ScfVerificationTests(unittest.TestCase):
     def test_verify_rejects_non_terminal_scf_reduce(self) -> None:
         text = """
         "builtin.module"() ({
-          "scf.reduce"() {'operand_count': 0} : () -> ()
-          %0 = "arith.constant"() {'value': 1} : () -> (i32)
+          "scf.reduce"() <{operand_count = 0}> : () -> ()
+          %0 = "arith.constant"() <{value = 1}> : () -> i32
         }) : () -> ()
         """
 

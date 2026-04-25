@@ -107,6 +107,20 @@ class SyntaxCoreTests(unittest.TestCase):
         with self.assertRaisesRegex(VerificationError, "parent"):
             verify_operation(module)
 
+    def test_verifier_rejects_stale_extra_use_records(self) -> None:
+        i32 = Type("i32")
+        block = Block()
+        region = Region.from_block_list([block])
+        module = Operation.create("builtin.module", regions=(region,))
+        with Builder().insert_at_end(block) as builder:
+            producer = builder.insert(Operation.create("arith.constant", result_types=(i32,)))
+            unrelated_user = builder.insert(Operation.create("arith.constant", result_types=(i32,)))
+
+        producer.results[0].add_use(unrelated_user, 0)
+
+        with self.assertRaisesRegex(VerificationError, "stale use"):
+            verify_operation(module)
+
     def test_verifier_uses_registered_dialect_verifier(self) -> None:
         def reject_quality_op(op: Operation) -> None:
             raise ValueError(f"{op.name} rejected by test verifier")
@@ -127,7 +141,7 @@ assert "intellic.dialects.scf" not in sys.modules
 
 text = """
 "builtin.module"() ({
-  %0 = "arith.constant"() {'value': 0} : () -> (index)
+  %0 = "arith.constant"() <{value = 0}> : () -> index
   "scf.if"(%0) ({
     "scf.condition"(%0) : () -> ()
   }) : () -> ()

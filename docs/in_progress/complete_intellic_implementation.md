@@ -237,6 +237,37 @@ Organization changes:
 - Parser tests now include golden IR printing and `original ==
   print(parse(original))` idempotence assertions.
 
+Final merge-review blocker verification:
+
+```bash
+python -m unittest tests.parser.test_golden_ir tests.parser.test_roundtrip tests.parser.test_diagnostics tests.parser.test_scf_verification
+# Ran 18 tests: OK
+
+python -m unittest tests.test_syntax_core
+# Ran 9 tests: OK
+
+python -m unittest tests.test_examples
+# Ran 2 tests: OK
+
+python -m unittest discover -s tests
+# Ran 134 tests: OK
+
+python scripts/check_repo_harness.py
+# repo harness policy passed
+
+python -c "import intellic; print(intellic.__version__)"
+# 0.1.0
+```
+
+Final merge-review blockers closed:
+
+- Canonical generic IR printing and parsing now use MLIR/xDSL-style property
+  dictionaries and function types, not Python literal pseudo syntax.
+- The structural verifier rejects stale or extra SSA use-list records.
+- Non-empty zero-result `scf.if` regions must terminate with `scf.yield`.
+- Challenging examples assert golden IR text and `original ==
+  print(parse(original))` idempotence, including affine object properties.
+
 Expected implementation test groups:
 
 - `tests/test_syntax_core.py`

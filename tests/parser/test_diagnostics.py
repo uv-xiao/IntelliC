@@ -40,7 +40,7 @@ class DiagnosticsTests(unittest.TestCase):
     def test_parser_rejects_parent_use_of_region_local_value(self) -> None:
         text = """
         "test.parent"(%0) ({
-          %0 = "arith.constant"() {'value': 1} : () -> (i32)
+          %0 = "arith.constant"() <{value = 1}> : () -> i32
         }) : () -> ()
         """
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import fields, is_dataclass
+import json
 from typing import Any
 
+from .attribute import Attribute
 from .operation import Operation
+from .type import Type
 from .value import Value
 
 
@@ -31,7 +34,8 @@ class _Printer:
         result_prefix = self._result_prefix(op)
         operands = ", ".join(self._value_name(operand) for operand in op.operands)
         properties = self._properties_suffix(op)
-        result_types = ", ".join(str(result.type) for result in op.results)
+        operand_types = ", ".join(str(operand.type) for operand in op.operands)
+        result_types = _format_function_results(tuple(result.type for result in op.results))
         if op.regions:
             lines = [
                 f'{prefix}{result_prefix}"{op.name}"({operands}){properties} ({{',
@@ -47,9 +51,9 @@ class _Printer:
                         child_indent = indent + 4
                     for child in block.operations:
                         lines.append(self.print_operation(child, child_indent))
-            lines.append(f"{prefix}}}) : () -> ({result_types})")
+            lines.append(f"{prefix}}}) : ({operand_types}) -> {result_types}")
             return "\n".join(lines)
-        return f'{prefix}{result_prefix}"{op.name}"({operands}){properties} : () -> ({result_types})'
+        return f'{prefix}{result_prefix}"{op.name}"({operands}){properties} : ({operand_types}) -> {result_types}'
 
     def _print_block_header(self, block, indent: int) -> str:
         name = f"^bb{self._next_block}"
@@ -70,7 +74,7 @@ class _Printer:
         }
         if not properties:
             return ""
-        return f" {properties!r}"
+        return f" <{{{', '.join(f'{key} = {value}' for key, value in properties.items())}}}>"
 
     def _value_name(self, value: Value) -> str:
         if value not in self._names:
@@ -91,19 +95,35 @@ def print_operation(op: Operation) -> str:
 
 
 def _encode_property(value: Any) -> Any:
+    if isinstance(value, str):
+        return json.dumps(value)
     if value is None or isinstance(value, (bool, int, str)):
-        return value
+        if value is True:
+            return "true"
+        if value is False:
+            return "false"
+        if value is None:
+            return "none"
+        return str(value)
     if isinstance(value, tuple):
-        return tuple(_encode_property(element) for element in value)
+        return f"[{', '.join(_encode_property(element) for element in value)}]"
+    if isinstance(value, Type):
+        return f"!intellic.type<{json.dumps(value.name)}>"
+    if isinstance(value, Attribute):
+        return f"#intellic.attr<{json.dumps(value.name)}, {_encode_property(value.value)}>"
     type_name = f"{type(value).__module__}.{type(value).__qualname__}"
     if type_name in _OBJECT_PROPERTY_TYPES and is_dataclass(value):
-        return {
-            "__intellic_object__": (
-                type_name,
-                {
-                    field.name: _encode_property(getattr(value, field.name))
-                    for field in fields(value)
-                },
-            )
-        }
+        encoded_fields = ", ".join(
+            f"{field.name} = {_encode_property(getattr(value, field.name))}"
+            for field in fields(value)
+        )
+        return f"#intellic.object<{json.dumps(type_name)}, {{{encoded_fields}}}>"
     raise TypeError(f"unsupported property value: {type_name}")
+
+
+def _format_function_results(types: tuple[Type, ...]) -> str:
+    if not types:
+        return "()"
+    if len(types) == 1:
+        return str(types[0])
+    return f"({', '.join(str(type_) for type_ in types)})"
