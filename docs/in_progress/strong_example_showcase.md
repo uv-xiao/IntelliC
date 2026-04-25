@@ -78,8 +78,9 @@ record it in the backlog instead of implementing the missing compiler feature.
 1. `examples/scf_piecewise_accumulate.py`
    - Source inspiration: xDSL/MLIR SCF `if` and `for` examples from
      `.repositories/xdsl/docs/marimo/mlir_ir.py` and xDSL SCF interpreter tests.
-   - IntelliC focus: nested `scf.if` inside `scf.for`, function execution,
-     loop trace evidence, parser/printer idempotence, and action records.
+   - IntelliC focus: nested `scf.if` inside `scf.for`, function-shaped IR,
+     branch reachability evidence, parser/printer idempotence, and action
+     records.
    - Expected status: implemented in this PR.
 
 2. `examples/affine_stencil_tile.py`
@@ -120,7 +121,8 @@ when relevant.
 - `python -m unittest discover -s tests` passes.
 - `python scripts/check_repo_harness.py` passes.
 - `python -m examples.scf_piecewise_accumulate` exits 0 and prints canonical IR,
-  parse/print status, semantic result, and action evidence.
+  parse/print status, branch reachability/action evidence, and the documented
+  semantic execution gap.
 - `python -m examples.affine_stencil_tile` exits 0 and prints canonical IR,
   parse/print status, affine access facts, and lowering evidence.
 - `python -m examples.action_cleanup_pipeline` exits 0 and prints canonical IR,
@@ -129,7 +131,7 @@ when relevant.
 
 ## Tests
 
-Planned focused verification:
+Completed local verification commands:
 
 ```bash
 python -m unittest tests/test_examples.py
