@@ -2,6 +2,7 @@ import unittest
 
 from examples.affine_tile import build_affine_tiled_access
 from examples.common import ExampleRun, print_example_run
+from examples.scf_piecewise_accumulate import run_demo as run_scf_piecewise_demo
 from examples.sum_to_n import build_sum_to_n
 from intellic.actions import passes
 from intellic.ir.actions import MutatorStage, PendingRecordGate, PipelineRun
@@ -118,6 +119,18 @@ class ExampleTests(unittest.TestCase):
         self.assertEqual(effects.count("write"), 2)
         self.assertEqual(run.db.require("AffineAccess", example.scalar_load.id).value["rank"], 2)
         self.assertEqual(run.db.require("AffineAccess", example.vector_store.id).value["kind"], "write")
+
+
+class StrongExampleTests(unittest.TestCase):
+    def test_scf_piecewise_accumulate_roundtrips_and_documents_if_execution_gap(self) -> None:
+        run = run_scf_piecewise_demo()
+
+        self.assertTrue(run.parse_print_idempotent)
+        self.assertIn('"scf.if"', run.canonical_ir)
+        self.assertIn('"scf.for"', run.canonical_ir)
+        self.assertIn("sparse-constant-propagation", run.action_names)
+        self.assertGreaterEqual(run.relation_counts["BranchReachability"], 1)
+        self.assertIn("scf.if concrete execution is not implemented", run.documented_gaps)
 
 
 if __name__ == "__main__":
