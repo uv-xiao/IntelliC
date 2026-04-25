@@ -35,3 +35,11 @@
   - Related: .repositories/xdsl/
   - Related: .repositories/llvm-project/
   - Agent interpretation: Maintain an example-case backlog with source inspiration, status, and missing capability notes; adapt xDSL/MLIR patterns rather than copying examples directly.
+
+- 2026-04-25 16:58 local - Example README and sum baseline upgrade
+  > examples/ need a readme to explain what each example does and want to show. Also, the old affine_tile.py can be removed (too easy), and the sum_to_n example should be improved to show more features (ir_parse/print, semantic execution, etc.)
+  - Context: User requested a scoped extension to PR #72 after the strong example showcase was marked ready.
+  - Related: examples/
+  - Related: tests/test_examples.py
+  - Related: docs/in_progress/strong_example_showcase.md
+  - Agent interpretation: Add example-suite documentation, remove the simple affine_tile example, and make sum_to_n a first-class runnable example with structured evidence.

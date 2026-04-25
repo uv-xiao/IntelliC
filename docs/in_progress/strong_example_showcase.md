@@ -27,7 +27,7 @@ single collective example command.
 ## Input
 
 - `examples/sum_to_n.py`
-- `examples/affine_tile.py`
+- `examples/README.md`
 - `tests/test_examples.py`
 - `docs/design/compiler_syntax.md`
 - `docs/design/compiler_semantics.md`
@@ -75,7 +75,15 @@ record it in the backlog instead of implementing the missing compiler feature.
 
 ### Initial Implemented Cases
 
-1. `examples/scf_piecewise_accumulate.py`
+1. `examples/sum_to_n.py`
+   - Source inspiration: the first executable compiler-slice example from PR
+     #71.
+   - IntelliC focus: canonical IR printing, parse/print idempotence, semantic
+     execution for `sum_to_n(5) -> 10`, semantic trace counts, and action
+     evidence.
+   - Expected status: implemented in this PR.
+
+2. `examples/scf_piecewise_accumulate.py`
    - Source inspiration: xDSL/MLIR SCF `if` and `for` examples from
      `.repositories/xdsl/docs/marimo/mlir_ir.py` and xDSL SCF interpreter tests.
    - IntelliC focus: nested `scf.if` inside `scf.for`, function-shaped IR,
@@ -83,7 +91,7 @@ record it in the backlog instead of implementing the missing compiler feature.
      records.
    - Expected status: implemented in this PR.
 
-2. `examples/affine_stencil_tile.py`
+3. `examples/affine_stencil_tile.py`
    - Source inspiration: xDSL affine dialect/lower-affine tests and MLIR affine
      memory-access idioms.
    - IntelliC focus: affine min/max, multiple affine maps, scalar/vector memory
@@ -91,7 +99,7 @@ record it in the backlog instead of implementing the missing compiler feature.
      lowering evidence.
    - Expected status: implemented in this PR.
 
-3. `examples/action_cleanup_pipeline.py`
+4. `examples/action_cleanup_pipeline.py`
    - Source inspiration: xDSL rewrite/canonicalization examples and transform
      tests.
    - IntelliC focus: deliberately optimizable IR that demonstrates
@@ -108,6 +116,7 @@ when relevant.
 
 | Case | Source Inspiration | Features Shown | Status | Notes |
 | --- | --- | --- | --- | --- |
+| `sum_to_n` | First executable compiler-slice example from PR #71 | canonical IR, parse/print, semantic execution, semantic trace counts, action evidence | implemented | Promoted from simple builder fixture to runnable structured example; old `affine_tile` example was removed as too small. |
 | `scf_piecewise_accumulate` | xDSL/MLIR SCF `if`/`for` examples and interpreter tests | nested SCF, branch reachability, loop/action records, parse/print, documented semantic gap | implemented | Branch reachability/action records are implemented; `scf.if` concrete execution remains documented as a current gap. |
 | `affine_stencil_tile` | xDSL affine dialect and lower-affine tests; MLIR affine memory-access idioms | affine maps, min/max, scalar/vector access facts, memory effects, lowering evidence | implemented | Affine fact and lowering evidence is implemented; concrete memory execution remains documented as a current gap. |
 | `action_cleanup_pipeline` | xDSL rewrite/canonicalization examples and transform tests | canonicalization, CSE, SCCP-style facts, DCE, inline evidence, mutation evidence, semantic preservation | implemented | Final cleanup state is reported separately from historical call/liveness evidence; uses only currently implemented action behavior. |
@@ -120,6 +129,9 @@ when relevant.
 - `python -m unittest tests/test_examples.py` passes.
 - `python -m unittest discover -s tests` passes.
 - `python scripts/check_repo_harness.py` passes.
+- `python -m examples.sum_to_n` exits 0 and prints canonical IR,
+  parse/print status, semantic result, semantic trace counts, and action
+  evidence.
 - `python -m examples.scf_piecewise_accumulate` exits 0 and prints canonical IR,
   parse/print status, branch reachability/action evidence, and the documented
   semantic execution gap.
@@ -137,6 +149,7 @@ Completed local verification commands:
 python -m unittest tests/test_examples.py
 python -m unittest discover -s tests
 python scripts/check_repo_harness.py
+python -m examples.sum_to_n
 python -m examples.scf_piecewise_accumulate
 python -m examples.affine_stencil_tile
 python -m examples.action_cleanup_pipeline
@@ -150,6 +163,7 @@ Task 5 verification commands:
 python -m unittest tests/test_examples.py
 python -m unittest discover -s tests
 python scripts/check_repo_harness.py
+python -m examples.sum_to_n
 python -m examples.scf_piecewise_accumulate
 python -m examples.affine_stencil_tile
 python -m examples.action_cleanup_pipeline
@@ -158,11 +172,16 @@ git diff --check
 
 Observed results from the Task 5 local verification run:
 
-- `python -m unittest tests/test_examples.py`: exit 0; `Ran 6 tests in 0.016s`;
+- `python -m unittest tests/test_examples.py`: exit 0; `Ran 7 tests in 0.023s`;
   `OK`.
-- `python -m unittest discover -s tests`: exit 0; `Ran 138 tests in 0.129s`;
+- `python -m unittest discover -s tests`: exit 0; `Ran 139 tests in 0.124s`;
   `OK`.
 - `python scripts/check_repo_harness.py`: exit 0; `repo harness policy passed`.
+- `python -m examples.sum_to_n`: exit 0; printed `canonical_ir:`,
+  `parse_print_idempotent: true`, `semantic_result: (10,)`,
+  `LoopIteration: 5`, `Evaluated: 14`, actions including
+  `canonicalize-greedy` and `loop-invariant-code-motion`, and
+  `ValueConcrete: 3`.
 - `python -m examples.scf_piecewise_accumulate`: exit 0; printed
   `canonical_ir:`, `parse_print_idempotent: true`, actions
   `verify-structure, sparse-constant-propagation, loop-invariant-code-motion`,

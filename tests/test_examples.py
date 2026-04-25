@@ -1,6 +1,6 @@
+from pathlib import Path
 import unittest
 
-from examples.affine_tile import build_affine_tiled_access
 from examples.affine_stencil_tile import (
     build_example as build_affine_stencil_example,
 )
@@ -9,12 +9,16 @@ from examples.action_cleanup_pipeline import run_demo as run_action_cleanup_demo
 from examples.common import ExampleRun, print_example_run
 from examples.scf_piecewise_accumulate import run_demo as run_scf_piecewise_demo
 from examples.sum_to_n import build_sum_to_n
+from examples.sum_to_n import run_demo as run_sum_to_n_demo
 from intellic.actions import passes
 from intellic.ir.actions import MutatorStage, PendingRecordGate, PipelineRun
 from intellic.ir.parser import parse_operation
 from intellic.ir.semantics import TraceDB, execute_function
 from intellic.ir.syntax import verify_operation
 from intellic.ir.syntax.printer import print_operation
+
+
+EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "examples"
 
 
 def operation_names(op):
@@ -50,8 +54,28 @@ class ExampleCommonTests(unittest.TestCase):
 
 
 class ExampleTests(unittest.TestCase):
+    def test_examples_readme_describes_runnable_showcase_modules(self) -> None:
+        readme = EXAMPLES_DIR / "README.md"
+
+        self.assertTrue(readme.exists())
+        text = readme.read_text(encoding="utf-8")
+        for module in (
+            "sum_to_n",
+            "scf_piecewise_accumulate",
+            "affine_stencil_tile",
+            "action_cleanup_pipeline",
+        ):
+            self.assertIn(f"python -m examples.{module}", text)
+        self.assertIn("parse/print", text)
+        self.assertIn("semantic execution", text)
+        self.assertIn("action evidence", text)
+
+    def test_old_affine_tile_example_is_removed(self) -> None:
+        self.assertFalse((EXAMPLES_DIR / "affine_tile.py").exists())
+
     def test_sum_to_n_runs_roundtrips_and_records_action_evidence(self) -> None:
         example = build_sum_to_n()
+        demo = run_sum_to_n_demo()
 
         verify_operation(example.operation)
         db = TraceDB()
@@ -102,28 +126,15 @@ class ExampleTests(unittest.TestCase):
         self.assertIn("canonicalize-greedy", action_names)
         self.assertIn("loop-invariant-code-motion", action_names)
         self.assertEqual(run.db.require("ValueConcrete", example.zero_i.id).value, 0)
-
-    def test_affine_tiled_access_records_scalar_and_vector_memory_facts(self) -> None:
-        example = build_affine_tiled_access()
-
-        verify_operation(example.module)
-        text = print_operation(example.module)
-        parsed = parse_operation(text)
-        self.assertEqual(operation_names(parsed), operation_names(example.module))
-        self.assertEqual(text, print_operation(parsed))
-        self.assertIn('"affine.vector_load"', text)
-        self.assertIn('#intellic.object<"intellic.dialects.affine.AffineMap"', text)
-
-        run = PipelineRun(example.module)
-        passes.lower_affine_to_scf().run(run)
-
-        accesses = run.db.query("AffineAccess")
-        effects = [record.value["kind"] for record in run.db.query("MemoryEffect")]
-        self.assertEqual(len(accesses), 4)
-        self.assertEqual(effects.count("read"), 2)
-        self.assertEqual(effects.count("write"), 2)
-        self.assertEqual(run.db.require("AffineAccess", example.scalar_load.id).value["rank"], 2)
-        self.assertEqual(run.db.require("AffineAccess", example.vector_store.id).value["kind"], "write")
+        self.assertTrue(demo.parse_print_idempotent)
+        self.assertEqual(demo.semantic_result, (10,))
+        self.assertEqual(demo.semantic_records["LoopIteration"], 5)
+        self.assertEqual(demo.semantic_records["Call"], 0)
+        self.assertGreaterEqual(demo.semantic_records["Evaluated"], 10)
+        self.assertIn("canonicalize-greedy", demo.action_names)
+        self.assertIn("loop-invariant-code-motion", demo.action_names)
+        self.assertGreaterEqual(demo.relation_counts["ValueConcrete"], 2)
+        self.assertIn('"scf.for"', demo.canonical_ir)
 
 
 class StrongExampleTests(unittest.TestCase):
