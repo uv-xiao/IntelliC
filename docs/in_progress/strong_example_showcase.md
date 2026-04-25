@@ -1,7 +1,7 @@
 # Feature Task: Strong Example Showcase
 
 - Branch: `examples/strong-showcase`
-- PR: unopened
+- PR: #72
 - Owner: Codex
 - Status: Design approved; implementation plan pending
 
