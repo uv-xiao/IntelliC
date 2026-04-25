@@ -82,6 +82,8 @@ def run_demo() -> ExampleRun:
     for action in actions:
         action.run(run)
     MutatorStage().run(run)
+    passes.symbol_dce_and_dead_code().run(run)
+    MutatorStage().run(run)
     PendingRecordGate().run(run)
 
     verify_operation(example.module)

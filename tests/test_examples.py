@@ -140,6 +140,9 @@ class StrongExampleTests(unittest.TestCase):
         self.assertGreaterEqual(run.mutation_applied_count, 3)
         self.assertIsNotNone(run.final_ir)
         self.assertNotIn('"func.call"', run.final_ir)
+        self.assertNotIn("dead_private", run.final_ir)
+        self.assertNotIn("identity", run.final_ir)
+        self.assertNotIn("value = 0", run.final_ir)
 
     def test_scf_piecewise_accumulate_roundtrips_and_documents_if_execution_gap(self) -> None:
         run = run_scf_piecewise_demo()
