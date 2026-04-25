@@ -3,7 +3,7 @@
 - Branch: `examples/strong-showcase`
 - PR: #72
 - Owner: Codex
-- Status: Implemented and locally verified; PR sync pending
+- Status: Implemented, locally verified, and synced to PR #72
 
 ## Goal
 
@@ -22,7 +22,7 @@ single collective example command.
 - [x] Implement in coherent commits
 - [x] Verify locally
 - [x] Sync local `docs/todo/` and `docs/in_progress/` status
-- [ ] Sync PR body / remote state after review
+- [x] Sync PR body / remote state after review
 
 ## Input
 
