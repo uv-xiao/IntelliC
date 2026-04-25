@@ -5,6 +5,7 @@ from examples.affine_stencil_tile import (
     build_example as build_affine_stencil_example,
 )
 from examples.affine_stencil_tile import run_demo as run_affine_stencil_demo
+from examples.action_cleanup_pipeline import run_demo as run_action_cleanup_demo
 from examples.common import ExampleRun, print_example_run
 from examples.scf_piecewise_accumulate import run_demo as run_scf_piecewise_demo
 from examples.sum_to_n import build_sum_to_n
@@ -126,6 +127,20 @@ class ExampleTests(unittest.TestCase):
 
 
 class StrongExampleTests(unittest.TestCase):
+    def test_action_cleanup_pipeline_runs_actions_and_preserves_semantics(self) -> None:
+        run = run_action_cleanup_demo()
+
+        self.assertTrue(run.parse_print_idempotent)
+        self.assertEqual(run.semantic_result, (5,))
+        self.assertIn("canonicalize-greedy", run.action_names)
+        self.assertIn("common-subexpression-elimination", run.action_names)
+        self.assertIn("symbol-dce-and-dead-code", run.action_names)
+        self.assertIn("inline-single-call", run.action_names)
+        self.assertGreaterEqual(run.relation_counts["MutationApplied"], 3)
+        self.assertGreaterEqual(run.mutation_applied_count, 3)
+        self.assertIsNotNone(run.final_ir)
+        self.assertNotIn('"func.call"', run.final_ir)
+
     def test_scf_piecewise_accumulate_roundtrips_and_documents_if_execution_gap(self) -> None:
         run = run_scf_piecewise_demo()
 
