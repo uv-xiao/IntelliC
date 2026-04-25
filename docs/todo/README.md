@@ -9,6 +9,9 @@
 - [x] Implementation-ready compiler design
 - [x] Minimal package and verification tooling
 - [x] First executable compiler slice
-- [ ] Strong self-running example showcase
+- [x] Strong self-running example showcase
+
+Future showcase cases remain tracked separately in
+`docs/in_progress/strong_example_showcase.md` under the example-case backlog.
 
 Each future feature should have a clear input, output, and verification contract.

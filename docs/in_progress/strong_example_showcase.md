@@ -3,7 +3,7 @@
 - Branch: `examples/strong-showcase`
 - PR: #72
 - Owner: Codex
-- Status: Design approved; implementation plan ready
+- Status: Implemented and locally verified; PR sync pending
 
 ## Goal
 
@@ -19,9 +19,10 @@ single collective example command.
 - [x] Define input, output, and verification criteria
 - [x] Write example-suite design and case backlog
 - [x] Write implementation plan
-- [ ] Implement in coherent commits
-- [ ] Verify locally
-- [ ] Sync `docs/design/`, `docs/todo/`, and `docs/in_progress/`
+- [x] Implement in coherent commits
+- [x] Verify locally
+- [x] Sync local `docs/todo/` and `docs/in_progress/` status
+- [ ] Sync PR body / remote state after review
 
 ## Input
 
@@ -106,9 +107,9 @@ when relevant.
 
 | Case | Source Inspiration | Features Shown | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `scf_piecewise_accumulate` | xDSL/MLIR SCF `if`/`for` examples and interpreter tests | nested SCF, semantic execution, loop trace records, parse/print, action evidence | planned | Current semantics should execute `func`, `arith`, and `scf.for`; branch support must be verified before implementation. |
-| `affine_stencil_tile` | xDSL affine dialect and lower-affine tests; MLIR affine memory-access idioms | affine maps, min/max, scalar/vector access facts, memory effects, lowering evidence | planned | Concrete memory execution is out of scope unless already supported. |
-| `action_cleanup_pipeline` | xDSL rewrite/canonicalization examples and transform tests | canonicalization, CSE, SCCP-style facts, DCE, mutation evidence, final IR | planned | Must use only currently implemented IntelliC action behavior. |
+| `scf_piecewise_accumulate` | xDSL/MLIR SCF `if`/`for` examples and interpreter tests | nested SCF, branch reachability, loop/action records, parse/print, documented semantic gap | implemented | Branch reachability/action records are implemented; `scf.if` concrete execution remains documented as a current gap. |
+| `affine_stencil_tile` | xDSL affine dialect and lower-affine tests; MLIR affine memory-access idioms | affine maps, min/max, scalar/vector access facts, memory effects, lowering evidence | implemented | Affine fact and lowering evidence is implemented; concrete memory execution remains documented as a current gap. |
+| `action_cleanup_pipeline` | xDSL rewrite/canonicalization examples and transform tests | canonicalization, CSE, SCCP-style facts, DCE, inline evidence, mutation evidence, semantic preservation | implemented | Final cleanup state is reported separately from historical call/liveness evidence; uses only currently implemented action behavior. |
 | `scf_while_state_machine` | MLIR/xDSL SCF while examples | while/condition/after region contracts and execution evidence | deferred | Document as a future case if current semantic execution is not sufficient. |
 | `affine_loop_nest_execution` | MLIR affine loop examples | nested affine loop execution and access legality | deferred | Current affine support records facts/lowering evidence but does not execute affine loops. |
 | `vector_compute_pipeline` | MLIR vector examples | vector compute semantics and transformations | deferred | Current vector support is type/access-oriented, not full vector computation. |
@@ -138,6 +139,49 @@ python -m examples.scf_piecewise_accumulate
 python -m examples.affine_stencil_tile
 python -m examples.action_cleanup_pipeline
 ```
+
+## Implementation Verification
+
+Task 5 verification commands:
+
+```bash
+python -m unittest tests/test_examples.py
+python -m unittest discover -s tests
+python scripts/check_repo_harness.py
+python -m examples.scf_piecewise_accumulate
+python -m examples.affine_stencil_tile
+python -m examples.action_cleanup_pipeline
+git diff --check
+```
+
+Observed results from the Task 5 local verification run:
+
+- `python -m unittest tests/test_examples.py`: exit 0; `Ran 6 tests in 0.016s`;
+  `OK`.
+- `python -m unittest discover -s tests`: exit 0; `Ran 138 tests in 0.129s`;
+  `OK`.
+- `python scripts/check_repo_harness.py`: exit 0; `repo harness policy passed`.
+- `python -m examples.scf_piecewise_accumulate`: exit 0; printed
+  `canonical_ir:`, `parse_print_idempotent: true`, actions
+  `verify-structure, sparse-constant-propagation, loop-invariant-code-motion`,
+  `BranchReachability: 2`, `ThenReachable: 1`, `ElseReachable: 1`, and the
+  documented `scf.if concrete execution is not implemented` gap.
+- `python -m examples.affine_stencil_tile`: exit 0; printed `canonical_ir:`,
+  `parse_print_idempotent: true`, actions
+  `verify-structure, common-subexpression-elimination, lower-affine-to-scf`,
+  `UniqueAffineAccess: 7`, `UniqueMemoryEffect: 7`, `ReadAccess: 4`,
+  `WriteAccess: 3`, `UniqueAffineExpansion: 9`, and the documented
+  `affine concrete memory execution is not implemented` gap.
+- `python -m examples.action_cleanup_pipeline`: exit 0; printed
+  `canonical_ir:`, `parse_print_idempotent: true`, `semantic_result: (5,)`,
+  actions `verify-structure, canonicalize-greedy,
+  common-subexpression-elimination, sparse-constant-propagation,
+  symbol-dce-and-dead-code, inline-single-call, symbol-dce-and-dead-code`,
+  `MutationApplied: 6`, `MutationRejected: 0`, historical call/liveness
+  evidence, and a `final_ir:` section with `FinalFuncCallOps: 0`,
+  `FinalIdentitySymbols: 0`, `FinalDeadPrivateSymbols: 0`, and
+  `FinalZeroConstants: 0`.
+- `git diff --check`: exit 0; no whitespace errors.
 
 ## Docs
 
