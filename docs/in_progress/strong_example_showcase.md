@@ -3,7 +3,7 @@
 - Branch: `examples/strong-showcase`
 - PR: #72
 - Owner: Codex
-- Status: Design approved; implementation plan pending
+- Status: Design approved; implementation plan ready
 
 ## Goal
 
@@ -18,6 +18,7 @@ single collective example command.
 
 - [x] Define input, output, and verification criteria
 - [x] Write example-suite design and case backlog
+- [x] Write implementation plan
 - [ ] Implement in coherent commits
 - [ ] Verify locally
 - [ ] Sync `docs/design/`, `docs/todo/`, and `docs/in_progress/`
